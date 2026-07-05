@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#131114">
+<title>GuitarLab — Practice Companion (alpha)</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#127928;</text></svg>">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <svg width="22" height="26" viewBox="0 0 22 26" aria-hidden="true">
+      <defs><linearGradient id="pick-g" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#ffc272"/><stop offset="1" stop-color="#e8912a"/>
+      </linearGradient></defs>
+      <path d="M11 25C6.5 21 1 15.5 1 9.5 1 4.5 5.5 1 11 1s10 3.5 10 8.5C21 15.5 15.5 21 11 25Z"
+            fill="url(#pick-g)" stroke="rgba(255,214,160,0.55)" stroke-width="1"/>
+    </svg>
+    Guitar<em>Lab</em> <span class="tag">alpha</span>
+  </div>
+  <nav class="tabs" id="tabs">
+    <button class="tab" data-panel="metronome">Metronome</button>
+    <button class="tab" data-panel="fretboard">Fretboard</button>
+    <button class="tab" data-panel="chords">Chords</button>
+    <button class="tab" data-panel="tuner">Tuner</button>
+    <button class="tab" data-panel="trainer">Trainer</button>
+  </nav>
+</header>
+<main>
+  <section class="panel" id="panel-metronome"></section>
+  <section class="panel" id="panel-fretboard"></section>
+  <section class="panel" id="panel-chords"></section>
+  <section class="panel" id="panel-tuner"></section>
+  <section class="panel" id="panel-trainer"></section>
+</main>
+<footer class="foot">
+  GuitarLab alpha &mdash; everything runs locally in your browser. Sound starts after your first click (browser autoplay policy). The Tuner needs microphone permission.
+</footer>
+<script src="js/theory.js"></script>
+<script src="js/app.js"></script>
+<script src="js/metronome.js"></script>
+<script src="js/fretboard.js"></script>
+<script src="js/chords.js"></script>
+<script src="js/tuner.js"></script>
+<script src="js/trainer.js"></script>
+<script>
+App.boot();
+// Offline support — only meaningful when served over http(s); file:// and
+// sandboxed embeds skip it silently.
+if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+  navigator.serviceWorker.register('sw.js').catch(function () { /* non-fatal */ });
+}
+</script>
+</body>
+</html>
