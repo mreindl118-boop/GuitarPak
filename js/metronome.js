@@ -204,6 +204,7 @@
     els.bpmDisplay.textContent = String(v);
     els.slider.value = String(v);
     App.store.set('met.bpm', v);
+    App.emit('tempo', { bpm: v, source: 'met' }); // fretboard practice follows
   }
 
   function tap() {
@@ -510,6 +511,12 @@
 
     buildDots();
     updateTrainerStatus();
+
+    // follow tempo changes made elsewhere (fretboard practice strip)
+    App.on('tempo', function (d) {
+      if (d.source === 'met') return;
+      if (d.bpm !== bpm) setBpm(d.bpm);
+    });
   }
 
   App.register('metronome', {

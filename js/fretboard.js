@@ -479,7 +479,12 @@
         }
       }
     }
-    return path;
+    // Adjacent strings overlap inside the window, so the same PITCH can appear
+    // twice (e.g. the 5th of G major: G-string fret 7 and B-string fret 3).
+    // Sort by pitch and keep one position per pitch — the lower-string
+    // fingering, which keeps the hand moving string to string.
+    path.sort(function (a, b) { return a.midi - b.midi || a.s - b.s; });
+    return path.filter(function (n, i) { return i === 0 || n.midi !== path[i - 1].midi; });
   }
 
   // expand the path into an index sequence for the chosen pattern
@@ -657,7 +662,8 @@
 
   function prWire() {
     pr.pattern = App.store.get('fb.pr.pattern', 'up');
-    pr.bpm = App.store.get('fb.pr.bpm', 80);
+    // tempo is SHARED with the metronome — met.bpm is the single source of truth
+    pr.bpm = Math.max(30, Math.min(280, parseInt(App.store.get('met.bpm', 100), 10) || 100));
     pr.rate = App.store.get('fb.pr.rate', 1);
     pr.sound = !!App.store.get('fb.pr.sound', true);
     pr.click = !!App.store.get('fb.pr.click', true);
@@ -683,10 +689,18 @@
     });
     bpm.addEventListener('change', function () {
       var v = parseInt(this.value, 10);
-      if (isNaN(v)) v = 80;
-      pr.bpm = Math.max(30, Math.min(240, v));
+      if (isNaN(v)) v = 100;
+      pr.bpm = Math.max(30, Math.min(280, v));
       this.value = String(pr.bpm);
-      App.store.set('fb.pr.bpm', pr.bpm); // takes effect on the next scheduled note
+      App.store.set('met.bpm', pr.bpm); // shared tempo — metronome follows
+      App.emit('tempo', { bpm: pr.bpm, source: 'fb' });
+    });
+
+    // follow tempo changes made on the metronome tab (incl. its tempo trainer)
+    App.on('tempo', function (d) {
+      if (d.source === 'fb') return;
+      pr.bpm = Math.max(30, Math.min(280, d.bpm)); // next scheduled note uses it
+      bpm.value = String(pr.bpm);
     });
     rate.addEventListener('change', function () {
       var v = parseInt(this.value, 10);
@@ -858,7 +872,7 @@
             '<option value="thirds">Thirds</option>' +
             '<option value="random">Random note</option>' +
           '</select>' +
-          '<input type="number" id="fb-pr-bpm" min="30" max="240" step="1" title="Practice tempo (BPM)" style="width:70px">' +
+          '<input type="number" id="fb-pr-bpm" min="30" max="280" step="1" title="Tempo (BPM) — linked to the metronome" style="width:70px">' +
           '<select id="fb-pr-rate" title="Notes per beat">' +
             '<option value="1">1 / beat</option>' +
             '<option value="2">8ths</option>' +

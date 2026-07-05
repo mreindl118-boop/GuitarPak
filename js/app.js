@@ -26,7 +26,7 @@ window.App = (function () {
   // ---- auto-update ----
   // version.json on GitHub is the source of truth. Web builds refresh through
   // the service worker; the APK build (file://) links to the new APK download.
-  var APP_VERSION = '0.4.0';
+  var APP_VERSION = '0.4.1';
   var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
 
   function verNum(v) {
@@ -148,6 +148,20 @@ window.App = (function () {
     }
   };
 
+  // ---- tiny event bus (cross-module links, e.g. shared tempo) ----
+  var busListeners = {};
+
+  function on(evt, fn) {
+    (busListeners[evt] = busListeners[evt] || []).push(fn);
+  }
+
+  function emit(evt, data) {
+    var list = busListeners[evt] || [];
+    for (var i = 0; i < list.length; i++) {
+      try { list[i](data); } catch (e) { console.error('bus:' + evt, e); }
+    }
+  }
+
   function injectCSS(id, cssText) {
     if (document.getElementById('css-' + id)) return;
     var s = document.createElement('style');
@@ -238,6 +252,8 @@ window.App = (function () {
     getAudio: getAudio,
     pluck: pluck,
     store: store,
+    on: on,
+    emit: emit,
     injectCSS: injectCSS,
     switchTo: switchTo,
     boot: boot,
