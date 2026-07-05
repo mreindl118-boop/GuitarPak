@@ -160,9 +160,15 @@
     var H = TOP + 5 * GAP + NUM_H;
     var lefty = state.lefty;
 
-    function fx(x) { return lefty ? W - x : x; }
+    // The board is laid out in "horizontal neck" coordinates (x = along the
+    // neck, y = across the strings) and then the WHOLE group — letters
+    // included — is rotated 90° clockwise, so on screen the nut sits at the
+    // top, the neck runs down, low E lands on the left, and labels read
+    // along the neck from the low-string side up to the high strings.
+    function fx(x) { return x; }
     function colCX(f) { return f === 0 ? LABEL_W + OPEN_W / 2 : nutX + (f - 0.5) * FRET_W; }
-    function rowY(r) { return TOP + r * GAP; }
+    // left-handed mirrors the STRING order (across the neck), keeping text readable
+    function rowY(r) { return TOP + (lefty ? 5 - r : r) * GAP; }
 
     var win = null;
     if (isPent() && state.pos > 0) win = boxWindow(state.pos, info.pcSet);
@@ -172,14 +178,13 @@
     var s = [];
     var r, f, i, x;
 
-    // no fixed width/height — the viewBox plus CSS (width:100%) auto-fits the
-    // whole neck to the screen width at any fret count / orientation
-    s.push('<svg id="fb-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + W + ' ' + H +
+    // rotated 90° cw: the on-screen viewBox is H wide and W tall (neck runs down)
+    s.push('<svg id="fb-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + H + ' ' + W +
       '" role="img" aria-label="Fretboard diagram">');
+    s.push('<g id="fb-rot" transform="rotate(90) translate(0,-' + H + ')">');
 
     // board background
-    var bx = lefty ? W - (nutX + N * FRET_W) : nutX;
-    s.push('<rect x="' + bx + '" y="' + boardTop + '" width="' + (N * FRET_W) +
+    s.push('<rect x="' + nutX + '" y="' + boardTop + '" width="' + (N * FRET_W) +
       '" height="' + (boardBot - boardTop) + '" rx="4" fill="var(--panel)"/>');
 
     // inlay markers
@@ -263,9 +268,9 @@
       }
     }
 
-    s.push('</svg>');
-    vb.w = W;
-    vb.h = H;
+    s.push('</g></svg>');
+    vb.w = H;  // on-screen width  = across the strings
+    vb.h = W;  // on-screen height = along the neck
     var keepX = els.scroll.scrollLeft;
     var keepY = els.scroll.scrollTop;
     els.scroll.innerHTML = s.join('');
@@ -285,15 +290,20 @@
   var ZMAX = 3.5;
   var suppressClick = false; // true briefly after pan / pinch / double-tap
 
+  var BASE_MAX_W = 520; // cap so wide desktop stages don't blow the board up
+
   function baseWidth(wrap) {
-    // pixel width at which the SVG fills the stage height (never below width-fit)
+    // zoom 1 = the six strings span the stage width; the neck runs past the
+    // bottom edge and scrolls vertically
     if (!vb.w || !wrap || !wrap.clientWidth) return 0;
-    return Math.max(wrap.clientWidth, (wrap.clientHeight - 8) * vb.w / vb.h);
+    return Math.min(wrap.clientWidth, BASE_MAX_W);
   }
 
   function minZoom(wrap) {
+    // smallest zoom = the whole neck visible inside the stage height
     var bw = baseWidth(wrap);
-    return bw > 0 ? Math.min(1, wrap.clientWidth / bw) : 1;
+    if (bw <= 0 || !vb.h) return 1;
+    return Math.min(1, ((wrap.clientHeight - 8) * vb.w / vb.h) / bw);
   }
 
   function applyZoom() {
@@ -302,7 +312,7 @@
     if (!svg || !wrap) return;
     var bw = baseWidth(wrap);
     if (bw <= 0) return; // panel hidden — onShow re-applies
-    var mz = Math.min(1, wrap.clientWidth / bw);
+    var mz = minZoom(wrap);
     if (zoom < mz) zoom = mz;
     svg.style.width = Math.round(bw * zoom) + 'px';
     var lbl = document.getElementById('fb-zlabel');
@@ -472,7 +482,8 @@
     flashEl.setAttribute('stroke', 'var(--accent)');
     flashEl.setAttribute('stroke-width', '2.5');
     flashEl.setAttribute('class', 'fb-flash');
-    svg.appendChild(flashEl);
+    // coordinates are in pre-rotation space — attach inside the rotated group
+    (document.getElementById('fb-rot') || svg).appendChild(flashEl);
     flashTimer = setTimeout(clearFlash, 400);
   }
 
@@ -569,7 +580,7 @@
           '<div class="row tight fb-legend" id="fb-legend"></div>' +
           '<h3 id="fb-info-title"></h3>' +
           '<div class="row tight" id="fb-info-notes"></div>' +
-          '<div class="muted small" style="margin-top:12px">Drag to pan &middot; pinch or Ctrl+scroll to zoom &middot; double-tap toggles whole-neck view</div>' +
+          '<div class="muted small" style="margin-top:12px">Scroll down the neck &middot; pinch or Ctrl+scroll to zoom &middot; double-tap toggles whole-neck view</div>' +
         '</div>' +
       '</div>';
 

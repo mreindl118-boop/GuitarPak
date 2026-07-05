@@ -1,5 +1,5 @@
 {
-  "version": "0.2.1",
+  "version": "0.3.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "Metronome keeps playing while you use other tabs (fretboard, tuner); stops when the app is minimized. Pulsing indicator on the Metronome tab while running."
+  "notes": "Vertical fretboard: nut at the top, neck scrolls down the screen, low E on the left, labels read along the neck. Left-handed mode mirrors the string order."
 }
