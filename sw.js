@@ -1,5 +1,5 @@
 /* GuitarLab service worker — cache-first so the app works fully offline once visited. */
-var CACHE = 'guitarlab-v6';
+var CACHE = 'guitarlab-v7';
 var ASSETS = [
   '.',
   'index.html',
@@ -39,6 +39,8 @@ self.addEventListener('activate', function (e) {
 
 self.addEventListener('fetch', function (e) {
   if (e.request.method !== 'GET') return;
+  // never intercept cross-origin requests (e.g. the version.json update check)
+  if (e.request.url.indexOf(self.location.origin) !== 0) return;
   e.respondWith(
     caches.match(e.request, { ignoreSearch: true }).then(function (hit) {
       return hit || fetch(e.request).then(function (res) {

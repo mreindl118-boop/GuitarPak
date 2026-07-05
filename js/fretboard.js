@@ -11,7 +11,7 @@
     root: 9,              // pitch class, default A
     scale: 'minorPent',
     tuning: 'standard',
-    frets: 12,            // 12 | 15 | 22
+    frets: 24,            // 12 | 15 | 22 | 24
     display: 'notes',     // notes | intervals | degrees
     lefty: false,
     pos: 0                // pentatonic box: 0 = All, 1..5 = box N (not persisted)
@@ -65,8 +65,8 @@
     if (Theory.SCALES[sc]) state.scale = sc;
     var tu = App.store.get('fb.tuning', 'standard');
     if (Theory.TUNINGS[tu]) state.tuning = tu;
-    var fr = App.store.get('fb.frets', 12);
-    if (fr === 12 || fr === 15 || fr === 22) state.frets = fr;
+    var fr = App.store.get('fb.frets', 24);
+    if (fr === 12 || fr === 15 || fr === 22 || fr === 24) state.frets = fr;
     var d = App.store.get('fb.display', 'notes');
     if (d === 'notes' || d === 'intervals' || d === 'degrees') state.display = d;
     state.lefty = !!App.store.get('fb.lefty', false);
@@ -264,38 +264,65 @@
     }
 
     s.push('</svg>');
-    var keepScroll = els.scroll.scrollLeft;
+    vb.w = W;
+    vb.h = H;
+    var keepX = els.scroll.scrollLeft;
+    var keepY = els.scroll.scrollTop;
     els.scroll.innerHTML = s.join('');
     applyZoom();
-    els.scroll.scrollLeft = keepScroll;
+    els.scroll.scrollLeft = keepX;
+    els.scroll.scrollTop = keepY;
   }
 
   // ---- fluid pan/zoom viewport ----
-  // Native horizontal scrolling supplies panning + momentum; zoom scales the
-  // SVG's CSS width (100% = whole neck fits the container).
+  // The stage is a fixed-height 2D scroll container. zoom = 1 sizes the SVG so
+  // the strings FILL the stage height (the neck extends past the right edge and
+  // scrolls); minZoom shrinks until the whole neck fits the width. Native
+  // scrolling supplies panning + momentum in both axes.
 
+  var vb = { w: 0, h: 0 };  // current SVG viewBox size
   var zoom = 1;
-  var ZMIN = 1, ZMAX = 3.5;
+  var ZMAX = 3.5;
   var suppressClick = false; // true briefly after pan / pinch / double-tap
+
+  function baseWidth(wrap) {
+    // pixel width at which the SVG fills the stage height (never below width-fit)
+    if (!vb.w || !wrap || !wrap.clientWidth) return 0;
+    return Math.max(wrap.clientWidth, (wrap.clientHeight - 8) * vb.w / vb.h);
+  }
+
+  function minZoom(wrap) {
+    var bw = baseWidth(wrap);
+    return bw > 0 ? Math.min(1, wrap.clientWidth / bw) : 1;
+  }
 
   function applyZoom() {
     var svg = document.getElementById('fb-svg');
-    if (svg) svg.style.width = (zoom * 100) + '%';
+    var wrap = els.scroll;
+    if (!svg || !wrap) return;
+    var bw = baseWidth(wrap);
+    if (bw <= 0) return; // panel hidden — onShow re-applies
+    var mz = Math.min(1, wrap.clientWidth / bw);
+    if (zoom < mz) zoom = mz;
+    svg.style.width = Math.round(bw * zoom) + 'px';
     var lbl = document.getElementById('fb-zlabel');
     if (lbl) lbl.textContent = Math.round(zoom * 100) + '%';
   }
 
-  // Zoom keeping the content point under anchorClientX fixed on screen.
-  function setZoom(z, anchorClientX) {
-    z = Math.max(ZMIN, Math.min(ZMAX, z));
+  // Zoom keeping the content point under (anchorClientX, anchorClientY) fixed.
+  function setZoom(z, anchorClientX, anchorClientY) {
     var wrap = els.scroll;
+    z = Math.max(minZoom(wrap), Math.min(ZMAX, z));
     var rect = wrap.getBoundingClientRect();
-    var midX = anchorClientX == null ? rect.width / 2 : anchorClientX - rect.left;
-    var contentX = wrap.scrollLeft + midX;
+    var mx = anchorClientX == null ? rect.width / 2 : anchorClientX - rect.left;
+    var my = anchorClientY == null ? rect.height / 2 : anchorClientY - rect.top;
+    var cx = wrap.scrollLeft + mx;
+    var cy = wrap.scrollTop + my;
     var k = z / zoom;
     zoom = z;
     applyZoom();
-    wrap.scrollLeft = contentX * k - midX;
+    wrap.scrollLeft = cx * k - mx;
+    wrap.scrollTop = cy * k - my;
   }
 
   function endGesture() {
@@ -323,8 +350,9 @@
         e.preventDefault(); // our zoom, not the browser's page zoom
         var d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX,
                            e.touches[0].clientY - e.touches[1].clientY);
-        var mid = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-        if (pinch.d0 > 0) setZoom(pinch.z0 * d / pinch.d0, mid);
+        var midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+        var midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        if (pinch.d0 > 0) setZoom(pinch.z0 * d / pinch.d0, midX, midY);
       }
     }, { passive: false });
 
@@ -333,14 +361,17 @@
         if (e.touches.length === 0) { pinch = null; endGesture(); }
         return;
       }
-      // double-tap toggles fit <-> 220%, centred on the tap
+      // double-tap toggles whole-neck fit <-> fill-height, centred on the tap
       if (e.changedTouches.length === 1 && e.touches.length === 0) {
         var x = e.changedTouches[0].clientX;
+        var y = e.changedTouches[0].clientY;
         var now = Date.now();
         if (now - lastTap.t < 320 && Math.abs(x - lastTap.x) < 44) {
           e.preventDefault();
           endGesture();
-          setZoom(zoom > 1.05 ? 1 : 2.2, x);
+          var fitZ = minZoom(wrap);
+          if (fitZ >= 0.999) setZoom(zoom > 1.05 ? 1 : 2.2, x, y);
+          else setZoom(zoom > fitZ * 1.05 ? fitZ : 1, x, y);
           lastTap.t = 0;
         } else {
           lastTap.t = now;
@@ -353,24 +384,35 @@
     wrap.addEventListener('wheel', function (e) {
       if (!e.ctrlKey) return;
       e.preventDefault();
-      setZoom(zoom * Math.exp(-e.deltaY * 0.0022), e.clientX);
+      setZoom(zoom * Math.exp(-e.deltaY * 0.0022), e.clientX, e.clientY);
     }, { passive: false });
 
     // mouse drag to pan (click-to-pluck still works via the moved threshold)
     var drag = null;
     wrap.addEventListener('mousedown', function (e) {
       if (e.button !== 0) return;
-      drag = { x: e.clientX, sl: wrap.scrollLeft, moved: false };
+      drag = { x: e.clientX, y: e.clientY, sl: wrap.scrollLeft, st: wrap.scrollTop, moved: false };
     });
     window.addEventListener('mousemove', function (e) {
       if (!drag) return;
       var dx = e.clientX - drag.x;
-      if (Math.abs(dx) > 5) drag.moved = true;
-      if (drag.moved) wrap.scrollLeft = drag.sl - dx;
+      var dy = e.clientY - drag.y;
+      if (Math.abs(dx) > 5 || Math.abs(dy) > 5) drag.moved = true;
+      if (drag.moved) {
+        wrap.scrollLeft = drag.sl - dx;
+        wrap.scrollTop = drag.st - dy;
+      }
     });
     window.addEventListener('mouseup', function () {
       if (drag && drag.moved) endGesture();
       drag = null;
+    });
+
+    // keep the fill-height sizing correct across rotations / window resizes
+    var rsTimer = null;
+    window.addEventListener('resize', function () {
+      if (rsTimer) clearTimeout(rsTimer);
+      rsTimer = setTimeout(applyZoom, 120);
     });
   }
 
@@ -394,6 +436,7 @@
       return;
     }
     els.infoTitle.textContent = Theory.pcName(state.root, pf) + ' ' + Theory.SCALES[state.scale].name + ':';
+    if (els.title) els.title.textContent = Theory.pcName(state.root, pf) + ' ' + Theory.SCALES[state.scale].name;
     var h = '';
     for (var i = 0; i < info.names.length; i++) {
       h += '<span class="fb-note' + (i === 0 ? ' fb-note-root' : '') + '"><b>' + info.names[i] +
@@ -447,11 +490,24 @@
   function init(rootEl) {
     App.injectCSS('fretboard',
       '.fb-field{display:inline-flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--muted);font-weight:600}' +
-      '.fb-scroll{padding:2px 0;overflow-x:auto;overscroll-behavior-x:contain;' +
-        'touch-action:pan-x pan-y;cursor:grab;scrollbar-width:thin;-webkit-overflow-scrolling:touch}' +
+      '.fb-board{position:relative;display:flex;flex-direction:column;gap:10px}' +
+      '.fb-board.fb-max{position:fixed;inset:0;z-index:200;margin:0;border-radius:0;padding:10px 14px}' +
+      '.fb-toolbar{flex:0 0 auto}' +
+      '.fb-title{font-family:var(--font-display);font-size:19px;font-weight:600;letter-spacing:1px;' +
+        'text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:42vw}' +
+      '.fb-gearbtn{font-size:17px;line-height:1;padding:6px 10px}' +
+      '.fb-scroll{flex:1 1 auto;min-height:0;display:flex;overflow:auto;overscroll-behavior:contain;' +
+        'touch-action:pan-x pan-y;cursor:grab;scrollbar-width:thin;-webkit-overflow-scrolling:touch;' +
+        'height:calc(100vh - 340px);height:calc(100dvh - 340px);min-height:240px}' +
+      '.fb-board.fb-max .fb-scroll{height:auto;min-height:0}' +
       '.fb-scroll:active{cursor:grabbing}' +
-      '.fb-scroll svg{width:100%;height:auto;display:block}' +
-      '.fb-zoomrow{margin-bottom:10px}' +
+      '.fb-scroll svg{width:100%;height:auto;display:block;margin:auto;flex:0 0 auto}' +
+      '.fb-settings{display:none;position:absolute;z-index:6;top:52px;left:10px;right:10px;max-width:760px;' +
+        'margin:0 auto;background:linear-gradient(180deg,#241e22 0%,#1b1619 100%);border:1px solid var(--line);' +
+        'border-radius:12px;padding:16px 18px;box-shadow:0 18px 50px rgba(0,0,0,0.55);' +
+        'max-height:calc(100% - 66px);overflow:auto}' +
+      '.fb-settings.open{display:block}' +
+      '.fb-settings h3{margin-top:14px}' +
       '.fb-hit{cursor:pointer}' +
       '.fb-hit:hover{fill:rgba(255,255,255,0.05)}' +
       '.fb-flash{animation:fb-flash .4s ease-out forwards;pointer-events:none}' +
@@ -476,44 +532,52 @@
     }
     var scaleOpts = Theory.SCALE_ORDER.map(function (id) { return [id, Theory.SCALES[id].name]; });
     var tuningOpts = Theory.TUNING_ORDER.map(function (id) { return [id, Theory.TUNINGS[id].name]; });
-    var fretOpts = [[12, '12'], [15, '15'], [22, '22']];
+    var fretOpts = [[12, '12'], [15, '15'], [22, '22'], [24, '24']];
 
     rootEl.innerHTML =
-      '<div class="card">' +
-        '<div class="row">' +
-          '<label class="field">Root<select id="fb-root">' + buildOptions(rootOpts, state.root) + '</select></label>' +
-          '<label class="field">Scale<select id="fb-scale">' + buildOptions(scaleOpts, state.scale) + '</select></label>' +
-          '<label class="field">Tuning<select id="fb-tuning">' + buildOptions(tuningOpts, state.tuning) + '</select></label>' +
-          '<label class="field">Frets<select id="fb-frets">' + buildOptions(fretOpts, state.frets) + '</select></label>' +
-          '<div class="fb-field">Display' +
-            '<div class="seg" id="fb-display">' +
-              '<button type="button" data-fbmode="notes">Notes</button>' +
-              '<button type="button" data-fbmode="intervals">Intervals</button>' +
-              '<button type="button" data-fbmode="degrees">Degrees</button>' +
-            '</div>' +
-          '</div>' +
-          '<label class="field">Left-handed<input type="checkbox" id="fb-lefty"' + (state.lefty ? ' checked' : '') + '></label>' +
-        '</div>' +
-      '</div>' +
-      '<div class="card">' +
-        '<div class="row tight fb-posrow" id="fb-posrow" style="display:none"></div>' +
-        '<div class="row tight spread fb-zoomrow">' +
-          '<span class="muted small">Drag to pan &middot; pinch or Ctrl+scroll to zoom &middot; double-tap to toggle</span>' +
+      '<div class="card fb-board" id="fb-board">' +
+        '<div class="row tight spread fb-toolbar">' +
+          '<span class="row tight">' +
+            '<button type="button" class="btn sm fb-gearbtn" id="fb-gear" title="Scale &amp; board settings" aria-label="Settings">&#9881;</button>' +
+            '<span class="fb-title" id="fb-title"></span>' +
+          '</span>' +
           '<span class="row tight">' +
             '<button type="button" class="btn sm" id="fb-zout" aria-label="Zoom out">&minus;</button>' +
             '<span class="chip" id="fb-zlabel">100%</span>' +
             '<button type="button" class="btn sm" id="fb-zin" aria-label="Zoom in">+</button>' +
             '<button type="button" class="btn sm" id="fb-zfit">Fit</button>' +
+            '<button type="button" class="btn sm" id="fb-max" title="Fullscreen" aria-label="Fullscreen">&#x26F6;</button>' +
           '</span>' +
         '</div>' +
+        '<div class="row tight fb-posrow" id="fb-posrow" style="display:none"></div>' +
         '<div class="fb-scroll" id="fb-scroll"></div>' +
-        '<div class="row tight fb-legend" id="fb-legend"></div>' +
-      '</div>' +
-      '<div class="card">' +
-        '<h2 id="fb-info-title"></h2>' +
-        '<div class="row tight" id="fb-info-notes"></div>' +
+        '<div class="fb-settings" id="fb-settings">' +
+          '<div class="row">' +
+            '<label class="field">Root<select id="fb-root">' + buildOptions(rootOpts, state.root) + '</select></label>' +
+            '<label class="field">Scale<select id="fb-scale">' + buildOptions(scaleOpts, state.scale) + '</select></label>' +
+            '<label class="field">Tuning<select id="fb-tuning">' + buildOptions(tuningOpts, state.tuning) + '</select></label>' +
+            '<label class="field">Frets<select id="fb-frets">' + buildOptions(fretOpts, state.frets) + '</select></label>' +
+            '<div class="fb-field">Display' +
+              '<div class="seg" id="fb-display">' +
+                '<button type="button" data-fbmode="notes">Notes</button>' +
+                '<button type="button" data-fbmode="intervals">Intervals</button>' +
+                '<button type="button" data-fbmode="degrees">Degrees</button>' +
+              '</div>' +
+            '</div>' +
+            '<label class="field">Left-handed<input type="checkbox" id="fb-lefty"' + (state.lefty ? ' checked' : '') + '></label>' +
+          '</div>' +
+          '<div class="row tight fb-legend" id="fb-legend"></div>' +
+          '<h3 id="fb-info-title"></h3>' +
+          '<div class="row tight" id="fb-info-notes"></div>' +
+          '<div class="muted small" style="margin-top:12px">Drag to pan &middot; pinch or Ctrl+scroll to zoom &middot; double-tap toggles whole-neck view</div>' +
+        '</div>' +
       '</div>';
 
+    els.board = document.getElementById('fb-board');
+    els.settings = document.getElementById('fb-settings');
+    els.gear = document.getElementById('fb-gear');
+    els.maxBtn = document.getElementById('fb-max');
+    els.title = document.getElementById('fb-title');
     els.root = document.getElementById('fb-root');
     els.scaleSel = document.getElementById('fb-scale');
     els.tuningSel = document.getElementById('fb-tuning');
@@ -547,7 +611,7 @@
     });
     els.fretsSel.addEventListener('change', function () {
       var v = parseInt(this.value, 10);
-      if (v === 12 || v === 15 || v === 22) state.frets = v;
+      if (v === 12 || v === 15 || v === 22 || v === 24) state.frets = v;
       saveState();
       renderBoard();
     });
@@ -576,11 +640,21 @@
 
     document.getElementById('fb-zout').addEventListener('click', function () { setZoom(zoom / 1.3); });
     document.getElementById('fb-zin').addEventListener('click', function () { setZoom(zoom * 1.3); });
-    document.getElementById('fb-zfit').addEventListener('click', function () { setZoom(1); });
+    document.getElementById('fb-zfit').addEventListener('click', function () { setZoom(minZoom(els.scroll)); });
+    els.gear.addEventListener('click', function () {
+      els.settings.classList.toggle('open');
+    });
+    els.maxBtn.addEventListener('click', function () { setMax(!maxMode); });
+    document.addEventListener('fullscreenchange', function () {
+      // system back / Esc exits native fullscreen — drop the overlay with it
+      if (!document.fullscreenElement && maxMode && usedNativeFs) setMax(false);
+      applyZoom();
+    });
     wireViewport();
 
     // one delegated listener survives every board re-render
     els.scroll.addEventListener('click', function (e) {
+      if (els.settings.classList.contains('open')) { els.settings.classList.remove('open'); return; }
       if (suppressClick) return; // tail end of a pan / pinch / double-tap
       var hit = e.target.closest ? e.target.closest('.fb-hit') : null;
       if (!hit) return;
@@ -598,12 +672,53 @@
     renderAll();
   }
 
+  // ---------------- fullscreen ("theater") mode ----------------
+  // CSS overlay always works (WebView, artifact, desktop); native fullscreen +
+  // landscape orientation lock are attempted on top where supported.
+
+  var maxMode = false;
+  var usedNativeFs = false;
+
+  function setMax(on) {
+    maxMode = on;
+    els.board.classList.toggle('fb-max', on);
+    els.maxBtn.innerHTML = on ? '&#10005;' : '&#x26F6;';
+    els.maxBtn.title = on ? 'Exit fullscreen' : 'Fullscreen';
+    document.body.style.overflow = on ? 'hidden' : '';
+    if (on) {
+      if (els.board.requestFullscreen) {
+        els.board.requestFullscreen().then(function () {
+          usedNativeFs = true;
+          if (screen.orientation && screen.orientation.lock) {
+            screen.orientation.lock('landscape').catch(function () {});
+          }
+        }).catch(function () { usedNativeFs = false; });
+      }
+    } else {
+      usedNativeFs = false;
+      if (document.fullscreenElement && document.exitFullscreen) {
+        document.exitFullscreen().catch(function () {});
+      }
+      if (screen.orientation && screen.orientation.unlock) {
+        try { screen.orientation.unlock(); } catch (e) { /* not locked */ }
+      }
+    }
+    applyZoom();
+  }
+
+  function onShow() {
+    applyZoom(); // stage had zero size while the tab was hidden
+  }
+
   function onHide() {
     clearFlash(); // plucked notes decay on their own (~1.2 s envelope in App.pluck)
+    if (maxMode) setMax(false);
+    if (els.settings) els.settings.classList.remove('open');
   }
 
   App.register('fretboard', {
     init: init,
+    onShow: onShow,
     onHide: onHide
   });
 })();

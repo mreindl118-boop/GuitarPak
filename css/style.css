@@ -507,6 +507,26 @@ svg text { user-select: none; }
 ::-webkit-scrollbar-thumb { background: #322a2d; border-radius: 5px; }
 ::-webkit-scrollbar-thumb:hover { background: #453b3e; }
 
+/* update banner */
+#app-update {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 18px;
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: linear-gradient(180deg, #2a2427 0%, #1e191c 100%);
+  border: 1px solid rgba(255, 171, 71, 0.55);
+  border-radius: 12px;
+  padding: 10px 16px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55), 0 0 18px rgba(255, 171, 71, 0.12);
+  font-size: 14px;
+  max-width: calc(100vw - 24px);
+  flex-wrap: wrap;
+}
+
 /* ---------- small screens ---------- */
 
 @media (max-width: 640px) {

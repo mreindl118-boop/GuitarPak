@@ -1,0 +1,5 @@
+{
+  "version": "0.2.0",
+  "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
+  "notes": "Fretboard overhaul: fullscreen landscape stage, 24 frets, gear settings drawer. Auto-update checks on web and Android."
+}

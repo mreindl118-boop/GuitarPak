@@ -2,18 +2,22 @@ package com.mreindl.guitarlab;
 
 import android.Manifest;
 import android.app.Activity;
+import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.webkit.PermissionRequest;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
+import android.webkit.WebViewClient;
 
 /**
  * GuitarLab wrapper: a full-screen WebView serving the bundled web app from
- * assets. The only native concern is bridging the WebView's microphone
- * request (tuner tab) to Android's runtime RECORD_AUDIO permission.
+ * assets. Native concerns: bridging the WebView's microphone request (tuner
+ * tab) to Android's runtime RECORD_AUDIO permission, and sending external
+ * links (e.g. the auto-updater's APK download) to the system browser.
  */
 public class MainActivity extends Activity {
 
@@ -51,6 +55,17 @@ public class MainActivity extends Activity {
                     }
                 }
                 request.deny();
+            }
+        });
+
+        web.setWebViewClient(new WebViewClient() {
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, String url) {
+                if (url.startsWith("file://")) return false; // in-app navigation
+                try {
+                    startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+                } catch (Exception ignored) { /* no handler for this URL */ }
+                return true;
             }
         });
 

@@ -23,6 +23,66 @@ window.App = (function () {
   var audioCtx = null;
   var PANEL_ORDER = ['metronome', 'fretboard', 'chords', 'tuner', 'trainer'];
 
+  // ---- auto-update ----
+  // version.json on GitHub is the source of truth. Web builds refresh through
+  // the service worker; the APK build (file://) links to the new APK download.
+  var APP_VERSION = '0.2.0';
+  var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
+
+  function verNum(v) {
+    var p = String(v).split('-')[0].split('.');
+    return (parseInt(p[0], 10) || 0) * 1e6 + (parseInt(p[1], 10) || 0) * 1e3 + (parseInt(p[2], 10) || 0);
+  }
+
+  function checkForUpdate() {
+    if (typeof fetch !== 'function') return;
+    fetch(UPDATE_INFO_URL, { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (info) {
+        if (info && info.version && verNum(info.version) > verNum(APP_VERSION)) showUpdateBanner(info);
+      })
+      .catch(function () { /* offline or blocked (artifact CSP) — retry next launch */ });
+  }
+
+  function showUpdateBanner(info) {
+    if (document.getElementById('app-update')) return;
+    var bar = document.createElement('div');
+    bar.id = 'app-update';
+    var msg = document.createElement('span');
+    msg.textContent = 'GuitarLab v' + String(info.version) + ' is available.';
+    bar.appendChild(msg);
+
+    var go = document.createElement('button');
+    go.className = 'btn sm primary';
+    if (location.protocol === 'file:') {
+      go.textContent = 'Get update';
+      go.onclick = function () {
+        // plain navigation — the APK's WebViewClient routes it to the browser
+        location.href = info.apk || 'https://github.com/mreindl118-boop/GuitarPak';
+      };
+    } else {
+      go.textContent = 'Update now';
+      go.onclick = function () {
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistration().then(function (reg) {
+            if (reg) reg.update();
+            // controllerchange triggers the reload; fall back if it doesn't
+            setTimeout(function () { location.reload(); }, 1500);
+          });
+        } else {
+          location.reload();
+        }
+      };
+    }
+    var later = document.createElement('button');
+    later.className = 'btn sm';
+    later.textContent = 'Later';
+    later.onclick = function () { bar.parentNode.removeChild(bar); };
+    bar.appendChild(go);
+    bar.appendChild(later);
+    document.body.appendChild(bar);
+  }
+
   function register(name, mod) {
     modules[name] = mod;
   }
@@ -139,6 +199,25 @@ window.App = (function () {
     var startTab = store.get('app.tab', 'metronome');
     if (PANEL_ORDER.indexOf(startTab) === -1) startTab = 'metronome';
     switchTo(startTab);
+
+    var foot = document.querySelector('.foot');
+    if (foot) foot.textContent += ' · v' + APP_VERSION;
+
+    // silent web auto-update: when an updated service worker takes control of
+    // a page that already had one, reload once to pick up the new assets
+    if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+      var hadController = !!navigator.serviceWorker.controller;
+      var reloaded = false;
+      navigator.serviceWorker.addEventListener('controllerchange', function () {
+        if (hadController && !reloaded) {
+          reloaded = true;
+          location.reload();
+        }
+      });
+    }
+
+    checkForUpdate();
+    setInterval(checkForUpdate, 4 * 60 * 60 * 1000); // long practice sessions
   }
 
   return {
@@ -149,6 +228,8 @@ window.App = (function () {
     injectCSS: injectCSS,
     switchTo: switchTo,
     boot: boot,
+    version: APP_VERSION,
+    checkForUpdate: checkForUpdate,
     get active() { return active; }
   };
 })();
