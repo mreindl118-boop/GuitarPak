@@ -1,0 +1,2 @@
+# apksigner side-files next to the released APK
+releases/*.idsig

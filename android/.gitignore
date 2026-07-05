@@ -1,0 +1,7 @@
+# build output
+build/
+*.apk
+*.idsig
+
+# signing key — keep private, regenerate with build.ps1 if lost
+*.keystore

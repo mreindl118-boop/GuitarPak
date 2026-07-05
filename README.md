@@ -2,10 +2,11 @@
 
 A guitar practice tool that runs entirely in your browser. No install, no accounts, no internet needed — open `index.html` and play.
 
-## How to run
+## Get it
 
-- **Easiest:** double-click `index.html` (Chrome or Edge recommended — both allow microphone access from local files).
-- **Or serve it:** `python -m http.server 8000` inside this folder, then open http://localhost:8000.
+- **Web (recommended):** https://mreindl118-boop.github.io/GuitarPak/ — installable as a PWA (browser menu → *Add to Home screen*), works offline after first visit, microphone tuner fully functional.
+- **Android APK (sideload):** [Download GuitarLab-alpha.apk](https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk) — allow "install unknown apps" when prompted. Rebuilt by `android/build.ps1`.
+- **Local:** double-click `index.html` (Chrome/Edge allow mic from local files), or `python -m http.server 8000` in this folder.
 
 Sound starts after your first click anywhere (browser autoplay policy). The Tuner tab will ask for microphone permission.
 
@@ -44,6 +45,9 @@ js/fretboard.js     │
 js/chords.js        ├ feature modules — each registers { init, onShow,
 js/tuner.js         │ onHide, onKey } with the shell
 js/trainer.js       ┘
+android/            WebView wrapper APK project (no Gradle — build.ps1 runs
+                    javac → d8 → aapt → zipalign → apksigner)
+releases/           built, signed APK
 ```
 
 ## Roadmap ideas (beyond alpha)
