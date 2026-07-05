@@ -36,6 +36,10 @@ public class MainActivity extends Activity {
         s.setDomStorageEnabled(true);
         s.setMediaPlaybackRequiresUserGesture(false);
         s.setAllowFileAccess(true);
+        // Let the bundled app fetch version.json from GitHub for the startup
+        // update check — WebView blocks network requests from file:// pages
+        // without this. All file:// content here is our own bundled assets.
+        s.setAllowUniversalAccessFromFileURLs(true);
 
         web.setWebChromeClient(new WebChromeClient() {
             @Override

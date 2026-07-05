@@ -1,5 +1,5 @@
 {
-  "version": "0.3.0",
+  "version": "0.3.1",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "Vertical fretboard: nut at the top, neck scrolls down the screen, low E on the left, labels read along the neck. Left-handed mode mirrors the string order."
+  "notes": "Update check now actually works inside the Android app (WebView was blocking it) and re-checks when you come back online or reopen the app."
 }

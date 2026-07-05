@@ -26,7 +26,7 @@ window.App = (function () {
   // ---- auto-update ----
   // version.json on GitHub is the source of truth. Web builds refresh through
   // the service worker; the APK build (file://) links to the new APK download.
-  var APP_VERSION = '0.3.0';
+  var APP_VERSION = '0.3.1';
   var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
 
   function verNum(v) {
@@ -34,14 +34,21 @@ window.App = (function () {
     return (parseInt(p[0], 10) || 0) * 1e6 + (parseInt(p[1], 10) || 0) * 1e3 + (parseInt(p[2], 10) || 0);
   }
 
-  function checkForUpdate() {
+  var lastUpdateCheck = 0;
+
+  function checkForUpdate(force) {
     if (typeof fetch !== 'function') return;
+    var now = Date.now();
+    if (!force && now - lastUpdateCheck < 15 * 60 * 1000) return; // throttle re-checks
+    lastUpdateCheck = now;
     fetch(UPDATE_INFO_URL, { cache: 'no-store' })
       .then(function (r) { return r.json(); })
       .then(function (info) {
         if (info && info.version && verNum(info.version) > verNum(APP_VERSION)) showUpdateBanner(info);
       })
-      .catch(function () { /* offline or blocked (artifact CSP) — retry next launch */ });
+      .catch(function () {
+        lastUpdateCheck = 0; // failed (offline / blocked) — allow an early retry
+      });
   }
 
   function showUpdateBanner(info) {
@@ -216,8 +223,14 @@ window.App = (function () {
       });
     }
 
-    checkForUpdate();
-    setInterval(checkForUpdate, 4 * 60 * 60 * 1000); // long practice sessions
+    // update checks: at every app start, when the network comes back, when the
+    // app returns to the foreground (throttled), and during long sessions
+    checkForUpdate(true);
+    window.addEventListener('online', function () { checkForUpdate(); });
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden) checkForUpdate();
+    });
+    setInterval(function () { checkForUpdate(); }, 4 * 60 * 60 * 1000);
   }
 
   return {
