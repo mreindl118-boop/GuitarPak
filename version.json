@@ -1,5 +1,5 @@
 {
-  "version": "0.3.1",
+  "version": "0.4.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "Update check now actually works inside the Android app (WebView was blocking it) and re-checks when you come back online or reopen the app."
+  "notes": "Practice runner on the fretboard: a glowing ring steps through the scale in time with a click — straight runs, groups of 3-6, thirds, random-note drills — with play/pause, tempo, and note sounds. All boards now default to 24 frets."
 }

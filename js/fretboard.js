@@ -67,6 +67,13 @@
     if (Theory.TUNINGS[tu]) state.tuning = tu;
     var fr = App.store.get('fb.frets', 24);
     if (fr === 12 || fr === 15 || fr === 22 || fr === 24) state.frets = fr;
+    // one-time migration: settings saved before 24 frets existed stay pinned
+    // at the old maximum — bump everyone to the full neck once
+    if (!App.store.get('fb.migr24', false)) {
+      state.frets = 24;
+      App.store.set('fb.frets', 24);
+      App.store.set('fb.migr24', true);
+    }
     var d = App.store.get('fb.display', 'notes');
     if (d === 'notes' || d === 'intervals' || d === 'degrees') state.display = d;
     state.lefty = !!App.store.get('fb.lefty', false);
@@ -146,6 +153,7 @@
   }
 
   function renderBoardInner() {
+    prStop(); // board geometry is changing — any running exercise is invalid
     var N = state.frets;
     var tun = Theory.TUNINGS[state.tuning];
     var pf = preferFlat();
@@ -426,6 +434,280 @@
     });
   }
 
+  // ---------------- practice runner ----------------
+  // Steps through the current scale (in the active position window) in time
+  // with its own click: a glowing ring marks the note to play NOW, a dashed
+  // ring previews the next one. Patterns: straight runs, groups of 3-6,
+  // thirds, and random-note drills.
+
+  var pr = {
+    running: false, idx: 0, seq: null, path: [],
+    pattern: 'up', bpm: 80, rate: 1, sound: true, click: true,
+    timer: null, raf: 0, nextT: 0, vis: [], ctx: null
+  };
+
+  function colCX2(f) {
+    var nutX = LABEL_W + OPEN_W;
+    return f === 0 ? LABEL_W + OPEN_W / 2 : nutX + (f - 0.5) * FRET_W;
+  }
+
+  function rowY2(s) { return TOP + (state.lefty ? s : 5 - s) * GAP; }
+
+  // playable positions: scale tones inside a 5-fret window (pentatonic box if
+  // one is selected, otherwise anchored at the lowest root on the low string)
+  function prPath() {
+    var tun = Theory.TUNINGS[state.tuning];
+    var info = Theory.scaleInfo(state.root, state.scale, preferFlat());
+    if (!info) return [];
+    var win;
+    if (isPent() && state.pos > 0) {
+      win = boxWindow(state.pos, info.pcSet);
+    } else {
+      var t0 = tun.midi[0], rootFret = 0, f;
+      for (f = 0; f < 12; f++) {
+        if (Theory.mod12(t0 + f) === Theory.mod12(state.root)) { rootFret = f; break; }
+      }
+      if (rootFret + 4 > state.frets) rootFret = Math.max(0, rootFret - 12);
+      win = [rootFret, rootFret + 4];
+    }
+    var path = [];
+    for (var s = 0; s < 6; s++) {
+      for (var fr = Math.max(0, win[0]); fr <= Math.min(state.frets, win[1]); fr++) {
+        var midi = tun.midi[s] + fr;
+        if (info.pcSet.has(Theory.mod12(midi))) {
+          path.push({ s: s, f: fr, midi: midi, cx: colCX2(fr), cy: rowY2(s) });
+        }
+      }
+    }
+    return path;
+  }
+
+  // expand the path into an index sequence for the chosen pattern
+  function prSeq(n, pattern) {
+    var out = [], i, j, k;
+    if (!n) return out;
+    if (pattern === 'updown') {
+      for (i = 0; i < n; i++) out.push(i);
+      for (i = n - 2; i >= 1; i--) out.push(i);
+    } else if (/^g[3-6]$/.test(pattern)) {
+      k = parseInt(pattern.slice(1), 10);
+      if (n < k) { for (i = 0; i < n; i++) out.push(i); }
+      else { for (i = 0; i + k <= n; i++) for (j = 0; j < k; j++) out.push(i + j); }
+    } else if (pattern === 'thirds') {
+      if (n < 3) { for (i = 0; i < n; i++) out.push(i); }
+      else { for (i = 0; i + 2 < n; i++) { out.push(i); out.push(i + 2); } }
+    } else if (pattern === 'random') {
+      return null; // pick at schedule time
+    } else { // 'up'
+      for (i = 0; i < n; i++) out.push(i);
+    }
+    return out;
+  }
+
+  function prRings() {
+    var g = document.getElementById('fb-rot');
+    if (!g) return null;
+    var cur = document.getElementById('fb-pr-ring');
+    if (!cur) {
+      var next = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      next.setAttribute('id', 'fb-pr-ring2');
+      next.setAttribute('r', '13');
+      next.setAttribute('fill', 'none');
+      next.setAttribute('stroke', 'var(--accent)');
+      next.setAttribute('stroke-width', '1.6');
+      next.setAttribute('stroke-dasharray', '4 4');
+      next.setAttribute('opacity', '0.55');
+      next.setAttribute('pointer-events', 'none');
+      g.appendChild(next);
+      cur = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      cur.setAttribute('id', 'fb-pr-ring');
+      cur.setAttribute('r', '15.5');
+      cur.setAttribute('fill', 'rgba(255,171,71,0.16)');
+      cur.setAttribute('stroke', 'var(--accent)');
+      cur.setAttribute('stroke-width', '3');
+      cur.setAttribute('pointer-events', 'none');
+      g.appendChild(cur);
+    }
+    return { cur: cur, next: document.getElementById('fb-pr-ring2') };
+  }
+
+  function prClearRings() {
+    var a = document.getElementById('fb-pr-ring');
+    var b = document.getElementById('fb-pr-ring2');
+    if (a && a.parentNode) a.parentNode.removeChild(a);
+    if (b && b.parentNode) b.parentNode.removeChild(b);
+  }
+
+  function prNodeAt(step) {
+    if (pr.seq === null) return pr.path[step % pr.path.length]; // random resolved in tick
+    return pr.path[pr.seq[step % pr.seq.length]];
+  }
+
+  function prTick() {
+    var horizon = pr.ctx.currentTime + 0.12;
+    while (pr.nextT < horizon) {
+      var node;
+      if (pr.seq === null) node = pr.path[Math.floor(Math.random() * pr.path.length)];
+      else node = pr.path[pr.seq[pr.idx % pr.seq.length]];
+      var nextNode;
+      if (pr.seq === null) nextNode = null;
+      else nextNode = pr.path[pr.seq[(pr.idx + 1) % pr.seq.length]];
+      var when = pr.nextT - pr.ctx.currentTime;
+      if (pr.sound) App.pluck(node.midi, when, 0.55, 0.32);
+      if (pr.click) {
+        var o = pr.ctx.createOscillator(), gn = pr.ctx.createGain();
+        o.type = 'sine';
+        o.frequency.value = 1150;
+        gn.gain.setValueAtTime(0.22, pr.nextT);
+        gn.gain.exponentialRampToValueAtTime(0.0001, pr.nextT + 0.03);
+        o.connect(gn);
+        gn.connect(pr.ctx.destination);
+        o.start(pr.nextT);
+        o.stop(pr.nextT + 0.05);
+      }
+      pr.vis.push({ t: pr.nextT, node: node, next: nextNode, step: pr.idx });
+      if (pr.vis.length > 64) pr.vis.shift();
+      pr.idx++;
+      pr.nextT += 60 / pr.bpm / pr.rate;
+    }
+  }
+
+  function prDraw() {
+    if (!pr.running) return;
+    var now = pr.ctx.currentTime;
+    var hit = null;
+    while (pr.vis.length && pr.vis[0].t <= now) hit = pr.vis.shift();
+    if (hit) {
+      var rings = prRings();
+      if (rings) {
+        rings.cur.setAttribute('cx', hit.node.cx);
+        rings.cur.setAttribute('cy', hit.node.cy);
+        if (hit.next) {
+          rings.next.setAttribute('cx', hit.next.cx);
+          rings.next.setAttribute('cy', hit.next.cy);
+          rings.next.setAttribute('opacity', '0.55');
+        } else {
+          rings.next.setAttribute('opacity', '0');
+        }
+      }
+      prScrollTo(hit.node);
+      var total = pr.seq === null ? pr.path.length : pr.seq.length;
+      prStatus((hit.step % total) + 1 + ' / ' + total);
+    }
+    pr.raf = requestAnimationFrame(prDraw);
+  }
+
+  // keep the active ring inside the middle band of the stage
+  function prScrollTo(node) {
+    var wrap = els.scroll;
+    var svg = document.getElementById('fb-svg');
+    if (!wrap || !svg) return;
+    var scale = svg.getBoundingClientRect().width / vb.w;
+    var yPost = node.cx * scale; // post-rotation y = pre-rotation x (along the neck)
+    var target = Math.max(0, yPost - wrap.clientHeight * 0.45);
+    if (Math.abs(wrap.scrollTop - target) > wrap.clientHeight * 0.22) {
+      wrap.scrollTo({ top: target, behavior: 'smooth' });
+    }
+  }
+
+  function prStatus(text) {
+    var el = document.getElementById('fb-pr-status');
+    if (el) el.textContent = text;
+  }
+
+  function prPlayBtn(running) {
+    var b = document.getElementById('fb-pr-play');
+    if (b) b.innerHTML = running ? '&#10074;&#10074; Pause' : '&#9654; Play';
+  }
+
+  function prStart() {
+    pr.path = prPath();
+    if (!pr.path.length) { prStatus('no notes in this position'); return; }
+    pr.seq = prSeq(pr.path.length, pr.pattern);
+    try { pr.ctx = App.getAudio(); } catch (e) { prStatus('audio unavailable'); return; }
+    pr.vis.length = 0;
+    pr.nextT = pr.ctx.currentTime + 0.15;
+    pr.running = true;
+    pr.timer = setInterval(prTick, 25);
+    prTick();
+    pr.raf = requestAnimationFrame(prDraw);
+    prPlayBtn(true);
+  }
+
+  function prPause() {
+    if (!pr.running) return;
+    if (pr.timer) { clearInterval(pr.timer); pr.timer = null; }
+    if (pr.raf) { cancelAnimationFrame(pr.raf); pr.raf = 0; }
+    pr.running = false;
+    pr.vis.length = 0;
+    prPlayBtn(false);
+  }
+
+  function prStop() {
+    prPause();
+    pr.idx = 0;
+    prClearRings();
+    prStatus('');
+  }
+
+  function prToggle() {
+    if (pr.running) prPause();
+    else prStart(); // resumes from pr.idx after a pause
+  }
+
+  function prWire() {
+    pr.pattern = App.store.get('fb.pr.pattern', 'up');
+    pr.bpm = App.store.get('fb.pr.bpm', 80);
+    pr.rate = App.store.get('fb.pr.rate', 1);
+    pr.sound = !!App.store.get('fb.pr.sound', true);
+    pr.click = !!App.store.get('fb.pr.click', true);
+
+    var pat = document.getElementById('fb-pr-pattern');
+    var bpm = document.getElementById('fb-pr-bpm');
+    var rate = document.getElementById('fb-pr-rate');
+    var sound = document.getElementById('fb-pr-sound');
+    var click = document.getElementById('fb-pr-click');
+    pat.value = pr.pattern;
+    bpm.value = String(pr.bpm);
+    rate.value = String(pr.rate);
+    sound.checked = pr.sound;
+    click.checked = pr.click;
+
+    document.getElementById('fb-pr-play').addEventListener('click', prToggle);
+    document.getElementById('fb-pr-reset').addEventListener('click', function () { prStop(); });
+    pat.addEventListener('change', function () {
+      pr.pattern = this.value;
+      App.store.set('fb.pr.pattern', pr.pattern);
+      pr.idx = 0;
+      if (pr.running) { pr.path = prPath(); pr.seq = prSeq(pr.path.length, pr.pattern); }
+    });
+    bpm.addEventListener('change', function () {
+      var v = parseInt(this.value, 10);
+      if (isNaN(v)) v = 80;
+      pr.bpm = Math.max(30, Math.min(240, v));
+      this.value = String(pr.bpm);
+      App.store.set('fb.pr.bpm', pr.bpm); // takes effect on the next scheduled note
+    });
+    rate.addEventListener('change', function () {
+      var v = parseInt(this.value, 10);
+      if (v >= 1 && v <= 4) pr.rate = v;
+      App.store.set('fb.pr.rate', pr.rate);
+    });
+    sound.addEventListener('change', function () {
+      pr.sound = !!this.checked;
+      App.store.set('fb.pr.sound', pr.sound);
+    });
+    click.addEventListener('change', function () {
+      pr.click = !!this.checked;
+      App.store.set('fb.pr.click', pr.click);
+    });
+
+    // pause (keep position) when the whole app goes to the background
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) prPause();
+    });
+  }
+
   function renderLegend() {
     var h = '';
     for (var i = 0; i < LEGEND.length; i++) {
@@ -504,6 +786,8 @@
       '.fb-board{position:relative;display:flex;flex-direction:column;gap:10px}' +
       '.fb-board.fb-max{position:fixed;inset:0;z-index:200;margin:0;border-radius:0;padding:10px 14px}' +
       '.fb-toolbar{flex:0 0 auto}' +
+      '.fb-practice{flex:0 0 auto}' +
+      '.fb-practice select,.fb-practice input[type=number]{padding:6px 8px;font-size:13px}' +
       '.fb-title{font-family:var(--font-display);font-size:19px;font-weight:600;letter-spacing:1px;' +
         'text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:42vw}' +
       '.fb-gearbtn{font-size:17px;line-height:1;padding:6px 10px}' +
@@ -561,6 +845,30 @@
           '</span>' +
         '</div>' +
         '<div class="row tight fb-posrow" id="fb-posrow" style="display:none"></div>' +
+        '<div class="row tight fb-practice">' +
+          '<button type="button" class="btn sm primary" id="fb-pr-play">&#9654; Play</button>' +
+          '<button type="button" class="btn sm" id="fb-pr-reset" title="Back to the first note">&#8634;</button>' +
+          '<select id="fb-pr-pattern" title="Exercise pattern">' +
+            '<option value="up">Straight up</option>' +
+            '<option value="updown">Up &amp; down</option>' +
+            '<option value="g3">In 3s</option>' +
+            '<option value="g4">In 4s</option>' +
+            '<option value="g5">In 5s</option>' +
+            '<option value="g6">In 6s</option>' +
+            '<option value="thirds">Thirds</option>' +
+            '<option value="random">Random note</option>' +
+          '</select>' +
+          '<input type="number" id="fb-pr-bpm" min="30" max="240" step="1" title="Practice tempo (BPM)" style="width:70px">' +
+          '<select id="fb-pr-rate" title="Notes per beat">' +
+            '<option value="1">1 / beat</option>' +
+            '<option value="2">8ths</option>' +
+            '<option value="3">Triplets</option>' +
+            '<option value="4">16ths</option>' +
+          '</select>' +
+          '<label class="row tight small muted" style="gap:5px"><input type="checkbox" id="fb-pr-sound">Notes</label>' +
+          '<label class="row tight small muted" style="gap:5px"><input type="checkbox" id="fb-pr-click">Click</label>' +
+          '<span class="muted small" id="fb-pr-status"></span>' +
+        '</div>' +
         '<div class="fb-scroll" id="fb-scroll"></div>' +
         '<div class="fb-settings" id="fb-settings">' +
           '<div class="row">' +
@@ -656,6 +964,7 @@
       els.settings.classList.toggle('open');
     });
     els.maxBtn.addEventListener('click', function () { setMax(!maxMode); });
+    prWire();
     document.addEventListener('fullscreenchange', function () {
       // system back / Esc exits native fullscreen — drop the overlay with it
       if (!document.fullscreenElement && maxMode && usedNativeFs) setMax(false);
@@ -723,6 +1032,7 @@
 
   function onHide() {
     clearFlash(); // plucked notes decay on their own (~1.2 s envelope in App.pluck)
+    prPause();    // exercise pauses (keeps its place) when leaving the tab
     if (maxMode) setMax(false);
     if (els.settings) els.settings.classList.remove('open');
   }
