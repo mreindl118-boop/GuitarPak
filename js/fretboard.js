@@ -262,6 +262,18 @@
       }
     }
 
+    // jam chord-tone rings — one per position, faded in/out per chord by CSS
+    // transition (this is what makes the chord changes morph smoothly)
+    for (r = 0; r < 6; r++) {
+      var js = 5 - r;
+      var jy = rowY(r);
+      for (f = 0; f <= N; f++) {
+        s.push('<circle class="fb-jam-ring" data-pc="' + Theory.mod12(tun.midi[js] + f) +
+          '" cx="' + fx(colCX(f)) + '" cy="' + jy + '" r="15" fill="none" ' +
+          'stroke="rgba(255,255,255,0.85)" stroke-width="2.5" pointer-events="none"/>');
+      }
+    }
+
     // invisible hit rects on top — every position is clickable/playable
     for (r = 0; r < 6; r++) {
       var hs = 5 - r;
@@ -285,6 +297,53 @@
     applyZoom();
     els.scroll.scrollLeft = keepX;
     els.scroll.scrollTop = keepY;
+    if (jamLast) jamPaint(jamLast); // fresh svg — reapply the live chord overlay
+  }
+
+  // ---------------- jam follow (scale-over-chord visualization) ----------------
+
+  var jamLast = null;
+  var autoMode = false;
+
+  function jamPaint(ev) {
+    var svg = document.getElementById('fb-svg');
+    if (svg) {
+      var rings = svg.querySelectorAll('.fb-jam-ring');
+      var tones = ev ? ev.tones : [];
+      for (var i = 0; i < rings.length; i++) {
+        var pc = parseInt(rings[i].getAttribute('data-pc'), 10);
+        var on = !!ev && tones.indexOf(pc) !== -1;
+        rings[i].classList.toggle('on', on);
+        rings[i].classList.toggle('root', on && pc === ev.rootPc);
+      }
+    }
+    var chip = document.getElementById('fb-jamchip');
+    if (chip) {
+      if (ev) {
+        chip.style.display = '';
+        chip.textContent = '♫ ' + ev.name + ' → ' + ev.suggestedName;
+      } else {
+        chip.style.display = 'none';
+      }
+    }
+  }
+
+  // re-root the board to the suggested chord scale, with a quick crossfade
+  function jamApplySuggestion(ev) {
+    if (!ev || !Theory.SCALES[ev.suggestedScale]) return;
+    if (state.root === ev.rootPc && state.scale === ev.suggestedScale) return;
+    state.root = ev.rootPc;
+    state.scale = ev.suggestedScale;
+    state.pos = 0;
+    if (els.root) els.root.value = String(state.root);
+    if (els.scaleSel) els.scaleSel.value = state.scale;
+    els.scroll.classList.add('fb-fade');
+    setTimeout(function () {
+      renderPosRow();
+      renderBoard();
+      renderInfo();
+      els.scroll.classList.remove('fb-fade');
+    }, 130);
   }
 
   // ---- fluid pan/zoom viewport ----
@@ -810,7 +869,12 @@
         'height:calc(100vh - 340px);height:calc(100dvh - 340px);min-height:240px}' +
       '.fb-board.fb-max .fb-scroll{height:auto;min-height:0}' +
       '.fb-scroll:active{cursor:grabbing}' +
+      '.fb-scroll{transition:opacity 0.18s ease}' +
+      '.fb-scroll.fb-fade{opacity:0.25}' +
       '.fb-scroll svg{width:100%;height:auto;display:block;margin:auto;flex:0 0 auto}' +
+      '.fb-jam-ring{opacity:0;transition:opacity 0.28s ease,stroke 0.28s ease}' +
+      '.fb-jam-ring.on{opacity:0.92}' +
+      '.fb-jam-ring.root{stroke:var(--accent);stroke-width:3.5}' +
       '.fb-settings{display:none;position:absolute;z-index:6;top:52px;left:10px;right:10px;max-width:760px;' +
         'margin:0 auto;background:linear-gradient(180deg,#241e22 0%,#1b1619 100%);border:1px solid var(--line);' +
         'border-radius:12px;padding:16px 18px;box-shadow:0 18px 50px rgba(0,0,0,0.55);' +
@@ -849,6 +913,7 @@
           '<span class="row tight">' +
             '<button type="button" class="btn sm fb-gearbtn" id="fb-gear" title="Scale &amp; board settings" aria-label="Settings">&#9881;</button>' +
             '<span class="fb-title" id="fb-title"></span>' +
+            '<button type="button" class="chip" id="fb-jamchip" style="display:none" title="Tap to switch the board to this mode"></button>' +
           '</span>' +
           '<span class="row tight">' +
             '<button type="button" class="btn sm" id="fb-zout" aria-label="Zoom out">&minus;</button>' +
@@ -898,6 +963,7 @@
               '</div>' +
             '</div>' +
             '<label class="field">Left-handed<input type="checkbox" id="fb-lefty"' + (state.lefty ? ' checked' : '') + '></label>' +
+            '<label class="field">Jam: auto-switch mode<input type="checkbox" id="fb-automode"></label>' +
           '</div>' +
           '<div class="row tight fb-legend" id="fb-legend"></div>' +
           '<h3 id="fb-info-title"></h3>' +
@@ -979,6 +1045,28 @@
     });
     els.maxBtn.addEventListener('click', function () { setMax(!maxMode); });
     prWire();
+
+    // follow the Jam tab's backing track
+    autoMode = !!App.store.get('fb.automode', false);
+    var autoChk = document.getElementById('fb-automode');
+    autoChk.checked = autoMode;
+    autoChk.addEventListener('change', function () {
+      autoMode = !!this.checked;
+      App.store.set('fb.automode', autoMode);
+      if (autoMode && jamLast) jamApplySuggestion(jamLast);
+    });
+    document.getElementById('fb-jamchip').addEventListener('click', function () {
+      if (jamLast) jamApplySuggestion(jamLast);
+    });
+    App.on('jam:chord', function (ev) {
+      jamLast = ev;
+      jamPaint(ev);
+      if (autoMode) jamApplySuggestion(ev);
+    });
+    App.on('jam:stopped', function () {
+      jamLast = null;
+      jamPaint(null);
+    });
     document.addEventListener('fullscreenchange', function () {
       // system back / Esc exits native fullscreen — drop the overlay with it
       if (!document.fullscreenElement && maxMode && usedNativeFs) setMax(false);

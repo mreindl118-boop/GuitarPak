@@ -1,5 +1,5 @@
 {
-  "version": "0.4.1",
+  "version": "0.5.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "Practice runner no longer repeats duplicated pitches at string crossings (e.g. the double 5th in G Ionian), and its tempo is now linked two-way with the metronome."
+  "notes": "New Jam tab: backing track builder with synthesized drums, bass, and comp instruments across 6 vibes, savable tracks, and shared tempo. The fretboard follows the changes live — chord tones glow with smooth transitions and each chord suggests a mode to shred with."
 }
