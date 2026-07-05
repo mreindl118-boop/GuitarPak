@@ -63,6 +63,11 @@
   var els = {};
 
   var CSS = [
+    '.tab.met-live::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;' +
+      'background:var(--accent);margin-right:7px;vertical-align:1px;' +
+      'box-shadow:0 0 8px var(--accent-glow);animation:met-pulse 0.9s ease-in-out infinite alternate;}',
+    '.tab.active.met-live::before{background:var(--bg);box-shadow:none;}',
+    '@keyframes met-pulse{from{opacity:0.45;}to{opacity:1;}}',
     '.met-dots{display:flex;gap:10px;align-items:center;flex-wrap:wrap;min-height:34px;}',
     '.met-dot{width:26px;height:26px;border-radius:50%;background:var(--card2);border:2px solid var(--line);cursor:pointer;padding:0;transition:transform 60ms ease,background 90ms ease,border-color 90ms ease,box-shadow 90ms ease;}',
     '.met-dot.met-acc{border-color:var(--accent);background:rgba(255,180,84,0.18);}',
@@ -329,6 +334,7 @@
     els.startStop.textContent = 'Stop';
     setTrainerDisabled(true);
     updateTrainerStatus();
+    setLive(true);
   }
 
   function stop() {
@@ -341,6 +347,13 @@
     if (els.startStop) els.startStop.textContent = 'Start';
     setTrainerDisabled(false);
     updateTrainerStatus();
+    setLive(false);
+  }
+
+  // pulsing dot on the Metronome tab while the click runs from another tab
+  function setLive(on) {
+    var btn = document.querySelector('.tab[data-panel="metronome"]');
+    if (btn) btn.classList.toggle('met-live', on);
   }
 
   function toggle() { if (running) stop(); else start(); }
@@ -392,6 +405,12 @@
     App.injectCSS('met', CSS);
     load();
     rootEl.innerHTML = HTML;
+
+    // stop when the APP goes away (minimized, screen off, browser tab hidden) —
+    // in-app tab switches don't fire this, so the click keeps running there
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden && running) stop();
+    });
 
     els.bpmDisplay = $('met-bpm-display');
     els.slider = $('met-bpm-slider');
@@ -495,7 +514,16 @@
 
   App.register('metronome', {
     init: init,
-    onHide: function () { stop(); }, // kills interval, RAF, and pending visuals
+    // Deliberately KEEP the click running across in-app tab switches — that's
+    // the point of a metronome while practicing on the fretboard or tuner.
+    // Only the beat-dot animation pauses; visibilitychange (in init) stops
+    // playback when the whole app is minimized or the screen turns off.
+    onHide: function () {
+      if (raf) { cancelAnimationFrame(raf); raf = 0; }
+    },
+    onShow: function () {
+      if (running && !raf) raf = requestAnimationFrame(draw);
+    },
     onKey: function (e) {
       if (e.code === 'Space' || e.key === ' ' || e.key === 'Spacebar') {
         e.preventDefault();
