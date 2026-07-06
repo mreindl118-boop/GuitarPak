@@ -387,7 +387,9 @@
   }
 
   function tick() {
-    var horizon = ctx.currentTime + 0.15;
+    // stall recovery: resume from now instead of scheduling silent past bars
+    if (nextBarT < ctx.currentTime - 0.02) nextBarT = ctx.currentTime + 0.05;
+    var horizon = ctx.currentTime + 0.3;
     var barLen = 4 * beatDur();
     while (nextBarT < horizon) {
       if (!state.track.length) { stop(); return; }

@@ -32,7 +32,7 @@
   ];
   var SUBN = { quarter: 1, eighth: 2, triplet: 3, sixteenth: 4 };
 
-  var LOOKAHEAD = 0.12;   // seconds of audio scheduled ahead
+  var LOOKAHEAD = 0.22;   // seconds of audio scheduled ahead (absorbs UI stalls)
   var TICK_MS = 25;       // scheduler interval
   var CLICK_DECAY = 0.03; // sharp exponential decay
   var FREQ_ACCENT = 1600, FREQ_NORMAL = 1050, FREQ_SUB = 700;
@@ -270,6 +270,9 @@
   // LOOKAHEAD seconds. bpm/subdiv/levels are re-read on every step, so
   // changes take effect on the next scheduled click without stopping.
   function tick() {
+    // fell behind the audio clock (main-thread stall)? jump forward rather
+    // than scheduling past-dated, silent clicks
+    if (nextTime < ctx.currentTime + 0.01) nextTime = ctx.currentTime + 0.05;
     var horizon = ctx.currentTime + LOOKAHEAD;
     while (nextTime < horizon) {
       var nb = numBeats();

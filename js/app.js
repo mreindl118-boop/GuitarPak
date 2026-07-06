@@ -26,7 +26,7 @@ window.App = (function () {
   // ---- auto-update ----
   // version.json on GitHub is the source of truth. Web builds refresh through
   // the service worker; the APK build (file://) links to the new APK download.
-  var APP_VERSION = '0.6.0';
+  var APP_VERSION = '0.6.1';
   var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
 
   function verNum(v) {
@@ -106,7 +106,8 @@ window.App = (function () {
   // Simple plucked-string voice shared by fretboard / chords / trainer.
   function pluck(midi, when, dur, gain) {
     var ctx = getAudio();
-    var t = ctx.currentTime + (when || 0);
+    // never schedule in the past — a past-dated envelope collapses to silence
+    var t = ctx.currentTime + Math.max(0, when || 0);
     dur = dur || 1.2;
     gain = gain == null ? 0.4 : gain;
     var f = Theory.noteFreq(midi);

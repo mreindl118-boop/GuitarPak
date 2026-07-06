@@ -30,29 +30,10 @@
   var GAP = 30;       // string spacing
   var NUM_H = 34;     // room for fret numbers under the board
 
-  // interval-class palette: semitones-from-root -> group
-  var GROUPS = {
-    root:    { fill: 'var(--accent)', text: '#171106',     stroke: '' },
-    third:   { fill: 'var(--teal)',   text: '#0c1f1c',     stroke: '' },
-    fifth:   { fill: 'var(--blue)',   text: '#0e1a30',     stroke: '' },
-    seventh: { fill: 'var(--purple)', text: '#1d1233',     stroke: '' },
-    other:   { fill: 'var(--card2)',  text: 'var(--text)', stroke: 'var(--muted)' }
-  };
-  var LEGEND = [
-    ['root', 'Root'],
-    ['third', '3rds (b3 / 3)'],
-    ['fifth', '5ths (b5 / 5)'],
-    ['seventh', '7ths (b7 / 7)'],
-    ['other', '2nds / 4th / 6ths']
-  ];
-
-  function groupOf(semis) {
-    if (semis === 0) return 'root';
-    if (semis === 3 || semis === 4) return 'third';
-    if (semis === 6 || semis === 7) return 'fifth';
-    if (semis === 10 || semis === 11) return 'seventh';
-    return 'other';
-  }
+  // one bright, unique color per SCALE DEGREE (index = step in the scale) —
+  // all light enough for dark label text, none of them dark/black
+  var DEG_COLORS = ['#ffab47', '#e8d44d', '#7ad97a', '#4cc9b0', '#6ea8fe', '#b48ef0', '#ff85b3'];
+  var DEG_TEXT = '#1c1206';
 
   var STRING_WIDTHS = [2.6, 2.3, 2.0, 1.5, 1.2, 1.0]; // index = stringIdx (0 = low E, wound = thicker)
 
@@ -126,6 +107,7 @@
     renderPosRow();
     renderBoard();
     renderInfo();
+    renderLegend(); // legend colors are per-degree, so it changes with the scale
   }
 
   function renderPosRow() {
@@ -247,17 +229,16 @@
         if (!info.pcSet.has(pc)) continue;
         if (win && (f < win[0] || f > win[1])) continue;
         var step = info.pcToStep.get(pc);
-        var semis = info.steps[step];
-        var g = GROUPS[groupOf(semis)];
+        var fill = DEG_COLORS[step % 7];
         var label;
         if (state.display === 'intervals') label = info.intervals[step];
         else if (state.display === 'degrees') label = String(step + 1);
         else label = Theory.pcName(pc, pf);
         var cx = fx(colCX(f));
-        s.push('<circle cx="' + cx + '" cy="' + cy + '" r="11.5" fill="' + g.fill + '"' +
-          (g.stroke ? ' stroke="' + g.stroke + '" stroke-width="1"' : '') + '/>');
+        s.push('<circle cx="' + cx + '" cy="' + cy + '" r="11.5" fill="' + fill + '"' +
+          (step === 0 ? ' stroke="#ffffff" stroke-width="1.6"' : '') + '/>');
         s.push('<text x="' + cx + '" y="' + (cy + 3.5) +
-          '" text-anchor="middle" font-size="10.5" font-weight="700" fill="' + g.text + '">' +
+          '" text-anchor="middle" font-size="10.5" font-weight="700" fill="' + DEG_TEXT + '">' +
           label + '</text>');
       }
     }
@@ -608,7 +589,10 @@
   }
 
   function prTick() {
-    var horizon = pr.ctx.currentTime + 0.12;
+    // if a main-thread stall left us behind the audio clock, jump forward —
+    // a short gap beats a burst of silent past-dated notes
+    if (pr.nextT < pr.ctx.currentTime + 0.01) pr.nextT = pr.ctx.currentTime + 0.05;
+    var horizon = pr.ctx.currentTime + 0.25;
     while (pr.nextT < horizon) {
       var node;
       if (pr.seq === null) node = pr.path[Math.floor(Math.random() * pr.path.length)];
@@ -781,13 +765,15 @@
     });
   }
 
+  // legend follows the current scale: one colored chip per degree
   function renderLegend() {
+    var pf = preferFlat();
+    var info = Theory.scaleInfo(state.root, state.scale, pf);
+    if (!info) { els.legend.innerHTML = ''; return; }
     var h = '';
-    for (var i = 0; i < LEGEND.length; i++) {
-      var g = GROUPS[LEGEND[i][0]];
-      var style = 'background:' + g.fill + (g.stroke ? ';border:1px solid ' + g.stroke : '');
-      h += '<span class="fb-legend-item"><span class="legend-dot" style="' + style + '"></span>' +
-        LEGEND[i][1] + '</span>';
+    for (var i = 0; i < info.intervals.length; i++) {
+      h += '<span class="fb-legend-item"><span class="legend-dot" style="background:' +
+        DEG_COLORS[i % 7] + '"></span>' + info.intervals[i] + ' &middot; ' + info.names[i] + '</span>';
     }
     els.legend.innerHTML = h;
   }
@@ -804,7 +790,8 @@
     if (els.title) els.title.textContent = Theory.pcName(state.root, pf) + ' ' + Theory.SCALES[state.scale].name;
     var h = '';
     for (var i = 0; i < info.names.length; i++) {
-      h += '<span class="fb-note' + (i === 0 ? ' fb-note-root' : '') + '"><b>' + info.names[i] +
+      h += '<span class="fb-note' + (i === 0 ? ' fb-note-root' : '') +
+        '" style="border-color:' + DEG_COLORS[i % 7] + '"><b>' + info.names[i] +
         '</b><span>' + info.intervals[i] + '</span></span>';
     }
     els.infoNotes.innerHTML = h;
