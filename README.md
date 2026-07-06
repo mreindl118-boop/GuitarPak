@@ -32,6 +32,12 @@ Sound starts after your first click anywhere (browser autoplay policy). The Tune
 >
 > All settings persist locally. No external dependencies, no accounts. Alpha scope: 6-string, fixed shape library, single-voice pitch detection.
 
+## Credits
+
+Jam-tab instrument samples are per-note renders of the **FluidR3 GM soundfont**
+(Frank Wen, MIT) from [gleitz/midi-js-soundfonts](https://github.com/gleitz/midi-js-soundfonts)
+(MIT) — details in [samples/CREDITS.md](samples/CREDITS.md). Drums are synthesized.
+
 ## Architecture
 
 ```

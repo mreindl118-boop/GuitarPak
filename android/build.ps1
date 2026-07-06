@@ -25,7 +25,7 @@ New-Item -ItemType Directory -Force "$out\obj", "$out\dex", "$out\assets" | Out-
 # Bundle the web app as WebView assets (sw.js omitted — no service workers on file://).
 Copy-Item "$web\index.html" "$out\assets\"
 Copy-Item "$web\manifest.webmanifest" "$out\assets\"
-Copy-Item -Recurse "$web\css", "$web\js", "$web\icons", "$web\fonts" "$out\assets\"
+Copy-Item -Recurse "$web\css", "$web\js", "$web\icons", "$web\fonts", "$web\samples" "$out\assets\"
 
 Step 'javac' { & "$jdk\bin\javac.exe" -source 8 -target 8 -nowarn -classpath $platform -d "$out\obj" "$proj\src\com\mreindl\guitarlab\MainActivity.java" }
 

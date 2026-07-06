@@ -92,6 +92,88 @@
     return 0;
   }
 
+  // ---------------- sampled instruments (FluidR3 GM, MIT — see samples/CREDITS.md) ----------------
+  // A few anchor notes per instrument, pitch-shifted between anchors at play
+  // time. Loaded lazily on first Play; every voice falls back to its synth
+  // twin when a sample isn't available (offline first run, artifact build).
+
+  var SAMPLE_SETS = {
+    bass:   { dir: 'samples/bass/',   notes: { 28: 'E1', 33: 'A1', 38: 'D2', 43: 'G2', 48: 'C3' } },
+    keys:   { dir: 'samples/keys/',   notes: { 48: 'C3', 52: 'E3', 57: 'A3', 60: 'C4', 64: 'E4', 69: 'A4', 72: 'C5' } },
+    pad:    { dir: 'samples/pad/',    notes: { 48: 'C3', 59: 'B3', 64: 'E4', 67: 'G4', 72: 'C5' } },
+    guitar: { dir: 'samples/guitar/', notes: { 40: 'E2', 45: 'A2', 50: 'D3', 55: 'G3', 59: 'B3', 64: 'E4' } }
+  };
+  var sampleBuf = {};
+  var samplesRequested = false;
+  var samplesLoaded = 0;
+  var samplesTotal = 0;
+
+  function loadSamples() {
+    if (samplesRequested || !ctx) return;
+    samplesRequested = true;
+    Object.keys(SAMPLE_SETS).forEach(function (setId) {
+      var set = SAMPLE_SETS[setId];
+      Object.keys(set.notes).forEach(function (m) {
+        samplesTotal++;
+        // XHR, not fetch — fetch() refuses file:// URLs inside the APK's WebView
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', set.dir + set.notes[m] + '.mp3', true);
+        xhr.responseType = 'arraybuffer';
+        xhr.onload = function () {
+          if ((xhr.status !== 200 && xhr.status !== 0) || !xhr.response) return;
+          ctx.decodeAudioData(xhr.response, function (buf) {
+            sampleBuf[setId + '/' + m] = buf;
+            samplesLoaded++;
+            sampleInfo();
+          }, function () { /* undecodable — synth fallback */ });
+        };
+        xhr.onerror = function () { /* offline / blocked — synth fallback */ };
+        try { xhr.send(); } catch (e) { /* file access blocked — synth fallback */ }
+      });
+    });
+  }
+
+  function sampleInfo() {
+    var el = document.getElementById('jam-sinfo');
+    if (el) el.textContent = samplesLoaded > 0 ? '· sampled instruments ready (' + samplesLoaded + '/' + samplesTotal + ')' : '';
+  }
+
+  function setReady(setId) {
+    var notes = SAMPLE_SETS[setId].notes;
+    for (var m in notes) if (sampleBuf[setId + '/' + m]) return true;
+    return false;
+  }
+
+  function nearestSample(setId, midi) {
+    var notes = SAMPLE_SETS[setId].notes, best = null, bd = 99;
+    for (var m in notes) {
+      var am = parseInt(m, 10);
+      var d = Math.abs(midi - am);
+      if (d < bd && sampleBuf[setId + '/' + m]) { bd = d; best = am; }
+    }
+    return best;
+  }
+
+  function playSample(setId, midi, t, dur, gain, attack, release) {
+    var anchor = nearestSample(setId, midi);
+    if (anchor == null) return false;
+    var src = ctx.createBufferSource();
+    src.buffer = sampleBuf[setId + '/' + anchor];
+    src.playbackRate.value = Math.pow(2, (midi - anchor) / 12);
+    var g = ctx.createGain();
+    attack = attack || 0.004;
+    release = release || 0.07;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(gain, t + attack);
+    g.gain.setValueAtTime(gain, t + Math.max(attack, dur - release));
+    g.gain.linearRampToValueAtTime(0.0001, t + dur);
+    src.connect(g);
+    g.connect(ctx.destination);
+    src.start(t);
+    src.stop(t + dur + 0.05);
+    return true;
+  }
+
   // ---------------- synth voices ----------------
 
   function getNoise() {
@@ -141,6 +223,11 @@
   }
 
   function bassNote(t, midi, dur, gain) {
+    if (setReady('bass') && playSample('bass', midi, t, Math.max(0.25, dur), gain * 1.5)) return;
+    bassSynth(t, midi, dur, gain);
+  }
+
+  function bassSynth(t, midi, dur, gain) {
     var o = ctx.createOscillator(), lp = ctx.createBiquadFilter(), g = ctx.createGain();
     o.type = 'triangle';
     o.frequency.value = Theory.noteFreq(midi);
@@ -154,6 +241,16 @@
   }
 
   function padChord(t, midis, dur, gain) {
+    if (setReady('pad')) {
+      for (var p = 0; p < midis.length; p++) {
+        playSample('pad', midis[p], t, dur, (gain / midis.length) * 1.9, 0.22, 0.4);
+      }
+      return;
+    }
+    padSynth(t, midis, dur, gain);
+  }
+
+  function padSynth(t, midis, dur, gain) {
     for (var i = 0; i < midis.length; i++) {
       var o = ctx.createOscillator(), lp = ctx.createBiquadFilter(), g = ctx.createGain();
       o.type = 'sawtooth';
@@ -170,6 +267,16 @@
   }
 
   function keysChord(t, midis, gain) {
+    if (setReady('keys')) {
+      for (var k = 0; k < midis.length; k++) {
+        playSample('keys', midis[k], t, 0.6, (gain / midis.length) * 1.7);
+      }
+      return;
+    }
+    keysSynth(t, midis, gain);
+  }
+
+  function keysSynth(t, midis, gain) {
     for (var i = 0; i < midis.length; i++) {
       var o = ctx.createOscillator(), g = ctx.createGain();
       o.type = 'triangle';
@@ -260,7 +367,12 @@
           t = barT + vibe.comp[i][0] * beatDur();
           if (state.comp === 'keys') {
             keysChord(t, voicing.slice(-4), vibe.comp[i][2] * 2.4);
-          } else { // strum
+          } else if (state.comp === 'guitar' && setReady('guitar')) {
+            for (var gv = 0; gv < voicing.length; gv++) { // sampled strum
+              playSample('guitar', voicing[gv], t + gv * 0.014,
+                Math.min(1.5, vibe.comp[i][1] * beatDur() + 0.35), vibe.comp[i][2] * 0.5);
+            }
+          } else { // synth pluck strum (also the sampled-guitar fallback)
             for (var v = 0; v < voicing.length; v++) {
               App.pluck(voicing[v], (t - ctx.currentTime) + v * 0.014, Math.min(1.1, vibe.comp[i][1] * beatDur()), vibe.comp[i][2] / 2.4);
             }
@@ -303,6 +415,7 @@
     if (playing) return;
     if (!state.track.length) { els.now.textContent = 'add some chords first'; return; }
     try { ctx = App.getAudio(); } catch (e) { els.now.textContent = 'audio unavailable'; return; }
+    loadSamples(); // lazy; first bars use synth until decoded (~a bar at most)
     vis.length = 0;
     barIdx = 0;
     nextBarT = ctx.currentTime + 0.1;
@@ -346,8 +459,15 @@
     state.barsPerChord = bp === 2 ? 2 : 1;
     var vb = App.store.get('jam.vibe', 'rock');
     if (VIBES[vb]) state.vibe = vb;
-    var cp = App.store.get('jam.comp', 'strum');
-    if (['strum', 'pad', 'keys', 'off'].indexOf(cp) !== -1) state.comp = cp;
+    var cp = App.store.get('jam.comp', 'guitar');
+    if (['guitar', 'strum', 'pad', 'keys', 'off'].indexOf(cp) !== -1) state.comp = cp;
+    // one-time: settings saved before sampled instruments existed move from
+    // the synth strum to the sampled guitar (synth stays selectable)
+    if (!App.store.get('jam.migrSamp', false)) {
+      if (state.comp === 'strum') state.comp = 'guitar';
+      App.store.set('jam.comp', state.comp);
+      App.store.set('jam.migrSamp', true);
+    }
     state.drums = App.store.get('jam.drums', true) !== false;
     state.bass = App.store.get('jam.bass', true) !== false;
     var tr = App.store.get('jam.track', null);
@@ -401,7 +521,7 @@
     state.sevenths = !!p.sevenths;
     state.barsPerChord = p.barsPerChord === 2 ? 2 : 1;
     if (VIBES[p.vibe]) state.vibe = p.vibe;
-    if (['strum', 'pad', 'keys', 'off'].indexOf(p.comp) !== -1) state.comp = p.comp;
+    if (['guitar', 'strum', 'pad', 'keys', 'off'].indexOf(p.comp) !== -1) state.comp = p.comp;
     state.drums = p.drums !== false;
     state.bass = p.bass !== false;
     state.track = (p.track || []).filter(validChord);
@@ -525,8 +645,9 @@
         '<div class="row tight">' +
           '<label class="field">Vibe<select id="jam-vibe">' + vibeOpts + '</select></label>' +
           '<label class="field">Comp<select id="jam-comp">' +
-            opt('strum', 'Guitar strum', state.comp) + opt('pad', 'Pad', state.comp) +
-            opt('keys', 'Keys', state.comp) + opt('off', 'Off', state.comp) + '</select></label>' +
+            opt('guitar', 'Guitar (sampled)', state.comp) + opt('strum', 'Guitar (synth)', state.comp) +
+            opt('pad', 'Pad', state.comp) + opt('keys', 'Keys', state.comp) +
+            opt('off', 'Off', state.comp) + '</select></label>' +
           '<label class="row tight small muted" style="gap:5px"><input type="checkbox" id="jam-drums">Drums</label>' +
           '<label class="row tight small muted" style="gap:5px"><input type="checkbox" id="jam-bass">Bass</label>' +
           '<label class="field">BPM<input type="number" id="jam-bpm" min="30" max="280" style="width:74px" title="Tempo — linked to the metronome"></label>' +
@@ -536,7 +657,7 @@
           '<button type="button" class="btn big primary" id="jam-play">Play</button>' +
           '<span class="jam-now" id="jam-now"></span>' +
         '</div>' +
-        '<div class="muted small" style="margin-top:10px">While it plays, open the Fretboard tab &mdash; it highlights the chord tones and suggests a mode for every chord.</div>' +
+        '<div class="muted small" style="margin-top:10px">While it plays, open the Fretboard tab &mdash; it highlights the chord tones and suggests a mode for every chord. <span id="jam-sinfo"></span></div>' +
       '</div>' +
       '<div class="card">' +
         '<h3>Saved tracks</h3>' +

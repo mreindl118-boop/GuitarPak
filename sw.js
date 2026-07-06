@@ -1,5 +1,5 @@
 /* GuitarLab service worker — cache-first so the app works fully offline once visited. */
-var CACHE = 'guitarlab-v13';
+var CACHE = 'guitarlab-v14';
 var ASSETS = [
   '.',
   'index.html',
@@ -18,7 +18,16 @@ var ASSETS = [
   'js/trainer.js',
   'manifest.webmanifest',
   'icons/icon-192.png',
-  'icons/icon-512.png'
+  'icons/icon-512.png',
+  'samples/bass/E1.mp3', 'samples/bass/A1.mp3', 'samples/bass/D2.mp3',
+  'samples/bass/G2.mp3', 'samples/bass/C3.mp3',
+  'samples/keys/C3.mp3', 'samples/keys/E3.mp3', 'samples/keys/A3.mp3',
+  'samples/keys/C4.mp3', 'samples/keys/E4.mp3', 'samples/keys/A4.mp3',
+  'samples/keys/C5.mp3',
+  'samples/pad/C3.mp3', 'samples/pad/B3.mp3', 'samples/pad/E4.mp3',
+  'samples/pad/G4.mp3', 'samples/pad/C5.mp3',
+  'samples/guitar/E2.mp3', 'samples/guitar/A2.mp3', 'samples/guitar/D3.mp3',
+  'samples/guitar/G3.mp3', 'samples/guitar/B3.mp3', 'samples/guitar/E4.mp3'
 ];
 
 self.addEventListener('install', function (e) {

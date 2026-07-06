@@ -1,5 +1,5 @@
 {
-  "version": "0.5.0",
+  "version": "0.6.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "New Jam tab: backing track builder with synthesized drums, bass, and comp instruments across 6 vibes, savable tracks, and shared tempo. The fretboard follows the changes live — chord tones glow with smooth transitions and each chord suggests a mode to shred with."
+  "notes": "Real sampled instruments in the Jam tab (MIT-licensed FluidR3): fingered bass, electric piano, warm pad, and steel-string guitar comping, with automatic synth fallback when offline."
 }
