@@ -384,6 +384,7 @@
       recent.length = 0;
       game.matchSince = 0;
       listening = true;
+      App.wake.acquire('tun-mic');
       els.toggle.disabled = false;
       els.toggle.textContent = 'Stop listening';
       els.toggle.classList.remove('primary');
@@ -420,6 +421,7 @@
     }
     timeBuf = null;
     listening = false;
+    App.wake.release('tun-mic');
     recent.length = 0;
     game.matchSince = 0;
     if (els.toggle) {

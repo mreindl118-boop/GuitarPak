@@ -422,6 +422,7 @@
     barIdx = 0;
     nextBarT = ctx.currentTime + 0.1;
     playing = true;
+    App.wake.acquire('jam-run');
     timer = setInterval(tick, 25);
     tick();
     els.play.textContent = 'Stop';
@@ -432,6 +433,7 @@
   function stop() {
     if (timer) { clearInterval(timer); timer = null; }
     playing = false;
+    App.wake.release('jam-run');
     vis.length = 0;
     if (els.play) els.play.textContent = 'Play';
     if (els.now) els.now.textContent = '';

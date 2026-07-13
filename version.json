@@ -1,5 +1,5 @@
 {
-  "version": "0.6.1",
+  "version": "0.7.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "Every scale degree now has its own bright color on the fretboard (no more dark notes), and audio schedulers recover from stalls so practice notes can no longer fire silently."
+  "notes": "The practice tools now keep your screen awake while they run — the metronome, fretboard practice runner, Jam backing tracks, chord progression player, session timer, one-minute chord-change drill, and mic tuner hold the screen on while active and release it the moment you stop."
 }

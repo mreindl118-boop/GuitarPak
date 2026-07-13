@@ -676,6 +676,7 @@
     pr.vis.length = 0;
     pr.nextT = pr.ctx.currentTime + 0.15;
     pr.running = true;
+    App.wake.acquire('fb-run');
     pr.timer = setInterval(prTick, 25);
     prTick();
     pr.raf = requestAnimationFrame(prDraw);
@@ -687,6 +688,7 @@
     if (pr.timer) { clearInterval(pr.timer); pr.timer = null; }
     if (pr.raf) { cancelAnimationFrame(pr.raf); pr.raf = 0; }
     pr.running = false;
+    App.wake.release('fb-run');
     pr.vis.length = 0;
     prPlayBtn(false);
   }
