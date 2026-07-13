@@ -68,6 +68,16 @@ Then: verify in preview, commit + push (credential is stored), and rebuild/
 republish the artifact via `python tools/bundle.py <out.html>` if that session
 owns the artifact URL.
 
+## Cloud / mobile sessions (claude.ai/code, PC off)
+
+All web work is possible (js/css/html, sw.js, version.json, README). NOT
+possible: building/signing the APK (the keystore and Android toolchain exist
+only on the owner's PC) and republishing the claude.ai artifact (owned by a
+PC session). For a release from the cloud: do checklist steps 1–4 only, note
+in the commit that releases/GuitarLab-alpha.apk is stale until the next PC
+session runs android\build.ps1, and open a pull request instead of pushing
+to main so the owner can review from their phone.
+
 ## Gotchas
 
 - PowerShell 5.1: no `&&`; embedded double quotes split native args (use
