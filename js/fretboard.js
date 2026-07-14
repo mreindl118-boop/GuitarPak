@@ -14,7 +14,8 @@
     frets: 24,            // 12 | 15 | 22 | 24
     display: 'notes',     // notes | intervals | degrees
     lefty: false,
-    pos: 0                // pentatonic box: 0 = All, 1..5 = box N (not persisted)
+    pos: 0,               // pentatonic box: 0 = All, 1..5 = box N (not persisted)
+    mode: 1               // 7-note scales: degree anchoring the practice window
   };
 
   var els = {};
@@ -31,8 +32,11 @@
   var NUM_H = 34;     // room for fret numbers under the board
 
   // one bright, unique color per SCALE DEGREE (index = step in the scale) —
-  // all light enough for dark label text, none of them dark/black
-  var DEG_COLORS = ['#ffab47', '#e8d44d', '#7ad97a', '#4cc9b0', '#6ea8fe', '#b48ef0', '#ff85b3'];
+  // all light enough for dark label text, none of them dark/black. DEG_COLORS
+  // is the live palette; users can recolor each degree in the settings panel
+  // (persisted as fb.colors, reset restores DEG_DEFAULTS).
+  var DEG_DEFAULTS = ['#ffab47', '#e8d44d', '#7ad97a', '#4cc9b0', '#6ea8fe', '#b48ef0', '#ff85b3'];
+  var DEG_COLORS = DEG_DEFAULTS.slice();
   var DEG_TEXT = '#1c1206';
 
   var STRING_WIDTHS = [2.6, 2.3, 2.0, 1.5, 1.2, 1.0]; // index = stringIdx (0 = low E, wound = thicker)
@@ -58,6 +62,13 @@
     var d = App.store.get('fb.display', 'notes');
     if (d === 'notes' || d === 'intervals' || d === 'degrees') state.display = d;
     state.lefty = !!App.store.get('fb.lefty', false);
+    var m = App.store.get('fb.mode', 1);
+    if (typeof m === 'number' && m >= 1 && m <= 7) state.mode = Math.floor(m);
+    var cols = App.store.get('fb.colors', null);
+    if (Array.isArray(cols) && cols.length === 7 &&
+        cols.every(function (c) { return /^#[0-9a-fA-F]{6}$/.test(c); })) {
+      DEG_COLORS = cols.slice();
+    }
   }
 
   function saveState() {
@@ -78,6 +89,46 @@
   function isPent() {
     var sc = Theory.SCALES[state.scale];
     return !!sc && sc.steps.length === 5;
+  }
+
+  function isHept() {
+    var sc = Theory.SCALES[state.scale];
+    return !!sc && sc.steps.length === 7;
+  }
+
+  // Mode k window (7-note scales): a 5-fret practice window anchored where the
+  // k-th scale degree sits on the low string, walking up the neck from the
+  // lowest root — G major: G(1) fr.3, A(2) fr.5, B(3) fr.7 ... F#(7) fr.14.
+  // The SCALE itself never changes (roots stay put); only the window moves.
+  function modeWindow(k) {
+    var steps = Theory.SCALES[state.scale].steps;
+    var t0 = Theory.TUNINGS[state.tuning].midi[0];
+    var rootFret = 0, f;
+    for (f = 0; f < 12; f++) {
+      if (Theory.mod12(t0 + f) === Theory.mod12(state.root)) { rootFret = f; break; }
+    }
+    var a = rootFret + steps[(k - 1) % steps.length];
+    if (a + 4 > state.frets && a - 12 >= 0) a -= 12;
+    return [a, a + 4];
+  }
+
+  // Name the k-th rotation of the current scale by matching its step pattern
+  // against the known 7-note scales ("Dorian", "Mixolydian", ...). Rotations
+  // with no named match (most harmonic/melodic-minor modes) fall back to ''.
+  function modeName(k) {
+    var steps = Theory.SCALES[state.scale].steps;
+    var base = steps[(k - 1) % 7];
+    var rot = [];
+    for (var i = 0; i < 7; i++) rot.push(Theory.mod12(steps[(k - 1 + i) % 7] - base));
+    var key = rot.join(',');
+    for (var id in Theory.SCALES) {
+      var sc = Theory.SCALES[id];
+      if (sc.steps.length === 7 && sc.steps.join(',') === key) {
+        var paren = sc.name.match(/\(([^)]+)\)/);
+        return paren ? paren[1] : sc.name;
+      }
+    }
+    return '';
   }
 
   // Box N window: anchored at the Nth scale tone on the low E string (box 1 = root).
@@ -111,19 +162,48 @@
   }
 
   function renderPosRow() {
-    if (!isPent()) {
-      state.pos = 0;
-      els.posrow.style.display = 'none';
-      els.posrow.innerHTML = '';
+    if (isPent()) {
+      els.posrow.style.display = '';
+      var h = '<span class="muted small">Position:</span>';
+      for (var i = 0; i <= 5; i++) {
+        h += '<button type="button" class="chip fb-chip' + (state.pos === i ? ' active' : '') +
+          '" data-fbpos="' + i + '">' + (i === 0 ? 'All' : 'Box ' + i) + '</button>';
+      }
+      els.posrow.innerHTML = h;
       return;
     }
-    els.posrow.style.display = '';
-    var h = '<span class="muted small">Position:</span>';
-    for (var i = 0; i <= 5; i++) {
-      h += '<button type="button" class="chip fb-chip' + (state.pos === i ? ' active' : '') +
-        '" data-fbpos="' + i + '">' + (i === 0 ? 'All' : 'Box ' + i) + '</button>';
+    if (isHept()) {
+      // mode switcher: same scale, same roots — each chip re-anchors the
+      // highlighted practice window at another degree's position up the neck
+      els.posrow.style.display = '';
+      var info = Theory.scaleInfo(state.root, state.scale, preferFlat());
+      var m = '<span class="muted small">Mode:</span>';
+      for (var k = 1; k <= 7; k++) {
+        var name = modeName(k);
+        var w = modeWindow(k);
+        m += '<button type="button" class="chip fb-chip' + (state.mode === k ? ' active' : '') +
+          '" data-fbmw="' + k + '" title="Same notes as ' + info.names[0] + ' ' +
+          (Theory.SCALES[state.scale].name || '') + ' — practice window anchored at ' +
+          info.names[k - 1] + (name ? ' (' + name + ')' : '') + '">' +
+          k + ' · ' + info.names[k - 1] + (name ? ' ' + name : '') + ' · fr ' + w[0] + '</button>';
+      }
+      els.posrow.innerHTML = m;
+      return;
     }
-    els.posrow.innerHTML = h;
+    state.pos = 0;
+    els.posrow.style.display = 'none';
+    els.posrow.innerHTML = '';
+  }
+
+  function renderColorInputs() {
+    if (!els.colors) return;
+    var h = '';
+    for (var i = 0; i < 7; i++) {
+      h += '<label class="fb-colpick" title="Color for scale degree ' + (i + 1) + '">' + (i + 1) +
+        '<input type="color" value="' + DEG_COLORS[i] + '" data-fbcol="' + i + '"></label>';
+    }
+    h += '<button type="button" class="chip fb-chip" id="fb-col-reset">Reset</button>';
+    els.colors.innerHTML = h;
   }
 
   function renderBoard() {
@@ -176,6 +256,20 @@
     // board background
     s.push('<rect x="' + nutX + '" y="' + boardTop + '" width="' + (N * FRET_W) +
       '" height="' + (boardBot - boardTop) + '" rx="4" fill="var(--panel)"/>');
+
+    // mode practice window (7-note scales): a soft band marking where the
+    // exercise runs — the notes themselves never change or hide
+    if (isHept()) {
+      var mwin = modeWindow(state.mode);
+      var bx0 = mwin[0] === 0 ? LABEL_W : nutX + (mwin[0] - 1) * FRET_W;
+      var bx1 = nutX + Math.min(mwin[1], N) * FRET_W;
+      s.push('<rect x="' + bx0 + '" y="' + boardTop + '" width="' + (bx1 - bx0) +
+        '" height="' + (boardBot - boardTop) + '" fill="var(--accent)" opacity="0.09" pointer-events="none"/>');
+      s.push('<line x1="' + bx0 + '" y1="' + boardTop + '" x2="' + bx0 + '" y2="' + boardBot +
+        '" stroke="var(--accent)" stroke-width="2" stroke-dasharray="5 4" opacity="0.6" pointer-events="none"/>');
+      s.push('<line x1="' + bx1 + '" y1="' + boardTop + '" x2="' + bx1 + '" y2="' + boardBot +
+        '" stroke="var(--accent)" stroke-width="2" stroke-dasharray="5 4" opacity="0.6" pointer-events="none"/>');
+    }
 
     // inlay markers
     var inlayY = TOP + 2.5 * GAP;
@@ -491,6 +585,16 @@
     return f === 0 ? LABEL_W + OPEN_W / 2 : nutX + (f - 0.5) * FRET_W;
   }
 
+  // bring a fret into view (the neck runs DOWN the screen, so neck-x -> scrollTop)
+  function scrollToFret(f) {
+    var svg = els.scroll && els.scroll.querySelector('svg');
+    if (!svg || !vb.h) return;
+    var nutX = LABEL_W + OPEN_W;
+    var x = f <= 0 ? 0 : nutX + (f - 1) * FRET_W;
+    var target = (x / vb.h) * svg.getBoundingClientRect().height - 30;
+    els.scroll.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
+  }
+
   function rowY2(s) { return TOP + (state.lefty ? s : 5 - s) * GAP; }
 
   // playable positions: scale tones inside a 5-fret window (pentatonic box if
@@ -502,6 +606,8 @@
     var win;
     if (isPent() && state.pos > 0) {
       win = boxWindow(state.pos, info.pcSet);
+    } else if (isHept()) {
+      win = modeWindow(state.mode); // the active mode chip anchors the exercise
     } else {
       var t0 = tun.midi[0], rootFret = 0, f;
       for (f = 0; f < 12; f++) {
@@ -666,6 +772,11 @@
   function prPlayBtn(running) {
     var b = document.getElementById('fb-pr-play');
     if (b) b.innerHTML = running ? '&#10074;&#10074; Pause' : '&#9654; Play';
+    var m = document.getElementById('fb-playmax'); // fullscreen twin
+    if (m) {
+      m.innerHTML = running ? '&#10074;&#10074;' : '&#9654;';
+      m.classList.toggle('on', !!running);
+    }
   }
 
   function prStart() {
@@ -725,6 +836,7 @@
     click.checked = pr.click;
 
     document.getElementById('fb-pr-play').addEventListener('click', prToggle);
+    document.getElementById('fb-playmax').addEventListener('click', prToggle);
     document.getElementById('fb-pr-reset').addEventListener('click', function () { prStop(); });
     pat.addEventListener('change', function () {
       pr.pattern = this.value;
@@ -856,6 +968,8 @@
         'opacity:0.85}' +
       '.fb-exitmax:hover{opacity:1;border-color:var(--accent)}' +
       '.fb-board.fb-max .fb-exitmax{display:flex}' +
+      '.fb-playmax{top:66px;color:var(--accent);font-size:16px}' + // sits under the x; same base style
+      '.fb-playmax.on{border-color:var(--accent)}' +
       '.fb-toolbar{flex:0 0 auto}' +
       '.fb-practice{flex:0 0 auto}' +
       '.fb-practice select,.fb-practice input[type=number]{padding:6px 8px;font-size:13px}' +
@@ -874,9 +988,14 @@
       '.fb-jam-ring.on{opacity:0.92}' +
       '.fb-jam-ring.root{stroke:var(--accent);stroke-width:3.5}' +
       '.fb-settings{display:none;position:absolute;z-index:6;top:52px;left:10px;right:10px;max-width:760px;' +
-        'margin:0 auto;background:linear-gradient(180deg,#241e22 0%,#1b1619 100%);border:1px solid var(--line);' +
+        'margin:0 auto;background:var(--card);border:1px solid var(--line);' +
         'border-radius:12px;padding:16px 18px;box-shadow:0 18px 50px rgba(0,0,0,0.55);' +
         'max-height:calc(100% - 66px);overflow:auto}' +
+      '.fb-colpick{display:inline-flex;flex-direction:column;align-items:center;gap:3px;' +
+        'font-size:11px;color:var(--muted);font-weight:600}' +
+      '.fb-colpick input[type=color]{width:36px;height:27px;border:1px solid var(--line);' +
+        'border-radius:6px;padding:1px;background:var(--card2);cursor:pointer}' +
+      '[data-theme=light] .fb-jam-ring{stroke:rgba(0,0,0,0.6)}' +
       '.fb-settings.open{display:block}' +
       '.fb-settings h3{margin-top:14px}' +
       '.fb-hit{cursor:pointer}' +
@@ -948,6 +1067,7 @@
         '</div>' +
         '<div class="fb-scroll" id="fb-scroll"></div>' +
         '<button type="button" class="fb-exitmax" id="fb-exitmax" title="Exit fullscreen" aria-label="Exit fullscreen">&#10005;</button>' +
+        '<button type="button" class="fb-exitmax fb-playmax" id="fb-playmax" title="Play / pause the exercise" aria-label="Play or pause the practice exercise">&#9654;</button>' +
         '<div class="fb-settings" id="fb-settings">' +
           '<div class="row">' +
             '<label class="field">Root<select id="fb-root">' + buildOptions(rootOpts, state.root) + '</select></label>' +
@@ -963,6 +1083,9 @@
             '</div>' +
             '<label class="field">Left-handed<input type="checkbox" id="fb-lefty"' + (state.lefty ? ' checked' : '') + '></label>' +
             '<label class="field">Jam: auto-switch mode<input type="checkbox" id="fb-automode"></label>' +
+          '</div>' +
+          '<div class="fb-field" style="margin-top:12px">Degree colors' +
+            '<div class="row tight" id="fb-colors"></div>' +
           '</div>' +
           '<div class="row tight fb-legend" id="fb-legend"></div>' +
           '<h3 id="fb-info-title"></h3>' +
@@ -1027,6 +1150,17 @@
       renderBoard();
     });
     els.posrow.addEventListener('click', function (e) {
+      var mw = e.target.closest('button[data-fbmw]');
+      if (mw) {
+        var k = parseInt(mw.getAttribute('data-fbmw'), 10);
+        if (isNaN(k) || k < 1 || k > 7) return;
+        state.mode = k;
+        App.store.set('fb.mode', k);
+        renderPosRow();
+        renderBoard();
+        scrollToFret(modeWindow(k)[0]);
+        return;
+      }
       var chip = e.target.closest('button[data-fbpos]');
       if (!chip) return;
       var p = parseInt(chip.getAttribute('data-fbpos'), 10);
@@ -1034,6 +1168,25 @@
       state.pos = p;
       renderPosRow();
       renderBoard();
+    });
+
+    els.colors = document.getElementById('fb-colors');
+    renderColorInputs();
+    els.colors.addEventListener('change', function (e) {
+      var inp = e.target.closest('input[data-fbcol]');
+      if (!inp || !/^#[0-9a-fA-F]{6}$/.test(inp.value)) return;
+      var ci = parseInt(inp.getAttribute('data-fbcol'), 10);
+      if (isNaN(ci) || ci < 0 || ci > 6) return;
+      DEG_COLORS[ci] = inp.value;
+      App.store.set('fb.colors', DEG_COLORS);
+      renderBoard(); renderInfo(); renderLegend();
+    });
+    els.colors.addEventListener('click', function (e) {
+      if (!e.target.closest('#fb-col-reset')) return;
+      DEG_COLORS = DEG_DEFAULTS.slice();
+      App.store.set('fb.colors', null);
+      renderColorInputs();
+      renderBoard(); renderInfo(); renderLegend();
     });
 
     document.getElementById('fb-zout').addEventListener('click', function () { setZoom(zoom / 1.3); });

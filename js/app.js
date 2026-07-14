@@ -26,7 +26,7 @@ window.App = (function () {
   // ---- auto-update ----
   // version.json on GitHub is the source of truth. Web builds refresh through
   // the service worker; the APK build (file://) links to the new APK download.
-  var APP_VERSION = '0.7.1';
+  var APP_VERSION = '0.8.1';
   var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
 
   function verNum(v) {
@@ -171,6 +171,13 @@ window.App = (function () {
     document.head.appendChild(s);
   }
 
+  // ---- theme (dark is the default "stage gear" look) ----
+  function applyTheme(t) {
+    document.documentElement.setAttribute('data-theme', t);
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', t === 'light' ? '#f3efe8' : '#131114');
+  }
+
   // ---- keep the screen awake during active practice ----
   // Ref-counted: a module calls App.wake.acquire(tag) the instant an activity
   // starts (audio playing, a practice runner stepping, a timer counting, the
@@ -274,6 +281,16 @@ window.App = (function () {
       var mod = modules[active];
       if (mod && mod.onKey) mod.onKey(e);
     });
+
+    applyTheme(store.get('app.theme', 'dark'));
+    var themeBtn = document.getElementById('theme-btn');
+    if (themeBtn) {
+      themeBtn.addEventListener('click', function () {
+        var next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+        store.set('app.theme', next);
+        applyTheme(next);
+      });
+    }
 
     var startTab = store.get('app.tab', 'metronome');
     if (PANEL_ORDER.indexOf(startTab) === -1) startTab = 'metronome';
