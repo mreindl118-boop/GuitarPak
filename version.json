@@ -1,5 +1,5 @@
 {
-  "version": "0.7.0",
+  "version": "0.7.1",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "The practice tools now keep your screen awake while they run — the metronome, fretboard practice runner, Jam backing tracks, chord progression player, session timer, one-minute chord-change drill, and mic tuner hold the screen on while active and release it the moment you stop. NOTE: this build is signed with a new key — uninstall the previous app before installing it."
+  "notes": "Fullscreen fretboard is now truly fullscreen - every control bar hides and one floating button shrinks it back. Practice tools keep the screen awake while they run. NOTE: this build is signed with a new key - uninstall the pre-0.7.0 app before installing."
 }
