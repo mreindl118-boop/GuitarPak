@@ -332,6 +332,7 @@
     litIndex = -1;
     nextTime = ctx.currentTime + 0.08;
     running = true;
+    App.wake.acquire('met');
     timer = setInterval(tick, TICK_MS);
     tick();
     raf = requestAnimationFrame(draw);
@@ -345,6 +346,7 @@
     if (timer) { clearInterval(timer); timer = null; }
     if (raf) { cancelAnimationFrame(raf); raf = 0; }
     running = false;
+    App.wake.release('met');
     visQueue.length = 0;
     litIndex = -1;
     if (els.dots) paintDots();

@@ -442,6 +442,7 @@
       return;
     }
     play.on = true;
+    App.wake.acquire('ch-play');
     play.chordIdx = 0;
     play.beat = 0;
     play.countLeft = els.countin.checked ? 4 : 0;
@@ -470,6 +471,7 @@
       play.clickBus = null;
     }
     play.on = false;
+    App.wake.release('ch-play');
     play.queue = [];
     play.seq = [];
     if (els.now) els.now.classList.remove('ch-on');

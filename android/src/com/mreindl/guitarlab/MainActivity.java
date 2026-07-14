@@ -7,6 +7,8 @@ import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.view.WindowManager;
+import android.webkit.JavascriptInterface;
 import android.webkit.PermissionRequest;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
@@ -40,6 +42,13 @@ public class MainActivity extends Activity {
         // update check — WebView blocks network requests from file:// pages
         // without this. All file:// content here is our own bundled assets.
         s.setAllowUniversalAccessFromFileURLs(true);
+
+        // Screen Wake Lock isn't available to file:// pages (not a secure
+        // context), so the web app calls GuitarLabHost.setKeepScreenOn(...) to
+        // hold the screen on during active practice. Only our own bundled
+        // assets run in this WebView (external links open in the browser), so
+        // exposing this single method is safe.
+        web.addJavascriptInterface(new WebHost(), "GuitarLabHost");
 
         web.setWebChromeClient(new WebChromeClient() {
             @Override
@@ -108,5 +117,22 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         if (web != null) web.onResume();
+    }
+
+    /** Bridge the web app's keep-awake requests to the window's screen flag. */
+    private final class WebHost {
+        @JavascriptInterface
+        public void setKeepScreenOn(final boolean on) {
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    if (on) {
+                        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                    } else {
+                        getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                    }
+                }
+            });
+        }
     }
 }

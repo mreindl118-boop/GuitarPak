@@ -40,12 +40,15 @@ Pop-Location
 
 Step 'zipalign' { & "$bt\zipalign.exe" -f 4 "$out\unsigned.apk" "$out\aligned.apk" }
 
+# The keystore (passwordless PKCS12; the file itself is the secret) must already
+# exist. Never auto-generate a replacement: a new key changes the app signature
+# and breaks in-place updates for every install.
 if (-not (Test-Path "$proj\guitarlab.keystore")) {
-    Step 'keytool' { & "$jdk\bin\keytool.exe" -genkeypair -keystore "$proj\guitarlab.keystore" -alias guitarlab -keyalg RSA -keysize 2048 -validity 10000 -storepass guitarlab1 -keypass guitarlab1 -dname "CN=GuitarLab, O=mreindl" }
+    throw 'android/guitarlab.keystore is missing - restore it from backup. Do NOT generate a new one.'
 }
 
 New-Item -ItemType Directory -Force (Split-Path $apkOut) | Out-Null
-Step 'apksigner' { & "$bt\apksigner.bat" sign --ks "$proj\guitarlab.keystore" --ks-pass pass:guitarlab1 --key-pass pass:guitarlab1 --out $apkOut "$out\aligned.apk" }
+Step 'apksigner' { & "$bt\apksigner.bat" sign --ks "$proj\guitarlab.keystore" --ks-pass pass: --out $apkOut "$out\aligned.apk" }
 
 Write-Host "==> verify"
 & "$bt\aapt.exe" dump badging $apkOut | Select-String -Pattern "^package|launchable-activity|uses-permission|sdkVersion"

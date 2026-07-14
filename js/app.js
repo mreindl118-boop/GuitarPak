@@ -26,7 +26,7 @@ window.App = (function () {
   // ---- auto-update ----
   // version.json on GitHub is the source of truth. Web builds refresh through
   // the service worker; the APK build (file://) links to the new APK download.
-  var APP_VERSION = '0.6.1';
+  var APP_VERSION = '0.7.1';
   var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
 
   function verNum(v) {
@@ -171,6 +171,63 @@ window.App = (function () {
     document.head.appendChild(s);
   }
 
+  // ---- keep the screen awake during active practice ----
+  // Ref-counted: a module calls App.wake.acquire(tag) the instant an activity
+  // starts (audio playing, a practice runner stepping, a timer counting, the
+  // mic live) and App.wake.release(tag) the instant it stops. The screen is held
+  // awake while >= 1 tag is held. Each tag is idempotent (acquire twice = held
+  // once), so start/stop must stay balanced on every path. Two backends, tried
+  // together:
+  //   * Screen Wake Lock API  — PWA / any https (secure) context
+  //   * GuitarLabHost bridge  — the Android APK; file:// is not a secure context
+  //                             so wakeLock is absent there, and the WebView
+  //                             toggles FLAG_KEEP_SCREEN_ON instead
+  // Silent no-op when neither exists (e.g. a plain file:// browser tab).
+  var wakeHolders = {};
+  var wakeCount = 0;
+  var wakeSentinel = null;
+
+  function applyWake() {
+    var host = window.GuitarLabHost;
+    if (host && typeof host.setKeepScreenOn === 'function') {
+      try { host.setKeepScreenOn(wakeCount > 0); } catch (e) { /* bridge gone */ }
+    }
+    if ('wakeLock' in navigator) {
+      var want = wakeCount > 0 && !document.hidden;
+      if (want && !wakeSentinel) {
+        navigator.wakeLock.request('screen').then(function (s) {
+          // request() is async — if we stopped wanting it meanwhile, drop it now
+          if (wakeCount > 0 && !document.hidden) {
+            wakeSentinel = s;
+            s.addEventListener('release', function () { wakeSentinel = null; });
+          } else {
+            s.release().catch(function () {});
+          }
+        }).catch(function () { /* rejected (low battery / not allowed) — non-fatal */ });
+      } else if (!want && wakeSentinel) {
+        wakeSentinel.release().catch(function () {});
+        wakeSentinel = null;
+      }
+    }
+  }
+
+  var wake = {
+    acquire: function (tag) {
+      if (!tag || wakeHolders[tag]) return;
+      wakeHolders[tag] = true;
+      wakeCount++;
+      applyWake();
+    },
+    release: function (tag) {
+      if (!tag || !wakeHolders[tag]) return;
+      delete wakeHolders[tag];
+      wakeCount = Math.max(0, wakeCount - 1);
+      applyWake();
+    },
+    reapply: applyWake, // the browser auto-drops the lock on tab-hide; re-request on return
+    get active() { return wakeCount > 0; }
+  };
+
   function switchTo(name) {
     if (name === active) return;
     if (active && modules[active] && modules[active].onHide) {
@@ -243,6 +300,7 @@ window.App = (function () {
     checkForUpdate(true);
     window.addEventListener('online', function () { checkForUpdate(); });
     document.addEventListener('visibilitychange', function () {
+      wake.reapply(); // re-request the screen lock the browser dropped on hide
       if (!document.hidden) checkForUpdate();
     });
     setInterval(function () { checkForUpdate(); }, 4 * 60 * 60 * 1000);
@@ -256,6 +314,7 @@ window.App = (function () {
     on: on,
     emit: emit,
     injectCSS: injectCSS,
+    wake: wake,
     switchTo: switchTo,
     boot: boot,
     version: APP_VERSION,

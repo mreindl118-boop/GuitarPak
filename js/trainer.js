@@ -86,6 +86,7 @@
   function sessStart() {
     if (sessRunning) return;
     sessRunning = true;
+    App.wake.acquire('tr-sess');
     sessStamp = Date.now();
     sessInt = setInterval(function () { sessRender(); sessButtons(); }, 250);
     sessRender();
@@ -96,6 +97,7 @@
     if (!sessRunning) return;
     sessAccum += Date.now() - sessStamp;
     sessRunning = false;
+    App.wake.release('tr-sess');
     if (sessInt) { clearInterval(sessInt); sessInt = null; }
     sessRender();
     sessButtons();
@@ -223,6 +225,7 @@
     if (ccRunning) return;
     App.getAudio(); // user gesture: unlock audio for the end-of-run chime
     ccRunning = true;
+    App.wake.acquire('tr-cc');
     ccN = 0;
     ccEnd = Date.now() + 60000;
     els.ccNum.textContent = '0';
@@ -244,6 +247,7 @@
   function ccFinish() {
     if (ccInt) { clearInterval(ccInt); ccInt = null; }
     ccRunning = false;
+    App.wake.release('tr-cc');
     els.ccClock.textContent = '0';
     // chime: two quick high plucks
     App.pluck(76, 0, 0.3, 0.5);
@@ -265,6 +269,7 @@
     if (ccInt) { clearInterval(ccInt); ccInt = null; }
     var wasRunning = ccRunning;
     ccRunning = false;
+    App.wake.release('tr-cc');
     ccN = 0;
     els.ccClock.textContent = '60';
     els.ccNum.textContent = '0';

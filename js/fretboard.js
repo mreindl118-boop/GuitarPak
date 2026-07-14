@@ -676,6 +676,7 @@
     pr.vis.length = 0;
     pr.nextT = pr.ctx.currentTime + 0.15;
     pr.running = true;
+    App.wake.acquire('fb-run');
     pr.timer = setInterval(prTick, 25);
     prTick();
     pr.raf = requestAnimationFrame(prDraw);
@@ -687,6 +688,7 @@
     if (pr.timer) { clearInterval(pr.timer); pr.timer = null; }
     if (pr.raf) { cancelAnimationFrame(pr.raf); pr.raf = 0; }
     pr.running = false;
+    App.wake.release('fb-run');
     pr.vis.length = 0;
     prPlayBtn(false);
   }
@@ -844,7 +846,16 @@
     App.injectCSS('fretboard',
       '.fb-field{display:inline-flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--muted);font-weight:600}' +
       '.fb-board{position:relative;display:flex;flex-direction:column;gap:10px}' +
-      '.fb-board.fb-max{position:fixed;inset:0;z-index:200;margin:0;border-radius:0;padding:10px 14px}' +
+      '.fb-board.fb-max{position:fixed;inset:0;z-index:200;margin:0;border-radius:0;padding:0}' +
+      // truly fullscreen: board only — every control row disappears, one floating
+      // exit button remains
+      '.fb-board.fb-max .fb-toolbar,.fb-board.fb-max .fb-practice,.fb-board.fb-max .fb-posrow{display:none}' +
+      '.fb-exitmax{display:none;position:absolute;top:12px;right:12px;z-index:210;width:44px;height:44px;' +
+        'align-items:center;justify-content:center;border-radius:50%;border:1px solid var(--line);' +
+        'background:rgba(19,17,20,0.72);color:var(--text);font-size:19px;line-height:1;cursor:pointer;' +
+        'opacity:0.85}' +
+      '.fb-exitmax:hover{opacity:1;border-color:var(--accent)}' +
+      '.fb-board.fb-max .fb-exitmax{display:flex}' +
       '.fb-toolbar{flex:0 0 auto}' +
       '.fb-practice{flex:0 0 auto}' +
       '.fb-practice select,.fb-practice input[type=number]{padding:6px 8px;font-size:13px}' +
@@ -936,6 +947,7 @@
           '<span class="muted small" id="fb-pr-status"></span>' +
         '</div>' +
         '<div class="fb-scroll" id="fb-scroll"></div>' +
+        '<button type="button" class="fb-exitmax" id="fb-exitmax" title="Exit fullscreen" aria-label="Exit fullscreen">&#10005;</button>' +
         '<div class="fb-settings" id="fb-settings">' +
           '<div class="row">' +
             '<label class="field">Root<select id="fb-root">' + buildOptions(rootOpts, state.root) + '</select></label>' +
@@ -1031,6 +1043,7 @@
       els.settings.classList.toggle('open');
     });
     els.maxBtn.addEventListener('click', function () { setMax(!maxMode); });
+    document.getElementById('fb-exitmax').addEventListener('click', function () { setMax(false); });
     prWire();
 
     // follow the Jam tab's backing track
@@ -1095,6 +1108,7 @@
     els.maxBtn.title = on ? 'Exit fullscreen' : 'Fullscreen';
     document.body.style.overflow = on ? 'hidden' : '';
     if (on) {
+      els.settings.classList.remove('open'); // its gear toggle is hidden in max mode
       if (els.board.requestFullscreen) {
         els.board.requestFullscreen().then(function () {
           usedNativeFs = true;
