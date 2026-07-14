@@ -26,7 +26,7 @@ window.App = (function () {
   // ---- auto-update ----
   // version.json on GitHub is the source of truth. Web builds refresh through
   // the service worker; the APK build (file://) links to the new APK download.
-  var APP_VERSION = '0.9.0';
+  var APP_VERSION = '0.9.1';
   var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
 
   function verNum(v) {

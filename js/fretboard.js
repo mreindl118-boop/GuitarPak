@@ -1321,6 +1321,31 @@
       jamLast = null;
       jamPaint(null);
     });
+    // one-click practice from a Trainer prompt: apply root/scale/tempo, jump
+    // to this tab, and start the runner (emitted inside the click gesture, so
+    // the AudioContext is allowed to start)
+    App.on('fb:practice', function (d) {
+      if (!d) return;
+      if (typeof d.root === 'number' && isFinite(d.root) && d.root >= 0 && d.root < 12) {
+        state.root = Math.floor(d.root);
+        els.root.value = String(state.root);
+      }
+      if (d.scale && Theory.SCALES[d.scale]) {
+        state.scale = d.scale;
+        els.scaleSel.value = state.scale;
+      }
+      saveState();
+      renderAll();
+      if (typeof d.bpm === 'number' && isFinite(d.bpm)) {
+        pr.bpm = Math.max(30, Math.min(280, Math.round(d.bpm)));
+        var bpmEl = document.getElementById('fb-pr-bpm');
+        if (bpmEl) bpmEl.value = String(pr.bpm);
+        App.store.set('met.bpm', pr.bpm);
+        App.emit('tempo', { bpm: pr.bpm, source: 'fb' }); // metronome follows
+      }
+      App.switchTo('fretboard');
+      prStart();
+    });
     document.addEventListener('fullscreenchange', function () {
       // system back / Esc exits native fullscreen — drop the overlay with it
       if (!document.fullscreenElement && maxMode && usedNativeFs) setMax(false);
