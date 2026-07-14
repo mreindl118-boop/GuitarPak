@@ -21,12 +21,12 @@ window.App = (function () {
   var modules = {};
   var active = null;
   var audioCtx = null;
-  var PANEL_ORDER = ['metronome', 'fretboard', 'chords', 'jam', 'tuner', 'trainer'];
+  var PANEL_ORDER = ['metronome', 'fretboard', 'chords', 'jam', 'tuner', 'trainer', 'settings'];
 
   // ---- auto-update ----
   // version.json on GitHub is the source of truth. Web builds refresh through
   // the service worker; the APK build (file://) links to the new APK download.
-  var APP_VERSION = '0.8.1';
+  var APP_VERSION = '0.9.0';
   var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
 
   function verNum(v) {
@@ -172,10 +172,28 @@ window.App = (function () {
   }
 
   // ---- theme (dark is the default "stage gear" look) ----
-  function applyTheme(t) {
+  // Preference (app.theme): 'dark' | 'light' | 'auto'. 'auto' follows the
+  // device via prefers-color-scheme, live — changed from the Settings tab.
+  var darkMQ = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+
+  function applyTheme(pref) {
+    var t = pref === 'auto' ? (darkMQ && !darkMQ.matches ? 'light' : 'dark') : pref;
+    if (t !== 'light') t = 'dark';
     document.documentElement.setAttribute('data-theme', t);
     var meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute('content', t === 'light' ? '#f3efe8' : '#131114');
+  }
+
+  function setTheme(pref) {
+    if (pref !== 'dark' && pref !== 'light' && pref !== 'auto') pref = 'dark';
+    store.set('app.theme', pref);
+    applyTheme(pref);
+  }
+
+  if (darkMQ && darkMQ.addEventListener) {
+    darkMQ.addEventListener('change', function () {
+      if (store.get('app.theme', 'dark') === 'auto') applyTheme('auto');
+    });
   }
 
   // ---- keep the screen awake during active practice ----
@@ -283,14 +301,6 @@ window.App = (function () {
     });
 
     applyTheme(store.get('app.theme', 'dark'));
-    var themeBtn = document.getElementById('theme-btn');
-    if (themeBtn) {
-      themeBtn.addEventListener('click', function () {
-        var next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
-        store.set('app.theme', next);
-        applyTheme(next);
-      });
-    }
 
     var startTab = store.get('app.tab', 'metronome');
     if (PANEL_ORDER.indexOf(startTab) === -1) startTab = 'metronome';
@@ -332,6 +342,8 @@ window.App = (function () {
     emit: emit,
     injectCSS: injectCSS,
     wake: wake,
+    setTheme: setTheme,
+    get themePref() { return store.get('app.theme', 'dark'); },
     switchTo: switchTo,
     boot: boot,
     version: APP_VERSION,

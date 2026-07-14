@@ -1,5 +1,5 @@
 {
-  "version": "0.8.1",
+  "version": "0.9.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "Fretboard mode switcher: chips along the top re-anchor the practice window at any degree (roots stay put, the highlighted starting position moves). Fullscreen fretboard gains a floating play/pause button. Plus customization: recolor each scale degree and a light/dark theme toggle. NOTE: if updating from 0.6.1 or older, uninstall the old app first (new signing key)."
+  "notes": "Fretboard: mode switching is now a dropdown (and a swipe in fullscreen), practice patterns are Scale/3s-7s plus 2nd-16th interval drills with an up/down/up-down direction toggle, and random is gone. New Settings tab with dark/light/auto theme (auto follows your device). Tuner mic fixed on Android - the app was missing an audio permission; error messages now say what to actually do. NOTE: updating from 0.6.1 or older requires uninstalling the old app first (new signing key)."
 }

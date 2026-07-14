@@ -187,8 +187,6 @@ html, body {
 
 .tabs { display: flex; gap: 2px; flex-wrap: wrap; }
 
-#theme-btn { margin-left: auto; }
-
 .tab {
   position: relative;
   background: transparent;

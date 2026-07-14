@@ -365,9 +365,42 @@
     pendingMic = true;
     els.toggle.disabled = true;
     els.toggle.textContent = 'Requesting mic…';
-    navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
-    }).then(function (s) {
+    // first try with tuner-friendly raw audio; if the device refuses to open
+    // with processing disabled (some Android WebViews do), retry plain
+    tryOpenMic({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } }, false);
+
+    function micFail(err) {
+      pendingMic = false;
+      els.toggle.disabled = false;
+      els.toggle.textContent = 'Start listening';
+      var name = err && err.name ? err.name : 'error';
+      if (name === 'NotReadableError' || name === 'AbortError') {
+        showErr('The microphone exists but could not be opened (' + name + '). Usually another app is ' +
+          'holding the mic, or the system blocked the audio device — close recorder/voice apps, check ' +
+          'Settings › Apps › GuitarLab › Permissions › Microphone, then press Start again.');
+      } else if (name === 'NotAllowedError' || name === 'SecurityError') {
+        showErr('Mic permission was denied (' + name + '). In the Android app: allow the microphone prompt, ' +
+          'or enable it under Settings › Apps › GuitarLab › Permissions. In a browser: click the ' +
+          'mic icon in the address bar and choose Allow, then press Start again.');
+      } else if (name === 'NotFoundError') {
+        showErr('No microphone was found on this device.');
+      } else {
+        showErr('Microphone unavailable (' + name + (err && err.message ? ': ' + err.message : '') + '). ' +
+          'Check the mic permission and try again.');
+      }
+    }
+
+    function tryOpenMic(constraints, isRetry) {
+      navigator.mediaDevices.getUserMedia(constraints).then(function (s) {
+        onMicStream(s);
+      }).catch(function (err) {
+        if (token !== startReq) return;
+        if (!isRetry) { tryOpenMic({ audio: true }, true); return; }
+        micFail(err);
+      });
+    }
+
+    function onMicStream(s) {
       if (token !== startReq) {
         // user hid the tab / pressed stop while the permission prompt was open
         s.getTracks().forEach(function (tr) { tr.stop(); });
@@ -391,16 +424,7 @@
       els.toggle.classList.add('danger');
       updateGameUI();
       rafId = requestAnimationFrame(frame);
-    }).catch(function (err) {
-      if (token !== startReq) return;
-      pendingMic = false;
-      els.toggle.disabled = false;
-      els.toggle.textContent = 'Start listening';
-      var name = err && err.name ? err.name : 'error';
-      showErr('Microphone unavailable (' + name + '). GuitarLab needs mic permission for the tuner — ' +
-        'click the mic icon in the address bar, choose Allow, then press Start again. ' +
-        'Tip: Chrome and Edge work even from file://; Firefox and Safari require http(s) or localhost.');
-    });
+    }
   }
 
   function stopMic() {
