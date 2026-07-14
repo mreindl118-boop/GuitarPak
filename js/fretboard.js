@@ -772,6 +772,11 @@
   function prPlayBtn(running) {
     var b = document.getElementById('fb-pr-play');
     if (b) b.innerHTML = running ? '&#10074;&#10074; Pause' : '&#9654; Play';
+    var m = document.getElementById('fb-playmax'); // fullscreen twin
+    if (m) {
+      m.innerHTML = running ? '&#10074;&#10074;' : '&#9654;';
+      m.classList.toggle('on', !!running);
+    }
   }
 
   function prStart() {
@@ -831,6 +836,7 @@
     click.checked = pr.click;
 
     document.getElementById('fb-pr-play').addEventListener('click', prToggle);
+    document.getElementById('fb-playmax').addEventListener('click', prToggle);
     document.getElementById('fb-pr-reset').addEventListener('click', function () { prStop(); });
     pat.addEventListener('change', function () {
       pr.pattern = this.value;
@@ -962,6 +968,8 @@
         'opacity:0.85}' +
       '.fb-exitmax:hover{opacity:1;border-color:var(--accent)}' +
       '.fb-board.fb-max .fb-exitmax{display:flex}' +
+      '.fb-playmax{top:66px;color:var(--accent);font-size:16px}' + // sits under the x; same base style
+      '.fb-playmax.on{border-color:var(--accent)}' +
       '.fb-toolbar{flex:0 0 auto}' +
       '.fb-practice{flex:0 0 auto}' +
       '.fb-practice select,.fb-practice input[type=number]{padding:6px 8px;font-size:13px}' +
@@ -1059,6 +1067,7 @@
         '</div>' +
         '<div class="fb-scroll" id="fb-scroll"></div>' +
         '<button type="button" class="fb-exitmax" id="fb-exitmax" title="Exit fullscreen" aria-label="Exit fullscreen">&#10005;</button>' +
+        '<button type="button" class="fb-exitmax fb-playmax" id="fb-playmax" title="Play / pause the exercise" aria-label="Play or pause the practice exercise">&#9654;</button>' +
         '<div class="fb-settings" id="fb-settings">' +
           '<div class="row">' +
             '<label class="field">Root<select id="fb-root">' + buildOptions(rootOpts, state.root) + '</select></label>' +

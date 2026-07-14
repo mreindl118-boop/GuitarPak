@@ -1,5 +1,5 @@
 {
-  "version": "0.8.0",
+  "version": "0.8.1",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "Fretboard mode switcher: chips along the top re-anchor the practice window at any degree (G Ionian at fr.3, same notes as A Dorian at fr.5 - roots stay put, the highlighted starting position moves). Plus customization: recolor each scale degree and a new light/dark theme toggle. NOTE: if updating from 0.6.1 or older, uninstall the old app first (new signing key)."
+  "notes": "Fretboard mode switcher: chips along the top re-anchor the practice window at any degree (roots stay put, the highlighted starting position moves). Fullscreen fretboard gains a floating play/pause button. Plus customization: recolor each scale degree and a light/dark theme toggle. NOTE: if updating from 0.6.1 or older, uninstall the old app first (new signing key)."
 }
