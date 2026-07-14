@@ -42,7 +42,9 @@ version.json      auto-update feed (source of truth for latest version)
 - Fretboard is drawn in horizontal-neck coordinates and rotated 90° cw as one
   SVG group (nut at top, low E left). Practice-runner paths dedupe identical
   pitches at string crossings.
-- Note colors: one bright color per scale degree (DEG_COLORS in fretboard.js).
+- Note colors: one bright color per scale degree (DEG_COLORS in fretboard.js);
+  user-customizable in the fretboard settings (stored as fb.colors, DEG_DEFAULTS
+  restores). Light/dark theme: data-theme attr on <html>, app.theme in storage.
 
 ## Dev loop
 

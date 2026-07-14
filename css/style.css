@@ -53,6 +53,67 @@
   --font-display: 'Barlow Condensed', 'Segoe UI', system-ui, sans-serif;
 }
 
+/* ---------- light theme (toggled by the ◐ button; persisted app.theme) ---------- */
+
+:root[data-theme="light"] {
+  --bg: #f3efe8;
+  --panel: #efe9df;
+  --card: #fffdf9;
+  --card2: #f0eadf;
+  --line: #d8cfc1;
+  --line-soft: rgba(0, 0, 0, 0.05);
+  --text: #2b241d;
+  --muted: #857b6b;
+  --accent: #d97e0f;        /* amber, darkened for contrast on light */
+  --accent-dim: #b96a10;
+  --accent-glow: rgba(217, 126, 15, 0.28);
+}
+
+/* the handful of intentionally-dark "stage gear" surfaces, re-lit */
+:root[data-theme="light"] .topbar {
+  background: rgba(250, 247, 242, 0.9);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.08);
+}
+:root[data-theme="light"] .btn {
+  background: linear-gradient(180deg, #fffdf9 0%, #efe8dc 100%);
+  border-color: #d2c8b8;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+:root[data-theme="light"] .btn:active { box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.15); }
+:root[data-theme="light"] select,
+:root[data-theme="light"] input[type="number"],
+:root[data-theme="light"] input[type="text"] {
+  background: linear-gradient(180deg, #fffdf9 0%, #f4eee5 100%);
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.07);
+}
+:root[data-theme="light"] input[type="range"]::-webkit-slider-runnable-track {
+  background: #e2dacd;
+  border-color: #cfc5b4;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+:root[data-theme="light"] input[type="range"]::-webkit-slider-thumb {
+  background: radial-gradient(circle at 35% 28%, #fffdf9, #d8cfc0 72%);
+}
+:root[data-theme="light"] .card {
+  background: linear-gradient(180deg, #fffdf9 0%, var(--card) 55%, #f4eee4 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 12px 32px rgba(0, 0, 0, 0.1);
+}
+:root[data-theme="light"] .seg {
+  background: #e8e1d5;
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.08);
+}
+:root[data-theme="light"] .seg button.active {
+  background: linear-gradient(180deg, #fffdf9 0%, #f1ebe1 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+:root[data-theme="light"] .chip {
+  background: linear-gradient(180deg, #fbf8f2 0%, #eee7db 100%);
+}
+:root[data-theme="light"] .chip.active {
+  border-color: rgba(217, 126, 15, 0.7);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 0 12px rgba(217, 126, 15, 0.16);
+}
+
 * { box-sizing: border-box; }
 
 html, body {
@@ -125,6 +186,8 @@ html, body {
 }
 
 .tabs { display: flex; gap: 2px; flex-wrap: wrap; }
+
+#theme-btn { margin-left: auto; }
 
 .tab {
   position: relative;
