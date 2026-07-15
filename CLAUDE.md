@@ -19,7 +19,8 @@ js/fretboard.js   │ App.register(name, {init, onShow, onHide, onKey})
 js/chords.js      │ DOM ids/CSS prefixed met-/fb-/ch-/jam-/tun-/tr-
 js/jam.js         │
 js/tuner.js       │
-js/trainer.js     ┘
+js/trainer.js     │
+js/settings.js    ┘ (settings: app-level prefs — theme dark/light/auto)
 samples/          MIT FluidR3 instrument MP3s (see samples/CREDITS.md)
 android/          APK project — build.ps1 (no Gradle: javac→d8→aapt→zipalign→
                   apksigner); keystore is gitignored, do NOT commit it
@@ -32,7 +33,8 @@ version.json      auto-update feed (source of truth for latest version)
 
 - Event bus: `App.on/emit`. Events: `tempo` {bpm, source} (met.bpm is the ONE
   shared tempo — always guard against echo via `source`), `jam:chord`,
-  `jam:stopped`.
+  `jam:stopped`, `fb:practice` {root?, scale?, bpm?} (Trainer prompt "Go" —
+  fretboard applies it, switches tabs, starts the runner).
 - Audio schedulers (metronome/practice/jam): 25 ms setInterval + lookahead on
   the AudioContext clock, with a catch-up guard (`if nextT < currentTime →
   jump forward`) so stalls never schedule past-dated (silent) notes. Keep this

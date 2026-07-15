@@ -1,5 +1,5 @@
 {
-  "version": "0.8.1",
+  "version": "0.9.1",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "Fretboard mode switcher: chips along the top re-anchor the practice window at any degree (roots stay put, the highlighted starting position moves). Fullscreen fretboard gains a floating play/pause button. Plus customization: recolor each scale degree and a light/dark theme toggle. NOTE: if updating from 0.6.1 or older, uninstall the old app first (new signing key)."
+  "notes": "Trainer prompts get a one-tap Go button: random key, mode, and improv prompts set up the fretboard (root, scale, tempo) and start the practice runner in one click. Plus everything from 0.9.0: swipe/dropdown mode switching, 2nd-16th interval drills with direction toggle, Settings tab with auto theme, and the Android tuner mic fix. NOTE: updating from 0.6.1 or older requires uninstalling the old app first (new signing key)."
 }

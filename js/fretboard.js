@@ -112,6 +112,27 @@
     return [a, a + 4];
   }
 
+  // "A Dorian · fr 5" — the shared label for the dropdown and the swipe flash
+  function modeLabel(info, k) {
+    var name = modeName(k);
+    return info.names[k - 1] + (name ? ' ' + name : '') + ' · fr ' + modeWindow(k)[0];
+  }
+
+  // Change the active mode from anywhere (dropdown, fullscreen swipe): moves
+  // the window band, scrolls to it, and — if an exercise was running — restarts
+  // it from the new position so the practice follows the switch.
+  function setMode(k) {
+    k = ((k - 1) % 7 + 7) % 7 + 1; // wrap around for swipe cycling
+    if (k === state.mode) return;
+    state.mode = k;
+    App.store.set('fb.mode', k);
+    var wasRunning = pr.running;
+    renderPosRow();
+    renderBoard();               // redraws the band (this stops the runner)
+    scrollToFret(modeWindow(k)[0]);
+    if (wasRunning) prStart();   // pick the exercise back up in the new window
+  }
+
   // Name the k-th rotation of the current scale by matching its step pattern
   // against the known 7-note scales ("Dorian", "Mixolydian", ...). Rotations
   // with no named match (most harmonic/melodic-minor modes) fall back to ''.
@@ -173,20 +194,19 @@
       return;
     }
     if (isHept()) {
-      // mode switcher: same scale, same roots — each chip re-anchors the
-      // highlighted practice window at another degree's position up the neck
+      // mode switcher: same scale, same roots — the selected mode re-anchors
+      // the highlighted practice window at another degree's position up the
+      // neck. A dropdown here; a horizontal swipe in fullscreen (linked state).
       els.posrow.style.display = '';
       var info = Theory.scaleInfo(state.root, state.scale, preferFlat());
-      var m = '<span class="muted small">Mode:</span>';
+      var m = '<label class="row tight small muted" style="gap:7px">Mode:' +
+        '<select id="fb-modesel" title="Same notes, same roots — moves the practice window">';
       for (var k = 1; k <= 7; k++) {
-        var name = modeName(k);
-        var w = modeWindow(k);
-        m += '<button type="button" class="chip fb-chip' + (state.mode === k ? ' active' : '') +
-          '" data-fbmw="' + k + '" title="Same notes as ' + info.names[0] + ' ' +
-          (Theory.SCALES[state.scale].name || '') + ' — practice window anchored at ' +
-          info.names[k - 1] + (name ? ' (' + name + ')' : '') + '">' +
-          k + ' · ' + info.names[k - 1] + (name ? ' ' + name : '') + ' · fr ' + w[0] + '</button>';
+        m += '<option value="' + k + '"' + (state.mode === k ? ' selected' : '') + '>' +
+          k + ' · ' + modeLabel(info, k) + '</option>';
       }
+      m += '</select></label>' +
+        '<span class="muted small">swipe the board in fullscreen to switch</span>';
       els.posrow.innerHTML = m;
       return;
     }
@@ -482,12 +502,32 @@
     setTimeout(function () { suppressClick = false; }, 350);
   }
 
+  // transient "2 · A Dorian · fr 5" pill after a fullscreen mode swipe
+  function flashMode() {
+    var info = Theory.scaleInfo(state.root, state.scale, preferFlat());
+    if (!info) return;
+    var el = document.getElementById('fb-modeflash');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'fb-modeflash';
+      els.board.appendChild(el);
+    }
+    el.textContent = state.mode + ' · ' + modeLabel(info, state.mode);
+    el.classList.remove('show');
+    void el.offsetWidth; // restart the fade animation
+    el.classList.add('show');
+  }
+
   function wireViewport() {
     var wrap = els.scroll;
     var pinch = null;
     var lastTap = { t: 0, x: 0 };
+    var swipe = null; // fullscreen mode-switch flick (7-note scales only)
 
     wrap.addEventListener('touchstart', function (e) {
+      swipe = e.touches.length === 1
+        ? { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now(), sl: wrap.scrollLeft }
+        : null;
       if (e.touches.length === 2) {
         pinch = {
           d0: Math.hypot(e.touches[0].clientX - e.touches[1].clientX,
@@ -512,6 +552,23 @@
       if (pinch) {
         if (e.touches.length === 0) { pinch = null; endGesture(); }
         return;
+      }
+      // fullscreen mode swipe: a fast, mostly-horizontal flick that didn't pan
+      // the board sideways cycles the practice-window mode (wraps 7 -> 1)
+      if (swipe && maxMode && isHept() &&
+          e.changedTouches.length === 1 && e.touches.length === 0) {
+        var sdx = e.changedTouches[0].clientX - swipe.x;
+        var sdy = e.changedTouches[0].clientY - swipe.y;
+        var panned = Math.abs(wrap.scrollLeft - swipe.sl) > 5;
+        if (Date.now() - swipe.t < 400 && Math.abs(sdx) >= 60 &&
+            Math.abs(sdx) > 2 * Math.abs(sdy) && !panned) {
+          swipe = null;
+          lastTap.t = 0; // a flick is not half of a double-tap
+          endGesture();
+          setMode(state.mode + (sdx < 0 ? 1 : -1)); // swipe left = next mode
+          flashMode();
+          return;
+        }
       }
       // double-tap toggles whole-neck fit <-> fill-height, centred on the tap
       if (e.changedTouches.length === 1 && e.touches.length === 0) {
@@ -571,12 +628,12 @@
   // ---------------- practice runner ----------------
   // Steps through the current scale (in the active position window) in time
   // with its own click: a glowing ring marks the note to play NOW, a dashed
-  // ring previews the next one. Patterns: straight runs, groups of 3-6,
-  // thirds, and random-note drills.
+  // ring previews the next one. Patterns: the straight scale or sliding groups
+  // of 3-7, each playable up, down, or up-and-down.
 
   var pr = {
     running: false, idx: 0, seq: null, path: [],
-    pattern: 'up', bpm: 80, rate: 1, sound: true, click: true,
+    pattern: 'scale', dir: 'up', bpm: 80, rate: 1, sound: true, click: true,
     timer: null, raf: 0, nextT: 0, vis: [], ctx: null
   };
 
@@ -633,26 +690,32 @@
     return path.filter(function (n, i) { return i === 0 || n.midi !== path[i - 1].midi; });
   }
 
-  // expand the path into an index sequence for the chosen pattern
-  function prSeq(n, pattern) {
-    var out = [], i, j, k;
-    if (!n) return out;
-    if (pattern === 'updown') {
-      for (i = 0; i < n; i++) out.push(i);
-      for (i = n - 2; i >= 1; i--) out.push(i);
-    } else if (/^g[3-6]$/.test(pattern)) {
+  // expand the path into an index sequence: the pattern builds the ascending
+  // run (straight scale or sliding groups of 3-7), the direction then plays it
+  // up, down (exact reverse), or up-then-down (skipping the repeated apex)
+  function prSeq(n, pattern, dir) {
+    var up = [], i, j, k;
+    if (!n) return up;
+    var iv = /^i([0-9]+)$/.exec(pattern);
+    if (/^g[3-7]$/.test(pattern)) {
       k = parseInt(pattern.slice(1), 10);
-      if (n < k) { for (i = 0; i < n; i++) out.push(i); }
-      else { for (i = 0; i + k <= n; i++) for (j = 0; j < k; j++) out.push(i + j); }
-    } else if (pattern === 'thirds') {
-      if (n < 3) { for (i = 0; i < n; i++) out.push(i); }
-      else { for (i = 0; i + 2 < n; i++) { out.push(i); out.push(i + 2); } }
-    } else if (pattern === 'random') {
-      return null; // pick at schedule time
-    } else { // 'up'
-      for (i = 0; i < n; i++) out.push(i);
+      if (n < k) { for (i = 0; i < n; i++) up.push(i); }
+      else { for (i = 0; i + k <= n; i++) for (j = 0; j < k; j++) up.push(i + j); }
+    } else if (iv) {
+      // interval practice: pairs a diatonic N-th apart (3rd = 2 scale steps),
+      // sliding up the window; falls back to the plain run if nothing fits
+      k = parseInt(iv[1], 10) - 1;
+      if (n > k) { for (i = 0; i + k < n; i++) { up.push(i); up.push(i + k); } }
+      else { for (i = 0; i < n; i++) up.push(i); }
+    } else { // 'scale'
+      for (i = 0; i < n; i++) up.push(i);
     }
-    return out;
+    if (dir === 'down') return up.slice().reverse();
+    if (dir === 'updown') {
+      var down = up.slice().reverse();
+      return up.concat(down.slice(1, Math.max(1, down.length - 1)));
+    }
+    return up;
   }
 
   function prRings() {
@@ -690,7 +753,6 @@
   }
 
   function prNodeAt(step) {
-    if (pr.seq === null) return pr.path[step % pr.path.length]; // random resolved in tick
     return pr.path[pr.seq[step % pr.seq.length]];
   }
 
@@ -700,12 +762,8 @@
     if (pr.nextT < pr.ctx.currentTime + 0.01) pr.nextT = pr.ctx.currentTime + 0.05;
     var horizon = pr.ctx.currentTime + 0.25;
     while (pr.nextT < horizon) {
-      var node;
-      if (pr.seq === null) node = pr.path[Math.floor(Math.random() * pr.path.length)];
-      else node = pr.path[pr.seq[pr.idx % pr.seq.length]];
-      var nextNode;
-      if (pr.seq === null) nextNode = null;
-      else nextNode = pr.path[pr.seq[(pr.idx + 1) % pr.seq.length]];
+      var node = pr.path[pr.seq[pr.idx % pr.seq.length]];
+      var nextNode = pr.path[pr.seq[(pr.idx + 1) % pr.seq.length]];
       var when = pr.nextT - pr.ctx.currentTime;
       if (pr.sound) App.pluck(node.midi, when, 0.55, 0.32);
       if (pr.click) {
@@ -745,7 +803,7 @@
         }
       }
       prScrollTo(hit.node);
-      var total = pr.seq === null ? pr.path.length : pr.seq.length;
+      var total = pr.seq.length;
       prStatus((hit.step % total) + 1 + ' / ' + total);
     }
     pr.raf = requestAnimationFrame(prDraw);
@@ -782,7 +840,7 @@
   function prStart() {
     pr.path = prPath();
     if (!pr.path.length) { prStatus('no notes in this position'); return; }
-    pr.seq = prSeq(pr.path.length, pr.pattern);
+    pr.seq = prSeq(pr.path.length, pr.pattern, pr.dir);
     try { pr.ctx = App.getAudio(); } catch (e) { prStatus('audio unavailable'); return; }
     pr.vis.length = 0;
     pr.nextT = pr.ctx.currentTime + 0.15;
@@ -817,7 +875,11 @@
   }
 
   function prWire() {
-    pr.pattern = App.store.get('fb.pr.pattern', 'up');
+    // migrate pre-0.9 stored patterns: up/updown/thirds/random -> scale (+dir)
+    var storedPat = App.store.get('fb.pr.pattern', 'scale');
+    pr.pattern = /^(scale|g[3-7]|i([2-9]|1[0-6]))$/.test(storedPat) ? storedPat : 'scale';
+    pr.dir = App.store.get('fb.pr.dir', storedPat === 'updown' ? 'updown' : 'up');
+    if (!/^(up|down|updown)$/.test(pr.dir)) pr.dir = 'up';
     // tempo is SHARED with the metronome — met.bpm is the single source of truth
     pr.bpm = Math.max(30, Math.min(280, parseInt(App.store.get('met.bpm', 100), 10) || 100));
     pr.rate = App.store.get('fb.pr.rate', 1);
@@ -842,7 +904,23 @@
       pr.pattern = this.value;
       App.store.set('fb.pr.pattern', pr.pattern);
       pr.idx = 0;
-      if (pr.running) { pr.path = prPath(); pr.seq = prSeq(pr.path.length, pr.pattern); }
+      if (pr.running) { pr.path = prPath(); pr.seq = prSeq(pr.path.length, pr.pattern, pr.dir); }
+    });
+    var dirSeg = document.getElementById('fb-pr-dir');
+    function paintDir() {
+      dirSeg.querySelectorAll('button').forEach(function (b) {
+        b.classList.toggle('active', b.getAttribute('data-fbdir') === pr.dir);
+      });
+    }
+    paintDir();
+    dirSeg.addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-fbdir]');
+      if (!b) return;
+      pr.dir = b.getAttribute('data-fbdir');
+      App.store.set('fb.pr.dir', pr.dir);
+      paintDir();
+      pr.idx = 0;
+      if (pr.running) { pr.path = prPath(); pr.seq = prSeq(pr.path.length, pr.pattern, pr.dir); }
     });
     bpm.addEventListener('change', function () {
       var v = parseInt(this.value, 10);
@@ -964,12 +1042,18 @@
       '.fb-board.fb-max .fb-toolbar,.fb-board.fb-max .fb-practice,.fb-board.fb-max .fb-posrow{display:none}' +
       '.fb-exitmax{display:none;position:absolute;top:12px;right:12px;z-index:210;width:44px;height:44px;' +
         'align-items:center;justify-content:center;border-radius:50%;border:1px solid var(--line);' +
-        'background:rgba(19,17,20,0.72);color:var(--text);font-size:19px;line-height:1;cursor:pointer;' +
+        'background:rgba(19,17,20,0.72);color:#ede8e0;font-size:19px;line-height:1;cursor:pointer;' + // fixed dark chip: keep light glyph in BOTH themes
         'opacity:0.85}' +
       '.fb-exitmax:hover{opacity:1;border-color:var(--accent)}' +
       '.fb-board.fb-max .fb-exitmax{display:flex}' +
       '.fb-playmax{top:66px;color:var(--accent);font-size:16px}' + // sits under the x; same base style
       '.fb-playmax.on{border-color:var(--accent)}' +
+      '#fb-modeflash{position:absolute;top:70px;left:50%;transform:translateX(-50%);z-index:205;' +
+        'background:rgba(19,17,20,0.85);border:1px solid var(--accent);color:#ede8e0;' +
+        'border-radius:999px;padding:8px 18px;font-family:var(--font-display);font-size:17px;' +
+        'letter-spacing:1px;white-space:nowrap;opacity:0;pointer-events:none}' +
+      '#fb-modeflash.show{animation:fb-modeflash 1.4s ease forwards}' +
+      '@keyframes fb-modeflash{0%{opacity:0}12%{opacity:1}70%{opacity:1}100%{opacity:0}}' +
       '.fb-toolbar{flex:0 0 auto}' +
       '.fb-practice{flex:0 0 auto}' +
       '.fb-practice select,.fb-practice input[type=number]{padding:6px 8px;font-size:13px}' +
@@ -1045,15 +1129,37 @@
           '<button type="button" class="btn sm primary" id="fb-pr-play">&#9654; Play</button>' +
           '<button type="button" class="btn sm" id="fb-pr-reset" title="Back to the first note">&#8634;</button>' +
           '<select id="fb-pr-pattern" title="Exercise pattern">' +
-            '<option value="up">Straight up</option>' +
-            '<option value="updown">Up &amp; down</option>' +
-            '<option value="g3">In 3s</option>' +
-            '<option value="g4">In 4s</option>' +
-            '<option value="g5">In 5s</option>' +
-            '<option value="g6">In 6s</option>' +
-            '<option value="thirds">Thirds</option>' +
-            '<option value="random">Random note</option>' +
+            '<option value="scale">Scale</option>' +
+            '<optgroup label="Groups">' +
+            '<option value="g3">3s</option>' +
+            '<option value="g4">4s</option>' +
+            '<option value="g5">5s</option>' +
+            '<option value="g6">6s</option>' +
+            '<option value="g7">7s</option>' +
+            '</optgroup>' +
+            '<optgroup label="Intervals">' +
+            '<option value="i2">2nds</option>' +
+            '<option value="i3">3rds</option>' +
+            '<option value="i4">4ths</option>' +
+            '<option value="i5">5ths</option>' +
+            '<option value="i6">6ths</option>' +
+            '<option value="i7">7ths</option>' +
+            '<option value="i8">Octaves</option>' +
+            '<option value="i9">9ths</option>' +
+            '<option value="i10">10ths</option>' +
+            '<option value="i11">11ths</option>' +
+            '<option value="i12">12ths</option>' +
+            '<option value="i13">13ths</option>' +
+            '<option value="i14">14ths</option>' +
+            '<option value="i15">15ths</option>' +
+            '<option value="i16">16ths</option>' +
+            '</optgroup>' +
           '</select>' +
+          '<div class="seg" id="fb-pr-dir" title="Direction — applies to every pattern">' +
+            '<button type="button" data-fbdir="up" title="Ascending">&#8593;</button>' +
+            '<button type="button" data-fbdir="down" title="Descending">&#8595;</button>' +
+            '<button type="button" data-fbdir="updown" title="Up, then back down">&#8597;</button>' +
+          '</div>' +
           '<input type="number" id="fb-pr-bpm" min="30" max="280" step="1" title="Tempo (BPM) — linked to the metronome" style="width:70px">' +
           '<select id="fb-pr-rate" title="Notes per beat">' +
             '<option value="1">1 / beat</option>' +
@@ -1149,18 +1255,13 @@
       saveState();
       renderBoard();
     });
-    els.posrow.addEventListener('click', function (e) {
-      var mw = e.target.closest('button[data-fbmw]');
-      if (mw) {
-        var k = parseInt(mw.getAttribute('data-fbmw'), 10);
-        if (isNaN(k) || k < 1 || k > 7) return;
-        state.mode = k;
-        App.store.set('fb.mode', k);
-        renderPosRow();
-        renderBoard();
-        scrollToFret(modeWindow(k)[0]);
-        return;
+    els.posrow.addEventListener('change', function (e) {
+      if (e.target && e.target.id === 'fb-modesel') {
+        var k = parseInt(e.target.value, 10);
+        if (!isNaN(k)) setMode(k);
       }
+    });
+    els.posrow.addEventListener('click', function (e) {
       var chip = e.target.closest('button[data-fbpos]');
       if (!chip) return;
       var p = parseInt(chip.getAttribute('data-fbpos'), 10);
@@ -1219,6 +1320,31 @@
     App.on('jam:stopped', function () {
       jamLast = null;
       jamPaint(null);
+    });
+    // one-click practice from a Trainer prompt: apply root/scale/tempo, jump
+    // to this tab, and start the runner (emitted inside the click gesture, so
+    // the AudioContext is allowed to start)
+    App.on('fb:practice', function (d) {
+      if (!d) return;
+      if (typeof d.root === 'number' && isFinite(d.root) && d.root >= 0 && d.root < 12) {
+        state.root = Math.floor(d.root);
+        els.root.value = String(state.root);
+      }
+      if (d.scale && Theory.SCALES[d.scale]) {
+        state.scale = d.scale;
+        els.scaleSel.value = state.scale;
+      }
+      saveState();
+      renderAll();
+      if (typeof d.bpm === 'number' && isFinite(d.bpm)) {
+        pr.bpm = Math.max(30, Math.min(280, Math.round(d.bpm)));
+        var bpmEl = document.getElementById('fb-pr-bpm');
+        if (bpmEl) bpmEl.value = String(pr.bpm);
+        App.store.set('met.bpm', pr.bpm);
+        App.emit('tempo', { bpm: pr.bpm, source: 'fb' }); // metronome follows
+      }
+      App.switchTo('fretboard');
+      prStart();
     });
     document.addEventListener('fullscreenchange', function () {
       // system back / Esc exits native fullscreen — drop the overlay with it

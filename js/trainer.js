@@ -158,8 +158,9 @@
       return 'Play "' + pick(Theory.PROGRESSIONS).name + '" in ' + keyName(randPc());
     },
     function () {
-      return 'Improvise over ' + keyName(randPc()) + ' ' +
-        Theory.SCALES[pick(Theory.SCALE_ORDER)].name + ' at ' + (60 + rand(61)) + ' BPM';
+      var pc = randPc(), sc = pick(Theory.SCALE_ORDER), bpm = 60 + rand(61);
+      return { text: 'Improvise over ' + keyName(pc) + ' ' + Theory.SCALES[sc].name + ' at ' + bpm + ' BPM',
+               go: { root: pc, scale: sc, bpm: bpm } };
     },
     function () {
       var a = 1 + rand(6), b = 1 + rand(6);
@@ -183,13 +184,18 @@
     }
   ];
 
-  function setPrompt(text) {
+  var promptGo = null; // fretboard action for the current prompt, if any
+
+  function setPrompt(p) {
+    var text = typeof p === 'string' ? p : p.text;
+    promptGo = typeof p === 'string' ? null : (p.go || null);
     if (promptCur) {
       promptHist.unshift(promptCur);
       if (promptHist.length > 5) promptHist.length = 5;
     }
     promptCur = text;
     els.prCur.textContent = text;
+    els.prGo.style.display = promptGo ? '' : 'none';
     renderPromptHist();
   }
 
@@ -420,6 +426,7 @@
           '<button class="btn primary" id="tr-pr-chal">Random challenge</button>' +
         '</div>' +
         '<div class="mid-display tr-prompt" id="tr-pr-cur">Press a button for a prompt…</div>' +
+        '<button class="btn primary sm" id="tr-pr-go" style="display:none" title="Set up the fretboard and start practicing">Go &rarr; Fretboard</button>' +
         '<div class="small muted" id="tr-pr-prevhead" style="display:none">Previous</div>' +
         '<ul class="list tr-prompt-hist" id="tr-pr-hist"></ul>' +
       '</div>' +
@@ -476,6 +483,7 @@
     els.sessList = $('tr-sess-list');
     els.sessClear = $('tr-sess-clear');
     els.prCur = $('tr-pr-cur');
+    els.prGo = $('tr-pr-go');
     els.prPrevHead = $('tr-pr-prevhead');
     els.prHist = $('tr-pr-hist');
     els.ccA = $('tr-cc-a');
@@ -514,16 +522,21 @@
 
     // card 2 wiring
     $('tr-pr-key').addEventListener('click', function () {
-      setPrompt('Key of ' + keyName(randPc()));
+      var pc = randPc();
+      setPrompt({ text: 'Key of ' + keyName(pc), go: { root: pc } });
     });
     $('tr-pr-mode').addEventListener('click', function () {
-      setPrompt(keyName(randPc()) + ' ' + Theory.SCALES[pick(Theory.SCALE_ORDER)].name);
+      var pc = randPc(), sc = pick(Theory.SCALE_ORDER);
+      setPrompt({ text: keyName(pc) + ' ' + Theory.SCALES[sc].name, go: { root: pc, scale: sc } });
     });
     $('tr-pr-chord').addEventListener('click', function () {
       setPrompt(randChordName());
     });
     $('tr-pr-chal').addEventListener('click', function () {
       setPrompt(pick(CHALLENGES)());
+    });
+    els.prGo.addEventListener('click', function () {
+      if (promptGo) App.emit('fb:practice', promptGo);
     });
 
     // card 3 wiring
