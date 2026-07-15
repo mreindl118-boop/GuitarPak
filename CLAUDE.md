@@ -34,7 +34,8 @@ version.json      auto-update feed (source of truth for latest version)
 - Event bus: `App.on/emit`. Events: `tempo` {bpm, source} (met.bpm is the ONE
   shared tempo — always guard against echo via `source`), `jam:chord`,
   `jam:stopped`, `fb:practice` {root?, scale?, bpm?} (Trainer prompt "Go" —
-  fretboard applies it, switches tabs, starts the runner).
+  fretboard applies it, switches tabs, starts the runner), `fb:scale`
+  {root, scale} (fretboard scale changed — chords page follows 7-note scales).
 - Audio schedulers (metronome/practice/jam): 25 ms setInterval + lookahead on
   the AudioContext clock, with a catch-up guard (`if nextT < currentTime →
   jump forward`) so stalls never schedule past-dated (silent) notes. Keep this

@@ -17,7 +17,7 @@
 
   // ---------------- state ----------------
 
-  var lib = { rootPc: 0, quality: 'maj', shapes: [] };
+  var lib = { rootPc: 0, quality: 'maj', shapes: [], view: 'diagram' }; // view: diagram | neck | tab
 
   var st = {
     keyPc: 0,
@@ -88,6 +88,8 @@
     var g = App.store.get;
 
     lib.rootPc = validPc(g('ch.libRoot', 0));
+    var lv = g('ch.view', 'diagram');
+    lib.view = (lv === 'neck' || lv === 'tab') ? lv : 'diagram';
     var lq = g('ch.libQuality', 'maj');
     lib.quality = Theory.QUALITY_ORDER.indexOf(lq) !== -1 ? lq : 'maj';
 
@@ -187,6 +189,106 @@
     return svg;
   }
 
+  // interval color per chord tone, matching the fretboard's degree palette
+  var IV_COLORS = { 0: '#ffab47', 3: '#7ad97a', 4: '#7ad97a', 7: '#6ea8fe', 10: '#b48ef0', 11: '#b48ef0' };
+  var IV_NAMES = ['R', '\u266d2', '2', '\u266d3', '3', '4', '\u266d5', '5', '\u266d6', '6', '\u266d7', '7'];
+
+  // fretboard-style mini neck: colored note dots on a drawn neck, nut on top
+  function renderShapeNeckSVG(shape) {
+    var NS = 'http://www.w3.org/2000/svg';
+    var SP_X = 22, SP_Y = 26, LEFT = 30, TOP = 34;
+    var gw = SP_X * 5, gh = SP_Y * 5;
+    var W = LEFT + gw + 16, H = TOP + gh + 10;
+    var tun = Theory.TUNINGS.standard.midi;
+    var pf = Theory.FLAT_KEYS.has(lib.rootPc);
+
+    var svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    svg.setAttribute('width', W);
+    svg.setAttribute('height', H);
+    svg.setAttribute('class', 'ch-svg ch-necksvg');
+
+    function el(tag, attrs, txt) {
+      var e = document.createElementNS(NS, tag);
+      for (var k in attrs) e.setAttribute(k, attrs[k]);
+      if (txt != null) e.textContent = txt;
+      svg.appendChild(e);
+      return e;
+    }
+
+    el('rect', { x: LEFT - 8, y: TOP, width: gw + 16, height: gh, rx: 4, fill: 'var(--panel)' });
+    var f, s;
+    for (f = 0; f <= 5; f++) {
+      el('line', { x1: LEFT - 8, y1: TOP + f * SP_Y, x2: LEFT + gw + 8, y2: TOP + f * SP_Y,
+                   stroke: 'var(--line)', 'stroke-width': 2 });
+    }
+    if (shape.baseFret === 1) {
+      el('rect', { x: LEFT - 8, y: TOP - 4, width: gw + 16, height: 5, fill: '#cfd6e4' });
+    } else {
+      el('text', { x: LEFT - 14, y: TOP + SP_Y * 0.5 + 4, 'text-anchor': 'end', 'font-size': 11,
+                   fill: 'var(--muted)', 'font-weight': 700 }, String(shape.baseFret));
+    }
+    for (s = 0; s < 6; s++) {
+      var sx = LEFT + s * SP_X;
+      el('line', { x1: sx, y1: TOP, x2: sx, y2: TOP + gh,
+                   stroke: 'var(--muted)', 'stroke-width': (2.4 - s * 0.28).toFixed(2) });
+    }
+    for (s = 0; s < 6; s++) {
+      var fr = shape.frets[s];
+      var x = LEFT + s * SP_X;
+      if (fr === -1) {
+        el('text', { x: x, y: TOP - 10, 'text-anchor': 'middle', 'font-size': 11,
+                     fill: 'var(--muted)', 'font-weight': 700 }, 'X');
+        continue;
+      }
+      var pc = Theory.mod12(tun[s] + fr);
+      var iv = Theory.mod12(pc - lib.rootPc);
+      var fill = IV_COLORS[iv] || '#e8d44d';
+      var cy;
+      if (fr === 0) {
+        cy = TOP - 13;
+      } else {
+        var row = fr - shape.baseFret;
+        if (row < 0) row = 0;
+        if (row > 4) row = 4;
+        cy = TOP + (row + 0.5) * SP_Y;
+      }
+      el('circle', { cx: x, cy: cy, r: 9, fill: fill,
+                     stroke: iv === 0 ? '#ffffff' : 'none', 'stroke-width': 1.6 });
+      el('text', { x: x, y: cy + 3.2, 'text-anchor': 'middle', 'font-size': 8.5,
+                   'font-weight': 700, fill: '#1c1206' }, Theory.pcName(pc, pf));
+      el('text', { x: x, y: TOP + gh + 9, 'text-anchor': 'middle', 'font-size': 8,
+                   fill: 'var(--muted)', 'font-weight': 600 }, IV_NAMES[iv]);
+    }
+    return svg;
+  }
+
+  // guitar tab block for a shape (standard-tuning shapes; high e on top)
+  function renderShapeTab(shape) {
+    var labels = ['e', 'B', 'G', 'D', 'A', 'E']; // display rows: string 5 (high) .. 0 (low)
+    var pre = document.createElement('pre');
+    pre.className = 'ch-tab';
+    var w = 1;
+    shape.frets.forEach(function (fr) { if (String(fr).length > w) w = String(fr).length; });
+    var lines = [];
+    for (var r = 0; r < 6; r++) {
+      var sIdx = 5 - r;
+      var fr = shape.frets[sIdx];
+      var cell = fr === -1 ? 'x' : String(fr);
+      while (cell.length < w) cell = cell + '-';
+      lines.push(labels[r] + '|--' + cell + '--|');
+    }
+    pre.textContent = lines.join('\n');
+    return pre;
+  }
+
+  // active view -> element (library figures and the "now playing" box share it)
+  function renderShapeView(shape) {
+    if (lib.view === 'neck') return renderShapeNeckSVG(shape);
+    if (lib.view === 'tab') return renderShapeTab(shape);
+    return renderShapeSVG(shape);
+  }
+
   // ---------------- card 1: chord library ----------------
 
   function renderLibrary() {
@@ -209,7 +311,7 @@
       btn.className = 'ch-shape';
       btn.dataset.i = i;
       btn.title = 'Click to strum ' + name;
-      btn.appendChild(renderShapeSVG(shape));
+      btn.appendChild(renderShapeView(shape));
       var cap = document.createElement('div');
       cap.className = 'ch-cap';
       cap.innerHTML = '<div class="ch-cap-name">' + esc(name) + '</div>' +
@@ -276,6 +378,13 @@
 
   function appendChord(c) {
     setTrack(st.track.concat([c]));
+  }
+
+  function paintViewSeg() {
+    if (!els.view) return;
+    els.view.querySelectorAll('button').forEach(function (b) {
+      b.classList.toggle('active', b.getAttribute('data-chview') === lib.view);
+    });
   }
 
   function updateSegUI() {
@@ -402,7 +511,7 @@
       els.nowRoman.textContent = cur.chord.roman || '';
       els.nowDia.innerHTML = '';
       if (cur.shape) {
-        els.nowDia.appendChild(renderShapeSVG(cur.shape));
+        els.nowDia.appendChild(renderShapeView(cur.shape));
       } else {
         els.nowDia.innerHTML = '<div class="muted small">no diagram</div>';
       }
@@ -543,7 +652,14 @@
         '<div class="row">' +
           '<label class="field">Root<select id="ch-lib-root"></select></label>' +
           '<label class="field">Quality<select id="ch-lib-quality"></select></label>' +
-          '<span class="muted small">Click a diagram to strum it.</span>' +
+          '<div class="ch-field"><span>View</span>' +
+            '<span class="seg" id="ch-view">' +
+              '<button type="button" data-chview="diagram">Diagram</button>' +
+              '<button type="button" data-chview="neck">Neck</button>' +
+              '<button type="button" data-chview="tab">Tab</button>' +
+            '</span>' +
+          '</div>' +
+          '<span class="muted small">Click a shape to strum it.</span>' +
         '</div>' +
         '<div id="ch-lib-shapes" class="ch-shapes"></div>' +
       '</div>' +
@@ -589,6 +705,7 @@
     els.libRoot = document.getElementById('ch-lib-root');
     els.libQuality = document.getElementById('ch-lib-quality');
     els.libShapes = document.getElementById('ch-lib-shapes');
+    els.view = document.getElementById('ch-view');
     els.key = document.getElementById('ch-key');
     els.scale = document.getElementById('ch-scale');
     els.seg = document.getElementById('ch-seg');
@@ -643,6 +760,14 @@
     els.libQuality.addEventListener('change', function () {
       lib.quality = els.libQuality.value;
       App.store.set('ch.libQuality', lib.quality);
+      renderLibrary();
+    });
+    els.view.addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-chview]');
+      if (!b) return;
+      lib.view = b.getAttribute('data-chview');
+      App.store.set('ch.view', lib.view);
+      paintViewSeg();
       renderLibrary();
     });
     els.libShapes.addEventListener('click', function (e) {
@@ -705,6 +830,13 @@
 
   function init(rootEl) {
     App.injectCSS('chords', CSS);
+    App.injectCSS('chords-views',
+      '.ch-tab{font-family:ui-monospace,Consolas,Menlo,monospace;font-size:13px;line-height:1.45;' +
+        'margin:0;padding:8px 10px;color:var(--text);background:var(--card2);' +
+        'border:1px solid var(--line);border-radius:8px;white-space:pre}' +
+      '.ch-necksvg{overflow:visible}' +
+      '.ch-shape .ch-tab{pointer-events:none}'
+    );
     loadState();
     buildDOM(rootEl);
     fillSelects();
@@ -718,10 +850,37 @@
     updateSegUI();
 
     wire();
+    paintViewSeg();
+
+    // stay linked to the fretboard's scale: seed from its saved state now,
+    // follow its changes live (7-note scales only - the palette is diatonic)
+    applyFbScale(App.store.get('fb.root', null), App.store.get('fb.scale', null), true);
+    App.on('fb:scale', function (d) {
+      if (d) applyFbScale(d.root, d.scale, false);
+    });
+
     renderLibrary();
     renderPalette();
     renderTrack();
     updatePlayBtn();
+  }
+
+  function applyFbScale(root, scale, quiet) {
+    if (typeof root !== 'number' || !isFinite(root)) return;
+    if (!scale || !Theory.SCALES[scale] || Theory.SCALES[scale].steps.length !== 7) return;
+    st.keyPc = validPc(root);
+    st.scaleId = scale;
+    lib.rootPc = validPc(root);
+    App.store.set('ch.key', st.keyPc);
+    App.store.set('ch.scale', st.scaleId);
+    App.store.set('ch.libRoot', lib.rootPc);
+    els.key.value = String(st.keyPc);
+    els.scale.value = st.scaleId;
+    els.libRoot.value = String(lib.rootPc);
+    if (!quiet) {           // live change: refresh what is on screen
+      renderPalette();
+      renderLibrary();
+    }
   }
 
   function onHide() {

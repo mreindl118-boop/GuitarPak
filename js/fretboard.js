@@ -129,6 +129,7 @@
     var wasRunning = pr.running;
     renderPosRow();
     renderBoard();               // redraws the band (this stops the runner)
+    fbRenderTab();               // exercise tab shows the new window
     scrollToFret(modeWindow(k)[0]);
     if (wasRunning) prStart();   // pick the exercise back up in the new window
   }
@@ -180,6 +181,7 @@
     renderBoard();
     renderInfo();
     renderLegend(); // legend colors are per-degree, so it changes with the scale
+    fbRenderTab();  // exercise tab follows every board change (no-op when hidden)
   }
 
   function renderPosRow() {
@@ -827,6 +829,38 @@
     if (el) el.textContent = text;
   }
 
+  // the current exercise (path x pattern x direction) as guitar tab, high e on
+  // top; string labels follow the tuning. Kept in sync by every control that
+  // changes the sequence (no-op while the strip is hidden).
+  function fbRenderTab() {
+    var el = document.getElementById('fb-tab');
+    if (!el || el.style.display === 'none') return;
+    var path = prPath();
+    var seq = prSeq(path.length, pr.pattern, pr.dir);
+    if (!seq.length) { el.textContent = '(no notes in this window)'; return; }
+    var tun = Theory.TUNINGS[state.tuning];
+    var pf = preferFlat();
+    var rows = [];
+    for (var s = 5; s >= 0; s--) {
+      rows.push({ s: s, label: Theory.pcName(Theory.mod12(tun.midi[s]), pf), cells: [] });
+    }
+    for (var i = 0; i < seq.length; i++) {
+      var n = path[seq[i]];
+      var w = String(n.f).length + 2;
+      for (var r = 0; r < rows.length; r++) {
+        rows[r].cells.push(rows[r].s === n.s
+          ? '-' + n.f + '-'
+          : new Array(w + 1).join('-'));
+      }
+    }
+    var lw = 0;
+    rows.forEach(function (r) { if (r.label.length > lw) lw = r.label.length; });
+    el.textContent = rows.map(function (r) {
+      var pad = new Array(lw - r.label.length + 1).join(' ');
+      return r.label + pad + '|' + r.cells.join('') + '|';
+    }).join('\n');
+  }
+
   function prPlayBtn(running) {
     var b = document.getElementById('fb-pr-play');
     if (b) b.innerHTML = running ? '&#10074;&#10074; Pause' : '&#9654; Play';
@@ -905,7 +939,19 @@
       App.store.set('fb.pr.pattern', pr.pattern);
       pr.idx = 0;
       if (pr.running) { pr.path = prPath(); pr.seq = prSeq(pr.path.length, pr.pattern, pr.dir); }
+      fbRenderTab();
     });
+    var tabChk = document.getElementById('fb-pr-tab');
+    var tabEl = document.getElementById('fb-tab');
+    tabChk.checked = !!App.store.get('fb.pr.tab', false);
+    tabEl.style.display = tabChk.checked ? '' : 'none';
+    if (tabChk.checked) fbRenderTab();
+    tabChk.addEventListener('change', function () {
+      App.store.set('fb.pr.tab', !!this.checked);
+      tabEl.style.display = this.checked ? '' : 'none';
+      if (this.checked) fbRenderTab();
+    });
+
     var dirSeg = document.getElementById('fb-pr-dir');
     function paintDir() {
       dirSeg.querySelectorAll('button').forEach(function (b) {
@@ -921,6 +967,7 @@
       paintDir();
       pr.idx = 0;
       if (pr.running) { pr.path = prPath(); pr.seq = prSeq(pr.path.length, pr.pattern, pr.dir); }
+      fbRenderTab();
     });
     bpm.addEventListener('change', function () {
       var v = parseInt(this.value, 10);
@@ -1039,7 +1086,7 @@
       '.fb-board.fb-max{position:fixed;inset:0;z-index:200;margin:0;border-radius:0;padding:0}' +
       // truly fullscreen: board only — every control row disappears, one floating
       // exit button remains
-      '.fb-board.fb-max .fb-toolbar,.fb-board.fb-max .fb-practice,.fb-board.fb-max .fb-posrow{display:none}' +
+      '.fb-board.fb-max .fb-toolbar,.fb-board.fb-max .fb-practice,.fb-board.fb-max .fb-posrow,.fb-board.fb-max .fb-tab{display:none}' +
       '.fb-exitmax{display:none;position:absolute;top:12px;right:12px;z-index:210;width:44px;height:44px;' +
         'align-items:center;justify-content:center;border-radius:50%;border:1px solid var(--line);' +
         'background:rgba(19,17,20,0.72);color:#ede8e0;font-size:19px;line-height:1;cursor:pointer;' + // fixed dark chip: keep light glyph in BOTH themes
@@ -1087,6 +1134,9 @@
       '.fb-flash{animation:fb-flash .4s ease-out forwards;pointer-events:none}' +
       '@keyframes fb-flash{0%{opacity:.95}100%{opacity:0}}' +
       '.fb-posrow{margin-bottom:12px}' +
+      '.fb-tab{font-family:ui-monospace,Consolas,Menlo,monospace;font-size:12.5px;line-height:1.5;' +
+        'overflow-x:auto;background:var(--card2);border:1px solid var(--line);border-radius:10px;' +
+        'padding:10px 14px;margin:0;color:var(--text);white-space:pre}' +
       '.fb-legend{margin-top:12px}' +
       '.fb-legend-item{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);font-weight:600}' +
       '.fb-chip{cursor:pointer;font-family:inherit}' +
@@ -1169,8 +1219,10 @@
           '</select>' +
           '<label class="row tight small muted" style="gap:5px"><input type="checkbox" id="fb-pr-sound">Notes</label>' +
           '<label class="row tight small muted" style="gap:5px"><input type="checkbox" id="fb-pr-click">Click</label>' +
+          '<label class="row tight small muted" style="gap:5px"><input type="checkbox" id="fb-pr-tab">Tab</label>' +
           '<span class="muted small" id="fb-pr-status"></span>' +
         '</div>' +
+        '<pre class="fb-tab" id="fb-tab" style="display:none"></pre>' +
         '<div class="fb-scroll" id="fb-scroll"></div>' +
         '<button type="button" class="fb-exitmax" id="fb-exitmax" title="Exit fullscreen" aria-label="Exit fullscreen">&#10005;</button>' +
         '<button type="button" class="fb-exitmax fb-playmax" id="fb-playmax" title="Play / pause the exercise" aria-label="Play or pause the practice exercise">&#9654;</button>' +
@@ -1224,12 +1276,14 @@
       if (!isNaN(v)) state.root = Theory.mod12(v);
       saveState();
       renderAll();
+      App.emit('fb:scale', { root: state.root, scale: state.scale });
     });
     els.scaleSel.addEventListener('change', function () {
       if (Theory.SCALES[this.value]) state.scale = this.value;
       state.pos = 0;
       saveState();
       renderAll();
+      App.emit('fb:scale', { root: state.root, scale: state.scale });
     });
     els.tuningSel.addEventListener('change', function () {
       if (Theory.TUNINGS[this.value]) state.tuning = this.value;
@@ -1343,6 +1397,7 @@
         App.store.set('met.bpm', pr.bpm);
         App.emit('tempo', { bpm: pr.bpm, source: 'fb' }); // metronome follows
       }
+      App.emit('fb:scale', { root: state.root, scale: state.scale });
       App.switchTo('fretboard');
       prStart();
     });
