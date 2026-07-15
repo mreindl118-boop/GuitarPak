@@ -1,0 +1,39 @@
+# XcodeGen spec — run `./sync-web.sh && xcodegen` to produce GuitarLab.xcodeproj
+name: GuitarLab
+options:
+  bundleIdPrefix: com.mreindl
+  deploymentTarget:
+    iOS: "15.0"
+targets:
+  GuitarLab:
+    type: application
+    platform: iOS
+    sources:
+      - Sources
+    resources:
+      - path: WebAssets
+        type: folder
+    info:
+      path: Info.plist
+      properties:
+        CFBundleDisplayName: GuitarLab
+        CFBundleShortVersionString: "0.10.1"
+        CFBundleVersion: "18"
+        NSMicrophoneUsageDescription: >-
+          GuitarLab listens to your guitar to run the tuner and the
+          note-finder game. Audio never leaves the device.
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UIRequiresFullScreen: false
+    settings:
+      base:
+        TARGETED_DEVICE_FAMILY: "1,2"   # iPhone + iPad
+        SWIFT_VERSION: "5.9"

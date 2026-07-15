@@ -24,6 +24,8 @@ js/settings.js    ┘ (settings: app-level prefs — theme dark/light/auto)
 samples/          MIT FluidR3 instrument MP3s (see samples/CREDITS.md)
 android/          APK project — build.ps1 (no Gradle: javac→d8→aapt→zipalign→
                   apksigner); keystore is gitignored, do NOT commit it
+ios/              WKWebView wrapper (XcodeGen project.yml + Swift; needs a Mac
+                  to build — the PWA is the primary iPad install)
 releases/         built signed APK (committed; raw URL = download link)
 tools/bundle.py   builds the single-file bundle for the claude.ai artifact
 version.json      auto-update feed (source of truth for latest version)

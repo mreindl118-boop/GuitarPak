@@ -1083,19 +1083,19 @@
     App.injectCSS('fretboard',
       '.fb-field{display:inline-flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--muted);font-weight:600}' +
       '.fb-board{position:relative;display:flex;flex-direction:column;gap:10px}' +
-      '.fb-board.fb-max{position:fixed;inset:0;z-index:200;margin:0;border-radius:0;padding:0}' +
+      '.fb-board.fb-max{position:fixed;inset:0;z-index:200;margin:0;border-radius:0;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}' +
       // truly fullscreen: board only — every control row disappears, one floating
       // exit button remains
       '.fb-board.fb-max .fb-toolbar,.fb-board.fb-max .fb-practice,.fb-board.fb-max .fb-posrow,.fb-board.fb-max .fb-tab{display:none}' +
-      '.fb-exitmax{display:none;position:absolute;top:12px;right:12px;z-index:210;width:44px;height:44px;' +
+      '.fb-exitmax{display:none;position:absolute;top:calc(12px + env(safe-area-inset-top,0px));right:calc(12px + env(safe-area-inset-right,0px));z-index:210;width:44px;height:44px;' +
         'align-items:center;justify-content:center;border-radius:50%;border:1px solid var(--line);' +
         'background:rgba(19,17,20,0.72);color:#ede8e0;font-size:19px;line-height:1;cursor:pointer;' + // fixed dark chip: keep light glyph in BOTH themes
         'opacity:0.85}' +
       '.fb-exitmax:hover{opacity:1;border-color:var(--accent)}' +
       '.fb-board.fb-max .fb-exitmax{display:flex}' +
-      '.fb-playmax{top:66px;color:var(--accent);font-size:16px}' + // sits under the x; same base style
+      '.fb-playmax{top:calc(66px + env(safe-area-inset-top,0px));color:var(--accent);font-size:16px}' + // sits under the x; same base style
       '.fb-playmax.on{border-color:var(--accent)}' +
-      '#fb-modeflash{position:absolute;top:70px;left:50%;transform:translateX(-50%);z-index:205;' +
+      '#fb-modeflash{position:absolute;top:calc(70px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);z-index:205;' +
         'background:rgba(19,17,20,0.85);border:1px solid var(--accent);color:#ede8e0;' +
         'border-radius:999px;padding:8px 18px;font-family:var(--font-display);font-size:17px;' +
         'letter-spacing:1px;white-space:nowrap;opacity:0;pointer-events:none}' +
