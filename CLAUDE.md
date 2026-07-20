@@ -16,7 +16,9 @@ js/app.js         shell: module registry, tab switching, shared AudioContext +
                   event bus, APP_VERSION + auto-update checker
 js/metronome.js   ┐ feature modules; each registers
 js/fretboard.js   │ App.register(name, {init, onShow, onHide, onKey})
-js/chords.js      │ DOM ids/CSS prefixed met-/fb-/ch-/jam-/tun-/tr-
+js/tab.js         │ DOM ids/CSS prefixed met-/fb-/tb-/ch-/jam-/tun-/tr-
+js/chords.js      │ (tab: exercise tablature, state fully linked with the
+                  │  fretboard via shared fb.* storage + the fb:set event)
 js/jam.js         │
 js/tuner.js       │
 js/trainer.js     │
@@ -37,7 +39,11 @@ version.json      auto-update feed (source of truth for latest version)
   shared tempo — always guard against echo via `source`), `jam:chord`,
   `jam:stopped`, `fb:practice` {root?, scale?, bpm?} (Trainer prompt "Go" —
   fretboard applies it, switches tabs, starts the runner), `fb:scale`
-  {root, scale} (fretboard scale changed — chords page follows 7-note scales).
+  {root, scale} (fretboard scale changed — chords page follows 7-note scales),
+  `fb:set` {source, root?, scale?, mode?, pattern?, dir?} (Tab page pushes
+  linked practice state; fretboard applies without switching tabs). The
+  exercise engine (path/sequence math) lives in theory.js as
+  Theory.exercisePath / Theory.exerciseSeq, shared by fretboard and tab.
 - Audio schedulers (metronome/practice/jam): 25 ms setInterval + lookahead on
   the AudioContext clock, with a catch-up guard (`if nextT < currentTime →
   jump forward`) so stalls never schedule past-dated (silent) notes. Keep this

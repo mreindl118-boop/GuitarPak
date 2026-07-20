@@ -1,5 +1,5 @@
 {
-  "version": "0.10.1",
+  "version": "0.12.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "iPad support: install from Safari with Add to Home Screen for a full-screen offline app - the layout now respects iPad safe areas and runs as a proper standalone app. Plus 0.10.0: the Chords page follows the Fretboard's scale, chord shapes get fretboard-style and tab views, and the Fretboard practice bar gains a live tab view of the current exercise. NOTE: updating from 0.6.1 or older requires uninstalling the old app first (new signing key)."
+  "notes": "New Tab page: the practice exercise written out as real tablature, fully linked with the Fretboard - root, scale, mode, pattern, and direction stay in sync both ways (Chords follows along too). View it horizontally (fit-to-screen systems or one scrolling line) or vertically, in three text sizes. The old Tab strip on the Fretboard page is gone. NOTE: updating from 0.6.1 or older requires uninstalling the old app first (new signing key)."
 }

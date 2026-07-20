@@ -15,7 +15,8 @@
     display: 'notes',     // notes | intervals | degrees
     lefty: false,
     pos: 0,               // pentatonic box: 0 = All, 1..5 = box N (not persisted)
-    mode: 1               // 7-note scales: degree anchoring the practice window
+    mode: 1,              // 7-note scales: degree anchoring the practice window
+    orient: 'v'           // 'v' nut-at-top (default) | 'h' classic left-to-right neck
   };
 
   var els = {};
@@ -62,6 +63,8 @@
     var d = App.store.get('fb.display', 'notes');
     if (d === 'notes' || d === 'intervals' || d === 'degrees') state.display = d;
     state.lefty = !!App.store.get('fb.lefty', false);
+    var ori = App.store.get('fb.orient', 'v');
+    if (ori === 'v' || ori === 'h') state.orient = ori;
     var m = App.store.get('fb.mode', 1);
     if (typeof m === 'number' && m >= 1 && m <= 7) state.mode = Math.floor(m);
     var cols = App.store.get('fb.colors', null);
@@ -129,7 +132,6 @@
     var wasRunning = pr.running;
     renderPosRow();
     renderBoard();               // redraws the band (this stops the runner)
-    fbRenderTab();               // exercise tab shows the new window
     scrollToFret(modeWindow(k)[0]);
     if (wasRunning) prStart();   // pick the exercise back up in the new window
   }
@@ -181,7 +183,6 @@
     renderBoard();
     renderInfo();
     renderLegend(); // legend colors are per-degree, so it changes with the scale
-    fbRenderTab();  // exercise tab follows every board change (no-op when hidden)
   }
 
   function renderPosRow() {
@@ -270,10 +271,15 @@
     var s = [];
     var r, f, i, x;
 
-    // rotated 90° cw: the on-screen viewBox is H wide and W tall (neck runs down)
-    s.push('<svg id="fb-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + H + ' ' + W +
+    // vertical: the whole group is rotated 90° cw (viewBox H x W, neck runs
+    // down). Horizontal: no rotation — the board reads left to right and every
+    // label sits upright. All child coordinates are identical either way.
+    var horiz = state.orient === 'h';
+    s.push('<svg id="fb-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' +
+      (horiz ? W + ' ' + H : H + ' ' + W) +
       '" role="img" aria-label="Fretboard diagram">');
-    s.push('<g id="fb-rot" transform="rotate(90) translate(0,-' + H + ')">');
+    s.push(horiz ? '<g id="fb-rot">'
+                 : '<g id="fb-rot" transform="rotate(90) translate(0,-' + H + ')">');
 
     // board background
     s.push('<rect x="' + nutX + '" y="' + boardTop + '" width="' + (N * FRET_W) +
@@ -386,8 +392,8 @@
     }
 
     s.push('</g></svg>');
-    vb.w = H;  // on-screen width  = across the strings
-    vb.h = W;  // on-screen height = along the neck
+    vb.w = horiz ? W : H;  // on-screen width  (h: along the neck, v: across it)
+    vb.h = horiz ? H : W;  // on-screen height (h: across the strings, v: along the neck)
     var keepX = els.scroll.scrollLeft;
     var keepY = els.scroll.scrollTop;
     els.scroll.innerHTML = s.join('');
@@ -457,14 +463,19 @@
   var BASE_MAX_W = 520; // cap so wide desktop stages don't blow the board up
 
   function baseWidth(wrap) {
-    // zoom 1 = the six strings span the stage width; the neck runs past the
-    // bottom edge and scrolls vertically
+    // vertical: zoom 1 = the six strings span the stage width (capped); the
+    // neck runs past the bottom edge and scrolls vertically.
+    // horizontal: zoom 1 = the whole neck spans the stage width; zooming in
+    // scrolls sideways along the neck.
     if (!vb.w || !wrap || !wrap.clientWidth) return 0;
+    if (state.orient === 'h') return wrap.clientWidth;
     return Math.min(wrap.clientWidth, BASE_MAX_W);
   }
 
   function minZoom(wrap) {
-    // smallest zoom = the whole neck visible inside the stage height
+    // smallest zoom = the whole neck visible (in the height when vertical;
+    // horizontal zoom 1 already fits the neck to the width)
+    if (state.orient === 'h') return 1;
     var bw = baseWidth(wrap);
     if (bw <= 0 || !vb.h) return 1;
     return Math.min(1, ((wrap.clientHeight - 8) * vb.w / vb.h) / bw);
@@ -644,80 +655,36 @@
     return f === 0 ? LABEL_W + OPEN_W / 2 : nutX + (f - 0.5) * FRET_W;
   }
 
-  // bring a fret into view (the neck runs DOWN the screen, so neck-x -> scrollTop)
+  // bring a fret into view (vertical: neck-x -> scrollTop; horizontal -> scrollLeft)
   function scrollToFret(f) {
     var svg = els.scroll && els.scroll.querySelector('svg');
     if (!svg || !vb.h) return;
     var nutX = LABEL_W + OPEN_W;
     var x = f <= 0 ? 0 : nutX + (f - 1) * FRET_W;
-    var target = (x / vb.h) * svg.getBoundingClientRect().height - 30;
-    els.scroll.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
+    if (state.orient === 'h') {
+      var lt = (x / vb.w) * svg.getBoundingClientRect().width - 30;
+      els.scroll.scrollTo({ left: Math.max(0, lt), behavior: 'smooth' });
+    } else {
+      var target = (x / vb.h) * svg.getBoundingClientRect().height - 30;
+      els.scroll.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
+    }
   }
 
   function rowY2(s) { return TOP + (state.lefty ? s : 5 - s) * GAP; }
 
-  // playable positions: scale tones inside a 5-fret window (pentatonic box if
-  // one is selected, otherwise anchored at the lowest root on the low string)
+  // playable positions come from the shared exercise engine (Theory), plus
+  // this board's screen coordinates for the runner's rings
   function prPath() {
-    var tun = Theory.TUNINGS[state.tuning];
-    var info = Theory.scaleInfo(state.root, state.scale, preferFlat());
-    if (!info) return [];
-    var win;
-    if (isPent() && state.pos > 0) {
-      win = boxWindow(state.pos, info.pcSet);
-    } else if (isHept()) {
-      win = modeWindow(state.mode); // the active mode chip anchors the exercise
-    } else {
-      var t0 = tun.midi[0], rootFret = 0, f;
-      for (f = 0; f < 12; f++) {
-        if (Theory.mod12(t0 + f) === Theory.mod12(state.root)) { rootFret = f; break; }
-      }
-      if (rootFret + 4 > state.frets) rootFret = Math.max(0, rootFret - 12);
-      win = [rootFret, rootFret + 4];
-    }
-    var path = [];
-    for (var s = 0; s < 6; s++) {
-      for (var fr = Math.max(0, win[0]); fr <= Math.min(state.frets, win[1]); fr++) {
-        var midi = tun.midi[s] + fr;
-        if (info.pcSet.has(Theory.mod12(midi))) {
-          path.push({ s: s, f: fr, midi: midi, cx: colCX2(fr), cy: rowY2(s) });
-        }
-      }
-    }
-    // Adjacent strings overlap inside the window, so the same PITCH can appear
-    // twice (e.g. the 5th of G major: G-string fret 7 and B-string fret 3).
-    // Sort by pitch and keep one position per pitch — the lower-string
-    // fingering, which keeps the hand moving string to string.
-    path.sort(function (a, b) { return a.midi - b.midi || a.s - b.s; });
-    return path.filter(function (n, i) { return i === 0 || n.midi !== path[i - 1].midi; });
+    return Theory.exercisePath({
+      rootPc: state.root, scaleId: state.scale, tuningId: state.tuning,
+      maxFret: state.frets, mode: state.mode, pentBox: isPent() ? state.pos : 0
+    }).map(function (n) {
+      return { s: n.s, f: n.f, midi: n.midi, cx: colCX2(n.f), cy: rowY2(n.s) };
+    });
   }
 
-  // expand the path into an index sequence: the pattern builds the ascending
-  // run (straight scale or sliding groups of 3-7), the direction then plays it
-  // up, down (exact reverse), or up-then-down (skipping the repeated apex)
   function prSeq(n, pattern, dir) {
-    var up = [], i, j, k;
-    if (!n) return up;
-    var iv = /^i([0-9]+)$/.exec(pattern);
-    if (/^g[3-7]$/.test(pattern)) {
-      k = parseInt(pattern.slice(1), 10);
-      if (n < k) { for (i = 0; i < n; i++) up.push(i); }
-      else { for (i = 0; i + k <= n; i++) for (j = 0; j < k; j++) up.push(i + j); }
-    } else if (iv) {
-      // interval practice: pairs a diatonic N-th apart (3rd = 2 scale steps),
-      // sliding up the window; falls back to the plain run if nothing fits
-      k = parseInt(iv[1], 10) - 1;
-      if (n > k) { for (i = 0; i + k < n; i++) { up.push(i); up.push(i + k); } }
-      else { for (i = 0; i < n; i++) up.push(i); }
-    } else { // 'scale'
-      for (i = 0; i < n; i++) up.push(i);
-    }
-    if (dir === 'down') return up.slice().reverse();
-    if (dir === 'updown') {
-      var down = up.slice().reverse();
-      return up.concat(down.slice(1, Math.max(1, down.length - 1)));
-    }
-    return up;
+    return Theory.exerciseSeq(n, pattern, dir);
   }
 
   function prRings() {
@@ -817,48 +784,23 @@
     var svg = document.getElementById('fb-svg');
     if (!wrap || !svg) return;
     var scale = svg.getBoundingClientRect().width / vb.w;
-    var yPost = node.cx * scale; // post-rotation y = pre-rotation x (along the neck)
-    var target = Math.max(0, yPost - wrap.clientHeight * 0.45);
-    if (Math.abs(wrap.scrollTop - target) > wrap.clientHeight * 0.22) {
-      wrap.scrollTo({ top: target, behavior: 'smooth' });
+    var along = node.cx * scale; // screen distance along the neck
+    if (state.orient === 'h') {
+      var lt = Math.max(0, along - wrap.clientWidth * 0.45);
+      if (Math.abs(wrap.scrollLeft - lt) > wrap.clientWidth * 0.22) {
+        wrap.scrollTo({ left: lt, behavior: 'smooth' });
+      }
+    } else {
+      var target = Math.max(0, along - wrap.clientHeight * 0.45);
+      if (Math.abs(wrap.scrollTop - target) > wrap.clientHeight * 0.22) {
+        wrap.scrollTo({ top: target, behavior: 'smooth' });
+      }
     }
   }
 
   function prStatus(text) {
     var el = document.getElementById('fb-pr-status');
     if (el) el.textContent = text;
-  }
-
-  // the current exercise (path x pattern x direction) as guitar tab, high e on
-  // top; string labels follow the tuning. Kept in sync by every control that
-  // changes the sequence (no-op while the strip is hidden).
-  function fbRenderTab() {
-    var el = document.getElementById('fb-tab');
-    if (!el || el.style.display === 'none') return;
-    var path = prPath();
-    var seq = prSeq(path.length, pr.pattern, pr.dir);
-    if (!seq.length) { el.textContent = '(no notes in this window)'; return; }
-    var tun = Theory.TUNINGS[state.tuning];
-    var pf = preferFlat();
-    var rows = [];
-    for (var s = 5; s >= 0; s--) {
-      rows.push({ s: s, label: Theory.pcName(Theory.mod12(tun.midi[s]), pf), cells: [] });
-    }
-    for (var i = 0; i < seq.length; i++) {
-      var n = path[seq[i]];
-      var w = String(n.f).length + 2;
-      for (var r = 0; r < rows.length; r++) {
-        rows[r].cells.push(rows[r].s === n.s
-          ? '-' + n.f + '-'
-          : new Array(w + 1).join('-'));
-      }
-    }
-    var lw = 0;
-    rows.forEach(function (r) { if (r.label.length > lw) lw = r.label.length; });
-    el.textContent = rows.map(function (r) {
-      var pad = new Array(lw - r.label.length + 1).join(' ');
-      return r.label + pad + '|' + r.cells.join('') + '|';
-    }).join('\n');
   }
 
   function prPlayBtn(running) {
@@ -939,19 +881,7 @@
       App.store.set('fb.pr.pattern', pr.pattern);
       pr.idx = 0;
       if (pr.running) { pr.path = prPath(); pr.seq = prSeq(pr.path.length, pr.pattern, pr.dir); }
-      fbRenderTab();
     });
-    var tabChk = document.getElementById('fb-pr-tab');
-    var tabEl = document.getElementById('fb-tab');
-    tabChk.checked = !!App.store.get('fb.pr.tab', false);
-    tabEl.style.display = tabChk.checked ? '' : 'none';
-    if (tabChk.checked) fbRenderTab();
-    tabChk.addEventListener('change', function () {
-      App.store.set('fb.pr.tab', !!this.checked);
-      tabEl.style.display = this.checked ? '' : 'none';
-      if (this.checked) fbRenderTab();
-    });
-
     var dirSeg = document.getElementById('fb-pr-dir');
     function paintDir() {
       dirSeg.querySelectorAll('button').forEach(function (b) {
@@ -967,7 +897,6 @@
       paintDir();
       pr.idx = 0;
       if (pr.running) { pr.path = prPath(); pr.seq = prSeq(pr.path.length, pr.pattern, pr.dir); }
-      fbRenderTab();
     });
     bpm.addEventListener('change', function () {
       var v = parseInt(this.value, 10);
@@ -1086,7 +1015,7 @@
       '.fb-board.fb-max{position:fixed;inset:0;z-index:200;margin:0;border-radius:0;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}' +
       // truly fullscreen: board only — every control row disappears, one floating
       // exit button remains
-      '.fb-board.fb-max .fb-toolbar,.fb-board.fb-max .fb-practice,.fb-board.fb-max .fb-posrow,.fb-board.fb-max .fb-tab{display:none}' +
+      '.fb-board.fb-max .fb-toolbar,.fb-board.fb-max .fb-practice,.fb-board.fb-max .fb-posrow{display:none}' +
       '.fb-exitmax{display:none;position:absolute;top:calc(12px + env(safe-area-inset-top,0px));right:calc(12px + env(safe-area-inset-right,0px));z-index:210;width:44px;height:44px;' +
         'align-items:center;justify-content:center;border-radius:50%;border:1px solid var(--line);' +
         'background:rgba(19,17,20,0.72);color:#ede8e0;font-size:19px;line-height:1;cursor:pointer;' + // fixed dark chip: keep light glyph in BOTH themes
@@ -1134,9 +1063,6 @@
       '.fb-flash{animation:fb-flash .4s ease-out forwards;pointer-events:none}' +
       '@keyframes fb-flash{0%{opacity:.95}100%{opacity:0}}' +
       '.fb-posrow{margin-bottom:12px}' +
-      '.fb-tab{font-family:ui-monospace,Consolas,Menlo,monospace;font-size:12.5px;line-height:1.5;' +
-        'overflow-x:auto;background:var(--card2);border:1px solid var(--line);border-radius:10px;' +
-        'padding:10px 14px;margin:0;color:var(--text);white-space:pre}' +
       '.fb-legend{margin-top:12px}' +
       '.fb-legend-item{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);font-weight:600}' +
       '.fb-chip{cursor:pointer;font-family:inherit}' +
@@ -1171,6 +1097,7 @@
             '<span class="chip" id="fb-zlabel">100%</span>' +
             '<button type="button" class="btn sm" id="fb-zin" aria-label="Zoom in">+</button>' +
             '<button type="button" class="btn sm" id="fb-zfit">Fit</button>' +
+            '<button type="button" class="btn sm" id="fb-rotate" title="Rotate the board (vertical / horizontal neck)" aria-label="Rotate the fretboard">&#8635;</button>' +
             '<button type="button" class="btn sm" id="fb-max" title="Fullscreen" aria-label="Fullscreen">&#x26F6;</button>' +
           '</span>' +
         '</div>' +
@@ -1219,10 +1146,8 @@
           '</select>' +
           '<label class="row tight small muted" style="gap:5px"><input type="checkbox" id="fb-pr-sound">Notes</label>' +
           '<label class="row tight small muted" style="gap:5px"><input type="checkbox" id="fb-pr-click">Click</label>' +
-          '<label class="row tight small muted" style="gap:5px"><input type="checkbox" id="fb-pr-tab">Tab</label>' +
           '<span class="muted small" id="fb-pr-status"></span>' +
         '</div>' +
-        '<pre class="fb-tab" id="fb-tab" style="display:none"></pre>' +
         '<div class="fb-scroll" id="fb-scroll"></div>' +
         '<button type="button" class="fb-exitmax" id="fb-exitmax" title="Exit fullscreen" aria-label="Exit fullscreen">&#10005;</button>' +
         '<button type="button" class="fb-exitmax fb-playmax" id="fb-playmax" title="Play / pause the exercise" aria-label="Play or pause the practice exercise">&#9654;</button>' +
@@ -1347,6 +1272,13 @@
     document.getElementById('fb-zout').addEventListener('click', function () { setZoom(zoom / 1.3); });
     document.getElementById('fb-zin').addEventListener('click', function () { setZoom(zoom * 1.3); });
     document.getElementById('fb-zfit').addEventListener('click', function () { setZoom(minZoom(els.scroll)); });
+    document.getElementById('fb-rotate').addEventListener('click', function () {
+      state.orient = state.orient === 'h' ? 'v' : 'h';
+      App.store.set('fb.orient', state.orient);
+      renderAll();
+      setZoom(minZoom(els.scroll)); // zoom means something new — refit
+      scrollToFret(isHept() ? modeWindow(state.mode)[0] : 0);
+    });
     els.gear.addEventListener('click', function () {
       els.settings.classList.toggle('open');
     });
@@ -1374,6 +1306,41 @@
     App.on('jam:stopped', function () {
       jamLast = null;
       jamPaint(null);
+    });
+    // linked state pushed from the Tab page: apply root/scale/mode/pattern/
+    // direction, refresh this board and its widgets — stay on whatever tab
+    // the user is on, don't start anything
+    App.on('fb:set', function (d) {
+      if (!d || d.source === 'fb') return;
+      if (typeof d.root === 'number' && isFinite(d.root) && d.root >= 0 && d.root < 12) {
+        state.root = Math.floor(d.root);
+        els.root.value = String(state.root);
+      }
+      if (d.scale && Theory.SCALES[d.scale]) {
+        state.scale = d.scale;
+        state.pos = 0;
+        els.scaleSel.value = state.scale;
+      }
+      if (typeof d.mode === 'number' && d.mode >= 1 && d.mode <= 7) state.mode = Math.floor(d.mode);
+      if (d.pattern && /^(scale|g[3-7]|i([2-9]|1[0-6]))$/.test(d.pattern)) {
+        pr.pattern = d.pattern;
+        var pe = document.getElementById('fb-pr-pattern');
+        if (pe) pe.value = pr.pattern;
+      }
+      if (d.dir && /^(up|down|updown)$/.test(d.dir)) {
+        pr.dir = d.dir;
+        var ds = document.getElementById('fb-pr-dir');
+        if (ds) ds.querySelectorAll('button').forEach(function (b) {
+          b.classList.toggle('active', b.getAttribute('data-fbdir') === pr.dir);
+        });
+      }
+      saveState();
+      pr.idx = 0;
+      if (pr.running) { pr.path = prPath(); pr.seq = prSeq(pr.path.length, pr.pattern, pr.dir); }
+      renderAll();
+      // the scale really did change — downstream followers (chords) get the
+      // same announcement as for a change made on this page
+      App.emit('fb:scale', { root: state.root, scale: state.scale });
     });
     // one-click practice from a Trainer prompt: apply root/scale/tempo, jump
     // to this tab, and start the runner (emitted inside the click gesture, so

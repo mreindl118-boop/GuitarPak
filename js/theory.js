@@ -336,6 +336,83 @@ window.Theory = (function () {
     return t.midi[stringIdx] + fret;
   }
 
+  // ---------------- practice exercises (pure geometry, shared by the ----
+  // ---------------- Fretboard runner and the Tab page) ------------------
+
+  // The playable positions for an exercise: scale tones inside a 5-fret
+  // window. 7-note scales anchor the window at the `mode`-th degree on the
+  // low string (walking up the neck from the lowest root); pentatonics use
+  // box N when pentBox > 0; everything else anchors at the lowest root.
+  // Returns [{ s, f, midi }] sorted by pitch, one position per pitch.
+  function exercisePath(opts) {
+    var scale = SCALES[opts.scaleId];
+    var tun = TUNINGS[opts.tuningId];
+    if (!scale || !tun) return [];
+    var info = scaleInfo(opts.rootPc, opts.scaleId);
+    var steps = scale.steps;
+    var maxFret = opts.maxFret || 24;
+    var t0 = tun.midi[0], rootFret = 0, f;
+    for (f = 0; f < 12; f++) {
+      if (mod12(t0 + f) === mod12(opts.rootPc)) { rootFret = f; break; }
+    }
+    var win;
+    if (steps.length === 5 && opts.pentBox > 0) {
+      var anchors = [rootFret];
+      f = rootFret + 1;
+      while (anchors.length < 5 && f < rootFret + 13) {
+        if (info.pcSet.has(mod12(t0 + f))) anchors.push(f);
+        f++;
+      }
+      var a = anchors[Math.min(opts.pentBox, anchors.length) - 1];
+      if (a + 4 > maxFret && a - 12 >= 0) a -= 12;
+      win = [a, a + 4];
+    } else if (steps.length === 7) {
+      var k = opts.mode || 1;
+      var a2 = rootFret + steps[(k - 1) % steps.length];
+      if (a2 + 4 > maxFret && a2 - 12 >= 0) a2 -= 12;
+      win = [a2, a2 + 4];
+    } else {
+      if (rootFret + 4 > maxFret) rootFret = Math.max(0, rootFret - 12);
+      win = [rootFret, rootFret + 4];
+    }
+    var path = [];
+    for (var s = 0; s < 6; s++) {
+      for (var fr = Math.max(0, win[0]); fr <= Math.min(maxFret, win[1]); fr++) {
+        var midi = tun.midi[s] + fr;
+        if (info.pcSet.has(mod12(midi))) path.push({ s: s, f: fr, midi: midi });
+      }
+    }
+    path.sort(function (a, b) { return a.midi - b.midi || a.s - b.s; });
+    return path.filter(function (n, i) { return i === 0 || n.midi !== path[i - 1].midi; });
+  }
+
+  // Index sequence for a pattern: the pattern builds the ascending run
+  // (straight scale, sliding groups g3-g7, or interval pairs i2-i16), the
+  // direction plays it up, down (exact reverse), or up-then-down (skipping
+  // the repeated apex).
+  function exerciseSeq(n, pattern, dir) {
+    var up = [], i, j, k;
+    if (!n) return up;
+    var iv = /^i([0-9]+)$/.exec(pattern);
+    if (/^g[3-7]$/.test(pattern)) {
+      k = parseInt(pattern.slice(1), 10);
+      if (n < k) { for (i = 0; i < n; i++) up.push(i); }
+      else { for (i = 0; i + k <= n; i++) for (j = 0; j < k; j++) up.push(i + j); }
+    } else if (iv) {
+      k = parseInt(iv[1], 10) - 1;
+      if (n > k) { for (i = 0; i + k < n; i++) { up.push(i); up.push(i + k); } }
+      else { for (i = 0; i < n; i++) up.push(i); }
+    } else { // 'scale'
+      for (i = 0; i < n; i++) up.push(i);
+    }
+    if (dir === 'down') return up.slice().reverse();
+    if (dir === 'updown') {
+      var down = up.slice().reverse();
+      return up.concat(down.slice(1, Math.max(1, down.length - 1)));
+    }
+    return up;
+  }
+
   return {
     SHARP: SHARP,
     FLAT: FLAT,
@@ -359,6 +436,8 @@ window.Theory = (function () {
     chordShapes: chordShapes,
     chordVoicing: chordVoicing,
     chordName: chordName,
-    fretMidi: fretMidi
+    fretMidi: fretMidi,
+    exercisePath: exercisePath,
+    exerciseSeq: exerciseSeq
   };
 })();
