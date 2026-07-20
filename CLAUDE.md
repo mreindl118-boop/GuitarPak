@@ -16,9 +16,9 @@ js/app.js         shell: module registry, tab switching, shared AudioContext +
                   event bus, APP_VERSION + auto-update checker
 js/metronome.js   ┐ feature modules; each registers
 js/fretboard.js   │ App.register(name, {init, onShow, onHide, onKey})
-js/tab.js         │ DOM ids/CSS prefixed met-/fb-/tb-/ch-/jam-/tun-/tr-
-js/chords.js      │ (tab: exercise tablature, state fully linked with the
-                  │  fretboard via shared fb.* storage + the fb:set event)
+js/chords.js      │ DOM ids/CSS prefixed met-/fb-/ch-/jam-/tun-/tr-
+                  │ (fretboard: one page, three views — board / tab / sheet
+                  │  via the fb-view dropdown; the runner plays in all three)
 js/jam.js         │
 js/tuner.js       │
 js/trainer.js     │

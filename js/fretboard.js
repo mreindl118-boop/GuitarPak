@@ -16,7 +16,11 @@
     lefty: false,
     pos: 0,               // pentatonic box: 0 = All, 1..5 = box N (not persisted)
     mode: 1,              // 7-note scales: degree anchoring the practice window
-    orient: 'v'           // 'v' nut-at-top (default) | 'h' classic left-to-right neck
+    orient: 'v',          // 'v' nut-at-top (default) | 'h' classic left-to-right neck
+    view: 'board',        // board | tab | sheet — one page, three linked views
+    tabOri: 'h',          // tab view: 'h' classic lines | 'v' time flows down
+    vFit: 'fit',          // tab+sheet: wrap to screen | one scrolling line
+    vSize: 'm'            // tab+sheet text/notation size
   };
 
   var els = {};
@@ -65,6 +69,14 @@
     state.lefty = !!App.store.get('fb.lefty', false);
     var ori = App.store.get('fb.orient', 'v');
     if (ori === 'v' || ori === 'h') state.orient = ori;
+    var vw = App.store.get('fb.view', 'board');
+    if (vw === 'board' || vw === 'tab' || vw === 'sheet') state.view = vw;
+    var to = App.store.get('tab.orient', 'h');
+    if (to === 'h' || to === 'v') state.tabOri = to;
+    var vf = App.store.get('tab.fit', 'fit');
+    if (vf === 'fit' || vf === 'scroll') state.vFit = vf;
+    var vs = App.store.get('tab.size', 'm');
+    if (vs === 's' || vs === 'm' || vs === 'l') state.vSize = vs;
     var m = App.store.get('fb.mode', 1);
     if (typeof m === 'number' && m >= 1 && m <= 7) state.mode = Math.floor(m);
     var cols = App.store.get('fb.colors', null);
@@ -184,9 +196,15 @@
     renderBoard();
     renderInfo();
     renderLegend(); // legend colors are per-degree, so it changes with the scale
+    renderAltView(); // tab/sheet views follow every board-state change
   }
 
   function renderPosRow() {
+    if (state.view !== 'board') {
+      els.posrow.style.display = 'none';
+      els.posrow.innerHTML = '';
+      return;
+    }
     if (isPent()) {
       els.posrow.style.display = '';
       var h = '<span class="muted small">Position:</span>';
@@ -741,7 +759,7 @@
     var hit = null;
     while (pr.vis.length && pr.vis[0].t <= now) hit = pr.vis.shift();
     if (hit) {
-      var rings = prRings();
+      var rings = state.view === 'board' ? prRings() : null;
       if (rings) {
         rings.cur.setAttribute('cx', hit.node.cx);
         rings.cur.setAttribute('cy', hit.node.cy);
@@ -753,8 +771,19 @@
           rings.next.setAttribute('opacity', '0');
         }
       }
-      prScrollTo(hit.node);
       var total = pr.seq.length;
+      if (state.view === 'board') {
+        prScrollTo(hit.node);
+      } else {
+        var cont = state.view === 'tab' ? els.tabout : els.sheetwrap;
+        var prev = cont.querySelector('.now');
+        if (prev) prev.classList.remove('now');
+        var cur = cont.querySelector('[data-step="' + (hit.step % total) + '"]');
+        if (cur) {
+          cur.classList.add('now');
+          if (cur.scrollIntoView) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        }
+      }
       prStatus((hit.step % total) + 1 + ' / ' + total);
     }
     pr.raf = requestAnimationFrame(prDraw);
@@ -783,6 +812,236 @@
   function prStatus(text) {
     var el = document.getElementById('fb-pr-status');
     if (el) el.textContent = text;
+  }
+
+  // ---------------- alternate views: tab + sheet (linked to everything) ----
+  var VSIZES = { s: 11, m: 13.5, l: 17 };
+
+  function altExercise() {
+    var path = prPath();
+    return { path: path, seq: prSeq(path.length, pr.pattern, pr.dir) };
+  }
+
+  function noteColor(info, pc) {
+    var step = info.pcToStep.get(pc);
+    return DEG_COLORS[(step || 0) % 7];
+  }
+
+  function tabCellHTML(n, i, info) {
+    var pc = Theory.mod12(n.midi);
+    var root = info.pcToStep.get(pc) === 0;
+    return '<span class="fbv-n' + (root ? ' fbv-root' : '') + '" data-step="' + i +
+      '" style="color:' + noteColor(info, pc) + '">-' + n.f + '-</span>';
+  }
+
+  function tabSystemHTML(ex, labels, info, from, to) {
+    var rows = [], s, i, r, lw = 0;
+    for (s = 0; s < 6; s++) if (labels[s].length > lw) lw = labels[s].length;
+    for (s = 5; s >= 0; s--) {
+      rows.push({ s: s, html: labels[s] + new Array(lw - labels[s].length + 1).join(' ') + '|' });
+    }
+    for (i = from; i < to; i++) {
+      var n = ex.path[ex.seq[i]];
+      var w = String(n.f).length + 2;
+      for (r = 0; r < rows.length; r++) {
+        rows[r].html += rows[r].s === n.s ? tabCellHTML(n, i, info) : new Array(w + 1).join('-');
+      }
+    }
+    return rows.map(function (row) { return row.html + '|'; }).join('\n');
+  }
+
+  function renderTabView() {
+    var out = els.tabout;
+    if (!out || state.view !== 'tab') return;
+    var ex = altExercise();
+    var info = Theory.scaleInfo(state.root, state.scale, preferFlat());
+    out.style.fontSize = VSIZES[state.vSize] + 'px';
+    if (!ex.seq.length) { out.textContent = '(no notes in this window)'; return; }
+    var tun = Theory.TUNINGS[state.tuning];
+    var pf = preferFlat();
+    var labels = [];
+    for (var s = 0; s < 6; s++) labels.push(Theory.pcName(Theory.mod12(tun.midi[s]), pf));
+
+    if (state.tabOri === 'v') {
+      var head = '', i;
+      for (i = 0; i < 6; i++) head += (labels[i] + '   ').slice(0, 3);
+      var lines = [head.replace(/\s+$/, '')];
+      for (i = 0; i < ex.seq.length; i++) {
+        var n = ex.path[ex.seq[i]];
+        var line = '';
+        for (var s2 = 0; s2 < 6; s2++) {
+          if (s2 === n.s) {
+            var pc = Theory.mod12(n.midi);
+            var cell = (String(n.f) + '   ').slice(0, 3);
+            line += '<span class="fbv-n' + (info.pcToStep.get(pc) === 0 ? ' fbv-root' : '') +
+              '" data-step="' + i + '" style="color:' + noteColor(info, pc) + '">' + cell + '</span>';
+          } else {
+            line += '\u00b7  ';
+          }
+        }
+        lines.push(line);
+      }
+      out.innerHTML = lines.join('\n');
+      return;
+    }
+
+    if (state.vFit === 'scroll') {
+      out.innerHTML = tabSystemHTML(ex, labels, info, 0, ex.seq.length);
+      return;
+    }
+    var charW = VSIZES[state.vSize] * 0.602;
+    var usable = Math.max(160, out.clientWidth - 34);
+    var lw = Math.max.apply(null, labels.map(function (l) { return l.length; }));
+    var budget = Math.floor(usable / charW) - lw - 2;
+    var htmls = [], i2 = 0;
+    while (i2 < ex.seq.length) {
+      var used = 0, j = i2;
+      while (j < ex.seq.length) {
+        var cw = String(ex.path[ex.seq[j]].f).length + 2;
+        if (used + cw > budget && j > i2) break;
+        used += cw; j++;
+      }
+      htmls.push(tabSystemHTML(ex, labels, info, i2, j));
+      i2 = j;
+    }
+    out.innerHTML = htmls.join('\n\n');
+  }
+
+  // sheet music: treble clef (guitar written an octave above sounding pitch),
+  // uniform noteheads colored by degree, accidentals from the key's spelling
+  var SHEET_LETTER_POS = { C: 0, D: 1, E: 2, F: 3, G: 4, A: 5, B: 6 };
+
+  function sheetNoteInfo(midi, pf) {
+    var written = midi + 12; // 8vb clef convention
+    var name = Theory.pcName(Theory.mod12(written), pf); // e.g. 'F#' or 'Bb'
+    var letter = name[0];
+    var acc = name.length > 1 ? name[1] : '';
+    var pcOfLetter = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[letter];
+    // octave of the WRITTEN pitch for this letter spelling
+    var oct = Math.floor((written - (Theory.mod12(written) - pcOfLetter >= 0 ? 0 : 0)) / 12) - 1;
+    // adjust octave when the spelling crosses C (e.g. B# / Cb) — our scales
+    // never produce those, so the simple floor is fine
+    var pos = SHEET_LETTER_POS[letter] + 7 * oct;
+    return { pos: pos, acc: acc };
+  }
+
+  function renderSheetView() {
+    var wrap = els.sheetwrap;
+    if (!wrap || state.view !== 'sheet') return;
+    var ex = altExercise();
+    var info = Theory.scaleInfo(state.root, state.scale, preferFlat());
+    if (!ex.seq.length) { wrap.textContent = '(no notes in this window)'; return; }
+    var pf = preferFlat();
+    var SC = { s: 0.8, m: 1, l: 1.3 }[state.vSize];
+    var GAP = 9 * SC;            // half-step between staff positions
+    var NOTE_W = 30 * SC;
+    var LEFT = 46 * SC;
+    var topPad = 5 * GAP;        // headroom for ledger lines
+    var staffH = 8 * GAP;        // 5 lines, 4 gaps... (4 gaps * 2 half-gaps)
+    var perRow = ex.seq.length;
+    if (state.vFit === 'fit') {
+      var usable = Math.max(220, wrap.clientWidth - 40);
+      perRow = Math.max(4, Math.floor((usable - LEFT) / NOTE_W));
+    }
+    var rows = Math.ceil(ex.seq.length / perRow);
+    var rowH = staffH + topPad * 2;
+    var W = LEFT + Math.min(perRow, ex.seq.length) * NOTE_W + 16;
+    var H = rows * rowH;
+    var E4POS = 30;              // bottom staff line
+    var svg = ['<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '">'];
+    for (var rIdx = 0; rIdx < rows; rIdx++) {
+      var oy = rIdx * rowH + topPad;
+      var l;
+      for (l = 0; l < 5; l++) {
+        var ly = oy + staffH - l * 2 * GAP;
+        svg.push('<line x1="8" y1="' + ly + '" x2="' + (W - 8) + '" y2="' + ly +
+          '" stroke="var(--muted)" stroke-width="1" opacity="0.75"/>');
+      }
+      svg.push('<text x="10" y="' + (oy + staffH - GAP) + '" font-size="' + (staffH * 0.95) +
+        '" fill="var(--text)" font-family="serif">\ud834\udd1e</text>');
+      var from = rIdx * perRow, to = Math.min(ex.seq.length, from + perRow);
+      for (var i = from; i < to; i++) {
+        var n = ex.path[ex.seq[i]];
+        var pc = Theory.mod12(n.midi);
+        var sn = sheetNoteInfo(n.midi, pf);
+        var x = LEFT + (i - from) * NOTE_W + NOTE_W / 2;
+        var y = oy + staffH - (sn.pos - E4POS) * GAP;
+        var col = noteColor(info, pc);
+        var isRoot = info.pcToStep.get(pc) === 0;
+        var g = '<g class="fbv-sn" data-step="' + i + '">';
+        // ledger lines
+        var lp;
+        for (lp = E4POS - 2; lp >= sn.pos - (sn.pos % 2); lp -= 2) {
+          if (lp < E4POS) g += '<line x1="' + (x - 10 * SC) + '" y1="' + (oy + staffH - (lp - E4POS) * GAP) +
+            '" x2="' + (x + 10 * SC) + '" y2="' + (oy + staffH - (lp - E4POS) * GAP) +
+            '" stroke="var(--muted)" stroke-width="1"/>';
+        }
+        for (lp = E4POS + 10; lp <= sn.pos + (sn.pos % 2 === 0 ? 0 : 1); lp += 2) {
+          g += '<line x1="' + (x - 10 * SC) + '" y1="' + (oy + staffH - (lp - E4POS) * GAP) +
+            '" x2="' + (x + 10 * SC) + '" y2="' + (oy + staffH - (lp - E4POS) * GAP) +
+            '" stroke="var(--muted)" stroke-width="1"/>';
+        }
+        g += '<circle class="fbv-halo" cx="' + x + '" cy="' + y + '" r="' + (10 * SC) +
+          '" fill="none" stroke="var(--accent)" stroke-width="3"/>';
+        g += '<ellipse cx="' + x + '" cy="' + y + '" rx="' + (6.4 * SC) + '" ry="' + (4.8 * SC) +
+          '" fill="' + col + '"' + (isRoot ? ' stroke="#ffffff" stroke-width="1.5"' : '') + '/>';
+        var stemUp = sn.pos < E4POS + 4;
+        g += '<line x1="' + (x + (stemUp ? 6 * SC : -6 * SC)) + '" y1="' + y +
+          '" x2="' + (x + (stemUp ? 6 * SC : -6 * SC)) + '" y2="' + (y + (stemUp ? -1 : 1) * 26 * SC) +
+          '" stroke="' + col + '" stroke-width="' + (1.4 * SC) + '"/>';
+        if (sn.acc) {
+          g += '<text x="' + (x - 15 * SC) + '" y="' + (y + 4 * SC) + '" font-size="' + (13 * SC) +
+            '" fill="' + col + '" font-weight="700">' + (sn.acc === '#' ? '\u266f' : '\u266d') + '</text>';
+        }
+        g += '</g>';
+        svg.push(g);
+      }
+    }
+    svg.push('</svg>');
+    wrap.innerHTML = svg.join('');
+  }
+
+  function renderAltView() {
+    if (state.view === 'tab') renderTabView();
+    else if (state.view === 'sheet') renderSheetView();
+  }
+
+  function paintViewOpts() {
+    var vo = document.getElementById('fb-viewopts');
+    if (!vo) return;
+    vo.style.display = state.view === 'board' ? 'none' : '';
+    document.getElementById('fb-vo-ori').style.display = state.view === 'tab' ? '' : 'none';
+    document.getElementById('fb-vo-fit').style.display =
+      (state.view === 'tab' && state.tabOri === 'v') ? 'none' : '';
+    vo.querySelectorAll('[data-fbvori]').forEach(function (b) {
+      b.classList.toggle('active', b.getAttribute('data-fbvori') === state.tabOri);
+    });
+    vo.querySelectorAll('[data-fbvfit]').forEach(function (b) {
+      b.classList.toggle('active', b.getAttribute('data-fbvfit') === state.vFit);
+    });
+    vo.querySelectorAll('[data-fbvsize]').forEach(function (b) {
+      b.classList.toggle('active', b.getAttribute('data-fbvsize') === state.vSize);
+    });
+  }
+
+  function applyView() {
+    var board = state.view === 'board';
+    els.scroll.style.display = board ? '' : 'none';
+    els.tabout.style.display = state.view === 'tab' ? '' : 'none';
+    els.sheetwrap.style.display = state.view === 'sheet' ? '' : 'none';
+    document.getElementById('fb-boardctl').style.display = board ? '' : 'none';
+    renderPosRow();          // pent boxes are board-pertinent
+    if (!board) els.posrow.style.display = 'none';
+    paintViewOpts();
+    if (board) applyZoom();
+    renderAltView();
+  }
+
+  function setView(v) {
+    if (v !== 'board' && v !== 'tab' && v !== 'sheet') return;
+    state.view = v;
+    App.store.set('fb.view', v);
+    applyView();             // the runner keeps playing across view switches
   }
 
   function prPlayBtn(running) {
@@ -863,6 +1122,7 @@
       App.store.set('fb.pr.pattern', pr.pattern);
       pr.idx = 0;
       if (pr.running) { pr.path = prPath(); pr.seq = prSeq(pr.path.length, pr.pattern, pr.dir); }
+      renderAltView();
     });
     var dirSeg = document.getElementById('fb-pr-dir');
     function paintDir() {
@@ -879,6 +1139,7 @@
       paintDir();
       pr.idx = 0;
       if (pr.running) { pr.path = prPath(); pr.seq = prSeq(pr.path.length, pr.pattern, pr.dir); }
+      renderAltView();
     });
     bpm.addEventListener('change', function () {
       var v = parseInt(this.value, 10);
@@ -1045,6 +1306,17 @@
       '.fb-flash{animation:fb-flash .4s ease-out forwards;pointer-events:none}' +
       '@keyframes fb-flash{0%{opacity:.95}100%{opacity:0}}' +
       '.fb-posrow{margin-bottom:12px}' +
+      '.fb-tabout{font-family:ui-monospace,Consolas,Menlo,monospace;line-height:1.6;overflow-x:auto;' +
+        'background:var(--card2);border:1px solid var(--line);border-radius:10px;' +
+        'padding:14px 16px;color:var(--text);white-space:pre;min-height:120px}' +
+      '.fbv-n{font-weight:700;border-radius:4px}' +
+      '.fbv-n.fbv-root{text-decoration:underline}' +
+      '.fbv-n.now{background:var(--accent);color:#1c1206 !important;box-shadow:0 0 10px var(--accent-glow)}' +
+      '.fb-sheetwrap{overflow-x:auto;background:var(--card2);border:1px solid var(--line);' +
+        'border-radius:10px;padding:12px 14px;min-height:140px}' +
+      '.fb-sheetwrap svg{display:block}' +
+      '.fbv-sn .fbv-halo{opacity:0;transition:opacity 0.1s}' +
+      '.fbv-sn.now .fbv-halo{opacity:0.95}' +
       '.fb-legend{margin-top:12px}' +
       '.fb-legend-item{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);font-weight:600}' +
       '.fb-chip{cursor:pointer;font-family:inherit}' +
@@ -1070,12 +1342,19 @@
             '<button type="button" class="chip" id="fb-jamchip" style="display:none" title="Tap to switch the board to this mode"></button>' +
           '</span>' +
           '<span class="row tight">' +
+            '<select id="fb-view" title="How to see the exercise">' +
+              '<option value="board">Fretboard</option>' +
+              '<option value="tab">Tab</option>' +
+              '<option value="sheet">Sheet</option>' +
+            '</select>' +
+            '<span class="row tight" id="fb-boardctl">' +
             '<button type="button" class="btn sm" id="fb-zout" aria-label="Zoom out">&minus;</button>' +
             '<span class="chip" id="fb-zlabel">100%</span>' +
             '<button type="button" class="btn sm" id="fb-zin" aria-label="Zoom in">+</button>' +
             '<button type="button" class="btn sm" id="fb-zfit">Fit</button>' +
             '<button type="button" class="btn sm" id="fb-rotate" title="Rotate the board (vertical / horizontal neck)" aria-label="Rotate the fretboard">&#8635;</button>' +
             '<button type="button" class="btn sm" id="fb-max" title="Fullscreen" aria-label="Fullscreen">&#x26F6;</button>' +
+            '</span>' +
           '</span>' +
         '</div>' +
         '<div class="row tight fb-posrow" id="fb-posrow" style="display:none"></div>' +
@@ -1125,7 +1404,24 @@
           '<label class="row tight small muted" style="gap:5px"><input type="checkbox" id="fb-pr-click">Click</label>' +
           '<span class="muted small" id="fb-pr-status"></span>' +
         '</div>' +
+        '<div class="row tight" id="fb-viewopts" style="display:none">' +
+          '<div class="fb-field" id="fb-vo-ori">View' +
+            '<div class="seg"><button type="button" data-fbvori="h">Horizontal</button>' +
+            '<button type="button" data-fbvori="v">Vertical</button></div>' +
+          '</div>' +
+          '<div class="fb-field">Layout' +
+            '<div class="seg" id="fb-vo-fit"><button type="button" data-fbvfit="fit">Fit</button>' +
+            '<button type="button" data-fbvfit="scroll">Scroll</button></div>' +
+          '</div>' +
+          '<div class="fb-field">Size' +
+            '<div class="seg" id="fb-vo-size"><button type="button" data-fbvsize="s">S</button>' +
+            '<button type="button" data-fbvsize="m">M</button>' +
+            '<button type="button" data-fbvsize="l">L</button></div>' +
+          '</div>' +
+        '</div>' +
         '<div class="fb-scroll" id="fb-scroll"></div>' +
+        '<div class="fb-tabout" id="fb-tabout" style="display:none"></div>' +
+        '<div class="fb-sheetwrap" id="fb-sheetwrap" style="display:none"></div>' +
         '<button type="button" class="fb-exitmax" id="fb-exitmax" title="Exit fullscreen" aria-label="Exit fullscreen">&#10005;</button>' +
         '<button type="button" class="fb-exitmax fb-playmax" id="fb-playmax" title="Play / pause the exercise" aria-label="Play or pause the practice exercise">&#9654;</button>' +
         '<div class="fb-settings" id="fb-settings">' +
@@ -1162,6 +1458,8 @@
     els.display = document.getElementById('fb-display');
     els.lefty = document.getElementById('fb-lefty');
     els.posrow = document.getElementById('fb-posrow');
+    els.tabout = document.getElementById('fb-tabout');
+    els.sheetwrap = document.getElementById('fb-sheetwrap');
     els.scroll = document.getElementById('fb-scroll');
     els.legend = document.getElementById('fb-legend');
     els.infoTitle = document.getElementById('fb-info-title');
@@ -1220,6 +1518,32 @@
       App.store.set('fb.colors', null);
       renderColorInputs();
       renderBoard(); renderInfo(); renderLegend();
+    });
+
+    document.getElementById('fb-view').value = state.view;
+    document.getElementById('fb-view').addEventListener('change', function () {
+      setView(this.value);
+    });
+    document.getElementById('fb-viewopts').addEventListener('click', function (e) {
+      var b = e.target.closest('button');
+      if (!b) return;
+      if (b.hasAttribute('data-fbvori')) {
+        state.tabOri = b.getAttribute('data-fbvori');
+        App.store.set('tab.orient', state.tabOri);
+      } else if (b.hasAttribute('data-fbvfit')) {
+        state.vFit = b.getAttribute('data-fbvfit');
+        App.store.set('tab.fit', state.vFit);
+      } else if (b.hasAttribute('data-fbvsize')) {
+        state.vSize = b.getAttribute('data-fbvsize');
+        App.store.set('tab.size', state.vSize);
+      } else {
+        return;
+      }
+      paintViewOpts();
+      renderAltView();
+    });
+    window.addEventListener('resize', function () {
+      if (state.view !== 'board' && state.vFit === 'fit') renderAltView();
     });
 
     document.getElementById('fb-zout').addEventListener('click', function () { setZoom(zoom / 1.3); });
@@ -1342,6 +1666,7 @@
 
     renderLegend();
     renderAll();
+    applyView();
   }
 
   // ---------------- fullscreen ("theater") mode ----------------
