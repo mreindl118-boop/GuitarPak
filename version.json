@@ -1,5 +1,5 @@
 {
-  "version": "0.14.0",
+  "version": "0.15.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "The Fretboard page now has three views in one - the board, degree-colored tablature, and real treble-clef sheet music - switched with a dropdown, all driven by the same key/scale/pattern and all playable: hit Play in any view and the current note lights up as the exercise runs. Plus the always-visible context bar from 0.13: key, scale, mode, tempo, and time signature in one place, every page linked. NOTE: updating from 0.6.1 or older requires uninstalling the old app first (new signing key)."
+  "notes": "Practice patterns, streamlined: pick a pattern type (Scale, Groups, Intervals, One string) and only the settings that matter appear - group size, interval plus how many strings a pair may span (2-5), or which single string to run the scale on. Plus 0.14's three-view Fretboard page (board / colored tab / sheet music, all playable) and 0.13's always-visible key/tempo bar. NOTE: updating from 0.6.1 or older requires uninstalling the old app first (new signing key)."
 }

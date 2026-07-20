@@ -355,6 +355,15 @@ window.Theory = (function () {
     for (f = 0; f < 12; f++) {
       if (mod12(t0 + f) === mod12(opts.rootPc)) { rootFret = f; break; }
     }
+    // single-string pattern: every scale tone along ONE string, whole neck
+    if (typeof opts.singleString === 'number' && opts.singleString >= 0 && opts.singleString <= 5) {
+      var sp = [];
+      for (var sf = 0; sf <= maxFret; sf++) {
+        var sm = tun.midi[opts.singleString] + sf;
+        if (info.pcSet.has(mod12(sm))) sp.push({ s: opts.singleString, f: sf, midi: sm });
+      }
+      return sp;
+    }
     var win;
     if (steps.length === 5 && opts.pentBox > 0) {
       var anchors = [rootFret];
@@ -390,19 +399,30 @@ window.Theory = (function () {
   // (straight scale, sliding groups g3-g7, or interval pairs i2-i16), the
   // direction plays it up, down (exact reverse), or up-then-down (skipping
   // the repeated apex).
-  function exerciseSeq(n, pattern, dir) {
+  // pattern tokens: 'scale' | 'gN' (groups 3-7) | 'iN' / 'iNsM' (intervals
+  // 2nd-16th, optionally constrained to pairs spanning at most M strings,
+  // M=2-5) | 'ssK' (single-string, K handled by exercisePath - plain run here)
+  function exerciseSeq(path, pattern, dir) {
+    var n = path.length;
     var up = [], i, j, k;
     if (!n) return up;
-    var iv = /^i([0-9]+)$/.exec(pattern);
-    if (/^g[3-7]$/.test(pattern)) {
-      k = parseInt(pattern.slice(1), 10);
+    var g = /^g([3-7])$/.exec(pattern);
+    var iv = /^i([0-9]+)(?:s([2-5]))?$/.exec(pattern);
+    if (g) {
+      k = parseInt(g[1], 10);
       if (n < k) { for (i = 0; i < n; i++) up.push(i); }
       else { for (i = 0; i + k <= n; i++) for (j = 0; j < k; j++) up.push(i + j); }
     } else if (iv) {
       k = parseInt(iv[1], 10) - 1;
-      if (n > k) { for (i = 0; i + k < n; i++) { up.push(i); up.push(i + k); } }
-      else { for (i = 0; i < n; i++) up.push(i); }
-    } else { // 'scale'
+      var span = iv[2] ? parseInt(iv[2], 10) : 0;
+      if (n > k) {
+        for (i = 0; i + k < n; i++) {
+          if (span && Math.abs(path[i].s - path[i + k].s) >= span) continue;
+          up.push(i); up.push(i + k);
+        }
+      }
+      if (!up.length) { for (i = 0; i < n; i++) up.push(i); } // nothing fit - plain run
+    } else { // 'scale' and 'ssK'
       for (i = 0; i < n; i++) up.push(i);
     }
     if (dir === 'down') return up.slice().reverse();

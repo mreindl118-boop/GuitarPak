@@ -675,16 +675,18 @@
   // playable positions come from the shared exercise engine (Theory), plus
   // this board's screen coordinates for the runner's rings
   function prPath() {
+    var ss = /^ss([0-5])$/.exec(pr.pattern);
     return Theory.exercisePath({
       rootPc: state.root, scaleId: state.scale, tuningId: state.tuning,
-      maxFret: state.frets, mode: state.mode, pentBox: isPent() ? state.pos : 0
+      maxFret: state.frets, mode: state.mode, pentBox: isPent() ? state.pos : 0,
+      singleString: ss ? parseInt(ss[1], 10) : undefined
     }).map(function (n) {
       return { s: n.s, f: n.f, midi: n.midi, cx: colCX2(n.f), cy: rowY2(n.s) };
     });
   }
 
-  function prSeq(n, pattern, dir) {
-    return Theory.exerciseSeq(n, pattern, dir);
+  function prSeq(path, pattern, dir) {
+    return Theory.exerciseSeq(path, pattern, dir);
   }
 
   function prRings() {
@@ -819,7 +821,7 @@
 
   function altExercise() {
     var path = prPath();
-    return { path: path, seq: prSeq(path.length, pr.pattern, pr.dir) };
+    return { path: path, seq: prSeq(path, pr.pattern, pr.dir) };
   }
 
   function noteColor(info, pc) {
@@ -1057,7 +1059,7 @@
   function prStart() {
     pr.path = prPath();
     if (!pr.path.length) { prStatus('no notes in this position'); return; }
-    pr.seq = prSeq(pr.path.length, pr.pattern, pr.dir);
+    pr.seq = prSeq(pr.path, pr.pattern, pr.dir);
     try { pr.ctx = App.getAudio(); } catch (e) { prStatus('audio unavailable'); return; }
     pr.vis.length = 0;
     pr.nextT = pr.ctx.currentTime + 0.15;
@@ -1091,10 +1093,12 @@
     else prStart(); // resumes from pr.idx after a pause
   }
 
+  var PAT_RE = /^(scale|g[3-7]|i([2-9]|1[0-6])(s[2-5])?|ss[0-5])$/;
+
   function prWire() {
     // migrate pre-0.9 stored patterns: up/updown/thirds/random -> scale (+dir)
     var storedPat = App.store.get('fb.pr.pattern', 'scale');
-    pr.pattern = /^(scale|g[3-7]|i([2-9]|1[0-6]))$/.test(storedPat) ? storedPat : 'scale';
+    pr.pattern = PAT_RE.test(storedPat) ? storedPat : 'scale';
     pr.dir = App.store.get('fb.pr.dir', storedPat === 'updown' ? 'updown' : 'up');
     if (!/^(up|down|updown)$/.test(pr.dir)) pr.dir = 'up';
     // tempo is SHARED with the metronome — met.bpm is the single source of truth
@@ -1103,12 +1107,81 @@
     pr.sound = !!App.store.get('fb.pr.sound', true);
     pr.click = !!App.store.get('fb.pr.click', true);
 
-    var pat = document.getElementById('fb-pr-pattern');
+    var typeSel = document.getElementById('fb-pr-type');
+    var groupSel = document.getElementById('fb-pr-group');
+    var ivSel = document.getElementById('fb-pr-iv');
+    var spanSel = document.getElementById('fb-pr-ivspan');
+    var strSel = document.getElementById('fb-pr-string');
+    var IVL = { 2: '2nds', 3: '3rds', 4: '4ths', 5: '5ths', 6: '6ths', 7: '7ths', 8: 'Octaves',
+      9: '9ths', 10: '10ths', 11: '11ths', 12: '12ths', 13: '13ths', 14: '14ths', 15: '15ths', 16: '16ths' };
+    var ivh = '', ivn;
+    for (ivn = 2; ivn <= 16; ivn++) ivh += '<option value="' + ivn + '">' + IVL[ivn] + '</option>';
+    ivSel.innerHTML = ivh;
+
+    function fillStringSel() {
+      var tun = Theory.TUNINGS[state.tuning];
+      var pf = preferFlat();
+      var h = '', s;
+      for (s = 5; s >= 0; s--) { // high e first, labeled 1st..6th + note
+        h += '<option value="' + s + '">' + (6 - s) + ' \u00b7 ' +
+          Theory.pcName(Theory.mod12(tun.midi[s]), pf) + '</option>';
+      }
+      strSel.innerHTML = h;
+    }
+    fillStringSel();
+
+    // decompose the stored token into the type + sub-selects
+    function decompose() {
+      var p = pr.pattern, mm;
+      if ((mm = /^g([3-7])$/.exec(p))) {
+        typeSel.value = 'group'; groupSel.value = mm[1];
+      } else if ((mm = /^i([0-9]+)(?:s([2-5]))?$/.exec(p))) {
+        typeSel.value = 'interval'; ivSel.value = mm[1]; spanSel.value = mm[2] || '0';
+      } else if ((mm = /^ss([0-5])$/.exec(p))) {
+        typeSel.value = 'string'; strSel.value = mm[1];
+      } else {
+        typeSel.value = 'scale';
+      }
+      paintPatternUI();
+    }
+
+    // only the pertinent sub-dropdowns are visible for the chosen type
+    function paintPatternUI() {
+      var t = typeSel.value;
+      groupSel.style.display = t === 'group' ? '' : 'none';
+      ivSel.style.display = t === 'interval' ? '' : 'none';
+      spanSel.style.display = t === 'interval' ? '' : 'none';
+      strSel.style.display = t === 'string' ? '' : 'none';
+    }
+
+    function compose() {
+      var t = typeSel.value;
+      if (t === 'group') return 'g' + groupSel.value;
+      if (t === 'interval') return 'i' + ivSel.value + (spanSel.value !== '0' ? 's' + spanSel.value : '');
+      if (t === 'string') return 'ss' + strSel.value;
+      return 'scale';
+    }
+
+    function patternChanged() {
+      pr.pattern = compose();
+      App.store.set('fb.pr.pattern', pr.pattern);
+      paintPatternUI();
+      pr.idx = 0;
+      if (pr.running) { pr.path = prPath(); pr.seq = prSeq(pr.path, pr.pattern, pr.dir); }
+      renderAltView();
+      if (/^ss/.test(pr.pattern) && state.view === 'board') scrollToFret(0);
+    }
+    typeSel.addEventListener('change', patternChanged);
+    groupSel.addEventListener('change', patternChanged);
+    ivSel.addEventListener('change', patternChanged);
+    spanSel.addEventListener('change', patternChanged);
+    strSel.addEventListener('change', patternChanged);
+    decompose();
+
     var bpm = document.getElementById('fb-pr-bpm');
     var rate = document.getElementById('fb-pr-rate');
     var sound = document.getElementById('fb-pr-sound');
     var click = document.getElementById('fb-pr-click');
-    pat.value = pr.pattern;
     bpm.value = String(pr.bpm);
     rate.value = String(pr.rate);
     sound.checked = pr.sound;
@@ -1117,13 +1190,6 @@
     document.getElementById('fb-pr-play').addEventListener('click', prToggle);
     document.getElementById('fb-playmax').addEventListener('click', prToggle);
     document.getElementById('fb-pr-reset').addEventListener('click', function () { prStop(); });
-    pat.addEventListener('change', function () {
-      pr.pattern = this.value;
-      App.store.set('fb.pr.pattern', pr.pattern);
-      pr.idx = 0;
-      if (pr.running) { pr.path = prPath(); pr.seq = prSeq(pr.path.length, pr.pattern, pr.dir); }
-      renderAltView();
-    });
     var dirSeg = document.getElementById('fb-pr-dir');
     function paintDir() {
       dirSeg.querySelectorAll('button').forEach(function (b) {
@@ -1138,7 +1204,7 @@
       App.store.set('fb.pr.dir', pr.dir);
       paintDir();
       pr.idx = 0;
-      if (pr.running) { pr.path = prPath(); pr.seq = prSeq(pr.path.length, pr.pattern, pr.dir); }
+      if (pr.running) { pr.path = prPath(); pr.seq = prSeq(pr.path, pr.pattern, pr.dir); }
       renderAltView();
     });
     bpm.addEventListener('change', function () {
@@ -1361,33 +1427,26 @@
         '<div class="row tight fb-practice">' +
           '<button type="button" class="btn sm primary" id="fb-pr-play">&#9654; Play</button>' +
           '<button type="button" class="btn sm" id="fb-pr-reset" title="Back to the first note">&#8634;</button>' +
-          '<select id="fb-pr-pattern" title="Exercise pattern">' +
+          '<select id="fb-pr-type" title="Pattern type">' +
             '<option value="scale">Scale</option>' +
-            '<optgroup label="Groups">' +
-            '<option value="g3">3s</option>' +
-            '<option value="g4">4s</option>' +
-            '<option value="g5">5s</option>' +
-            '<option value="g6">6s</option>' +
-            '<option value="g7">7s</option>' +
-            '</optgroup>' +
-            '<optgroup label="Intervals">' +
-            '<option value="i2">2nds</option>' +
-            '<option value="i3">3rds</option>' +
-            '<option value="i4">4ths</option>' +
-            '<option value="i5">5ths</option>' +
-            '<option value="i6">6ths</option>' +
-            '<option value="i7">7ths</option>' +
-            '<option value="i8">Octaves</option>' +
-            '<option value="i9">9ths</option>' +
-            '<option value="i10">10ths</option>' +
-            '<option value="i11">11ths</option>' +
-            '<option value="i12">12ths</option>' +
-            '<option value="i13">13ths</option>' +
-            '<option value="i14">14ths</option>' +
-            '<option value="i15">15ths</option>' +
-            '<option value="i16">16ths</option>' +
-            '</optgroup>' +
+            '<option value="group">Groups</option>' +
+            '<option value="interval">Intervals</option>' +
+            '<option value="string">One string</option>' +
           '</select>' +
+          '<select id="fb-pr-group" title="Notes per group" style="display:none">' +
+            '<option value="3">3s</option><option value="4">4s</option>' +
+            '<option value="5">5s</option><option value="6">6s</option>' +
+            '<option value="7">7s</option>' +
+          '</select>' +
+          '<select id="fb-pr-iv" title="Interval" style="display:none"></select>' +
+          '<select id="fb-pr-ivspan" title="How many strings an interval pair may span" style="display:none">' +
+            '<option value="0">Any strings</option>' +
+            '<option value="2">2 strings</option>' +
+            '<option value="3">3 strings</option>' +
+            '<option value="4">4 strings</option>' +
+            '<option value="5">5 strings</option>' +
+          '</select>' +
+          '<select id="fb-pr-string" title="Which string" style="display:none"></select>' +
           '<div class="seg" id="fb-pr-dir" title="Direction — applies to every pattern">' +
             '<button type="button" data-fbdir="up" title="Ascending">&#8593;</button>' +
             '<button type="button" data-fbdir="down" title="Descending">&#8595;</button>' +
@@ -1597,10 +1656,8 @@
         state.pos = 0;
       }
       if (typeof d.mode === 'number' && d.mode >= 1 && d.mode <= 7) state.mode = Math.floor(d.mode);
-      if (d.pattern && /^(scale|g[3-7]|i([2-9]|1[0-6]))$/.test(d.pattern)) {
+      if (d.pattern && PAT_RE.test(d.pattern)) {
         pr.pattern = d.pattern;
-        var pe = document.getElementById('fb-pr-pattern');
-        if (pe) pe.value = pr.pattern;
       }
       if (d.dir && /^(up|down|updown)$/.test(d.dir)) {
         pr.dir = d.dir;
@@ -1611,7 +1668,7 @@
       }
       saveState();
       pr.idx = 0;
-      if (pr.running) { pr.path = prPath(); pr.seq = prSeq(pr.path.length, pr.pattern, pr.dir); }
+      if (pr.running) { pr.path = prPath(); pr.seq = prSeq(pr.path, pr.pattern, pr.dir); }
       renderAll();
       // the scale really did change — downstream followers (chords) get the
       // same announcement as for a change made on this page
