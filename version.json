@@ -1,5 +1,5 @@
 {
-  "version": "0.16.1",
+  "version": "0.17.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "The metronome now syncs across every tab: a transport button in the top bar starts and stops it from anywhere, pulses on the beat wherever you are, and stays in lockstep with the main Metronome page in both directions. NOTE: updating from 0.6.1 or older requires uninstalling the old app first (new signing key)."
+  "notes": "Clearer controls everywhere: buttons and dropdowns are bigger, brighter and easier to hit. The metronome Tap button is now a big stationary pad that never jumps while you tap. The Chords page opens with every chord in your current key as full diagrams, color-coded by scale degree. Plus the cross-tab metronome transport from 0.16.1."
 }

@@ -345,7 +345,59 @@
     return renderShapeSVG(shape);
   }
 
-  // ---------------- card 1: chord library ----------------
+  // ---------------- card 1: every chord in the key ----------------
+
+  var keyShapeList = []; // shape (or null) per diatonic chord, for the strum handler
+
+  function renderKeyChords() {
+    if (!els.keyShapes) return;
+    els.keyShapes.innerHTML = '';
+    keyShapeList = [];
+    var dia;
+    try {
+      dia = Theory.diatonic(st.keyPc, st.scaleId, st.sevenths);
+    } catch (e) {
+      els.keyShapes.innerHTML = '<div class="error">Could not build key chords: ' + esc(e.message) + '</div>';
+      return;
+    }
+    if (!dia.length) {
+      els.keyShapes.innerHTML = '<div class="muted small">Pick a 7-note scale in the bar above to see its chords.</div>';
+      return;
+    }
+    var pal = degPalette();
+    dia.forEach(function (d, i) {
+      var shapes = [];
+      try { shapes = Theory.chordShapes(d.rootPc, d.quality); } catch (e2) { /* keep empty */ }
+      var shape = shapes.length ? shapes[0] : null;
+      keyShapeList.push(shape);
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'ch-shape ch-keychord';
+      btn.dataset.i = i;
+      btn.title = shape ? 'Click to strum ' + d.name : d.name;
+      btn.style.setProperty('--deg-c', pal[i % 7]);
+      var head = document.createElement('div');
+      head.className = 'ch-keyhead';
+      head.innerHTML = '<span class="ch-keyroman">' + esc(d.roman) + '</span>' +
+                       '<span class="ch-keyname">' + esc(d.name) + '</span>';
+      btn.appendChild(head);
+      if (shape) {
+        btn.appendChild(renderShapeView(shape));
+        var lbl = document.createElement('div');
+        lbl.className = 'muted small';
+        lbl.textContent = shape.label;
+        btn.appendChild(lbl);
+      } else {
+        var no = document.createElement('div');
+        no.className = 'muted small';
+        no.textContent = 'no diagram';
+        btn.appendChild(no);
+      }
+      els.keyShapes.appendChild(btn);
+    });
+  }
+
+  // ---------------- card 2: chord library ----------------
 
   function renderLibrary() {
     lib.shapes = [];
@@ -466,6 +518,7 @@
     App.emit('fb:set', { source: 'ch', root: st.keyPc, scale: st.scaleId }); // whole app follows the preset
     renderKeyLabel();
     updateSegUI();
+    renderKeyChords();
     renderPalette();
     var resolved;
     try {
@@ -669,13 +722,20 @@
 
   var CSS = '' +
     '.ch-shapes{display:flex;flex-wrap:wrap;gap:12px;margin-top:14px;}' +
-    '.ch-shape{background:var(--card2);border:1px solid var(--line);border-radius:10px;' +
-      'padding:8px 10px 9px;cursor:pointer;display:flex;flex-direction:column;align-items:center;' +
-      'gap:2px;color:var(--text);font-family:inherit;}' +
+    '.ch-shape{background:var(--card2);border:1px solid var(--ctl-border,var(--line));border-radius:10px;' +
+      'padding:10px 12px 11px;cursor:pointer;display:flex;flex-direction:column;align-items:center;' +
+      'gap:3px;color:var(--text);font-family:inherit;box-shadow:0 2px 8px rgba(0,0,0,0.25);}' +
     '.ch-shape:hover{border-color:var(--accent-dim);}' +
     '.ch-shape:active{transform:translateY(1px);}' +
     '.ch-cap{text-align:center;}' +
-    '.ch-cap-name{font-weight:700;font-size:13.5px;}' +
+    '.ch-cap-name{font-weight:700;font-size:14.5px;}' +
+    '.ch-keygrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));' +
+      'gap:12px;margin-top:14px;}' +
+    '.ch-keychord{border-top:3px solid var(--deg-c,var(--accent));justify-content:flex-start;}' +
+    '.ch-keyhead{display:flex;align-items:baseline;gap:8px;justify-content:center;flex-wrap:wrap;}' +
+    '.ch-keyroman{font-family:var(--font-display);font-size:19px;font-weight:700;' +
+      'color:var(--deg-c,var(--accent));letter-spacing:1px;}' +
+    '.ch-keyname{font-size:16px;font-weight:700;}' +
     '.ch-line{stroke:var(--line);stroke-width:1;}' +
     '.ch-string{stroke:var(--muted);stroke-opacity:.55;stroke-width:1;}' +
     '.ch-nut{fill:var(--text);}' +
@@ -712,23 +772,7 @@
   function buildDOM(root) {
     root.innerHTML =
       '<div class="card">' +
-        '<h2>Chord library</h2>' +
-        '<div class="row">' +
-          '<label class="field">Root<select id="ch-lib-root"></select></label>' +
-          '<label class="field">Quality<select id="ch-lib-quality"></select></label>' +
-          '<div class="ch-field"><span>View</span>' +
-            '<span class="seg" id="ch-view">' +
-              '<button type="button" data-chview="diagram">Diagram</button>' +
-              '<button type="button" data-chview="neck">Neck</button>' +
-              '<button type="button" data-chview="tab">Tab</button>' +
-            '</span>' +
-          '</div>' +
-          '<span class="muted small">Click a shape to strum it.</span>' +
-        '</div>' +
-        '<div id="ch-lib-shapes" class="ch-shapes"></div>' +
-      '</div>' +
-      '<div class="card">' +
-        '<h2>Progression player</h2>' +
+        '<h2>Chords in the key</h2>' +
         '<div class="row">' +
           '<span class="chip" id="ch-key-label" title="Key and scale come from the bar at the top"></span>' +
           '<div class="ch-field"><span>Chords</span>' +
@@ -737,6 +781,29 @@
               '<button type="button" data-v="1">7ths</button>' +
             '</span>' +
           '</div>' +
+          '<div class="ch-field"><span>View</span>' +
+            '<span class="seg" id="ch-view">' +
+              '<button type="button" data-chview="diagram">Diagram</button>' +
+              '<button type="button" data-chview="neck">Neck</button>' +
+              '<button type="button" data-chview="tab">Tab</button>' +
+            '</span>' +
+          '</div>' +
+          '<span class="muted small">Every chord in the key &mdash; click one to strum it.</span>' +
+        '</div>' +
+        '<div id="ch-key-shapes" class="ch-keygrid"></div>' +
+      '</div>' +
+      '<div class="card">' +
+        '<h2>Chord library</h2>' +
+        '<div class="row">' +
+          '<label class="field">Root<select id="ch-lib-root"></select></label>' +
+          '<label class="field">Quality<select id="ch-lib-quality"></select></label>' +
+          '<span class="muted small">Any chord, every shape &mdash; click one to strum it.</span>' +
+        '</div>' +
+        '<div id="ch-lib-shapes" class="ch-shapes"></div>' +
+      '</div>' +
+      '<div class="card">' +
+        '<h2>Progression player</h2>' +
+        '<div class="row">' +
           '<label class="field">Preset<select id="ch-preset"></select></label>' +
         '</div>' +
         '<div id="ch-palette" class="ch-palette"></div>' +
@@ -765,6 +832,7 @@
         '<div id="ch-status" class="ch-status"></div>' +
       '</div>';
 
+    els.keyShapes = document.getElementById('ch-key-shapes');
     els.libRoot = document.getElementById('ch-lib-root');
     els.libQuality = document.getElementById('ch-lib-quality');
     els.libShapes = document.getElementById('ch-lib-shapes');
@@ -826,7 +894,14 @@
       lib.view = b.getAttribute('data-chview');
       App.store.set('ch.view', lib.view);
       paintViewSeg();
+      renderKeyChords();
       renderLibrary();
+    });
+    els.keyShapes.addEventListener('click', function (e) {
+      var b = e.target.closest('.ch-keychord');
+      if (!b) return;
+      var shape = keyShapeList[Number(b.dataset.i)];
+      if (shape) strumShape(shape);
     });
     els.libShapes.addEventListener('click', function (e) {
       var b = e.target.closest('.ch-shape');
@@ -843,6 +918,7 @@
       st.sevenths = v;
       App.store.set('ch.sevenths', v);
       updateSegUI();
+      renderKeyChords();
       renderPalette();
     });
     els.preset.addEventListener('change', function () {
@@ -906,6 +982,7 @@
       if (d) applyFbScale(d.root, d.scale, false);
     });
 
+    renderKeyChords();
     renderLibrary();
     renderPalette();
     renderTrack();
@@ -924,6 +1001,7 @@
     els.libRoot.value = String(lib.rootPc);
     renderKeyLabel();
     if (!quiet) {           // live change: refresh what is on screen
+      renderKeyChords();
       renderPalette();
       renderLibrary();
     }
@@ -945,7 +1023,8 @@
 
   function onShow() {
     renderKeyLabel();
-    renderLibrary(); // key or degree palette may have changed while away
+    renderKeyChords(); // key or degree palette may have changed while away
+    renderLibrary();
   }
 
   App.register('chords', { init: init, onShow: onShow, onHide: onHide, onKey: onKey });
