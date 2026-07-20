@@ -1,6 +1,7 @@
-# Deploys the web app to GitHub Pages on every push to main.
-# `enablement: true` creates the Pages site on first run, so no manual
-# Settings > Pages step is needed — merging this file activates everything.
+# Keeps GitHub Pages in lockstep with main by mirroring main into the
+# gh-pages branch on every push. Pages serves the gh-pages branch (the branch
+# was first pushed manually, which auto-enables Pages on user repos — the
+# Pages REST API is not callable with the workflow token, so branch mode it is).
 name: Deploy GitHub Pages
 
 on:
@@ -9,27 +10,23 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
-  group: pages
+  group: pages-sync
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  sync:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/configure-pages@v4
-        with:
-          enablement: true
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: .
-      - id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Mirror main to gh-pages
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # .nojekyll: serve files verbatim, skip the Jekyll build
+          touch .nojekyll
+          git add .nojekyll
+          git -c commit.gpgsign=false commit -m "pages: mirror of main @ ${GITHUB_SHA}" --allow-empty
+          git push --force origin HEAD:gh-pages
