@@ -36,6 +36,13 @@
     <button class="tab" data-panel="trainer">Trainer</button>
     <button class="tab" data-panel="settings" aria-label="Settings">&#9881;</button>
   </nav>
+  <div class="ctxbar" id="ctxbar">
+    <label class="cx-field">Key<select id="cx-root"></select></label>
+    <label class="cx-field">Scale<select id="cx-scale"></select></label>
+    <label class="cx-field" id="cx-mode-wrap">Mode<select id="cx-mode"></select></label>
+    <label class="cx-field">BPM<input id="cx-bpm" type="number" min="30" max="280" step="1"></label>
+    <label class="cx-field">Time<select id="cx-sig"></select></label>
+  </div>
 </header>
 <main>
   <section class="panel" id="panel-metronome"></section>

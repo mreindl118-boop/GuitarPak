@@ -134,6 +134,7 @@
     renderBoard();               // redraws the band (this stops the runner)
     scrollToFret(modeWindow(k)[0]);
     if (wasRunning) prStart();   // pick the exercise back up in the new window
+    App.emit('fb:set', { source: 'fb', mode: k }); // context bar follows the swipe
   }
 
   // Name the k-th rotation of the current scale by matching its step pattern
@@ -194,23 +195,6 @@
           '" data-fbpos="' + i + '">' + (i === 0 ? 'All' : 'Box ' + i) + '</button>';
       }
       els.posrow.innerHTML = h;
-      return;
-    }
-    if (isHept()) {
-      // mode switcher: same scale, same roots — the selected mode re-anchors
-      // the highlighted practice window at another degree's position up the
-      // neck. A dropdown here; a horizontal swipe in fullscreen (linked state).
-      els.posrow.style.display = '';
-      var info = Theory.scaleInfo(state.root, state.scale, preferFlat());
-      var m = '<label class="row tight small muted" style="gap:7px">Mode:' +
-        '<select id="fb-modesel" title="Same notes, same roots — moves the practice window">';
-      for (var k = 1; k <= 7; k++) {
-        m += '<option value="' + k + '"' + (state.mode === k ? ' selected' : '') + '>' +
-          k + ' · ' + modeLabel(info, k) + '</option>';
-      }
-      m += '</select></label>' +
-        '<span class="muted small">swipe the board in fullscreen to switch</span>';
-      els.posrow.innerHTML = m;
       return;
     }
     state.pos = 0;
@@ -438,8 +422,6 @@
     state.root = ev.rootPc;
     state.scale = ev.suggestedScale;
     state.pos = 0;
-    if (els.root) els.root.value = String(state.root);
-    if (els.scaleSel) els.scaleSel.value = state.scale;
     els.scroll.classList.add('fb-fade');
     setTimeout(function () {
       renderPosRow();
@@ -1076,11 +1058,6 @@
 
     loadState();
 
-    var rootOpts = [];
-    for (var pc = 0; pc < 12; pc++) {
-      rootOpts.push([pc, Theory.pcName(pc, Theory.FLAT_KEYS.has(pc))]);
-    }
-    var scaleOpts = Theory.SCALE_ORDER.map(function (id) { return [id, Theory.SCALES[id].name]; });
     var tuningOpts = Theory.TUNING_ORDER.map(function (id) { return [id, Theory.TUNINGS[id].name]; });
     var fretOpts = [[12, '12'], [15, '15'], [22, '22'], [24, '24']];
 
@@ -1153,8 +1130,6 @@
         '<button type="button" class="fb-exitmax fb-playmax" id="fb-playmax" title="Play / pause the exercise" aria-label="Play or pause the practice exercise">&#9654;</button>' +
         '<div class="fb-settings" id="fb-settings">' +
           '<div class="row">' +
-            '<label class="field">Root<select id="fb-root">' + buildOptions(rootOpts, state.root) + '</select></label>' +
-            '<label class="field">Scale<select id="fb-scale">' + buildOptions(scaleOpts, state.scale) + '</select></label>' +
             '<label class="field">Tuning<select id="fb-tuning">' + buildOptions(tuningOpts, state.tuning) + '</select></label>' +
             '<label class="field">Frets<select id="fb-frets">' + buildOptions(fretOpts, state.frets) + '</select></label>' +
             '<div class="fb-field">Display' +
@@ -1182,8 +1157,6 @@
     els.gear = document.getElementById('fb-gear');
     els.maxBtn = document.getElementById('fb-max');
     els.title = document.getElementById('fb-title');
-    els.root = document.getElementById('fb-root');
-    els.scaleSel = document.getElementById('fb-scale');
     els.tuningSel = document.getElementById('fb-tuning');
     els.fretsSel = document.getElementById('fb-frets');
     els.display = document.getElementById('fb-display');
@@ -1196,20 +1169,6 @@
 
     updateSeg();
 
-    els.root.addEventListener('change', function () {
-      var v = parseInt(this.value, 10);
-      if (!isNaN(v)) state.root = Theory.mod12(v);
-      saveState();
-      renderAll();
-      App.emit('fb:scale', { root: state.root, scale: state.scale });
-    });
-    els.scaleSel.addEventListener('change', function () {
-      if (Theory.SCALES[this.value]) state.scale = this.value;
-      state.pos = 0;
-      saveState();
-      renderAll();
-      App.emit('fb:scale', { root: state.root, scale: state.scale });
-    });
     els.tuningSel.addEventListener('change', function () {
       if (Theory.TUNINGS[this.value]) state.tuning = this.value;
       saveState();
@@ -1233,12 +1192,6 @@
       state.lefty = !!this.checked;
       saveState();
       renderBoard();
-    });
-    els.posrow.addEventListener('change', function (e) {
-      if (e.target && e.target.id === 'fb-modesel') {
-        var k = parseInt(e.target.value, 10);
-        if (!isNaN(k)) setMode(k);
-      }
     });
     els.posrow.addEventListener('click', function (e) {
       var chip = e.target.closest('button[data-fbpos]');
@@ -1314,12 +1267,10 @@
       if (!d || d.source === 'fb') return;
       if (typeof d.root === 'number' && isFinite(d.root) && d.root >= 0 && d.root < 12) {
         state.root = Math.floor(d.root);
-        els.root.value = String(state.root);
       }
       if (d.scale && Theory.SCALES[d.scale]) {
         state.scale = d.scale;
         state.pos = 0;
-        els.scaleSel.value = state.scale;
       }
       if (typeof d.mode === 'number' && d.mode >= 1 && d.mode <= 7) state.mode = Math.floor(d.mode);
       if (d.pattern && /^(scale|g[3-7]|i([2-9]|1[0-6]))$/.test(d.pattern)) {
@@ -1349,11 +1300,9 @@
       if (!d) return;
       if (typeof d.root === 'number' && isFinite(d.root) && d.root >= 0 && d.root < 12) {
         state.root = Math.floor(d.root);
-        els.root.value = String(state.root);
       }
       if (d.scale && Theory.SCALES[d.scale]) {
         state.scale = d.scale;
-        els.scaleSel.value = state.scale;
       }
       saveState();
       renderAll();

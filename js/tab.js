@@ -50,16 +50,9 @@
 
   // push a shared-state change to storage AND the live fretboard
   function shareChange(patch) {
-    if ('root' in patch) App.store.set('fb.root', st.root);
-    if ('scale' in patch) App.store.set('fb.scale', st.scale);
-    if ('mode' in patch) App.store.set('fb.mode', st.mode);
     if ('pattern' in patch) App.store.set('fb.pr.pattern', st.pattern);
     if ('dir' in patch) App.store.set('fb.pr.dir', st.dir);
-    App.emit('fb:set', {
-      source: 'tab',
-      root: st.root, scale: st.scale, mode: st.mode,
-      pattern: st.pattern, dir: st.dir
-    });
+    App.emit('fb:set', { source: 'tab', pattern: st.pattern, dir: st.dir });
   }
 
   function preferFlat() { return Theory.FLAT_KEYS.has(Theory.mod12(st.root)); }
@@ -171,19 +164,13 @@
     out.textContent = systems.join('\n\n');
   }
 
-  function renderModeSel() {
-    if (!isHept()) {
-      els.modeWrap.style.display = 'none';
-      return;
+  function renderKey() {
+    var name = Theory.pcName(st.root, preferFlat()) + ' ' + Theory.SCALES[st.scale].name;
+    if (isHept() && st.mode > 1) {
+      var info = Theory.scaleInfo(st.root, st.scale, preferFlat());
+      name += ' \u00b7 mode ' + st.mode + ' (' + info.names[st.mode - 1] + ')';
     }
-    els.modeWrap.style.display = '';
-    var info = Theory.scaleInfo(st.root, st.scale, preferFlat());
-    var h = '';
-    for (var k = 1; k <= 7; k++) {
-      h += '<option value="' + k + '"' + (st.mode === k ? ' selected' : '') + '>' +
-        k + ' · ' + info.names[k - 1] + '</option>';
-    }
-    els.mode.innerHTML = h;
+    els.key.textContent = name;
   }
 
   function paintSegs() {
@@ -198,7 +185,7 @@
   }
 
   function renderAll() {
-    renderModeSel();
+    renderKey();
     paintSegs();
     renderTab();
   }
@@ -218,13 +205,7 @@
     loadShared();
     loadOwn();
 
-    var rootOpts = '', scaleOpts = '', patOpts = '', pc, i;
-    for (pc = 0; pc < 12; pc++) {
-      rootOpts += '<option value="' + pc + '">' + Theory.pcName(pc, Theory.FLAT_KEYS.has(pc)) + '</option>';
-    }
-    Theory.SCALE_ORDER.forEach(function (id) {
-      scaleOpts += '<option value="' + id + '">' + Theory.SCALES[id].name + '</option>';
-    });
+    var patOpts = '', i;
     patOpts = '<option value="scale">Scale</option><optgroup label="Groups">';
     for (i = 3; i <= 7; i++) patOpts += '<option value="g' + i + '">' + i + 's</option>';
     patOpts += '</optgroup><optgroup label="Intervals">';
@@ -237,9 +218,7 @@
       '<div class="card">' +
         '<h2>Tablature</h2>' +
         '<div class="row">' +
-          '<label class="field">Root<select id="tb-root">' + rootOpts + '</select></label>' +
-          '<label class="field">Scale<select id="tb-scale">' + scaleOpts + '</select></label>' +
-          '<span class="tb-field" id="tb-mode-wrap">Mode<select id="tb-mode"></select></span>' +
+          '<span class="chip" id="tb-key" title="Key, scale, and mode come from the bar at the top"></span>' +
           '<label class="field">Pattern<select id="tb-pattern">' + patOpts + '</select></label>' +
           '<div class="tb-field">Direction' +
             '<div class="seg" id="tb-dir">' +
@@ -275,10 +254,7 @@
         '<pre class="tb-out" id="tb-out" style="margin-top:14px"></pre>' +
       '</div>';
 
-    els.root = document.getElementById('tb-root');
-    els.scale = document.getElementById('tb-scale');
-    els.mode = document.getElementById('tb-mode');
-    els.modeWrap = document.getElementById('tb-mode-wrap');
+    els.key = document.getElementById('tb-key');
     els.pattern = document.getElementById('tb-pattern');
     els.dirSeg = document.getElementById('tb-dir');
     els.oriSeg = document.getElementById('tb-ori');
@@ -287,21 +263,8 @@
     els.out = document.getElementById('tb-out');
     els.count = document.getElementById('tb-count');
 
-    els.root.value = String(st.root);
-    els.scale.value = st.scale;
     els.pattern.value = st.pattern;
 
-    els.root.addEventListener('change', function () {
-      var v = parseInt(this.value, 10);
-      if (!isNaN(v)) { st.root = Theory.mod12(v); shareChange({ root: 1 }); renderAll(); }
-    });
-    els.scale.addEventListener('change', function () {
-      if (Theory.SCALES[this.value]) { st.scale = this.value; shareChange({ scale: 1 }); renderAll(); }
-    });
-    els.mode.addEventListener('change', function () {
-      var k = parseInt(this.value, 10);
-      if (k >= 1 && k <= 7) { st.mode = k; shareChange({ mode: 1 }); renderTab(); }
-    });
     els.pattern.addEventListener('change', function () {
       st.pattern = this.value; shareChange({ pattern: 1 }); renderTab();
     });
@@ -341,8 +304,13 @@
     App.on('fb:scale', function (d) {
       if (!d) return;
       loadShared();
-      els.root.value = String(st.root);
-      els.scale.value = st.scale;
+      if (App.active === 'tab') renderAll();
+    });
+    // mode/pattern/dir pushed from the bar or a fullscreen swipe
+    App.on('fb:set', function (d) {
+      if (!d || d.source === 'tab') return;
+      loadShared();
+      els.pattern.value = st.pattern;
       if (App.active === 'tab') renderAll();
     });
 
@@ -354,10 +322,8 @@
   }
 
   function onShow() {
-    // the fretboard (or trainer) may have changed the shared state — re-read
+    // the bar / fretboard / trainer may have changed shared state — re-read
     loadShared();
-    els.root.value = String(st.root);
-    els.scale.value = st.scale;
     els.pattern.value = st.pattern;
     renderAll();
   }
