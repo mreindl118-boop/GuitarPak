@@ -676,10 +676,12 @@
   // this board's screen coordinates for the runner's rings
   function prPath() {
     var ss = /^ss([0-5])$/.exec(pr.pattern);
+    var im = /^i[0-9]+m([0-9]+)$/.exec(pr.pattern);
     return Theory.exercisePath({
       rootPc: state.root, scaleId: state.scale, tuningId: state.tuning,
       maxFret: state.frets, mode: state.mode, pentBox: isPent() ? state.pos : 0,
-      singleString: ss ? parseInt(ss[1], 10) : undefined
+      singleString: ss ? parseInt(ss[1], 10) : undefined,
+      stringMask: im ? parseInt(im[1], 10) : undefined
     }).map(function (n) {
       return { s: n.s, f: n.f, midi: n.midi, cx: colCX2(n.f), cy: rowY2(n.s) };
     });
@@ -1093,11 +1095,12 @@
     else prStart(); // resumes from pr.idx after a pause
   }
 
-  var PAT_RE = /^(scale|g[3-7]|i([2-9]|1[0-6])(s[2-5])?|ss[0-5])$/;
+  var PAT_RE = /^(scale|g[3-7]|i([2-9]|1[0-6])(m([1-9]|[1-5][0-9]|6[0-2]))?|ss[0-5])$/;
 
   function prWire() {
     // migrate pre-0.9 stored patterns: up/updown/thirds/random -> scale (+dir)
-    var storedPat = App.store.get('fb.pr.pattern', 'scale');
+    var storedPat = String(App.store.get('fb.pr.pattern', 'scale'));
+    storedPat = storedPat.replace(/^(i[0-9]+)s[2-5]$/, '$1'); // 0.15.0 span tokens
     pr.pattern = PAT_RE.test(storedPat) ? storedPat : 'scale';
     pr.dir = App.store.get('fb.pr.dir', storedPat === 'updown' ? 'updown' : 'up');
     if (!/^(up|down|updown)$/.test(pr.dir)) pr.dir = 'up';
@@ -1110,8 +1113,9 @@
     var typeSel = document.getElementById('fb-pr-type');
     var groupSel = document.getElementById('fb-pr-group');
     var ivSel = document.getElementById('fb-pr-iv');
-    var spanSel = document.getElementById('fb-pr-ivspan');
+    var stripEl = document.getElementById('fb-pr-strings');
     var strSel = document.getElementById('fb-pr-string');
+    var strMask = 63; // intervals: bit s = string s enabled (low E = bit 0)
     var IVL = { 2: '2nds', 3: '3rds', 4: '4ths', 5: '5ths', 6: '6ths', 7: '7ths', 8: 'Octaves',
       9: '9ths', 10: '10ths', 11: '11ths', 12: '12ths', 13: '13ths', 14: '14ths', 15: '15ths', 16: '16ths' };
     var ivh = '', ivn;
@@ -1127,16 +1131,37 @@
           Theory.pcName(Theory.mod12(tun.midi[s]), pf) + '</option>';
       }
       strSel.innerHTML = h;
+      // interval string chips: low E .. high e, tap to toggle
+      var c = '';
+      for (s = 0; s < 6; s++) {
+        c += '<button type="button" class="chip fb-chip fb-strchip' +
+          ((strMask & (1 << s)) ? ' active' : '') + '" data-fbstr="' + s + '">' +
+          Theory.pcName(Theory.mod12(tun.midi[s]), pf) + '</button>';
+      }
+      stripEl.innerHTML = c;
     }
     fillStringSel();
+
+    stripEl.addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-fbstr]');
+      if (!b) return;
+      var bit = 1 << parseInt(b.getAttribute('data-fbstr'), 10);
+      var next = strMask ^ bit;
+      if (!next) return;         // keep at least one string on
+      strMask = next;
+      b.classList.toggle('active', !!(strMask & bit));
+      patternChanged();
+    });
 
     // decompose the stored token into the type + sub-selects
     function decompose() {
       var p = pr.pattern, mm;
       if ((mm = /^g([3-7])$/.exec(p))) {
         typeSel.value = 'group'; groupSel.value = mm[1];
-      } else if ((mm = /^i([0-9]+)(?:s([2-5]))?$/.exec(p))) {
-        typeSel.value = 'interval'; ivSel.value = mm[1]; spanSel.value = mm[2] || '0';
+      } else if ((mm = /^i([0-9]+)(?:m([0-9]+))?$/.exec(p))) {
+        typeSel.value = 'interval'; ivSel.value = mm[1];
+        strMask = mm[2] ? (parseInt(mm[2], 10) & 63) || 63 : 63;
+        fillStringSel(); // repaint chips to the mask
       } else if ((mm = /^ss([0-5])$/.exec(p))) {
         typeSel.value = 'string'; strSel.value = mm[1];
       } else {
@@ -1150,14 +1175,14 @@
       var t = typeSel.value;
       groupSel.style.display = t === 'group' ? '' : 'none';
       ivSel.style.display = t === 'interval' ? '' : 'none';
-      spanSel.style.display = t === 'interval' ? '' : 'none';
+      stripEl.style.display = t === 'interval' ? '' : 'none';
       strSel.style.display = t === 'string' ? '' : 'none';
     }
 
     function compose() {
       var t = typeSel.value;
       if (t === 'group') return 'g' + groupSel.value;
-      if (t === 'interval') return 'i' + ivSel.value + (spanSel.value !== '0' ? 's' + spanSel.value : '');
+      if (t === 'interval') return 'i' + ivSel.value + (strMask !== 63 ? 'm' + strMask : '');
       if (t === 'string') return 'ss' + strSel.value;
       return 'scale';
     }
@@ -1174,7 +1199,6 @@
     typeSel.addEventListener('change', patternChanged);
     groupSel.addEventListener('change', patternChanged);
     ivSel.addEventListener('change', patternChanged);
-    spanSel.addEventListener('change', patternChanged);
     strSel.addEventListener('change', patternChanged);
     decompose();
 
@@ -1372,6 +1396,8 @@
       '.fb-flash{animation:fb-flash .4s ease-out forwards;pointer-events:none}' +
       '@keyframes fb-flash{0%{opacity:.95}100%{opacity:0}}' +
       '.fb-posrow{margin-bottom:12px}' +
+      '.fb-strchip{padding:4px 9px;font-size:12px;opacity:0.45}' +
+      '.fb-strchip.active{opacity:1;color:var(--accent);border-color:rgba(255,171,71,0.7)}' +
       '.fb-tabout{font-family:ui-monospace,Consolas,Menlo,monospace;line-height:1.6;overflow-x:auto;' +
         'background:var(--card2);border:1px solid var(--line);border-radius:10px;' +
         'padding:14px 16px;color:var(--text);white-space:pre;min-height:120px}' +
@@ -1439,13 +1465,7 @@
             '<option value="7">7s</option>' +
           '</select>' +
           '<select id="fb-pr-iv" title="Interval" style="display:none"></select>' +
-          '<select id="fb-pr-ivspan" title="How many strings an interval pair may span" style="display:none">' +
-            '<option value="0">Any strings</option>' +
-            '<option value="2">2 strings</option>' +
-            '<option value="3">3 strings</option>' +
-            '<option value="4">4 strings</option>' +
-            '<option value="5">5 strings</option>' +
-          '</select>' +
+          '<span class="row tight" id="fb-pr-strings" title="Tap strings on or off" style="display:none"></span>' +
           '<select id="fb-pr-string" title="Which string" style="display:none"></select>' +
           '<div class="seg" id="fb-pr-dir" title="Direction — applies to every pattern">' +
             '<button type="button" data-fbdir="up" title="Ascending">&#8593;</button>' +

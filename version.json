@@ -1,5 +1,5 @@
 {
-  "version": "0.15.1",
+  "version": "0.16.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "Chord shapes now speak the same color language as the fretboard: every dot, note name, and tab fret number is colored by its degree in the CURRENT key (custom colors included), the key's root gets the white ring, and chord tones outside the key show neutral - across diagram, neck, and tab views. NOTE: updating from 0.6.1 or older requires uninstalling the old app first (new signing key)."
+  "notes": "Interval practice now has tappable string toggles - tap the six string chips at the end of the practice bar to turn each string on or off, and the exercise sticks to the strings you left on. Chord shapes are also now colored, named, and numbered by the current key across diagram, neck, and tab views. NOTE: updating from 0.6.1 or older requires uninstalling the old app first (new signing key)."
 }
