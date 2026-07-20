@@ -1,5 +1,5 @@
 {
-  "version": "0.10.1",
+  "version": "0.11.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "iPad support: install from Safari with Add to Home Screen for a full-screen offline app - the layout now respects iPad safe areas and runs as a proper standalone app. Plus 0.10.0: the Chords page follows the Fretboard's scale, chord shapes get fretboard-style and tab views, and the Fretboard practice bar gains a live tab view of the current exercise. NOTE: updating from 0.6.1 or older requires uninstalling the old app first (new signing key)."
+  "notes": "Rotate the fretboard! The new rotate button in the board toolbar flips between the vertical neck and a classic left-to-right horizontal view with upright note names - great in landscape and fullscreen. Zoom, practice runner, mode windows, and scrolling all follow the orientation. NOTE: updating from 0.6.1 or older requires uninstalling the old app first (new signing key)."
 }

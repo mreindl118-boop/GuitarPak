@@ -15,7 +15,8 @@
     display: 'notes',     // notes | intervals | degrees
     lefty: false,
     pos: 0,               // pentatonic box: 0 = All, 1..5 = box N (not persisted)
-    mode: 1               // 7-note scales: degree anchoring the practice window
+    mode: 1,              // 7-note scales: degree anchoring the practice window
+    orient: 'v'           // 'v' nut-at-top (default) | 'h' classic left-to-right neck
   };
 
   var els = {};
@@ -62,6 +63,8 @@
     var d = App.store.get('fb.display', 'notes');
     if (d === 'notes' || d === 'intervals' || d === 'degrees') state.display = d;
     state.lefty = !!App.store.get('fb.lefty', false);
+    var ori = App.store.get('fb.orient', 'v');
+    if (ori === 'v' || ori === 'h') state.orient = ori;
     var m = App.store.get('fb.mode', 1);
     if (typeof m === 'number' && m >= 1 && m <= 7) state.mode = Math.floor(m);
     var cols = App.store.get('fb.colors', null);
@@ -270,10 +273,15 @@
     var s = [];
     var r, f, i, x;
 
-    // rotated 90° cw: the on-screen viewBox is H wide and W tall (neck runs down)
-    s.push('<svg id="fb-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + H + ' ' + W +
+    // vertical: the whole group is rotated 90° cw (viewBox H x W, neck runs
+    // down). Horizontal: no rotation — the board reads left to right and every
+    // label sits upright. All child coordinates are identical either way.
+    var horiz = state.orient === 'h';
+    s.push('<svg id="fb-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' +
+      (horiz ? W + ' ' + H : H + ' ' + W) +
       '" role="img" aria-label="Fretboard diagram">');
-    s.push('<g id="fb-rot" transform="rotate(90) translate(0,-' + H + ')">');
+    s.push(horiz ? '<g id="fb-rot">'
+                 : '<g id="fb-rot" transform="rotate(90) translate(0,-' + H + ')">');
 
     // board background
     s.push('<rect x="' + nutX + '" y="' + boardTop + '" width="' + (N * FRET_W) +
@@ -386,8 +394,8 @@
     }
 
     s.push('</g></svg>');
-    vb.w = H;  // on-screen width  = across the strings
-    vb.h = W;  // on-screen height = along the neck
+    vb.w = horiz ? W : H;  // on-screen width  (h: along the neck, v: across it)
+    vb.h = horiz ? H : W;  // on-screen height (h: across the strings, v: along the neck)
     var keepX = els.scroll.scrollLeft;
     var keepY = els.scroll.scrollTop;
     els.scroll.innerHTML = s.join('');
@@ -457,14 +465,19 @@
   var BASE_MAX_W = 520; // cap so wide desktop stages don't blow the board up
 
   function baseWidth(wrap) {
-    // zoom 1 = the six strings span the stage width; the neck runs past the
-    // bottom edge and scrolls vertically
+    // vertical: zoom 1 = the six strings span the stage width (capped); the
+    // neck runs past the bottom edge and scrolls vertically.
+    // horizontal: zoom 1 = the whole neck spans the stage width; zooming in
+    // scrolls sideways along the neck.
     if (!vb.w || !wrap || !wrap.clientWidth) return 0;
+    if (state.orient === 'h') return wrap.clientWidth;
     return Math.min(wrap.clientWidth, BASE_MAX_W);
   }
 
   function minZoom(wrap) {
-    // smallest zoom = the whole neck visible inside the stage height
+    // smallest zoom = the whole neck visible (in the height when vertical;
+    // horizontal zoom 1 already fits the neck to the width)
+    if (state.orient === 'h') return 1;
     var bw = baseWidth(wrap);
     if (bw <= 0 || !vb.h) return 1;
     return Math.min(1, ((wrap.clientHeight - 8) * vb.w / vb.h) / bw);
@@ -644,14 +657,19 @@
     return f === 0 ? LABEL_W + OPEN_W / 2 : nutX + (f - 0.5) * FRET_W;
   }
 
-  // bring a fret into view (the neck runs DOWN the screen, so neck-x -> scrollTop)
+  // bring a fret into view (vertical: neck-x -> scrollTop; horizontal -> scrollLeft)
   function scrollToFret(f) {
     var svg = els.scroll && els.scroll.querySelector('svg');
     if (!svg || !vb.h) return;
     var nutX = LABEL_W + OPEN_W;
     var x = f <= 0 ? 0 : nutX + (f - 1) * FRET_W;
-    var target = (x / vb.h) * svg.getBoundingClientRect().height - 30;
-    els.scroll.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
+    if (state.orient === 'h') {
+      var lt = (x / vb.w) * svg.getBoundingClientRect().width - 30;
+      els.scroll.scrollTo({ left: Math.max(0, lt), behavior: 'smooth' });
+    } else {
+      var target = (x / vb.h) * svg.getBoundingClientRect().height - 30;
+      els.scroll.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
+    }
   }
 
   function rowY2(s) { return TOP + (state.lefty ? s : 5 - s) * GAP; }
@@ -817,10 +835,17 @@
     var svg = document.getElementById('fb-svg');
     if (!wrap || !svg) return;
     var scale = svg.getBoundingClientRect().width / vb.w;
-    var yPost = node.cx * scale; // post-rotation y = pre-rotation x (along the neck)
-    var target = Math.max(0, yPost - wrap.clientHeight * 0.45);
-    if (Math.abs(wrap.scrollTop - target) > wrap.clientHeight * 0.22) {
-      wrap.scrollTo({ top: target, behavior: 'smooth' });
+    var along = node.cx * scale; // screen distance along the neck
+    if (state.orient === 'h') {
+      var lt = Math.max(0, along - wrap.clientWidth * 0.45);
+      if (Math.abs(wrap.scrollLeft - lt) > wrap.clientWidth * 0.22) {
+        wrap.scrollTo({ left: lt, behavior: 'smooth' });
+      }
+    } else {
+      var target = Math.max(0, along - wrap.clientHeight * 0.45);
+      if (Math.abs(wrap.scrollTop - target) > wrap.clientHeight * 0.22) {
+        wrap.scrollTo({ top: target, behavior: 'smooth' });
+      }
     }
   }
 
@@ -1171,6 +1196,7 @@
             '<span class="chip" id="fb-zlabel">100%</span>' +
             '<button type="button" class="btn sm" id="fb-zin" aria-label="Zoom in">+</button>' +
             '<button type="button" class="btn sm" id="fb-zfit">Fit</button>' +
+            '<button type="button" class="btn sm" id="fb-rotate" title="Rotate the board (vertical / horizontal neck)" aria-label="Rotate the fretboard">&#8635;</button>' +
             '<button type="button" class="btn sm" id="fb-max" title="Fullscreen" aria-label="Fullscreen">&#x26F6;</button>' +
           '</span>' +
         '</div>' +
@@ -1347,6 +1373,13 @@
     document.getElementById('fb-zout').addEventListener('click', function () { setZoom(zoom / 1.3); });
     document.getElementById('fb-zin').addEventListener('click', function () { setZoom(zoom * 1.3); });
     document.getElementById('fb-zfit').addEventListener('click', function () { setZoom(minZoom(els.scroll)); });
+    document.getElementById('fb-rotate').addEventListener('click', function () {
+      state.orient = state.orient === 'h' ? 'v' : 'h';
+      App.store.set('fb.orient', state.orient);
+      renderAll();
+      setZoom(minZoom(els.scroll)); // zoom means something new — refit
+      scrollToFret(isHept() ? modeWindow(state.mode)[0] : 0);
+    });
     els.gear.addEventListener('click', function () {
       els.settings.classList.toggle('open');
     });
