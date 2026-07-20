@@ -384,8 +384,10 @@ window.Theory = (function () {
       if (rootFret + 4 > maxFret) rootFret = Math.max(0, rootFret - 12);
       win = [rootFret, rootFret + 4];
     }
+    var mask = (typeof opts.stringMask === 'number' && opts.stringMask > 0) ? opts.stringMask : 63;
     var path = [];
     for (var s = 0; s < 6; s++) {
+      if (!(mask & (1 << s))) continue; // string toggled off
       for (var fr = Math.max(0, win[0]); fr <= Math.min(maxFret, win[1]); fr++) {
         var midi = tun.midi[s] + fr;
         if (info.pcSet.has(mod12(midi))) path.push({ s: s, f: fr, midi: midi });
@@ -399,29 +401,23 @@ window.Theory = (function () {
   // (straight scale, sliding groups g3-g7, or interval pairs i2-i16), the
   // direction plays it up, down (exact reverse), or up-then-down (skipping
   // the repeated apex).
-  // pattern tokens: 'scale' | 'gN' (groups 3-7) | 'iN' / 'iNsM' (intervals
-  // 2nd-16th, optionally constrained to pairs spanning at most M strings,
-  // M=2-5) | 'ssK' (single-string, K handled by exercisePath - plain run here)
+  // pattern tokens: 'scale' | 'gN' (groups 3-7) | 'iN' / 'iNmM' (intervals
+  // 2nd-16th; M = enabled-strings bitmask, applied in exercisePath) |
+  // 'ssK' (single-string, K handled by exercisePath - plain run here)
   function exerciseSeq(path, pattern, dir) {
     var n = path.length;
     var up = [], i, j, k;
     if (!n) return up;
     var g = /^g([3-7])$/.exec(pattern);
-    var iv = /^i([0-9]+)(?:s([2-5]))?$/.exec(pattern);
+    var iv = /^i([0-9]+)(?:m[0-9]+)?$/.exec(pattern); // mask handled by exercisePath
     if (g) {
       k = parseInt(g[1], 10);
       if (n < k) { for (i = 0; i < n; i++) up.push(i); }
       else { for (i = 0; i + k <= n; i++) for (j = 0; j < k; j++) up.push(i + j); }
     } else if (iv) {
       k = parseInt(iv[1], 10) - 1;
-      var span = iv[2] ? parseInt(iv[2], 10) : 0;
-      if (n > k) {
-        for (i = 0; i + k < n; i++) {
-          if (span && Math.abs(path[i].s - path[i + k].s) >= span) continue;
-          up.push(i); up.push(i + k);
-        }
-      }
-      if (!up.length) { for (i = 0; i < n; i++) up.push(i); } // nothing fit - plain run
+      if (n > k) { for (i = 0; i + k < n; i++) { up.push(i); up.push(i + k); } }
+      if (!up.length) { for (i = 0; i < n; i++) up.push(i); } // interval wider than the path
     } else { // 'scale' and 'ssK'
       for (i = 0; i < n; i++) up.push(i);
     }
