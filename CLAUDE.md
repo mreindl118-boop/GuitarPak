@@ -24,6 +24,8 @@ js/settings.js    ┘ (settings: app-level prefs — theme dark/light/auto)
 samples/          MIT FluidR3 instrument MP3s (see samples/CREDITS.md)
 android/          APK project — build.ps1 (no Gradle: javac→d8→aapt→zipalign→
                   apksigner); keystore is gitignored, do NOT commit it
+ios/              WKWebView wrapper (XcodeGen project.yml + Swift; needs a Mac
+                  to build — the PWA is the primary iPad install)
 releases/         built signed APK (committed; raw URL = download link)
 tools/bundle.py   builds the single-file bundle for the claude.ai artifact
 version.json      auto-update feed (source of truth for latest version)
@@ -34,7 +36,8 @@ version.json      auto-update feed (source of truth for latest version)
 - Event bus: `App.on/emit`. Events: `tempo` {bpm, source} (met.bpm is the ONE
   shared tempo — always guard against echo via `source`), `jam:chord`,
   `jam:stopped`, `fb:practice` {root?, scale?, bpm?} (Trainer prompt "Go" —
-  fretboard applies it, switches tabs, starts the runner).
+  fretboard applies it, switches tabs, starts the runner), `fb:scale`
+  {root, scale} (fretboard scale changed — chords page follows 7-note scales).
 - Audio schedulers (metronome/practice/jam): 25 ms setInterval + lookahead on
   the AudioContext clock, with a catch-up guard (`if nextT < currentTime →
   jump forward`) so stalls never schedule past-dated (silent) notes. Keep this
