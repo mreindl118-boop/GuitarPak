@@ -1,5 +1,5 @@
 {
-  "version": "0.11.0",
+  "version": "0.12.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "Rotate the fretboard! The new rotate button in the board toolbar flips between the vertical neck and a classic left-to-right horizontal view with upright note names - great in landscape and fullscreen. Zoom, practice runner, mode windows, and scrolling all follow the orientation. NOTE: updating from 0.6.1 or older requires uninstalling the old app first (new signing key)."
+  "notes": "New Tab page: the practice exercise written out as real tablature, fully linked with the Fretboard - root, scale, mode, pattern, and direction stay in sync both ways (Chords follows along too). View it horizontally (fit-to-screen systems or one scrolling line) or vertically, in three text sizes. The old Tab strip on the Fretboard page is gone. NOTE: updating from 0.6.1 or older requires uninstalling the old app first (new signing key)."
 }
