@@ -1,5 +1,5 @@
 {
-  "version": "0.15.0",
+  "version": "0.15.1",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "Practice patterns, streamlined: pick a pattern type (Scale, Groups, Intervals, One string) and only the settings that matter appear - group size, interval plus how many strings a pair may span (2-5), or which single string to run the scale on. Plus 0.14's three-view Fretboard page (board / colored tab / sheet music, all playable) and 0.13's always-visible key/tempo bar. NOTE: updating from 0.6.1 or older requires uninstalling the old app first (new signing key)."
+  "notes": "Chord shapes now speak the same color language as the fretboard: every dot, note name, and tab fret number is colored by its degree in the CURRENT key (custom colors included), the key's root gets the white ring, and chord tones outside the key show neutral - across diagram, neck, and tab views. NOTE: updating from 0.6.1 or older requires uninstalling the old app first (new signing key)."
 }

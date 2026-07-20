@@ -124,6 +124,10 @@
 
   function renderShapeSVG(shape) {
     var NS = 'http://www.w3.org/2000/svg';
+    var kinfo = keyInfo();
+    var pal = degPalette();
+    var pf = Theory.FLAT_KEYS.has(st.keyPc);
+    var tunMidi = Theory.TUNINGS.standard.midi;
     var SP_X = 13, SP_Y = 17, LEFT = 24, TOP = 30;
     var gw = SP_X * 5, gh = SP_Y * 5;
     var W = LEFT + gw + 12, H = TOP + gh + 8;
@@ -154,6 +158,27 @@
       c.setAttribute('cx', cx); c.setAttribute('cy', cy);
       c.setAttribute('r', r); c.setAttribute('class', cls);
       svg.appendChild(c);
+      return c;
+    }
+
+    // colored note dot: key-degree fill, note name inside, white ring on the
+    // key's root — the same language the fretboard speaks
+    function noteDot(cx, cy, r, pc) {
+      var tone = keyTone(kinfo, pal, pc);
+      var c = circle(cx, cy, r, '');
+      c.setAttribute('fill', tone.color);
+      if (tone.isKeyRoot) {
+        c.setAttribute('stroke', '#ffffff');
+        c.setAttribute('stroke-width', '1.3');
+      }
+      var t = document.createElementNS(NS, 'text');
+      t.setAttribute('x', cx); t.setAttribute('y', cy + 2.4);
+      t.setAttribute('text-anchor', 'middle');
+      t.setAttribute('font-size', '6.6');
+      t.setAttribute('font-weight', '700');
+      t.setAttribute('fill', '#1c1206');
+      t.textContent = Theory.pcName(pc, pf);
+      svg.appendChild(t);
     }
 
     var f, s;
@@ -178,29 +203,50 @@
       if (fr === -1) {
         text(x, TOP - 8, 'X', 'ch-xo', 'middle');
       } else if (fr === 0) {
-        circle(x, TOP - 10.5, 3.4, 'ch-open');
+        noteDot(x, TOP - 10.5, 4.6, Theory.mod12(tunMidi[s]));
       } else {
         var row = fr - shape.baseFret;
         if (row < 0) row = 0;
         if (row > 4) row = 4;
-        circle(x, TOP + (row + 0.5) * SP_Y, 4.6, 'ch-dot');
+        noteDot(x, TOP + (row + 0.5) * SP_Y, 5.6, Theory.mod12(tunMidi[s] + fr));
       }
     }
     return svg;
   }
 
-  // interval color per chord tone, matching the fretboard's degree palette
-  var IV_COLORS = { 0: '#ffab47', 3: '#7ad97a', 4: '#7ad97a', 7: '#6ea8fe', 10: '#b48ef0', 11: '#b48ef0' };
-  var IV_NAMES = ['R', '\u266d2', '2', '\u266d3', '3', '4', '\u266d5', '5', '\u266d6', '6', '\u266d7', '7'];
+  // KEY-degree coloring — identical to the fretboard: same palette (including
+  // the user's custom fb.colors), degrees measured from the CURRENT KEY in the
+  // context bar. Chord tones outside the key render neutral.
+  var DEG_DEFAULTS = ['#ffab47', '#e8d44d', '#7ad97a', '#4cc9b0', '#6ea8fe', '#b48ef0', '#ff85b3'];
+  var NON_KEY = '#8f867c';
+
+  function degPalette() {
+    var c = App.store.get('fb.colors', null);
+    return (Array.isArray(c) && c.length === 7 &&
+      c.every(function (x) { return /^#[0-9a-fA-F]{6}$/.test(x); })) ? c : DEG_DEFAULTS;
+  }
+
+  function keyInfo() {
+    return Theory.scaleInfo(st.keyPc, st.scaleId, Theory.FLAT_KEYS.has(st.keyPc));
+  }
+
+  // { color, isKeyRoot, deg (1-based or 0 if outside the key) } for a pitch class
+  function keyTone(info, pal, pc) {
+    var step = info.pcToStep.get(pc);
+    if (step === undefined) return { color: NON_KEY, isKeyRoot: false, deg: 0 };
+    return { color: pal[step % 7], isKeyRoot: step === 0, deg: step + 1 };
+  }
 
   // fretboard-style mini neck: colored note dots on a drawn neck, nut on top
   function renderShapeNeckSVG(shape) {
     var NS = 'http://www.w3.org/2000/svg';
+    var kinfo = keyInfo();
+    var pal = degPalette();
     var SP_X = 22, SP_Y = 26, LEFT = 30, TOP = 34;
     var gw = SP_X * 5, gh = SP_Y * 5;
     var W = LEFT + gw + 16, H = TOP + gh + 10;
     var tun = Theory.TUNINGS.standard.midi;
-    var pf = Theory.FLAT_KEYS.has(lib.rootPc);
+    var pf = Theory.FLAT_KEYS.has(st.keyPc);
 
     var svg = document.createElementNS(NS, 'svg');
     svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
@@ -242,8 +288,8 @@
         continue;
       }
       var pc = Theory.mod12(tun[s] + fr);
-      var iv = Theory.mod12(pc - lib.rootPc);
-      var fill = IV_COLORS[iv] || '#e8d44d';
+      var tone = keyTone(kinfo, pal, pc);
+      var fill = tone.color;
       var cy;
       if (fr === 0) {
         cy = TOP - 13;
@@ -254,11 +300,11 @@
         cy = TOP + (row + 0.5) * SP_Y;
       }
       el('circle', { cx: x, cy: cy, r: 9, fill: fill,
-                     stroke: iv === 0 ? '#ffffff' : 'none', 'stroke-width': 1.6 });
+                     stroke: tone.isKeyRoot ? '#ffffff' : 'none', 'stroke-width': 1.6 });
       el('text', { x: x, y: cy + 3.2, 'text-anchor': 'middle', 'font-size': 8.5,
                    'font-weight': 700, fill: '#1c1206' }, Theory.pcName(pc, pf));
       el('text', { x: x, y: TOP + gh + 9, 'text-anchor': 'middle', 'font-size': 8,
-                   fill: 'var(--muted)', 'font-weight': 600 }, IV_NAMES[iv]);
+                   fill: 'var(--muted)', 'font-weight': 600 }, tone.deg ? String(tone.deg) : '\u00b7');
     }
     return svg;
   }
@@ -266,6 +312,9 @@
   // guitar tab block for a shape (standard-tuning shapes; high e on top)
   function renderShapeTab(shape) {
     var labels = ['e', 'B', 'G', 'D', 'A', 'E']; // display rows: string 5 (high) .. 0 (low)
+    var kinfo = keyInfo();
+    var pal = degPalette();
+    var tun = Theory.TUNINGS.standard.midi;
     var pre = document.createElement('pre');
     pre.className = 'ch-tab';
     var w = 1;
@@ -276,9 +325,16 @@
       var fr = shape.frets[sIdx];
       var cell = fr === -1 ? 'x' : String(fr);
       while (cell.length < w) cell = cell + '-';
-      lines.push(labels[r] + '|--' + cell + '--|');
+      if (fr === -1) {
+        lines.push(labels[r] + '|--' + cell + '--|');
+      } else {
+        var tone = keyTone(kinfo, pal, Theory.mod12(tun[sIdx] + fr));
+        lines.push(labels[r] + '|--<span style="color:' + tone.color +
+          ';font-weight:700' + (tone.isKeyRoot ? ';text-decoration:underline' : '') + '">' +
+          cell + '</span>--|');
+      }
     }
-    pre.textContent = lines.join('\n');
+    pre.innerHTML = lines.join('\n');
     return pre;
   }
 
@@ -887,5 +943,10 @@
     }
   }
 
-  App.register('chords', { init: init, onHide: onHide, onKey: onKey });
+  function onShow() {
+    renderKeyLabel();
+    renderLibrary(); // key or degree palette may have changed while away
+  }
+
+  App.register('chords', { init: init, onShow: onShow, onHide: onHide, onKey: onKey });
 })();
