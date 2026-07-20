@@ -220,6 +220,17 @@
 
   // ---- beat dots ----
 
+  function applySig(next) {
+    sig = SIGS.indexOf(next) !== -1 ? next : '4/4';
+    App.store.set('met.sig', sig);
+    levels = defaultLevels(); // rebuild with beat 1 accented
+    litIndex = -1;
+    buildDots();
+    saveLevels();
+    if (running) { curBeat = 0; curSub = 0; barCount = 0; }
+    updateTrainerStatus();
+  }
+
   function buildDots() {
     var nb = numBeats();
     if (levels.length !== nb) levels = defaultLevels();
@@ -467,15 +478,15 @@
 
     // signature + dots
     els.sig.addEventListener('change', function () {
-      sig = els.sig.value;
-      if (SIGS.indexOf(sig) === -1) sig = '4/4';
-      App.store.set('met.sig', sig);
-      levels = defaultLevels(); // rebuild with beat 1 accented
-      litIndex = -1;
-      buildDots();
-      saveLevels();
-      if (running) { curBeat = 0; curSub = 0; barCount = 0; }
-      updateTrainerStatus();
+      applySig(this.value);
+      App.emit('sig', { sig: sig, source: 'met' }); // context bar mirrors it
+    });
+
+    // the context bar (or anything else) changed the signature
+    App.on('sig', function (d) {
+      if (!d || d.source === 'met') return;
+      applySig(d.sig);
+      els.sig.value = sig;
     });
 
     els.dots.addEventListener('click', function (e) {

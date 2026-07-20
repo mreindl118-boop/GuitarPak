@@ -21,12 +21,12 @@ window.App = (function () {
   var modules = {};
   var active = null;
   var audioCtx = null;
-  var PANEL_ORDER = ['metronome', 'fretboard', 'tab', 'chords', 'jam', 'tuner', 'trainer', 'settings'];
+  var PANEL_ORDER = ['metronome', 'fretboard', 'chords', 'jam', 'tuner', 'trainer', 'settings'];
 
   // ---- auto-update ----
   // version.json on GitHub is the source of truth. Web builds refresh through
   // the service worker; the APK build (file://) links to the new APK download.
-  var APP_VERSION = '0.12.0';
+  var APP_VERSION = '0.15.0';
   var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
 
   function verNum(v) {
@@ -271,6 +271,108 @@ window.App = (function () {
     store.set('app.tab', name);
   }
 
+  // ---- persistent context bar: key / scale / mode / bpm / time ----
+  // The single home for the shared musical context. Pushes changes through the
+  // existing bus (fb:set -> fretboard applies and re-announces fb:scale, which
+  // chords + tab follow; tempo + sig -> metronome/jam) and mirrors changes made
+  // anywhere else back into its widgets.
+  var CX_SIGS = ['2/4', '3/4', '4/4', '5/4', '6/8', '7/8', '9/8', '12/8']; // keep in sync with metronome
+
+  function wireContextBar() {
+    var root = document.getElementById('cx-root');
+    var scale = document.getElementById('cx-scale');
+    var mode = document.getElementById('cx-mode');
+    var modeWrap = document.getElementById('cx-mode-wrap');
+    var bpm = document.getElementById('cx-bpm');
+    var sig = document.getElementById('cx-sig');
+    if (!root) return;
+
+    var pc, h = '';
+    for (pc = 0; pc < 12; pc++) {
+      h += '<option value="' + pc + '">' + Theory.pcName(pc, Theory.FLAT_KEYS.has(pc)) + '</option>';
+    }
+    root.innerHTML = h;
+    h = '';
+    Theory.SCALE_ORDER.forEach(function (id) {
+      h += '<option value="' + id + '">' + Theory.SCALES[id].name + '</option>';
+    });
+    scale.innerHTML = h;
+    h = '';
+    CX_SIGS.forEach(function (s) { h += '<option value="' + s + '">' + s + '</option>'; });
+    sig.innerHTML = h;
+
+    function curRoot() { var v = store.get('fb.root', 9); return (typeof v === 'number' && v >= 0 && v < 12) ? Math.floor(v) : 9; }
+    function curScale() { var v = store.get('fb.scale', 'minorPent'); return Theory.SCALES[v] ? v : 'minorPent'; }
+    function curMode() { var v = store.get('fb.mode', 1); return (typeof v === 'number' && v >= 1 && v <= 7) ? Math.floor(v) : 1; }
+
+    function refreshModeSel() {
+      var sc = Theory.SCALES[curScale()];
+      if (!sc || sc.steps.length !== 7) { modeWrap.style.display = 'none'; return; }
+      modeWrap.style.display = '';
+      var info = Theory.scaleInfo(curRoot(), curScale());
+      var m = curMode(), k, o = '';
+      for (k = 1; k <= 7; k++) {
+        o += '<option value="' + k + '"' + (k === m ? ' selected' : '') + '>' +
+          k + ' \u00b7 ' + info.names[k - 1] + '</option>';
+      }
+      mode.innerHTML = o;
+    }
+
+    function refreshAll() {
+      root.value = String(curRoot());
+      scale.value = curScale();
+      refreshModeSel();
+      bpm.value = String(Math.max(30, Math.min(280, parseInt(store.get('met.bpm', 120), 10) || 120)));
+      var sv = store.get('met.sig', '4/4');
+      sig.value = CX_SIGS.indexOf(sv) !== -1 ? sv : '4/4';
+    }
+    refreshAll();
+
+    function pushMusic(patch) {
+      var payload = { source: 'bar', root: curRoot(), scale: curScale(), mode: curMode() };
+      for (var k in patch) payload[k] = patch[k];
+      store.set('fb.root', payload.root);
+      store.set('fb.scale', payload.scale);
+      store.set('fb.mode', payload.mode);
+      emit('fb:set', payload);
+    }
+
+    root.addEventListener('change', function () {
+      var v = parseInt(this.value, 10);
+      if (!isNaN(v)) { pushMusic({ root: ((v % 12) + 12) % 12 }); refreshModeSel(); }
+    });
+    scale.addEventListener('change', function () {
+      if (Theory.SCALES[this.value]) { pushMusic({ scale: this.value, mode: 1 }); refreshModeSel(); }
+    });
+    mode.addEventListener('change', function () {
+      var k = parseInt(this.value, 10);
+      if (k >= 1 && k <= 7) pushMusic({ mode: k });
+    });
+    bpm.addEventListener('change', function () {
+      var v = parseInt(this.value, 10);
+      if (isNaN(v)) v = 120;
+      v = Math.max(30, Math.min(280, v));
+      this.value = String(v);
+      store.set('met.bpm', v);
+      emit('tempo', { bpm: v, source: 'bar' });
+    });
+    sig.addEventListener('change', function () {
+      if (CX_SIGS.indexOf(this.value) === -1) return;
+      store.set('met.sig', this.value);
+      emit('sig', { sig: this.value, source: 'bar' });
+    });
+
+    // mirror changes made anywhere else
+    on('fb:scale', function () { refreshAll(); });
+    on('fb:set', function (d) { if (d && d.source !== 'bar') refreshAll(); });
+    on('tempo', function (d) {
+      if (d && d.source !== 'bar') bpm.value = String(Math.max(30, Math.min(280, Math.round(d.bpm))));
+    });
+    on('sig', function (d) {
+      if (d && d.source !== 'bar' && CX_SIGS.indexOf(d.sig) !== -1) sig.value = d.sig;
+    });
+  }
+
   function boot() {
     PANEL_ORDER.forEach(function (name) {
       var el = document.getElementById('panel-' + name);
@@ -301,6 +403,7 @@ window.App = (function () {
     });
 
     applyTheme(store.get('app.theme', 'dark'));
+    wireContextBar();
 
     var startTab = store.get('app.tab', 'metronome');
     if (PANEL_ORDER.indexOf(startTab) === -1) startTab = 'metronome';

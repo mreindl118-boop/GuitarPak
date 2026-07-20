@@ -29,18 +29,23 @@
   <nav class="tabs" id="tabs">
     <button class="tab" data-panel="metronome">Metronome</button>
     <button class="tab" data-panel="fretboard">Fretboard</button>
-    <button class="tab" data-panel="tab">Tab</button>
     <button class="tab" data-panel="chords">Chords</button>
     <button class="tab" data-panel="jam">Jam</button>
     <button class="tab" data-panel="tuner">Tuner</button>
     <button class="tab" data-panel="trainer">Trainer</button>
     <button class="tab" data-panel="settings" aria-label="Settings">&#9881;</button>
   </nav>
+  <div class="ctxbar" id="ctxbar">
+    <label class="cx-field">Key<select id="cx-root"></select></label>
+    <label class="cx-field">Scale<select id="cx-scale"></select></label>
+    <label class="cx-field" id="cx-mode-wrap">Mode<select id="cx-mode"></select></label>
+    <label class="cx-field">BPM<input id="cx-bpm" type="number" min="30" max="280" step="1"></label>
+    <label class="cx-field">Time<select id="cx-sig"></select></label>
+  </div>
 </header>
 <main>
   <section class="panel" id="panel-metronome"></section>
   <section class="panel" id="panel-fretboard"></section>
-  <section class="panel" id="panel-tab"></section>
   <section class="panel" id="panel-chords"></section>
   <section class="panel" id="panel-jam"></section>
   <section class="panel" id="panel-tuner"></section>
@@ -54,7 +59,6 @@
 <script src="js/app.js"></script>
 <script src="js/metronome.js"></script>
 <script src="js/fretboard.js"></script>
-<script src="js/tab.js"></script>
 <script src="js/chords.js"></script>
 <script src="js/jam.js"></script>
 <script src="js/tuner.js"></script>

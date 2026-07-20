@@ -380,6 +380,12 @@
     setTrack(st.track.concat([c]));
   }
 
+  function renderKeyLabel() {
+    if (!els.keyLabel) return;
+    els.keyLabel.textContent = Theory.pcName(st.keyPc, Theory.FLAT_KEYS.has(st.keyPc)) +
+      ' ' + (Theory.SCALES[st.scaleId] ? Theory.SCALES[st.scaleId].name : st.scaleId);
+  }
+
   function paintViewSeg() {
     if (!els.view) return;
     els.view.querySelectorAll('button').forEach(function (b) {
@@ -400,7 +406,9 @@
     st.sevenths = !!preset.sevenths;
     App.store.set('ch.scale', st.scaleId);
     App.store.set('ch.sevenths', st.sevenths);
-    els.scale.value = st.scaleId;
+    App.store.set('fb.scale', st.scaleId);
+    App.emit('fb:set', { source: 'ch', root: st.keyPc, scale: st.scaleId }); // whole app follows the preset
+    renderKeyLabel();
     updateSegUI();
     renderPalette();
     var resolved;
@@ -666,8 +674,7 @@
       '<div class="card">' +
         '<h2>Progression player</h2>' +
         '<div class="row">' +
-          '<label class="field">Key<select id="ch-key"></select></label>' +
-          '<label class="field">Scale<select id="ch-scale"></select></label>' +
+          '<span class="chip" id="ch-key-label" title="Key and scale come from the bar at the top"></span>' +
           '<div class="ch-field"><span>Chords</span>' +
             '<span class="seg" id="ch-seg">' +
               '<button type="button" data-v="0">Triads</button>' +
@@ -706,8 +713,7 @@
     els.libQuality = document.getElementById('ch-lib-quality');
     els.libShapes = document.getElementById('ch-lib-shapes');
     els.view = document.getElementById('ch-view');
-    els.key = document.getElementById('ch-key');
-    els.scale = document.getElementById('ch-scale');
+    els.keyLabel = document.getElementById('ch-key-label');
     els.seg = document.getElementById('ch-seg');
     els.preset = document.getElementById('ch-preset');
     els.palette = document.getElementById('ch-palette');
@@ -736,14 +742,10 @@
     for (i = 0; i < 12; i++) {
       var nm = Theory.pcName(i, Theory.FLAT_KEYS.has(i));
       addOption(els.libRoot, String(i), nm);
-      addOption(els.key, String(i), nm);
     }
     Theory.QUALITY_ORDER.forEach(function (q) {
       var qq = Theory.QUALITIES[q];
       addOption(els.libQuality, q, qq.name + (qq.symbol ? ' (' + qq.symbol + ')' : ''));
-    });
-    SEVEN_NOTE_SCALES.forEach(function (id) {
-      addOption(els.scale, id, Theory.SCALES[id].name);
     });
     addOption(els.preset, '', '— choose preset —');
     Theory.PROGRESSIONS.forEach(function (p) {
@@ -777,16 +779,6 @@
       if (shape) strumShape(shape);
     });
 
-    els.key.addEventListener('change', function () {
-      st.keyPc = validPc(els.key.value);
-      App.store.set('ch.key', st.keyPc);
-      renderPalette();
-    });
-    els.scale.addEventListener('change', function () {
-      st.scaleId = els.scale.value;
-      App.store.set('ch.scale', st.scaleId);
-      renderPalette();
-    });
     els.seg.addEventListener('click', function (e) {
       var b = e.target.closest('button');
       if (!b) return;
@@ -843,14 +835,13 @@
 
     els.libRoot.value = String(lib.rootPc);
     els.libQuality.value = lib.quality;
-    els.key.value = String(st.keyPc);
-    els.scale.value = st.scaleId;
     els.bpm.value = st.bpm;
     els.bars.value = String(st.barsPerChord);
     updateSegUI();
 
     wire();
     paintViewSeg();
+    renderKeyLabel();
 
     // stay linked to the fretboard's scale: seed from its saved state now,
     // follow its changes live (7-note scales only - the palette is diatonic)
@@ -874,9 +865,8 @@
     App.store.set('ch.key', st.keyPc);
     App.store.set('ch.scale', st.scaleId);
     App.store.set('ch.libRoot', lib.rootPc);
-    els.key.value = String(st.keyPc);
-    els.scale.value = st.scaleId;
     els.libRoot.value = String(lib.rootPc);
+    renderKeyLabel();
     if (!quiet) {           // live change: refresh what is on screen
       renderPalette();
       renderLibrary();

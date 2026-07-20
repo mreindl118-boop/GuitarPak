@@ -16,9 +16,9 @@ js/app.js         shell: module registry, tab switching, shared AudioContext +
                   event bus, APP_VERSION + auto-update checker
 js/metronome.js   ┐ feature modules; each registers
 js/fretboard.js   │ App.register(name, {init, onShow, onHide, onKey})
-js/tab.js         │ DOM ids/CSS prefixed met-/fb-/tb-/ch-/jam-/tun-/tr-
-js/chords.js      │ (tab: exercise tablature, state fully linked with the
-                  │  fretboard via shared fb.* storage + the fb:set event)
+js/chords.js      │ DOM ids/CSS prefixed met-/fb-/ch-/jam-/tun-/tr-
+                  │ (fretboard: one page, three views — board / tab / sheet
+                  │  via the fb-view dropdown; the runner plays in all three)
 js/jam.js         │
 js/tuner.js       │
 js/trainer.js     │
@@ -35,7 +35,12 @@ version.json      auto-update feed (source of truth for latest version)
 
 ## Cross-module conventions
 
-- Event bus: `App.on/emit`. Events: `tempo` {bpm, source} (met.bpm is the ONE
+- Context bar (index.html #ctxbar, wired in app.js): the single home for key/
+  scale/mode/BPM/time signature, always visible under the tabs. It reads the
+  shared stores (fb.root/fb.scale/fb.mode, met.bpm, met.sig) and pushes changes
+  over the bus; pages must NOT grow their own duplicate selects for these.
+- Event bus: `App.on/emit`. New: `sig` {sig, source} (time signature changed —
+  metronome and the bar mirror each other). Events: `tempo` {bpm, source} (met.bpm is the ONE
   shared tempo — always guard against echo via `source`), `jam:chord`,
   `jam:stopped`, `fb:practice` {root?, scale?, bpm?} (Trainer prompt "Go" —
   fretboard applies it, switches tabs, starts the runner), `fb:scale`
