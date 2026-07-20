@@ -314,7 +314,11 @@
     var now = ctx.currentTime;
     var hit = null;
     while (visQueue.length && visQueue[0].t <= now) hit = visQueue.shift();
-    if (hit) { litIndex = hit.beat; paintDots(); }
+    if (hit) {
+      litIndex = hit.beat;
+      paintDots();
+      App.emit('met:beat', { beat: hit.beat }); // context bar pulse
+    }
     raf = requestAnimationFrame(draw);
   }
 
@@ -351,6 +355,7 @@
     setTrainerDisabled(true);
     updateTrainerStatus();
     setLive(true);
+    App.emit('met:state', { running: true }); // context bar mirrors the transport
   }
 
   function stop() {
@@ -365,6 +370,7 @@
     setTrainerDisabled(false);
     updateTrainerStatus();
     setLive(false);
+    App.emit('met:state', { running: false });
   }
 
   // pulsing dot on the Metronome tab while the click runs from another tab
@@ -374,6 +380,11 @@
   }
 
   function toggle() { if (running) stop(); else start(); }
+
+  // start/stop requested from anywhere (the context bar's transport button);
+  // the emit happens synchronously inside the user's click, so getAudio is
+  // still within the gesture
+  App.on('met:toggle', function () { toggle(); });
 
   // ---- tempo trainer UI ----
 

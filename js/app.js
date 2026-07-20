@@ -26,7 +26,7 @@ window.App = (function () {
   // ---- auto-update ----
   // version.json on GitHub is the source of truth. Web builds refresh through
   // the service worker; the APK build (file://) links to the new APK download.
-  var APP_VERSION = '0.16.0';
+  var APP_VERSION = '0.16.1';
   var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
 
   function verNum(v) {
@@ -361,6 +361,24 @@ window.App = (function () {
       store.set('met.sig', this.value);
       emit('sig', { sig: this.value, source: 'bar' });
     });
+
+    // metronome transport: one button, live on every tab
+    var met = document.getElementById('cx-met');
+    if (met) {
+      met.addEventListener('click', function () { emit('met:toggle', {}); });
+      on('met:state', function (d) {
+        var runs = !!(d && d.running);
+        met.classList.toggle('on', runs);
+        met.innerHTML = runs ? '&#9632;' : '&#9654;';
+        if (!runs) met.classList.remove('tick');
+      });
+      var tickTimer = null;
+      on('met:beat', function () {
+        met.classList.add('tick');
+        if (tickTimer) clearTimeout(tickTimer);
+        tickTimer = setTimeout(function () { met.classList.remove('tick'); }, 110);
+      });
+    }
 
     // mirror changes made anywhere else
     on('fb:scale', function () { refreshAll(); });

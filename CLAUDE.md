@@ -40,7 +40,9 @@ version.json      auto-update feed (source of truth for latest version)
   shared stores (fb.root/fb.scale/fb.mode, met.bpm, met.sig) and pushes changes
   over the bus; pages must NOT grow their own duplicate selects for these.
 - Event bus: `App.on/emit`. New: `sig` {sig, source} (time signature changed —
-  metronome and the bar mirror each other). Events: `tempo` {bpm, source} (met.bpm is the ONE
+  metronome and the bar mirror each other), `met:toggle` (request start/stop
+  from anywhere), `met:state` {running}, `met:beat` {beat} (context-bar
+  transport button + pulse). Events: `tempo` {bpm, source} (met.bpm is the ONE
   shared tempo — always guard against echo via `source`), `jam:chord`,
   `jam:stopped`, `fb:practice` {root?, scale?, bpm?} (Trainer prompt "Go" —
   fretboard applies it, switches tabs, starts the runner), `fb:scale`

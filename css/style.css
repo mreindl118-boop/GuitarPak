@@ -223,6 +223,10 @@ html, body {
 .ctxbar select { padding-right: 26px; }
 .ctxbar input[type="number"] { width: 64px; }
 
+#cx-met { padding: 4px 12px; }
+#cx-met.on { color: var(--accent); border-color: rgba(255, 171, 71, 0.7); }
+#cx-met.tick { box-shadow: 0 0 14px var(--accent-glow), inset 0 0 6px var(--accent-glow); }
+
 .tab {
   position: relative;
   background: transparent;
