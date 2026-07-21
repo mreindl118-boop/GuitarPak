@@ -75,6 +75,13 @@
     '.met-dot.met-on{background:var(--accent);border-color:var(--accent);transform:scale(1.22);box-shadow:0 0 12px rgba(255,180,84,0.55);}',
     '.met-dot.met-mute.met-on{background:var(--muted);border-color:var(--muted);box-shadow:none;}',
     '.met-wide{width:100%;margin-top:12px;}',
+    // fixed 3-digit width: 99 -> 100 BPM must never reflow the row while tapping
+    '#met-bpm-display{min-width:3ch;}',
+    '.met-tap{min-width:96px;min-height:60px;font-family:var(--font-display);font-size:20px;' +
+      'font-weight:700;letter-spacing:2.5px;text-transform:uppercase;' +
+      'border-color:rgba(255,171,71,0.55);touch-action:manipulation;}',
+    '.met-tap:active{transform:none;border-color:var(--accent);' +
+      'box-shadow:0 0 14px var(--accent-glow),inset 0 2px 5px rgba(0,0,0,0.4);}',
     '.met-mt{margin-top:14px;}',
     '.met-num{width:80px;}',
     '#met-vol{width:200px;max-width:60vw;}',
@@ -94,7 +101,7 @@
     '      <button class="btn" id="met-m1" type="button">-1</button>',
     '      <button class="btn" id="met-p1" type="button">+1</button>',
     '      <button class="btn" id="met-p5" type="button">+5</button>',
-    '      <button class="btn" id="met-tap" type="button">Tap Tempo</button>',
+    '      <button class="btn met-tap" id="met-tap" type="button" title="Tap the beat to set the tempo">Tap</button>',
     '    </div>',
     '  </div>',
     '  <input type="range" id="met-bpm-slider" class="met-wide" min="30" max="280" step="1">',
@@ -108,7 +115,7 @@
     '    <label class="field">Subdivision',
     '      <select id="met-subdiv"></select>',
     '    </label>',
-    '    <label class="field">Volume (<span id="met-vol-val">80</span>%)',
+    '    <label class="field"><span>Volume (<span id="met-vol-val">80</span>%)</span>',
     '      <input type="range" id="met-vol" min="0" max="100" step="1">',
     '    </label>',
     '  </div>',
@@ -314,7 +321,11 @@
     var now = ctx.currentTime;
     var hit = null;
     while (visQueue.length && visQueue[0].t <= now) hit = visQueue.shift();
-    if (hit) { litIndex = hit.beat; paintDots(); }
+    if (hit) {
+      litIndex = hit.beat;
+      paintDots();
+      App.emit('met:beat', { beat: hit.beat }); // context bar pulse
+    }
     raf = requestAnimationFrame(draw);
   }
 
@@ -351,6 +362,7 @@
     setTrainerDisabled(true);
     updateTrainerStatus();
     setLive(true);
+    App.emit('met:state', { running: true }); // context bar mirrors the transport
   }
 
   function stop() {
@@ -365,6 +377,7 @@
     setTrainerDisabled(false);
     updateTrainerStatus();
     setLive(false);
+    App.emit('met:state', { running: false });
   }
 
   // pulsing dot on the Metronome tab while the click runs from another tab
@@ -374,6 +387,11 @@
   }
 
   function toggle() { if (running) stop(); else start(); }
+
+  // start/stop requested from anywhere (the context bar's transport button);
+  // the emit happens synchronously inside the user's click, so getAudio is
+  // still within the gesture
+  App.on('met:toggle', function () { toggle(); });
 
   // ---- tempo trainer UI ----
 
@@ -473,7 +491,14 @@
     $('met-m1').addEventListener('click', function () { setBpm(bpm - 1); });
     $('met-p1').addEventListener('click', function () { setBpm(bpm + 1); });
     $('met-p5').addEventListener('click', function () { setBpm(bpm + 5); });
-    $('met-tap').addEventListener('click', tap);
+    // pointerdown (not click) so the tempo is measured at finger-down, and the
+    // handler stays single-fire (no click listener alongside it)
+    var tapBtn = $('met-tap');
+    if (window.PointerEvent) {
+      tapBtn.addEventListener('pointerdown', function (e) { e.preventDefault(); tap(); });
+    } else {
+      tapBtn.addEventListener('click', tap);
+    }
     els.slider.addEventListener('input', function () { setBpm(els.slider.value); });
 
     // signature + dots

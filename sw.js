@@ -1,5 +1,5 @@
 /* GuitarLab service worker — cache-first so the app works fully offline once visited. */
-var CACHE = 'guitarlab-v30';
+var CACHE = 'guitarlab-v36';
 var ASSETS = [
   '.',
   'index.html',
@@ -22,13 +22,24 @@ var ASSETS = [
   'icons/icon-512.png',
   'samples/bass/E1.mp3', 'samples/bass/A1.mp3', 'samples/bass/D2.mp3',
   'samples/bass/G2.mp3', 'samples/bass/C3.mp3',
+  'samples/bassp/E1.mp3', 'samples/bassp/A1.mp3', 'samples/bassp/D2.mp3',
+  'samples/bassp/G2.mp3', 'samples/bassp/C3.mp3',
   'samples/keys/C3.mp3', 'samples/keys/E3.mp3', 'samples/keys/A3.mp3',
   'samples/keys/C4.mp3', 'samples/keys/E4.mp3', 'samples/keys/A4.mp3',
   'samples/keys/C5.mp3',
   'samples/pad/C3.mp3', 'samples/pad/B3.mp3', 'samples/pad/E4.mp3',
   'samples/pad/G4.mp3', 'samples/pad/C5.mp3',
-  'samples/guitar/E2.mp3', 'samples/guitar/A2.mp3', 'samples/guitar/D3.mp3',
-  'samples/guitar/G3.mp3', 'samples/guitar/B3.mp3', 'samples/guitar/E4.mp3'
+  'samples/guitar/E2.mp3', 'samples/guitar/A2.mp3', 'samples/guitar/C3.mp3',
+  'samples/guitar/D3.mp3', 'samples/guitar/F3.mp3', 'samples/guitar/G3.mp3',
+  'samples/guitar/A3.mp3', 'samples/guitar/B3.mp3', 'samples/guitar/D4.mp3',
+  'samples/guitar/E4.mp3', 'samples/guitar/G4.mp3', 'samples/guitar/C5.mp3',
+  'samples/guitar/E5.mp3',
+  'samples/eguitar/E2.mp3', 'samples/eguitar/A2.mp3', 'samples/eguitar/D3.mp3',
+  'samples/eguitar/G3.mp3', 'samples/eguitar/B3.mp3', 'samples/eguitar/E4.mp3',
+  'samples/eguitar/G4.mp3', 'samples/eguitar/C5.mp3',
+  'samples/nylon/E2.mp3', 'samples/nylon/A2.mp3', 'samples/nylon/D3.mp3',
+  'samples/nylon/G3.mp3', 'samples/nylon/B3.mp3', 'samples/nylon/E4.mp3',
+  'samples/nylon/G4.mp3', 'samples/nylon/C5.mp3'
 ];
 
 self.addEventListener('install', function (e) {

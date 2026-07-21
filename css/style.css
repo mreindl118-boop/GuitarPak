@@ -40,6 +40,8 @@
   --line-soft: rgba(255, 255, 255, 0.05);
   --text: #ede8e0;
   --muted: #a29889;
+  --label: #c9beac;       /* form labels — brighter than muted for legibility */
+  --ctl-border: #5a4d52;  /* button/select borders — clearly visible on the cards */
   --accent: #ffab47;        /* tube amber */
   --accent-dim: #c97f26;
   --accent-glow: rgba(255, 171, 71, 0.35);
@@ -64,6 +66,8 @@
   --line-soft: rgba(0, 0, 0, 0.05);
   --text: #2b241d;
   --muted: #857b6b;
+  --label: #6e6355;
+  --ctl-border: #b3a691;
   --accent: #d97e0f;        /* amber, darkened for contrast on light */
   --accent-dim: #b96a10;
   --accent-glow: rgba(217, 126, 15, 0.28);
@@ -76,7 +80,7 @@
 }
 :root[data-theme="light"] .btn {
   background: linear-gradient(180deg, #fffdf9 0%, #efe8dc 100%);
-  border-color: #d2c8b8;
+  border-color: var(--ctl-border);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 2px 6px rgba(0, 0, 0, 0.1);
 }
 :root[data-theme="light"] .btn:active { box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.15); }
@@ -85,6 +89,9 @@
 :root[data-theme="light"] input[type="text"] {
   background: linear-gradient(180deg, #fffdf9 0%, #f4eee5 100%);
   box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.07);
+}
+:root[data-theme="light"] select {
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='7'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23b96a10' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
 }
 :root[data-theme="light"] input[type="range"]::-webkit-slider-runnable-track {
   background: #e2dacd;
@@ -207,21 +214,25 @@ html, body {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 1.2px;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--label);
 }
 
 .ctxbar select, .ctxbar input[type="number"] {
-  padding: 4px 8px;
-  font-size: 13px;
+  padding: 6px 9px;
+  font-size: 14px;
   border-radius: 7px;
 }
 
-.ctxbar select { padding-right: 26px; }
-.ctxbar input[type="number"] { width: 64px; }
+.ctxbar select { padding-right: 28px; }
+.ctxbar input[type="number"] { width: 68px; }
+
+#cx-met { padding: 6px 14px; }
+#cx-met.on { color: var(--accent); border-color: rgba(255, 171, 71, 0.7); }
+#cx-met.tick { box-shadow: 0 0 14px var(--accent-glow), inset 0 0 6px var(--accent-glow); }
 
 .tab {
   position: relative;
@@ -357,14 +368,14 @@ main {
 /* ---------- buttons ---------- */
 
 .btn {
-  background: linear-gradient(180deg, #2b2428 0%, #1f1a1d 100%);
+  background: linear-gradient(180deg, #342c30 0%, #221c1f 100%);
   color: var(--text);
-  border: 1px solid #3b3236;
+  border: 1px solid var(--ctl-border);
   border-radius: 10px;
-  padding: 9px 17px;
+  padding: 10px 18px;
   font-family: var(--font-body);
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 15px;
+  font-weight: 600;
   letter-spacing: 0.2px;
   cursor: pointer;
   user-select: none;
@@ -398,7 +409,7 @@ main {
   border-radius: 12px;
 }
 
-.btn.sm { font-size: 12.5px; padding: 5px 11px; border-radius: 8px; }
+.btn.sm { font-size: 13px; padding: 6px 12px; border-radius: 8px; }
 .btn[disabled] { opacity: 0.4; cursor: default; }
 
 /* ---------- form controls ---------- */
@@ -407,20 +418,21 @@ label.field {
   display: inline-flex;
   flex-direction: column;
   gap: 5px;
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 600;
   letter-spacing: 1.4px;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--label);
 }
 
 select, input[type="number"], input[type="text"] {
-  background: linear-gradient(180deg, #151113 0%, #1c171a 100%);
+  background: linear-gradient(180deg, #1b1518 0%, #251f22 100%);
   color: var(--text);
-  border: 1px solid var(--line);
+  border: 1px solid var(--ctl-border);
   border-radius: 9px;
-  padding: 8px 11px;
-  font-size: 14px;
+  padding: 9px 12px;
+  font-size: 15px;
+  font-weight: 500;
   font-family: var(--font-body);
   box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.35);
 }
@@ -428,8 +440,8 @@ select, input[type="number"], input[type="text"] {
 select {
   appearance: none;
   -webkit-appearance: none;
-  padding-right: 30px;
-  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23a29889' stroke-width='1.6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  padding-right: 32px;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='7'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23ffab47' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 11px center;
 }
@@ -489,7 +501,7 @@ input[type="range"]::-moz-range-thumb {
 .seg {
   display: inline-flex;
   background: #151113;
-  border: 1px solid var(--line);
+  border: 1px solid var(--ctl-border);
   border-radius: 10px;
   padding: 3px;
   box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.35);
@@ -497,13 +509,13 @@ input[type="range"]::-moz-range-thumb {
 
 .seg button {
   background: transparent;
-  color: var(--muted);
+  color: var(--label);
   border: none;
   border-radius: 7px;
-  padding: 6px 13px;
+  padding: 7px 14px;
   font-family: var(--font-body);
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
   transition: color 120ms ease, background 120ms ease;
 }
@@ -520,10 +532,10 @@ input[type="range"]::-moz-range-thumb {
   align-items: center;
   gap: 6px;
   background: linear-gradient(180deg, #272125 0%, #1d181b 100%);
-  border: 1px solid var(--line);
+  border: 1px solid var(--ctl-border);
   border-radius: 999px;
   padding: 5px 13px;
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 500;
   box-shadow: inset 0 1px 0 var(--line-soft);
   transition: border-color 120ms ease, color 120ms ease, box-shadow 120ms ease;

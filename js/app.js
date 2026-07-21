@@ -10,8 +10,13 @@
  *
  * Shared services:
  *   App.getAudio()                    lazily-created shared AudioContext (resumed)
- *   App.pluck(midi, when, dur, gain)  simple plucked-string voice; `when` is seconds
- *                                     from now (audio-clock accurate)
+ *   App.pluck(midi, when, dur, gain)  plucked-string voice — the sampled tone
+ *                                     chosen in Settings (app.pluckTone:
+ *                                     steel | electric | nylon | synth) with a
+ *                                     synth fallback; `when` is seconds from
+ *                                     now (audio-clock accurate).
+ *                                     App.pluckSynth forces the synth voice;
+ *                                     App.setPluckTone switches the tone.
  *   App.store.get(key, fallback) / App.store.set(key, value)   JSON localStorage
  *   App.injectCSS(id, cssText)        add module-specific styles once
  */
@@ -26,7 +31,7 @@ window.App = (function () {
   // ---- auto-update ----
   // version.json on GitHub is the source of truth. Web builds refresh through
   // the service worker; the APK build (file://) links to the new APK download.
-  var APP_VERSION = '0.16.0';
+  var APP_VERSION = '0.21.0';
   var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
 
   function verNum(v) {
@@ -100,11 +105,117 @@ window.App = (function () {
       audioCtx = new Ctx();
     }
     if (audioCtx.state === 'suspended') audioCtx.resume();
+    decodeGuitar(); // turn any prefetched sample bytes into playable buffers
     return audioCtx;
   }
 
-  // Simple plucked-string voice shared by fretboard / chords / trainer.
+  // ---- sampled pluck voice (FluidR3 GM — samples/CREDITS.md) ----
+  // The pluck instrument is an app-level setting (app.pluckTone: steel |
+  // electric | nylon | synth, Settings tab). Anchor-note MP3s for the chosen
+  // tone are prefetched as raw bytes (XHR, because fetch() refuses file://
+  // inside the APK's WebView) and decoded once the shared AudioContext
+  // exists. App.pluck plays the nearest anchor pitch-shifted with a few cents
+  // of random detune and level variation so repeated notes don't sound
+  // stamped out; the synth voice stays as the automatic fallback and is
+  // exposed as App.pluckSynth for callers that want it on purpose.
+  var PLUCK_SETS = {
+    steel: { dir: 'samples/guitar/', notes: {
+      40: 'E2', 45: 'A2', 48: 'C3', 50: 'D3', 53: 'F3', 55: 'G3', 57: 'A3',
+      59: 'B3', 62: 'D4', 64: 'E4', 67: 'G4', 72: 'C5', 76: 'E5' } },
+    electric: { dir: 'samples/eguitar/', notes: {
+      40: 'E2', 45: 'A2', 50: 'D3', 55: 'G3', 59: 'B3', 64: 'E4', 67: 'G4', 72: 'C5' } },
+    nylon: { dir: 'samples/nylon/', notes: {
+      40: 'E2', 45: 'A2', 50: 'D3', 55: 'G3', 59: 'B3', 64: 'E4', 67: 'G4', 72: 'C5' } }
+  };
+  var pluckRaw = { steel: {}, electric: {}, nylon: {} };  // tone -> midi -> bytes
+  var pluckBuf = { steel: {}, electric: {}, nylon: {} };  // tone -> midi -> AudioBuffer
+  var pluckReadyN = { steel: 0, electric: 0, nylon: 0 };
+  var pluckFetched = {};
+
+  function pluckTonePref() {
+    var t = store.get('app.pluckTone', 'steel');
+    return (t === 'electric' || t === 'nylon' || t === 'synth') ? t : 'steel';
+  }
+
+  function setPluckTone(tone) {
+    if (tone !== 'electric' && tone !== 'nylon' && tone !== 'synth') tone = 'steel';
+    store.set('app.pluckTone', tone);
+    prefetchPluck(tone); // start loading now; notes switch over as it decodes
+  }
+
+  function prefetchPluck(tone) {
+    var set = PLUCK_SETS[tone];
+    if (!set || pluckFetched[tone]) return;
+    pluckFetched[tone] = true;
+    Object.keys(set.notes).forEach(function (m) {
+      var xhr = new XMLHttpRequest();
+      xhr.open('GET', set.dir + set.notes[m] + '.mp3', true);
+      xhr.responseType = 'arraybuffer';
+      xhr.onload = function () {
+        if ((xhr.status === 200 || xhr.status === 0) && xhr.response) {
+          pluckRaw[tone][m] = xhr.response;
+          if (audioCtx) decodeGuitar();
+        }
+      };
+      try { xhr.send(); } catch (e) { /* blocked — synth fallback */ }
+    });
+  }
+
+  function decodeGuitar() {
+    if (!audioCtx) return;
+    Object.keys(pluckRaw).forEach(function (tone) {
+      Object.keys(pluckRaw[tone]).forEach(function (m) {
+        var bytes = pluckRaw[tone][m];
+        delete pluckRaw[tone][m]; // decodeAudioData detaches the buffer
+        audioCtx.decodeAudioData(bytes, function (buf) {
+          pluckBuf[tone][m] = buf;
+          pluckReadyN[tone]++;
+        }, function () { /* undecodable — synth fallback */ });
+      });
+    });
+  }
+
+  // Plucked-string voice shared by fretboard / chords / jam / trainer:
+  // the chosen sampled tone when its bank is decoded, synth twin otherwise.
   function pluck(midi, when, dur, gain) {
+    var ctx = getAudio();
+    var t = ctx.currentTime + Math.max(0, when || 0);
+    dur = dur || 1.2;
+    gain = gain == null ? 0.4 : gain;
+    var tone = pluckTonePref();
+    if (tone === 'synth') { pluckSynth(midi, when, dur, gain); return; }
+    prefetchPluck(tone); // no-op once requested
+    var bank = pluckBuf[tone];
+    if (!pluckReadyN[tone] && pluckReadyN.steel) bank = pluckBuf.steel; // still decoding — steel stands in
+    var best = null, bd = 99;
+    for (var m in bank) {
+      var d = Math.abs(midi - m);
+      if (d < bd) { bd = d; best = Number(m); }
+    }
+    if (best !== null && bd <= 4.5) {
+      var src = ctx.createBufferSource();
+      src.buffer = bank[best];
+      // ±4 cents; midi may be fractional (tuner calibration) — that's fine here
+      src.playbackRate.value = Math.pow(2, (midi - best + (Math.random() - 0.5) * 0.08) / 12);
+      var lv = gain * 1.4 * (0.92 + Math.random() * 0.16);
+      var g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(lv, t + 0.003);
+      // hold, then an exponential tail — a linear gate chops the string's
+      // natural ring and is exactly what sounds robotic on scale runs
+      var rel = Math.min(0.35, Math.max(0.12, dur * 0.35));
+      g.gain.setValueAtTime(lv, t + Math.max(0.02, dur - rel));
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.05);
+      src.connect(g);
+      g.connect(ctx.destination);
+      src.start(t);
+      src.stop(t + dur + 0.1);
+      return;
+    }
+    pluckSynth(midi, when, dur, gain);
+  }
+
+  function pluckSynth(midi, when, dur, gain) {
     var ctx = getAudio();
     // never schedule in the past — a past-dated envelope collapses to silence
     var t = ctx.currentTime + Math.max(0, when || 0);
@@ -362,6 +473,24 @@ window.App = (function () {
       emit('sig', { sig: this.value, source: 'bar' });
     });
 
+    // metronome transport: one button, live on every tab
+    var met = document.getElementById('cx-met');
+    if (met) {
+      met.addEventListener('click', function () { emit('met:toggle', {}); });
+      on('met:state', function (d) {
+        var runs = !!(d && d.running);
+        met.classList.toggle('on', runs);
+        met.innerHTML = runs ? '&#9632;' : '&#9654;';
+        if (!runs) met.classList.remove('tick');
+      });
+      var tickTimer = null;
+      on('met:beat', function () {
+        met.classList.add('tick');
+        if (tickTimer) clearTimeout(tickTimer);
+        tickTimer = setTimeout(function () { met.classList.remove('tick'); }, 110);
+      });
+    }
+
     // mirror changes made anywhere else
     on('fb:scale', function () { refreshAll(); });
     on('fb:set', function (d) { if (d && d.source !== 'bar') refreshAll(); });
@@ -425,6 +554,9 @@ window.App = (function () {
       });
     }
 
+    prefetchPluck('steel');            // universal fallback / stand-in bank
+    prefetchPluck(pluckTonePref());    // the chosen tone (no-op if steel/synth)
+
     // update checks: at every app start, when the network comes back, when the
     // app returns to the foreground (throttled), and during long sessions
     checkForUpdate(true);
@@ -440,6 +572,10 @@ window.App = (function () {
     register: register,
     getAudio: getAudio,
     pluck: pluck,
+    pluckSynth: pluckSynth,
+    setPluckTone: setPluckTone,
+    get pluckTone() { return pluckTonePref(); },
+    get pluckSampled() { return pluckReadyN.steel + pluckReadyN.electric + pluckReadyN.nylon > 0; },
     store: store,
     on: on,
     emit: emit,

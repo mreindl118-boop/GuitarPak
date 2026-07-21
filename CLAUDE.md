@@ -17,6 +17,8 @@ js/app.js         shell: module registry, tab switching, shared AudioContext +
 js/metronome.js   ┐ feature modules; each registers
 js/fretboard.js   │ App.register(name, {init, onShow, onHide, onKey})
 js/chords.js      │ DOM ids/CSS prefixed met-/fb-/ch-/jam-/tun-/tr-
+                  │ (chords: chord-explorer neck + theory panel + progression
+                  │  player; the neck follows the sounding chord live)
                   │ (fretboard: one page, three views — board / tab / sheet
                   │  via the fb-view dropdown; the runner plays in all three)
 js/jam.js         │
@@ -40,7 +42,9 @@ version.json      auto-update feed (source of truth for latest version)
   shared stores (fb.root/fb.scale/fb.mode, met.bpm, met.sig) and pushes changes
   over the bus; pages must NOT grow their own duplicate selects for these.
 - Event bus: `App.on/emit`. New: `sig` {sig, source} (time signature changed —
-  metronome and the bar mirror each other). Events: `tempo` {bpm, source} (met.bpm is the ONE
+  metronome and the bar mirror each other), `met:toggle` (request start/stop
+  from anywhere), `met:state` {running}, `met:beat` {beat} (context-bar
+  transport button + pulse). Events: `tempo` {bpm, source} (met.bpm is the ONE
   shared tempo — always guard against echo via `source`), `jam:chord`,
   `jam:stopped`, `fb:practice` {root?, scale?, bpm?} (Trainer prompt "Go" —
   fretboard applies it, switches tabs, starts the runner), `fb:scale`
@@ -48,7 +52,8 @@ version.json      auto-update feed (source of truth for latest version)
   `fb:set` {source, root?, scale?, mode?, pattern?, dir?} (Tab page pushes
   linked practice state; fretboard applies without switching tabs). The
   exercise engine (path/sequence math) lives in theory.js as
-  Theory.exercisePath / Theory.exerciseSeq, shared by fretboard and tab.
+  Theory.exercisePath / Theory.exerciseSeq / Theory.pickDirs (pick strokes:
+  alt | eco | down | up), shared by fretboard and tab.
 - Audio schedulers (metronome/practice/jam): 25 ms setInterval + lookahead on
   the AudioContext clock, with a catch-up guard (`if nextT < currentTime →
   jump forward`) so stalls never schedule past-dated (silent) notes. Keep this

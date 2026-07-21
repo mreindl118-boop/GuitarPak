@@ -429,6 +429,25 @@ window.Theory = (function () {
     return up;
   }
 
+  // Pick strokes for an exercise sequence, one 'd'/'u' per step.
+  // mode: 'alt' (strict alternation), 'down' / 'up' (all one way),
+  // 'eco' (economy/sweep: crossing to a higher-pitched string continues as a
+  // downstroke and to a lower one as an upstroke, alternating on one string).
+  function pickDirs(path, seq, mode) {
+    var out = [], last = 'u', prev = null, i, node, d;
+    for (i = 0; i < seq.length; i++) {
+      node = path[seq[i]];
+      if (mode === 'down') d = 'd';
+      else if (mode === 'up') d = 'u';
+      else if (mode === 'eco' && prev && node && node.s !== prev.s) d = node.s > prev.s ? 'd' : 'u';
+      else d = last === 'd' ? 'u' : 'd';
+      out.push(d);
+      last = d;
+      if (node) prev = node;
+    }
+    return out;
+  }
+
   return {
     SHARP: SHARP,
     FLAT: FLAT,
@@ -454,6 +473,7 @@ window.Theory = (function () {
     chordName: chordName,
     fretMidi: fretMidi,
     exercisePath: exercisePath,
-    exerciseSeq: exerciseSeq
+    exerciseSeq: exerciseSeq,
+    pickDirs: pickDirs
   };
 })();
