@@ -1,5 +1,5 @@
 {
-  "version": "0.17.0",
+  "version": "0.18.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "Clearer controls everywhere: buttons and dropdowns are bigger, brighter and easier to hit. The metronome Tap button is now a big stationary pad that never jumps while you tap. The Chords page opens with every chord in your current key as full diagrams, color-coded by scale degree. Plus the cross-tab metronome transport from 0.16.1."
+  "notes": "Sounds a lot more human: fretboard, chord and trainer notes now play a real sampled steel guitar instead of a synth beep, and the Jam band got loose — natural timing and volume variation, accented hi-hats, up/down strums, plus two new comp instruments (clean electric and nylon guitar, MIT-licensed FluidR3 samples). Also in 0.17: clearer buttons and dropdowns, a stationary metronome Tap pad, and every chord in your key as diagrams on the Chords page."
 }

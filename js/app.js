@@ -10,8 +10,11 @@
  *
  * Shared services:
  *   App.getAudio()                    lazily-created shared AudioContext (resumed)
- *   App.pluck(midi, when, dur, gain)  simple plucked-string voice; `when` is seconds
- *                                     from now (audio-clock accurate)
+ *   App.pluck(midi, when, dur, gain)  plucked-string voice (sampled steel
+ *                                     guitar once decoded, synth fallback);
+ *                                     `when` is seconds from now (audio-clock
+ *                                     accurate). App.pluckSynth forces the
+ *                                     synth voice.
  *   App.store.get(key, fallback) / App.store.set(key, value)   JSON localStorage
  *   App.injectCSS(id, cssText)        add module-specific styles once
  */
@@ -26,7 +29,7 @@ window.App = (function () {
   // ---- auto-update ----
   // version.json on GitHub is the source of truth. Web builds refresh through
   // the service worker; the APK build (file://) links to the new APK download.
-  var APP_VERSION = '0.17.0';
+  var APP_VERSION = '0.18.0';
   var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
 
   function verNum(v) {
@@ -100,11 +103,85 @@ window.App = (function () {
       audioCtx = new Ctx();
     }
     if (audioCtx.state === 'suspended') audioCtx.resume();
+    decodeGuitar(); // turn any prefetched sample bytes into playable buffers
     return audioCtx;
   }
 
-  // Simple plucked-string voice shared by fretboard / chords / trainer.
+  // ---- sampled pluck voice (steel guitar, FluidR3 GM — samples/CREDITS.md) ----
+  // Anchor-note MP3s are prefetched as raw bytes at boot (XHR, because fetch()
+  // refuses file:// inside the APK's WebView) and decoded once the shared
+  // AudioContext exists. App.pluck plays the nearest anchor pitch-shifted with
+  // a few cents of random detune and level variation so repeated notes don't
+  // sound stamped out; the synth voice below stays as the automatic fallback
+  // and is exposed as App.pluckSynth for callers that want it on purpose.
+  var GTR_NOTES = {
+    40: 'E2', 45: 'A2', 48: 'C3', 50: 'D3', 53: 'F3', 55: 'G3', 57: 'A3',
+    59: 'B3', 62: 'D4', 64: 'E4', 67: 'G4', 72: 'C5', 76: 'E5'
+  };
+  var gtrRaw = {};   // midi -> ArrayBuffer awaiting decode
+  var gtrBuf = {};   // midi -> decoded AudioBuffer
+  var gtrReady = 0;
+
+  function prefetchGuitar() {
+    Object.keys(GTR_NOTES).forEach(function (m) {
+      var xhr = new XMLHttpRequest();
+      xhr.open('GET', 'samples/guitar/' + GTR_NOTES[m] + '.mp3', true);
+      xhr.responseType = 'arraybuffer';
+      xhr.onload = function () {
+        if ((xhr.status === 200 || xhr.status === 0) && xhr.response) {
+          gtrRaw[m] = xhr.response;
+          if (audioCtx) decodeGuitar();
+        }
+      };
+      try { xhr.send(); } catch (e) { /* blocked — synth fallback */ }
+    });
+  }
+
+  function decodeGuitar() {
+    if (!audioCtx) return;
+    Object.keys(gtrRaw).forEach(function (m) {
+      var bytes = gtrRaw[m];
+      delete gtrRaw[m]; // decodeAudioData detaches the buffer
+      audioCtx.decodeAudioData(bytes, function (buf) {
+        gtrBuf[m] = buf;
+        gtrReady++;
+      }, function () { /* undecodable — synth fallback */ });
+    });
+  }
+
+  // Plucked-string voice shared by fretboard / chords / jam / trainer:
+  // sampled guitar when the bank is decoded, synth twin otherwise.
   function pluck(midi, when, dur, gain) {
+    var ctx = getAudio();
+    var t = ctx.currentTime + Math.max(0, when || 0);
+    dur = dur || 1.2;
+    gain = gain == null ? 0.4 : gain;
+    var best = null, bd = 99;
+    for (var m in gtrBuf) {
+      var d = Math.abs(midi - m);
+      if (d < bd) { bd = d; best = Number(m); }
+    }
+    if (best !== null && bd <= 4.5) {
+      var src = ctx.createBufferSource();
+      src.buffer = gtrBuf[best];
+      // ±4 cents; midi may be fractional (tuner calibration) — that's fine here
+      src.playbackRate.value = Math.pow(2, (midi - best + (Math.random() - 0.5) * 0.08) / 12);
+      var lv = gain * 1.4 * (0.92 + Math.random() * 0.16);
+      var g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(lv, t + 0.004);
+      g.gain.setValueAtTime(lv, t + Math.max(0.02, dur - 0.12));
+      g.gain.linearRampToValueAtTime(0.0001, t + dur);
+      src.connect(g);
+      g.connect(ctx.destination);
+      src.start(t);
+      src.stop(t + dur + 0.05);
+      return;
+    }
+    pluckSynth(midi, when, dur, gain);
+  }
+
+  function pluckSynth(midi, when, dur, gain) {
     var ctx = getAudio();
     // never schedule in the past — a past-dated envelope collapses to silence
     var t = ctx.currentTime + Math.max(0, when || 0);
@@ -443,6 +520,8 @@ window.App = (function () {
       });
     }
 
+    prefetchGuitar(); // sampled pluck bank (decodes once audio starts)
+
     // update checks: at every app start, when the network comes back, when the
     // app returns to the foreground (throttled), and during long sessions
     checkForUpdate(true);
@@ -458,6 +537,8 @@ window.App = (function () {
     register: register,
     getAudio: getAudio,
     pluck: pluck,
+    pluckSynth: pluckSynth,
+    get pluckSampled() { return gtrReady > 0; },
     store: store,
     on: on,
     emit: emit,

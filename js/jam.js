@@ -19,7 +19,7 @@
     sevenths: false,
     barsPerChord: 1,
     vibe: 'rock',
-    comp: 'strum',      // strum | pad | keys | off
+    comp: 'strum',      // guitar | eguitar | nylon | strum | pad | keys | off
     drums: true,
     bass: true,
     track: []           // [{rootPc, quality, name, roman}]
@@ -98,11 +98,21 @@
   // twin when a sample isn't available (offline first run, artifact build).
 
   var SAMPLE_SETS = {
-    bass:   { dir: 'samples/bass/',   notes: { 28: 'E1', 33: 'A1', 38: 'D2', 43: 'G2', 48: 'C3' } },
-    keys:   { dir: 'samples/keys/',   notes: { 48: 'C3', 52: 'E3', 57: 'A3', 60: 'C4', 64: 'E4', 69: 'A4', 72: 'C5' } },
-    pad:    { dir: 'samples/pad/',    notes: { 48: 'C3', 59: 'B3', 64: 'E4', 67: 'G4', 72: 'C5' } },
-    guitar: { dir: 'samples/guitar/', notes: { 40: 'E2', 45: 'A2', 50: 'D3', 55: 'G3', 59: 'B3', 64: 'E4' } }
+    bass:    { dir: 'samples/bass/',    notes: { 28: 'E1', 33: 'A1', 38: 'D2', 43: 'G2', 48: 'C3' } },
+    keys:    { dir: 'samples/keys/',    notes: { 48: 'C3', 52: 'E3', 57: 'A3', 60: 'C4', 64: 'E4', 69: 'A4', 72: 'C5' } },
+    pad:     { dir: 'samples/pad/',     notes: { 48: 'C3', 59: 'B3', 64: 'E4', 67: 'G4', 72: 'C5' } },
+    guitar:  { dir: 'samples/guitar/',  notes: { 40: 'E2', 45: 'A2', 48: 'C3', 50: 'D3', 53: 'F3', 55: 'G3',
+                                                 57: 'A3', 59: 'B3', 62: 'D4', 64: 'E4', 67: 'G4', 72: 'C5', 76: 'E5' } },
+    eguitar: { dir: 'samples/eguitar/', notes: { 40: 'E2', 45: 'A2', 50: 'D3', 55: 'G3', 59: 'B3', 64: 'E4', 67: 'G4', 72: 'C5' } },
+    nylon:   { dir: 'samples/nylon/',   notes: { 40: 'E2', 45: 'A2', 50: 'D3', 55: 'G3', 59: 'B3', 64: 'E4', 67: 'G4', 72: 'C5' } }
   };
+
+  var GUITAR_COMPS = { guitar: 1, eguitar: 1, nylon: 1 };
+  var COMP_IDS = ['guitar', 'eguitar', 'nylon', 'strum', 'pad', 'keys', 'off'];
+
+  // humanize: ± up to `s` seconds. Scheduled hits are always a lookahead ahead
+  // of the audio clock, so small negative offsets can never land in the past.
+  function hum(s) { return (Math.random() * 2 - 1) * s; }
   var sampleBuf = {};
   var samplesRequested = false;
   var samplesLoaded = 0;
@@ -243,7 +253,7 @@
   function padChord(t, midis, dur, gain) {
     if (setReady('pad')) {
       for (var p = 0; p < midis.length; p++) {
-        playSample('pad', midis[p], t, dur, (gain / midis.length) * 1.9, 0.22, 0.4);
+        playSample('pad', midis[p], t + p * 0.012, dur, (gain / midis.length) * 1.9, 0.22, 0.4);
       }
       return;
     }
@@ -269,7 +279,9 @@
   function keysChord(t, midis, gain) {
     if (setReady('keys')) {
       for (var k = 0; k < midis.length; k++) {
-        playSample('keys', midis[k], t, 0.6, (gain / midis.length) * 1.7);
+        // slight roll + per-note level so the chord doesn't hit as one block
+        playSample('keys', midis[k], t + k * 0.004 + Math.random() * 0.006, 0.6,
+          (gain / midis.length) * 1.7 * (0.88 + Math.random() * 0.24));
       }
       return;
     }
@@ -346,16 +358,27 @@
     var i, t;
     if (state.drums) {
       var d = vibe.drums;
-      for (i = 0; i < d.k.length; i++) kick(stepTime(barT, d.k[i], d.swing), 0.85);
-      for (i = 0; i < d.s.length; i++) snare(stepTime(barT, d.s[i], d.swing), 0.5);
-      for (i = 0; i < d.h.length; i++) hat(stepTime(barT, d.h[i], d.swing), 0.22);
+      for (i = 0; i < d.k.length; i++) {
+        kick(stepTime(barT, d.k[i], d.swing) + hum(0.004), 0.78 + Math.random() * 0.14);
+      }
+      for (i = 0; i < d.s.length; i++) {
+        snare(stepTime(barT, d.s[i], d.swing) + hum(0.005), 0.44 + Math.random() * 0.12);
+      }
+      for (i = 0; i < d.h.length; i++) {
+        // accent the beat, keep the in-betweens lighter, ghost a few — a
+        // straight row of identical hats is what makes a machine sound like one
+        var hg = (d.h[i] % 4 === 0 ? 0.26 : 0.15) * (0.85 + Math.random() * 0.3);
+        if (Math.random() < 0.05) hg *= 0.4;
+        hat(stepTime(barT, d.h[i], d.swing) + hum(0.006), hg);
+      }
     }
     if (state.bass) {
       var root = bassRootMidi(chord.rootPc);
       for (i = 0; i < vibe.bass.length; i++) {
-        t = barT + vibe.bass[i][0] * beatDur();
+        t = barT + vibe.bass[i][0] * beatDur() + hum(0.006);
         var next = i + 1 < vibe.bass.length ? barT + vibe.bass[i + 1][0] * beatDur() : barT + 4 * beatDur();
-        bassNote(t, root + degSemis(vibe.bass[i][1], chord.quality), Math.max(0.15, next - t - 0.02), 0.5);
+        bassNote(t, root + degSemis(vibe.bass[i][1], chord.quality),
+          Math.max(0.15, next - t - 0.02), 0.5 * (0.9 + Math.random() * 0.2));
       }
     }
     if (state.comp !== 'off') {
@@ -364,17 +387,28 @@
         if (isChordStart) padChord(barT, voicing.slice(-4), 4 * beatDur() * state.barsPerChord, 0.5);
       } else {
         for (i = 0; i < vibe.comp.length; i++) {
-          t = barT + vibe.comp[i][0] * beatDur();
+          t = barT + vibe.comp[i][0] * beatDur() + hum(0.008);
+          var hitGain = vibe.comp[i][2] * (0.88 + Math.random() * 0.24);
           if (state.comp === 'keys') {
-            keysChord(t, voicing.slice(-4), vibe.comp[i][2] * 2.4);
-          } else if (state.comp === 'guitar' && setReady('guitar')) {
-            for (var gv = 0; gv < voicing.length; gv++) { // sampled strum
-              playSample('guitar', voicing[gv], t + gv * 0.014,
-                Math.min(1.5, vibe.comp[i][1] * beatDur() + 0.35), vibe.comp[i][2] * 0.5);
-            }
-          } else { // synth pluck strum (also the sampled-guitar fallback)
-            for (var v = 0; v < voicing.length; v++) {
-              App.pluck(voicing[v], (t - ctx.currentTime) + v * 0.014, Math.min(1.1, vibe.comp[i][1] * beatDur()), vibe.comp[i][2] / 2.4);
+            keysChord(t, voicing.slice(-4), hitGain * 2.4);
+            continue;
+          }
+          // strummed guitars: strum speed breathes hit to hit, offbeat hits
+          // are upstrokes (high strings first), every note varies a little
+          var gap = 0.008 + Math.random() * 0.012;
+          var order = vibe.comp[i][0] % 1 !== 0 ? voicing.slice().reverse() : voicing;
+          var sampled = GUITAR_COMPS[state.comp] && setReady(state.comp);
+          for (var v = 0; v < order.length; v++) {
+            var noteGain = 0.9 + Math.random() * 0.2;
+            if (sampled) {
+              playSample(state.comp, order[v], t + v * gap,
+                Math.min(1.5, vibe.comp[i][1] * beatDur() + 0.35), hitGain * 0.5 * noteGain);
+            } else if (state.comp === 'strum') { // synth on purpose
+              App.pluckSynth(order[v], (t - ctx.currentTime) + v * gap,
+                Math.min(1.1, vibe.comp[i][1] * beatDur()), hitGain / 2.4 * noteGain);
+            } else { // sampled set still decoding — App.pluck picks the best voice
+              App.pluck(order[v], (t - ctx.currentTime) + v * gap,
+                Math.min(1.1, vibe.comp[i][1] * beatDur()), hitGain / 2.4 * noteGain);
             }
           }
         }
@@ -464,7 +498,7 @@
     var vb = App.store.get('jam.vibe', 'rock');
     if (VIBES[vb]) state.vibe = vb;
     var cp = App.store.get('jam.comp', 'guitar');
-    if (['guitar', 'strum', 'pad', 'keys', 'off'].indexOf(cp) !== -1) state.comp = cp;
+    if (COMP_IDS.indexOf(cp) !== -1) state.comp = cp;
     // one-time: settings saved before sampled instruments existed move from
     // the synth strum to the sampled guitar (synth stays selectable)
     if (!App.store.get('jam.migrSamp', false)) {
@@ -525,7 +559,7 @@
     state.sevenths = !!p.sevenths;
     state.barsPerChord = p.barsPerChord === 2 ? 2 : 1;
     if (VIBES[p.vibe]) state.vibe = p.vibe;
-    if (['guitar', 'strum', 'pad', 'keys', 'off'].indexOf(p.comp) !== -1) state.comp = p.comp;
+    if (COMP_IDS.indexOf(p.comp) !== -1) state.comp = p.comp;
     state.drums = p.drums !== false;
     state.bass = p.bass !== false;
     state.track = (p.track || []).filter(validChord);
@@ -649,7 +683,8 @@
         '<div class="row tight">' +
           '<label class="field">Vibe<select id="jam-vibe">' + vibeOpts + '</select></label>' +
           '<label class="field">Comp<select id="jam-comp">' +
-            opt('guitar', 'Guitar (sampled)', state.comp) + opt('strum', 'Guitar (synth)', state.comp) +
+            opt('guitar', 'Steel guitar', state.comp) + opt('eguitar', 'Electric guitar', state.comp) +
+            opt('nylon', 'Nylon guitar', state.comp) + opt('strum', 'Synth pluck', state.comp) +
             opt('pad', 'Pad', state.comp) + opt('keys', 'Keys', state.comp) +
             opt('off', 'Off', state.comp) + '</select></label>' +
           '<label class="row tight small muted" style="gap:5px"><input type="checkbox" id="jam-drums">Drums</label>' +
