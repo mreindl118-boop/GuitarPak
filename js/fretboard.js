@@ -645,8 +645,8 @@
   // of 3-7, each playable up, down, or up-and-down.
 
   var pr = {
-    running: false, idx: 0, seq: null, path: [],
-    pattern: 'scale', dir: 'up', bpm: 80, rate: 1, sound: true, click: true,
+    running: false, idx: 0, seq: null, path: [], dirs: null,
+    pattern: 'scale', dir: 'up', pick: 'alt', bpm: 80, rate: 1, sound: true, click: true,
     timer: null, raf: 0, nextT: 0, vis: [], ctx: null
   };
 
@@ -688,7 +688,27 @@
   }
 
   function prSeq(path, pattern, dir) {
-    return Theory.exerciseSeq(path, pattern, dir);
+    var seq = Theory.exerciseSeq(path, pattern, dir);
+    // pick strokes ride along with every seq rebuild so they can never drift
+    pr.dirs = Theory.pickDirs(path, seq, pr.pick === 'off' ? 'alt' : pr.pick);
+    return seq;
+  }
+
+  // animated stroke indicator (practice strip + fullscreen twin):
+  // ⊓ = downstroke, ∨ = upstroke, nudged in the stroke's direction per note
+  function prStroke(step) {
+    var d = pr.dirs && pr.dirs.length ? pr.dirs[step % pr.dirs.length] : null;
+    ['fb-pr-stroke', 'fb-strokemax'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      if (pr.pick === 'off' || !d) { el.style.display = 'none'; return; }
+      el.style.display = '';
+      el.textContent = d === 'd' ? '⊓' : '∨';
+      el.title = d === 'd' ? 'Downstroke' : 'Upstroke';
+      el.classList.remove('fb-sd', 'fb-su');
+      void el.offsetWidth; // restart the nudge animation
+      el.classList.add(d === 'd' ? 'fb-sd' : 'fb-su');
+    });
   }
 
   function prRings() {
@@ -788,6 +808,7 @@
           if (cur.scrollIntoView) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
         }
       }
+      prStroke(hit.step);
       prStatus((hit.step % total) + 1 + ' / ' + total);
     }
     pr.raf = requestAnimationFrame(prDraw);
@@ -1088,6 +1109,10 @@
     pr.idx = 0;
     prClearRings();
     prStatus('');
+    ['fb-pr-stroke', 'fb-strokemax'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.style.display = 'none';
+    });
   }
 
   function prToggle() {
@@ -1104,6 +1129,8 @@
     pr.pattern = PAT_RE.test(storedPat) ? storedPat : 'scale';
     pr.dir = App.store.get('fb.pr.dir', storedPat === 'updown' ? 'updown' : 'up');
     if (!/^(up|down|updown)$/.test(pr.dir)) pr.dir = 'up';
+    pr.pick = String(App.store.get('fb.pr.pick', 'alt'));
+    if (!/^(alt|eco|down|up|off)$/.test(pr.pick)) pr.pick = 'alt';
     // tempo is SHARED with the metronome — met.bpm is the single source of truth
     pr.bpm = Math.max(30, Math.min(280, parseInt(App.store.get('met.bpm', 100), 10) || 100));
     pr.rate = App.store.get('fb.pr.rate', 1);
@@ -1231,6 +1258,20 @@
       if (pr.running) { pr.path = prPath(); pr.seq = prSeq(pr.path, pr.pattern, pr.dir); }
       renderAltView();
     });
+    var pickSel = document.getElementById('fb-pr-pick');
+    pickSel.value = pr.pick;
+    pickSel.addEventListener('change', function () {
+      pr.pick = /^(alt|eco|down|up|off)$/.test(this.value) ? this.value : 'alt';
+      App.store.set('fb.pr.pick', pr.pick);
+      if (pr.seq) pr.dirs = Theory.pickDirs(pr.path, pr.seq, pr.pick === 'off' ? 'alt' : pr.pick);
+      if (pr.pick === 'off' || !pr.running) {
+        ['fb-pr-stroke', 'fb-strokemax'].forEach(function (id) {
+          var el = document.getElementById(id);
+          if (el) el.style.display = 'none';
+        });
+      }
+    });
+
     bpm.addEventListener('change', function () {
       var v = parseInt(this.value, 10);
       if (isNaN(v)) v = 100;
@@ -1357,6 +1398,17 @@
       '.fb-board.fb-max .fb-exitmax{display:flex}' +
       '.fb-playmax{top:calc(66px + env(safe-area-inset-top,0px));color:var(--accent);font-size:16px}' + // sits under the x; same base style
       '.fb-playmax.on{border-color:var(--accent)}' +
+      '.fb-strokemax{top:calc(120px + env(safe-area-inset-top,0px));pointer-events:none}' + // stroke readout under the transport
+      '.fb-stroke{display:inline-flex;align-items:center;justify-content:center;min-width:26px;' +
+        'height:26px;font-size:21px;font-weight:700;line-height:1;color:var(--accent);' +
+        'text-shadow:0 0 10px var(--accent-glow)}' +
+      '.fb-stroke.fb-sd{animation:fb-strokedown 160ms ease}' +
+      '.fb-stroke.fb-su{animation:fb-strokeup 160ms ease}' +
+      '@keyframes fb-strokedown{from{transform:translateY(-8px);opacity:0.35}to{transform:none;opacity:1}}' +
+      '@keyframes fb-strokeup{from{transform:translateY(8px);opacity:0.35}to{transform:none;opacity:1}}' +
+      // the fullscreen twin exists only in fullscreen (.fb-stroke's display
+      // would otherwise beat .fb-exitmax's display:none — same specificity)
+      '.fb-board:not(.fb-max) .fb-strokemax{display:none}' +
       '#fb-modeflash{position:absolute;top:calc(70px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);z-index:205;' +
         'background:rgba(19,17,20,0.85);border:1px solid var(--accent);color:#ede8e0;' +
         'border-radius:999px;padding:8px 18px;font-family:var(--font-display);font-size:17px;' +
@@ -1472,6 +1524,14 @@
             '<button type="button" data-fbdir="down" title="Descending">&#8595;</button>' +
             '<button type="button" data-fbdir="updown" title="Up, then back down">&#8597;</button>' +
           '</div>' +
+          '<select id="fb-pr-pick" title="Pick strokes — the animated symbol shows the stroke for each note (&#8851; down, &#8744; up)">' +
+            '<option value="alt">Alternate</option>' +
+            '<option value="eco">Economy</option>' +
+            '<option value="down">All down</option>' +
+            '<option value="up">All up</option>' +
+            '<option value="off">No picking</option>' +
+          '</select>' +
+          '<span class="fb-stroke" id="fb-pr-stroke" style="display:none"></span>' +
           '<input type="number" id="fb-pr-bpm" min="30" max="280" step="1" title="Tempo (BPM) — linked to the metronome" style="width:70px">' +
           '<select id="fb-pr-rate" title="Notes per beat">' +
             '<option value="1">1 / beat</option>' +
@@ -1503,6 +1563,7 @@
         '<div class="fb-sheetwrap" id="fb-sheetwrap" style="display:none"></div>' +
         '<button type="button" class="fb-exitmax" id="fb-exitmax" title="Exit fullscreen" aria-label="Exit fullscreen">&#10005;</button>' +
         '<button type="button" class="fb-exitmax fb-playmax" id="fb-playmax" title="Play / pause the exercise" aria-label="Play or pause the practice exercise">&#9654;</button>' +
+        '<span class="fb-exitmax fb-strokemax fb-stroke" id="fb-strokemax" aria-hidden="true" style="display:none"></span>' +
         '<div class="fb-settings" id="fb-settings">' +
           '<div class="row">' +
             '<label class="field">Tuning<select id="fb-tuning">' + buildOptions(tuningOpts, state.tuning) + '</select></label>' +

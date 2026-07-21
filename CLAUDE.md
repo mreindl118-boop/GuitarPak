@@ -50,7 +50,8 @@ version.json      auto-update feed (source of truth for latest version)
   `fb:set` {source, root?, scale?, mode?, pattern?, dir?} (Tab page pushes
   linked practice state; fretboard applies without switching tabs). The
   exercise engine (path/sequence math) lives in theory.js as
-  Theory.exercisePath / Theory.exerciseSeq, shared by fretboard and tab.
+  Theory.exercisePath / Theory.exerciseSeq / Theory.pickDirs (pick strokes:
+  alt | eco | down | up), shared by fretboard and tab.
 - Audio schedulers (metronome/practice/jam): 25 ms setInterval + lookahead on
   the AudioContext clock, with a catch-up guard (`if nextT < currentTime →
   jump forward`) so stalls never schedule past-dated (silent) notes. Keep this

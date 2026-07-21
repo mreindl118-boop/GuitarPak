@@ -1,5 +1,5 @@
 {
-  "version": "0.18.0",
+  "version": "0.19.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "Sounds a lot more human: fretboard, chord and trainer notes now play a real sampled steel guitar instead of a synth beep, and the Jam band got loose — natural timing and volume variation, accented hi-hats, up/down strums, plus two new comp instruments (clean electric and nylon guitar, MIT-licensed FluidR3 samples). Also in 0.17: clearer buttons and dropdowns, a stationary metronome Tap pad, and every chord in your key as diagrams on the Chords page."
+  "notes": "Practice with real picking technique: a new Picking setting on the fretboard runner (alternate, economy/sweep, all-down, all-up) animates the stroke for every note. New in Settings: choose fingered or picked bass for the Jam backing tracks. Plus everything from 0.18: sampled guitar notes everywhere, humanized jam feel, and electric + nylon comp guitars."
 }

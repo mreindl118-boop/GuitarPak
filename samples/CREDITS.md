@@ -9,6 +9,7 @@ project (also MIT).
 | Folder | FluidR3 GM instrument |
 |---|---|
 | `bass/` | Electric Bass (finger) |
+| `bassp/` | Electric Bass (pick) |
 | `keys/` | Electric Piano 1 |
 | `pad/` | Pad 2 (warm) |
 | `guitar/` | Acoustic Guitar (steel) |

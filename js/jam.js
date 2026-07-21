@@ -99,6 +99,7 @@
 
   var SAMPLE_SETS = {
     bass:    { dir: 'samples/bass/',    notes: { 28: 'E1', 33: 'A1', 38: 'D2', 43: 'G2', 48: 'C3' } },
+    bassp:   { dir: 'samples/bassp/',   notes: { 28: 'E1', 33: 'A1', 38: 'D2', 43: 'G2', 48: 'C3' } },
     keys:    { dir: 'samples/keys/',    notes: { 48: 'C3', 52: 'E3', 57: 'A3', 60: 'C4', 64: 'E4', 69: 'A4', 72: 'C5' } },
     pad:     { dir: 'samples/pad/',     notes: { 48: 'C3', 59: 'B3', 64: 'E4', 67: 'G4', 72: 'C5' } },
     guitar:  { dir: 'samples/guitar/',  notes: { 40: 'E2', 45: 'A2', 48: 'C3', 50: 'D3', 53: 'F3', 55: 'G3',
@@ -233,7 +234,10 @@
   }
 
   function bassNote(t, midi, dur, gain) {
-    if (setReady('bass') && playSample('bass', midi, t, Math.max(0.25, dur), gain * 1.5)) return;
+    // app-level bass style (Settings tab): fingered or picked electric bass
+    var set = App.store.get('app.bassStyle', 'finger') === 'pick' ? 'bassp' : 'bass';
+    if (setReady(set) && playSample(set, midi, t, Math.max(0.25, dur), gain * 1.5)) return;
+    if (set !== 'bass' && setReady('bass') && playSample('bass', midi, t, Math.max(0.25, dur), gain * 1.5)) return;
     bassSynth(t, midi, dur, gain);
   }
 

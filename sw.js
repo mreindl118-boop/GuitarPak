@@ -1,5 +1,5 @@
 /* GuitarLab service worker — cache-first so the app works fully offline once visited. */
-var CACHE = 'guitarlab-v33';
+var CACHE = 'guitarlab-v34';
 var ASSETS = [
   '.',
   'index.html',
@@ -22,6 +22,8 @@ var ASSETS = [
   'icons/icon-512.png',
   'samples/bass/E1.mp3', 'samples/bass/A1.mp3', 'samples/bass/D2.mp3',
   'samples/bass/G2.mp3', 'samples/bass/C3.mp3',
+  'samples/bassp/E1.mp3', 'samples/bassp/A1.mp3', 'samples/bassp/D2.mp3',
+  'samples/bassp/G2.mp3', 'samples/bassp/C3.mp3',
   'samples/keys/C3.mp3', 'samples/keys/E3.mp3', 'samples/keys/A3.mp3',
   'samples/keys/C4.mp3', 'samples/keys/E4.mp3', 'samples/keys/A4.mp3',
   'samples/keys/C5.mp3',
