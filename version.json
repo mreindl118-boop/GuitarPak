@@ -1,5 +1,5 @@
 {
-  "version": "0.20.0",
+  "version": "0.21.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "Scale playback sounds like actual playing now: notes ring naturally into each other (tempo-aware), group starts and beats get a gentle accent, upstrokes sit a touch softer, and the guide click is quieter. New in Settings: pick the note sound for the whole app \u2014 steel, electric, nylon or synth. Plus the 0.19 picking trainer and fingered/picked bass choice."
+  "notes": "The Chords tab is rebuilt around a real fretboard: pick any chord (or tap the in-key chips) and see it on a big neck, strum it by tapping, hear single notes, cycle voicings, and read the built-in theory - the chord spelled out, its role in your key, and a scale to solo over it with a one-tap jump to practice. The progression player's current chord now lights up the neck live. The vertical tab view now lines up with the fretboard as real rotated tablature with upright, readable numbers. Includes 0.20's natural scale playback and note-sound setting."
 }

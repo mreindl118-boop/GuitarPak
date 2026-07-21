@@ -1,9 +1,15 @@
-/* GuitarLab — Chords module.
- * Card 1: chord library — every known shape for a root+quality as clickable SVG
- *         diagrams (click = strum).
- * Card 2: progression player — diatonic palette / presets build a chord track,
- *         played in a loop with a Web-Audio lookahead scheduler.
- * Registers as 'chords'. All ids/classes prefixed ch-, store keys prefixed 'ch.'.
+/* GuitarLab — Chords module, rebuilt around a real fretboard.
+ * Card 1: chord explorer — a big horizontal neck (its own instance, separate
+ *         from the practice fretboard) showing the selected chord voicing.
+ *         Root/quality dropdowns + voicing chips + in-key chips select the
+ *         chord; the app plays it (tap the neck = strum, tap a dot = that
+ *         note). A theory panel spells the chord, names its function in the
+ *         current key, and suggests a scale to solo with (one tap jumps to
+ *         the Fretboard tab and starts practicing it).
+ * Card 2: progression player — diatonic palette / presets build a chord
+ *         track, played in a loop; the explorer neck follows the sounding
+ *         chord live.
+ * Registers as 'chords'. All ids/classes prefixed ch-, store keys 'ch.'.
  */
 (function () {
   'use strict';
@@ -15,9 +21,36 @@
     return Theory.SCALES[id].steps.length === 7;
   });
 
+  // ---------------- music-theory reference data ----------------
+
+  // semitones-from-root -> chord-degree label (chord-tone context)
+  var IV_LABELS = { 0: 'R', 1: '♭2', 2: '2', 3: '♭3', 4: '3', 5: '4',
+    6: '♭5', 7: '5', 8: '♯5', 9: '6', 10: '♭7', 11: '7' };
+
+  // scale-degree (0-based) -> harmonic function, worded for practice
+  var FUNC_NAMES = [
+    'tonic — home base',
+    'supertonic — often sets up the dominant',
+    'mediant — colors the tonic',
+    'subdominant — moves away from home',
+    'dominant — pulls back home',
+    'submediant — the relative minor spot',
+    'leading tone — tense, wants to resolve up'
+  ];
+
+  // quality -> scale that sings over it (same map the Jam page uses)
+  var CHORD_SCALE = {
+    maj: 'major', maj7: 'major', sus2: 'mixolydian', sus4: 'mixolydian',
+    min: 'dorian', m7: 'dorian', mMaj7: 'melodicMinor',
+    '7': 'mixolydian', m7b5: 'locrian', dim: 'locrian',
+    dim7: 'harmonicMinor', aug: 'melodicMinor', augMaj7: 'melodicMinor'
+  };
+
   // ---------------- state ----------------
 
-  var lib = { rootPc: 0, quality: 'maj', shapes: [], view: 'diagram' }; // view: diagram | neck | tab
+  // explorer: the chord on the big neck (ch.libRoot/ch.libQuality keys kept
+  // from the old library so users' last chord carries over)
+  var ex = { rootPc: 0, quality: 'maj', shapes: [], shapeIdx: 0 };
 
   var st = {
     keyPc: 0,
@@ -87,11 +120,9 @@
   function loadState() {
     var g = App.store.get;
 
-    lib.rootPc = validPc(g('ch.libRoot', 0));
-    var lv = g('ch.view', 'diagram');
-    lib.view = (lv === 'neck' || lv === 'tab') ? lv : 'diagram';
+    ex.rootPc = validPc(g('ch.libRoot', 0));
     var lq = g('ch.libQuality', 'maj');
-    lib.quality = Theory.QUALITY_ORDER.indexOf(lq) !== -1 ? lq : 'maj';
+    ex.quality = Theory.QUALITY_ORDER.indexOf(lq) !== -1 ? lq : 'maj';
 
     st.keyPc = validPc(g('ch.key', 0));
     var sc = g('ch.scale', 'major');
@@ -118,9 +149,29 @@
 
   function saveTrack() { App.store.set('ch.track', st.track); }
 
-  // ---------------- SVG chord diagram (reusable) ----------------
-  // Vertical diagram: 6 strings as vertical lines (low E leftmost),
-  // 5-fret window starting at shape.baseFret.
+  // ---------------- key-degree coloring (shared language with the fretboard) ----------------
+
+  var DEG_DEFAULTS = ['#ffab47', '#e8d44d', '#7ad97a', '#4cc9b0', '#6ea8fe', '#b48ef0', '#ff85b3'];
+  var NON_KEY = '#8f867c';
+
+  function degPalette() {
+    var c = App.store.get('fb.colors', null);
+    return (Array.isArray(c) && c.length === 7 &&
+      c.every(function (x) { return /^#[0-9a-fA-F]{6}$/.test(x); })) ? c : DEG_DEFAULTS;
+  }
+
+  function keyInfo() {
+    return Theory.scaleInfo(st.keyPc, st.scaleId, Theory.FLAT_KEYS.has(st.keyPc));
+  }
+
+  // { color, isKeyRoot, deg (1-based or 0 if outside the key) } for a pitch class
+  function keyTone(info, pal, pc) {
+    var step = info.pcToStep.get(pc);
+    if (step === undefined) return { color: NON_KEY, isKeyRoot: false, deg: 0 };
+    return { color: pal[step % 7], isKeyRoot: step === 0, deg: step + 1 };
+  }
+
+  // ---------------- small vertical diagram (the "now playing" box) ----------------
 
   function renderShapeSVG(shape) {
     var NS = 'http://www.w3.org/2000/svg';
@@ -153,24 +204,17 @@
       t.textContent = str;
       svg.appendChild(t);
     }
-    function circle(cx, cy, r, cls) {
-      var c = document.createElementNS(NS, 'circle');
-      c.setAttribute('cx', cx); c.setAttribute('cy', cy);
-      c.setAttribute('r', r); c.setAttribute('class', cls);
-      svg.appendChild(c);
-      return c;
-    }
 
-    // colored note dot: key-degree fill, note name inside, white ring on the
-    // key's root — the same language the fretboard speaks
     function noteDot(cx, cy, r, pc) {
       var tone = keyTone(kinfo, pal, pc);
-      var c = circle(cx, cy, r, '');
+      var c = document.createElementNS(NS, 'circle');
+      c.setAttribute('cx', cx); c.setAttribute('cy', cy); c.setAttribute('r', r);
       c.setAttribute('fill', tone.color);
       if (tone.isKeyRoot) {
         c.setAttribute('stroke', '#ffffff');
         c.setAttribute('stroke-width', '1.3');
       }
+      svg.appendChild(c);
       var t = document.createElementNS(NS, 'text');
       t.setAttribute('x', cx); t.setAttribute('y', cy + 2.4);
       t.setAttribute('text-anchor', 'middle');
@@ -214,45 +258,38 @@
     return svg;
   }
 
-  // KEY-degree coloring — identical to the fretboard: same palette (including
-  // the user's custom fb.colors), degrees measured from the CURRENT KEY in the
-  // context bar. Chord tones outside the key render neutral.
-  var DEG_DEFAULTS = ['#ffab47', '#e8d44d', '#7ad97a', '#4cc9b0', '#6ea8fe', '#b48ef0', '#ff85b3'];
-  var NON_KEY = '#8f867c';
+  // ---------------- card 1: chord explorer ----------------
 
-  function degPalette() {
-    var c = App.store.get('fb.colors', null);
-    return (Array.isArray(c) && c.length === 7 &&
-      c.every(function (x) { return /^#[0-9a-fA-F]{6}$/.test(x); })) ? c : DEG_DEFAULTS;
+  function curShape() {
+    return ex.shapes.length ? ex.shapes[Math.min(ex.shapeIdx, ex.shapes.length - 1)] : null;
   }
 
-  function keyInfo() {
-    return Theory.scaleInfo(st.keyPc, st.scaleId, Theory.FLAT_KEYS.has(st.keyPc));
+  function exName() {
+    return Theory.chordName(ex.rootPc, ex.quality, Theory.FLAT_KEYS.has(st.keyPc));
   }
 
-  // { color, isKeyRoot, deg (1-based or 0 if outside the key) } for a pitch class
-  function keyTone(info, pal, pc) {
-    var step = info.pcToStep.get(pc);
-    if (step === undefined) return { color: NON_KEY, isKeyRoot: false, deg: 0 };
-    return { color: pal[step % 7], isKeyRoot: step === 0, deg: step + 1 };
-  }
-
-  // fretboard-style mini neck: colored note dots on a drawn neck, nut on top
-  function renderShapeNeckSVG(shape) {
+  // the big horizontal neck: high e on top (tab orientation), 5-fret window
+  function renderBoard() {
+    els.board.innerHTML = '';
+    var shape = curShape();
+    if (!shape) {
+      els.board.innerHTML = '<div class="muted small">No voicing available for ' + esc(exName()) + '.</div>';
+      return;
+    }
     var NS = 'http://www.w3.org/2000/svg';
     var kinfo = keyInfo();
     var pal = degPalette();
-    var SP_X = 22, SP_Y = 26, LEFT = 30, TOP = 34;
-    var gw = SP_X * 5, gh = SP_Y * 5;
-    var W = LEFT + gw + 16, H = TOP + gh + 10;
-    var tun = Theory.TUNINGS.standard.midi;
     var pf = Theory.FLAT_KEYS.has(st.keyPc);
+    var tun = Theory.TUNINGS.standard.midi;
+    var LEFT = 74, TOP = 24, ROW = 36, COLW = 100, COLS = 5;
+    var gw = COLS * COLW, gh = 5 * ROW;
+    var W = LEFT + gw + 16, H = TOP + gh + 40;
+    var base = shape.baseFret;
 
     var svg = document.createElementNS(NS, 'svg');
     svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
-    svg.setAttribute('width', W);
-    svg.setAttribute('height', H);
-    svg.setAttribute('class', 'ch-svg ch-necksvg');
+    svg.setAttribute('class', 'ch-bsvg');
+    svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
 
     function el(tag, attrs, txt) {
       var e = document.createElementNS(NS, tag);
@@ -262,177 +299,202 @@
       return e;
     }
 
-    el('rect', { x: LEFT - 8, y: TOP, width: gw + 16, height: gh, rx: 4, fill: 'var(--panel)' });
-    var f, s;
-    for (f = 0; f <= 5; f++) {
-      el('line', { x1: LEFT - 8, y1: TOP + f * SP_Y, x2: LEFT + gw + 8, y2: TOP + f * SP_Y,
-                   stroke: 'var(--line)', 'stroke-width': 2 });
+    // neck
+    el('rect', { x: LEFT, y: TOP - 8, width: gw, height: gh + 16, rx: 5, fill: 'var(--panel)',
+                 stroke: 'var(--line)', 'stroke-width': 1 });
+
+    // inlay markers on real fret numbers inside the window
+    [3, 5, 7, 9, 12, 15, 17, 19].forEach(function (fN) {
+      var c = fN - base;
+      if (c < 0 || c >= COLS) return;
+      var x = LEFT + (c + 0.5) * COLW;
+      if (fN === 12) {
+        el('circle', { cx: x, cy: TOP + gh * 0.32, r: 5, fill: 'var(--line)' });
+        el('circle', { cx: x, cy: TOP + gh * 0.68, r: 5, fill: 'var(--line)' });
+      } else {
+        el('circle', { cx: x, cy: TOP + gh * 0.5, r: 5, fill: 'var(--line)' });
+      }
+    });
+
+    // frets (vertical) + fret numbers underneath
+    var c;
+    for (c = 0; c <= COLS; c++) {
+      el('line', { x1: LEFT + c * COLW, y1: TOP - 8, x2: LEFT + c * COLW, y2: TOP + gh + 8,
+                   stroke: 'var(--line)', 'stroke-width': c === 0 && base === 1 ? 0 : 2 });
     }
-    if (shape.baseFret === 1) {
-      el('rect', { x: LEFT - 8, y: TOP - 4, width: gw + 16, height: 5, fill: '#cfd6e4' });
-    } else {
-      el('text', { x: LEFT - 14, y: TOP + SP_Y * 0.5 + 4, 'text-anchor': 'end', 'font-size': 11,
-                   fill: 'var(--muted)', 'font-weight': 700 }, String(shape.baseFret));
+    if (base === 1) { // nut
+      el('rect', { x: LEFT - 4, y: TOP - 8, width: 6, height: gh + 16, rx: 2, fill: '#cfd6e4' });
     }
-    for (s = 0; s < 6; s++) {
-      var sx = LEFT + s * SP_X;
-      el('line', { x1: sx, y1: TOP, x2: sx, y2: TOP + gh,
-                   stroke: 'var(--muted)', 'stroke-width': (2.4 - s * 0.28).toFixed(2) });
+    for (c = 0; c < COLS; c++) {
+      el('text', { x: LEFT + (c + 0.5) * COLW, y: TOP + gh + 30, 'text-anchor': 'middle',
+                   'font-size': 13, 'font-weight': 700, fill: 'var(--muted)' }, String(base + c));
     }
-    for (s = 0; s < 6; s++) {
+
+    // strings: display row r=0 (top) = high e (s=5) ... r=5 (bottom) = low E (s=0)
+    var names = ['e', 'B', 'G', 'D', 'A', 'E'];
+    var r, s;
+    for (r = 0; r < 6; r++) {
+      s = 5 - r;
+      var y = TOP + r * ROW;
+      el('line', { x1: LEFT, y1: y, x2: LEFT + gw, y2: y,
+                   stroke: 'var(--muted)', 'stroke-opacity': 0.75,
+                   'stroke-width': (1 + s * 0.35).toFixed(2) });
+      el('text', { x: 16, y: y + 4, 'text-anchor': 'middle', 'font-size': 12,
+                   'font-weight': 700, fill: 'var(--muted)' }, names[r]);
+    }
+
+    // fingered / open / muted per string
+    for (r = 0; r < 6; r++) {
+      s = 5 - r;
       var fr = shape.frets[s];
-      var x = LEFT + s * SP_X;
+      var y2 = TOP + r * ROW;
       if (fr === -1) {
-        el('text', { x: x, y: TOP - 10, 'text-anchor': 'middle', 'font-size': 11,
-                     fill: 'var(--muted)', 'font-weight': 700 }, 'X');
+        el('text', { x: 42, y: y2 + 5, 'text-anchor': 'middle', 'font-size': 15,
+                     'font-weight': 700, fill: 'var(--muted)' }, '×');
         continue;
       }
-      var pc = Theory.mod12(tun[s] + fr);
+      var midi = tun[s] + fr;
+      var pc = Theory.mod12(midi);
       var tone = keyTone(kinfo, pal, pc);
-      var fill = tone.color;
-      var cy;
-      if (fr === 0) {
-        cy = TOP - 13;
-      } else {
-        var row = fr - shape.baseFret;
-        if (row < 0) row = 0;
-        if (row > 4) row = 4;
-        cy = TOP + (row + 0.5) * SP_Y;
-      }
-      el('circle', { cx: x, cy: cy, r: 9, fill: fill,
-                     stroke: tone.isKeyRoot ? '#ffffff' : 'none', 'stroke-width': 1.6 });
-      el('text', { x: x, y: cy + 3.2, 'text-anchor': 'middle', 'font-size': 8.5,
-                   'font-weight': 700, fill: '#1c1206' }, Theory.pcName(pc, pf));
-      el('text', { x: x, y: TOP + gh + 9, 'text-anchor': 'middle', 'font-size': 8,
-                   fill: 'var(--muted)', 'font-weight': 600 }, tone.deg ? String(tone.deg) : '\u00b7');
+      var cx = fr === 0 ? 42 : LEFT + (fr - base + 0.5) * COLW;
+      var rad = fr === 0 ? 11 : 14;
+      var dot = el('circle', { cx: cx, cy: y2, r: rad, fill: tone.color,
+                               stroke: tone.isKeyRoot ? '#ffffff' : 'rgba(0,0,0,0.35)',
+                               'stroke-width': tone.isKeyRoot ? 2 : 1 });
+      dot.setAttribute('class', 'ch-bdot');
+      dot.setAttribute('data-midi', midi);
+      el('text', { x: cx, y: y2 + 3.8, 'text-anchor': 'middle', 'font-size': fr === 0 ? 9 : 10.5,
+                   'font-weight': 700, fill: '#1c1206', 'pointer-events': 'none' },
+         Theory.pcName(pc, pf));
     }
-    return svg;
+    els.board.appendChild(svg);
   }
 
-  // guitar tab block for a shape (standard-tuning shapes; high e on top)
-  function renderShapeTab(shape) {
-    var labels = ['e', 'B', 'G', 'D', 'A', 'E']; // display rows: string 5 (high) .. 0 (low)
-    var kinfo = keyInfo();
-    var pal = degPalette();
-    var tun = Theory.TUNINGS.standard.midi;
-    var pre = document.createElement('pre');
-    pre.className = 'ch-tab';
-    var w = 1;
-    shape.frets.forEach(function (fr) { if (String(fr).length > w) w = String(fr).length; });
-    var lines = [];
-    for (var r = 0; r < 6; r++) {
-      var sIdx = 5 - r;
-      var fr = shape.frets[sIdx];
-      var cell = fr === -1 ? 'x' : String(fr);
-      while (cell.length < w) cell = cell + '-';
-      if (fr === -1) {
-        lines.push(labels[r] + '|--' + cell + '--|');
-      } else {
-        var tone = keyTone(kinfo, pal, Theory.mod12(tun[sIdx] + fr));
-        lines.push(labels[r] + '|--<span style="color:' + tone.color +
-          ';font-weight:700' + (tone.isKeyRoot ? ';text-decoration:underline' : '') + '">' +
-          cell + '</span>--|');
-      }
-    }
-    pre.innerHTML = lines.join('\n');
-    return pre;
+  function renderShapeChips() {
+    els.shapeSel.innerHTML = '';
+    ex.shapes.forEach(function (shape, i) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'chip ch-shapechip' + (i === Math.min(ex.shapeIdx, ex.shapes.length - 1) ? ' active' : '');
+      b.dataset.i = i;
+      b.textContent = shape.label;
+      els.shapeSel.appendChild(b);
+    });
   }
 
-  // active view -> element (library figures and the "now playing" box share it)
-  function renderShapeView(shape) {
-    if (lib.view === 'neck') return renderShapeNeckSVG(shape);
-    if (lib.view === 'tab') return renderShapeTab(shape);
-    return renderShapeSVG(shape);
-  }
-
-  // ---------------- card 1: every chord in the key ----------------
-
-  var keyShapeList = []; // shape (or null) per diatonic chord, for the strum handler
-
-  function renderKeyChords() {
-    if (!els.keyShapes) return;
-    els.keyShapes.innerHTML = '';
-    keyShapeList = [];
+  // in-key chips: the diatonic chords of the context-bar key
+  function renderInKey() {
+    els.inkey.innerHTML = '';
     var dia;
-    try {
-      dia = Theory.diatonic(st.keyPc, st.scaleId, st.sevenths);
-    } catch (e) {
-      els.keyShapes.innerHTML = '<div class="error">Could not build key chords: ' + esc(e.message) + '</div>';
-      return;
-    }
+    try { dia = Theory.diatonic(st.keyPc, st.scaleId, st.sevenths); } catch (e) { dia = []; }
     if (!dia.length) {
-      els.keyShapes.innerHTML = '<div class="muted small">Pick a 7-note scale in the bar above to see its chords.</div>';
+      els.inkey.innerHTML = '<span class="muted small">Pick a 7-note scale in the bar above for in-key chords.</span>';
       return;
     }
     var pal = degPalette();
     dia.forEach(function (d, i) {
-      var shapes = [];
-      try { shapes = Theory.chordShapes(d.rootPc, d.quality); } catch (e2) { /* keep empty */ }
-      var shape = shapes.length ? shapes[0] : null;
-      keyShapeList.push(shape);
-      var btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'ch-shape ch-keychord';
-      btn.dataset.i = i;
-      btn.title = shape ? 'Click to strum ' + d.name : d.name;
-      btn.style.setProperty('--deg-c', pal[i % 7]);
-      var head = document.createElement('div');
-      head.className = 'ch-keyhead';
-      head.innerHTML = '<span class="ch-keyroman">' + esc(d.roman) + '</span>' +
-                       '<span class="ch-keyname">' + esc(d.name) + '</span>';
-      btn.appendChild(head);
-      if (shape) {
-        btn.appendChild(renderShapeView(shape));
-        var lbl = document.createElement('div');
-        lbl.className = 'muted small';
-        lbl.textContent = shape.label;
-        btn.appendChild(lbl);
-      } else {
-        var no = document.createElement('div');
-        no.className = 'muted small';
-        no.textContent = 'no diagram';
-        btn.appendChild(no);
-      }
-      els.keyShapes.appendChild(btn);
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'chip ch-inkeychip' +
+        (d.rootPc === ex.rootPc && d.quality === ex.quality ? ' active' : '');
+      b.dataset.root = d.rootPc;
+      b.dataset.quality = d.quality;
+      b.style.setProperty('--deg-c', pal[i % 7]);
+      b.innerHTML = '<b>' + esc(d.roman) + '</b>' + esc(d.name);
+      b.title = 'Load ' + d.name + ' onto the neck';
+      els.inkey.appendChild(b);
     });
   }
 
-  // ---------------- card 2: chord library ----------------
+  // find the chord's place in the current key (roman + function), if any
+  function keyFunction() {
+    var info = keyInfo();
+    var deg = info.pcToStep.get(ex.rootPc);
+    var keyName = Theory.pcName(st.keyPc, Theory.FLAT_KEYS.has(st.keyPc)) + ' ' +
+      (Theory.SCALES[st.scaleId] ? Theory.SCALES[st.scaleId].name.replace(/\s*\(.*\)$/, '') : '');
+    if (deg === undefined) {
+      return { html: esc(exName()) + '’s root isn’t in ' + esc(keyName) +
+        ' — this chord lives outside the key (borrowed or chromatic).', roman: '' };
+    }
+    var tri = [], sev = [];
+    try { tri = Theory.diatonic(st.keyPc, st.scaleId, false); } catch (e) { /* non-diatonic scale */ }
+    try { sev = Theory.diatonic(st.keyPc, st.scaleId, true); } catch (e2) { /* ditto */ }
+    var t = tri[deg], v = sev[deg];
+    var fn = FUNC_NAMES[deg] || '';
+    if (t && t.quality === ex.quality) {
+      return { html: 'In ' + esc(keyName) + ': <b>' + esc(t.roman) + '</b> — ' + esc(fn) + '.', roman: t.roman };
+    }
+    if (v && v.quality === ex.quality) {
+      return { html: 'In ' + esc(keyName) + ': <b>' + esc(v.roman) + '</b> — ' + esc(fn) + '.', roman: v.roman };
+    }
+    var native = t ? t.name + (v ? ' / ' + v.name : '') : '';
+    return { html: 'Root is degree ' + (deg + 1) + ' of ' + esc(keyName) + ', but this quality isn’t diatonic' +
+      (native ? ' (the key’s own chord there is ' + esc(native) + ')' : '') + '.', roman: '' };
+  }
 
-  function renderLibrary() {
-    lib.shapes = [];
-    els.libShapes.innerHTML = '';
-    var name = Theory.chordName(lib.rootPc, lib.quality, Theory.FLAT_KEYS.has(lib.rootPc));
-    try {
-      lib.shapes = Theory.chordShapes(lib.rootPc, lib.quality);
-    } catch (e) {
-      els.libShapes.innerHTML = '<div class="error">Could not build shapes: ' + esc(e.message) + '</div>';
-      return;
-    }
-    if (!lib.shapes.length) {
-      els.libShapes.innerHTML = '<div class="muted">No diagram available for ' + esc(name) + '.</div>';
-      return;
-    }
-    lib.shapes.forEach(function (shape, i) {
-      var btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'ch-shape';
-      btn.dataset.i = i;
-      btn.title = 'Click to strum ' + name;
-      btn.appendChild(renderShapeView(shape));
-      var cap = document.createElement('div');
-      cap.className = 'ch-cap';
-      cap.innerHTML = '<div class="ch-cap-name">' + esc(name) + '</div>' +
-                      '<div class="muted small">' + esc(shape.label) + '</div>';
-      btn.appendChild(cap);
-      els.libShapes.appendChild(btn);
+  function renderTheory() {
+    var q = Theory.QUALITIES[ex.quality];
+    var kinfo = keyInfo();
+    var pal = degPalette();
+    var pf = Theory.FLAT_KEYS.has(st.keyPc);
+
+    // spelled tones: interval label + note name, colored by key degree
+    var tones = '';
+    var formula = [];
+    q.intervals.forEach(function (iv) {
+      var lbl = IV_LABELS[Theory.mod12(iv)] || String(iv);
+      formula.push(lbl);
+      var pc = Theory.mod12(ex.rootPc + iv);
+      var tone = keyTone(kinfo, pal, pc);
+      tones += '<span class="chip ch-tonechip" style="--deg-c:' + tone.color + '">' +
+        '<b>' + esc(lbl) + '</b>' + esc(Theory.pcName(pc, pf)) + '</span>';
     });
+    els.tones.innerHTML = tones;
+    els.formula.textContent = q.name + (q.symbol ? ' (' + q.symbol + ')' : '') +
+      ' · formula ' + formula.join(' – ');
+
+    els.fn.innerHTML = keyFunction().html;
+
+    var sc = CHORD_SCALE[ex.quality] || 'major';
+    var scName = Theory.pcName(ex.rootPc, pf) + ' ' +
+      Theory.SCALES[sc].name.replace(/\s*\(.*\)$/, '');
+    els.suggestName.textContent = scName;
+    els.practice.dataset.scale = sc;
+  }
+
+  function exRender() {
+    els.exName.textContent = exName();
+    renderShapeChips();
+    renderBoard();
+    renderTheory();
+    renderInKey();
+  }
+
+  // load a chord onto the neck. opts: {persist, strum}
+  function exLoad(rootPc, quality, opts) {
+    opts = opts || {};
+    ex.rootPc = validPc(rootPc);
+    ex.quality = Theory.QUALITIES[quality] ? quality : 'maj';
+    try { ex.shapes = Theory.chordShapes(ex.rootPc, ex.quality); } catch (e) { ex.shapes = []; }
+    ex.shapeIdx = 0;
+    els.exRoot.value = String(ex.rootPc);
+    els.exQuality.value = ex.quality;
+    if (opts.persist !== false) {
+      App.store.set('ch.libRoot', ex.rootPc);
+      App.store.set('ch.libQuality', ex.quality);
+    }
+    exRender();
+    if (opts.strum) strumShape(curShape());
   }
 
   function strumShape(shape) {
+    if (!shape) return;
     App.getAudio(); // ensure ctx exists / resumed inside the user gesture
     var v = Theory.chordVoicing(shape.frets);
-    for (var i = 0; i < v.length; i++) App.pluck(v[i], i * 0.04, 1.4, 0.32);
+    var gap = 0.025 + Math.random() * 0.02; // a hand, not a machine
+    for (var i = 0; i < v.length; i++) {
+      App.pluck(v[i], i * gap, 1.6, 0.32 * (0.9 + Math.random() * 0.2));
+    }
   }
 
   // ---------------- card 2: palette / track ----------------
@@ -494,13 +556,6 @@
       ' ' + (Theory.SCALES[st.scaleId] ? Theory.SCALES[st.scaleId].name : st.scaleId);
   }
 
-  function paintViewSeg() {
-    if (!els.view) return;
-    els.view.querySelectorAll('button').forEach(function (b) {
-      b.classList.toggle('active', b.getAttribute('data-chview') === lib.view);
-    });
-  }
-
   function updateSegUI() {
     var btns = els.seg.querySelectorAll('button');
     for (var i = 0; i < btns.length; i++) {
@@ -518,8 +573,8 @@
     App.emit('fb:set', { source: 'ch', root: st.keyPc, scale: st.scaleId }); // whole app follows the preset
     renderKeyLabel();
     updateSegUI();
-    renderKeyChords();
     renderPalette();
+    exRender();
     var resolved;
     try {
       resolved = Theory.resolveProgression(preset, st.keyPc);
@@ -575,8 +630,9 @@
   function scheduleStrum(voicing, t) {
     var ctx = App.getAudio();
     var base = Math.max(0, t - ctx.currentTime);
+    var gap = 0.028 + Math.random() * 0.018;
     for (var i = 0; i < voicing.length; i++) {
-      App.pluck(voicing[i], base + i * 0.04, 1.4, 0.3);
+      App.pluck(voicing[i], base + i * gap, 1.4, 0.3 * (0.9 + Math.random() * 0.2));
     }
   }
 
@@ -626,16 +682,12 @@
       var cur = play.seq[idx];
       els.nowName.textContent = cur.name;
       els.nowRoman.textContent = cur.chord.roman || '';
-      els.nowDia.innerHTML = '';
-      if (cur.shape) {
-        els.nowDia.appendChild(renderShapeView(cur.shape));
-      } else {
-        els.nowDia.innerHTML = '<div class="muted small">no diagram</div>';
-      }
+      // the explorer neck follows the sounding chord (not persisted — the
+      // user's own selection comes back on the next manual pick)
+      exLoad(cur.chord.rootPc, cur.chord.quality, { persist: false });
     } else {
       els.nowName.textContent = 'Count-in';
       els.nowRoman.textContent = '1 · 2 · 3 · 4';
-      els.nowDia.innerHTML = '';
     }
   }
 
@@ -681,7 +733,6 @@
     els.now.classList.add('ch-on');
     els.nowName.textContent = '';
     els.nowRoman.textContent = '';
-    els.nowDia.innerHTML = '';
 
     play.timer = setInterval(scheduler, TICK_MS);
     scheduler(); // fill the first lookahead window immediately
@@ -721,30 +772,31 @@
   // ---------------- init ----------------
 
   var CSS = '' +
-    '.ch-shapes{display:flex;flex-wrap:wrap;gap:12px;margin-top:14px;}' +
-    '.ch-shape{background:var(--card2);border:1px solid var(--ctl-border,var(--line));border-radius:10px;' +
-      'padding:10px 12px 11px;cursor:pointer;display:flex;flex-direction:column;align-items:center;' +
-      'gap:3px;color:var(--text);font-family:inherit;box-shadow:0 2px 8px rgba(0,0,0,0.25);}' +
-    '.ch-shape:hover{border-color:var(--accent-dim);}' +
-    '.ch-shape:active{transform:translateY(1px);}' +
-    '.ch-cap{text-align:center;}' +
-    '.ch-cap-name{font-weight:700;font-size:14.5px;}' +
-    '.ch-keygrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));' +
-      'gap:12px;margin-top:14px;}' +
-    '.ch-keychord{border-top:3px solid var(--deg-c,var(--accent));justify-content:flex-start;}' +
-    '.ch-keyhead{display:flex;align-items:baseline;gap:8px;justify-content:center;flex-wrap:wrap;}' +
-    '.ch-keyroman{font-family:var(--font-display);font-size:19px;font-weight:700;' +
-      'color:var(--deg-c,var(--accent));letter-spacing:1px;}' +
-    '.ch-keyname{font-size:16px;font-weight:700;}' +
+    '.ch-exname{font-family:var(--font-display);font-size:34px;font-weight:700;' +
+      'letter-spacing:1px;line-height:1;min-width:90px;}' +
+    '.ch-boardwrap{overflow-x:auto;margin-top:12px;}' +
+    '.ch-bsvg{display:block;width:100%;min-width:540px;max-width:760px;height:auto;cursor:pointer;}' +
+    '.ch-bdot{cursor:pointer;}' +
+    '.ch-bdot:hover{stroke:#ffffff;stroke-width:2;}' +
+    '.ch-shapesel{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}' +
+    '.ch-shapechip{cursor:pointer;font-family:inherit;color:var(--text);}' +
+    '.ch-inkeyrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;}' +
+    '.ch-inkeychip{cursor:pointer;font-family:inherit;color:var(--text);gap:7px;' +
+      'border-color:var(--deg-c,var(--line));}' +
+    '.ch-inkeychip b{color:var(--deg-c,var(--accent));}' +
+    '.ch-inkeychip.active{box-shadow:0 0 10px var(--deg-c,var(--accent-glow));color:var(--text);}' +
+    '.ch-theory{margin-top:14px;display:flex;flex-direction:column;gap:9px;}' +
+    '.ch-tones{display:flex;flex-wrap:wrap;gap:8px;}' +
+    '.ch-tonechip{border-color:var(--deg-c,var(--line));gap:7px;}' +
+    '.ch-tonechip b{color:var(--deg-c,var(--accent));font-size:14px;}' +
+    '.ch-fnline{font-size:14px;}' +
+    '.ch-field{display:inline-flex;flex-direction:column;gap:4px;font-size:12.5px;' +
+      'color:var(--label,var(--muted));font-weight:600;}' +
     '.ch-line{stroke:var(--line);stroke-width:1;}' +
     '.ch-string{stroke:var(--muted);stroke-opacity:.55;stroke-width:1;}' +
     '.ch-nut{fill:var(--text);}' +
-    '.ch-dot{fill:var(--accent);}' +
-    '.ch-open{fill:none;stroke:var(--muted);stroke-width:1.2;}' +
     '.ch-xo{fill:var(--muted);font-size:9px;font-weight:700;}' +
     '.ch-fretnum{fill:var(--muted);font-size:9.5px;}' +
-    '.ch-field{display:inline-flex;flex-direction:column;gap:4px;font-size:12.5px;' +
-      'color:var(--muted);font-weight:600;}' +
     '.ch-palette{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 14px;}' +
     '.chip.ch-pal{cursor:pointer;font-family:inherit;color:var(--text);gap:7px;}' +
     '.chip.ch-pal:hover{border-color:var(--accent-dim);}' +
@@ -772,39 +824,39 @@
   function buildDOM(root) {
     root.innerHTML =
       '<div class="card">' +
-        '<h2>Chords in the key</h2>' +
+        '<h2>Chord explorer</h2>' +
         '<div class="row">' +
+          '<span class="ch-exname" id="ch-ex-name"></span>' +
+          '<label class="field">Root<select id="ch-ex-root"></select></label>' +
+          '<label class="field">Chord<select id="ch-ex-quality"></select></label>' +
+          '<button type="button" class="btn primary" id="ch-ex-strum">Strum</button>' +
+          '<button type="button" class="btn" id="ch-ex-add" title="Append this chord to the progression below">+ Progression</button>' +
+        '</div>' +
+        '<div class="ch-inkeyrow"><span class="ch-field"><span>In the key</span></span>' +
           '<span class="chip" id="ch-key-label" title="Key and scale come from the bar at the top"></span>' +
-          '<div class="ch-field"><span>Chords</span>' +
-            '<span class="seg" id="ch-seg">' +
-              '<button type="button" data-v="0">Triads</button>' +
-              '<button type="button" data-v="1">7ths</button>' +
-            '</span>' +
-          '</div>' +
-          '<div class="ch-field"><span>View</span>' +
-            '<span class="seg" id="ch-view">' +
-              '<button type="button" data-chview="diagram">Diagram</button>' +
-              '<button type="button" data-chview="neck">Neck</button>' +
-              '<button type="button" data-chview="tab">Tab</button>' +
-            '</span>' +
-          '</div>' +
-          '<span class="muted small">Every chord in the key &mdash; click one to strum it.</span>' +
+          '<span class="seg" id="ch-seg">' +
+            '<button type="button" data-v="0">Triads</button>' +
+            '<button type="button" data-v="1">7ths</button>' +
+          '</span>' +
+          '<span id="ch-inkey" class="ch-inkeyrow" style="margin-top:0"></span>' +
         '</div>' +
-        '<div id="ch-key-shapes" class="ch-keygrid"></div>' +
-      '</div>' +
-      '<div class="card">' +
-        '<h2>Chord library</h2>' +
-        '<div class="row">' +
-          '<label class="field">Root<select id="ch-lib-root"></select></label>' +
-          '<label class="field">Quality<select id="ch-lib-quality"></select></label>' +
-          '<span class="muted small">Any chord, every shape &mdash; click one to strum it.</span>' +
+        '<div class="ch-boardwrap" id="ch-board" title="Tap the neck to strum; tap a note to hear it"></div>' +
+        '<div class="ch-shapesel" id="ch-shapesel"></div>' +
+        '<div class="ch-theory">' +
+          '<div class="ch-tones" id="ch-tones"></div>' +
+          '<div class="muted small" id="ch-formula"></div>' +
+          '<div class="ch-fnline" id="ch-fn"></div>' +
+          '<div class="row tight"><span class="muted small">Solo over it with</span>' +
+            '<span class="chip" id="ch-suggest-name"></span>' +
+            '<button type="button" class="btn sm" id="ch-practice" title="Set up the fretboard with this scale and start the practice runner">Practice it &#8594;</button>' +
+          '</div>' +
         '</div>' +
-        '<div id="ch-lib-shapes" class="ch-shapes"></div>' +
       '</div>' +
       '<div class="card">' +
         '<h2>Progression player</h2>' +
         '<div class="row">' +
           '<label class="field">Preset<select id="ch-preset"></select></label>' +
+          '<span class="muted small">Tap palette chords to build; the neck above follows the chord as it plays.</span>' +
         '</div>' +
         '<div id="ch-palette" class="ch-palette"></div>' +
         '<div class="ch-trackwrap">' +
@@ -818,7 +870,6 @@
           '<div id="ch-now" class="ch-now">' +
             '<div id="ch-now-name" class="ch-now-name"></div>' +
             '<div id="ch-now-roman" class="muted"></div>' +
-            '<div id="ch-now-dia"></div>' +
           '</div>' +
         '</div>' +
         '<div class="row" style="margin-top:14px">' +
@@ -832,11 +883,19 @@
         '<div id="ch-status" class="ch-status"></div>' +
       '</div>';
 
-    els.keyShapes = document.getElementById('ch-key-shapes');
-    els.libRoot = document.getElementById('ch-lib-root');
-    els.libQuality = document.getElementById('ch-lib-quality');
-    els.libShapes = document.getElementById('ch-lib-shapes');
-    els.view = document.getElementById('ch-view');
+    els.exName = document.getElementById('ch-ex-name');
+    els.exRoot = document.getElementById('ch-ex-root');
+    els.exQuality = document.getElementById('ch-ex-quality');
+    els.exStrum = document.getElementById('ch-ex-strum');
+    els.exAdd = document.getElementById('ch-ex-add');
+    els.inkey = document.getElementById('ch-inkey');
+    els.board = document.getElementById('ch-board');
+    els.shapeSel = document.getElementById('ch-shapesel');
+    els.tones = document.getElementById('ch-tones');
+    els.formula = document.getElementById('ch-formula');
+    els.fn = document.getElementById('ch-fn');
+    els.suggestName = document.getElementById('ch-suggest-name');
+    els.practice = document.getElementById('ch-practice');
     els.keyLabel = document.getElementById('ch-key-label');
     els.seg = document.getElementById('ch-seg');
     els.preset = document.getElementById('ch-preset');
@@ -846,7 +905,6 @@
     els.now = document.getElementById('ch-now');
     els.nowName = document.getElementById('ch-now-name');
     els.nowRoman = document.getElementById('ch-now-roman');
-    els.nowDia = document.getElementById('ch-now-dia');
     els.bpm = document.getElementById('ch-bpm');
     els.bars = document.getElementById('ch-bars');
     els.countin = document.getElementById('ch-countin');
@@ -865,11 +923,11 @@
     var i;
     for (i = 0; i < 12; i++) {
       var nm = Theory.pcName(i, Theory.FLAT_KEYS.has(i));
-      addOption(els.libRoot, String(i), nm);
+      addOption(els.exRoot, String(i), nm);
     }
     Theory.QUALITY_ORDER.forEach(function (q) {
       var qq = Theory.QUALITIES[q];
-      addOption(els.libQuality, q, qq.name + (qq.symbol ? ' (' + qq.symbol + ')' : ''));
+      addOption(els.exQuality, q, qq.name + (qq.symbol ? ' (' + qq.symbol + ')' : ''));
     });
     addOption(els.preset, '', '— choose preset —');
     Theory.PROGRESSIONS.forEach(function (p) {
@@ -878,36 +936,42 @@
   }
 
   function wire() {
-    els.libRoot.addEventListener('change', function () {
-      lib.rootPc = validPc(els.libRoot.value);
-      App.store.set('ch.libRoot', lib.rootPc);
-      renderLibrary();
+    els.exRoot.addEventListener('change', function () {
+      exLoad(els.exRoot.value, ex.quality, { strum: true });
     });
-    els.libQuality.addEventListener('change', function () {
-      lib.quality = els.libQuality.value;
-      App.store.set('ch.libQuality', lib.quality);
-      renderLibrary();
+    els.exQuality.addEventListener('change', function () {
+      exLoad(ex.rootPc, els.exQuality.value, { strum: true });
     });
-    els.view.addEventListener('click', function (e) {
-      var b = e.target.closest('button[data-chview]');
+    els.exStrum.addEventListener('click', function () { strumShape(curShape()); });
+    els.exAdd.addEventListener('click', function () {
+      appendChord({ rootPc: ex.rootPc, quality: ex.quality,
+        roman: keyFunction().roman, name: exName() });
+    });
+    els.shapeSel.addEventListener('click', function (e) {
+      var b = e.target.closest('.ch-shapechip');
       if (!b) return;
-      lib.view = b.getAttribute('data-chview');
-      App.store.set('ch.view', lib.view);
-      paintViewSeg();
-      renderKeyChords();
-      renderLibrary();
+      ex.shapeIdx = Number(b.dataset.i) || 0;
+      renderShapeChips();
+      renderBoard();
+      strumShape(curShape());
     });
-    els.keyShapes.addEventListener('click', function (e) {
-      var b = e.target.closest('.ch-keychord');
+    els.inkey.addEventListener('click', function (e) {
+      var b = e.target.closest('.ch-inkeychip');
       if (!b) return;
-      var shape = keyShapeList[Number(b.dataset.i)];
-      if (shape) strumShape(shape);
+      exLoad(b.dataset.root, b.dataset.quality, { strum: true });
     });
-    els.libShapes.addEventListener('click', function (e) {
-      var b = e.target.closest('.ch-shape');
-      if (!b) return;
-      var shape = lib.shapes[Number(b.dataset.i)];
-      if (shape) strumShape(shape);
+    els.board.addEventListener('click', function (e) {
+      var dot = e.target.closest && e.target.closest('[data-midi]');
+      if (dot) {
+        App.getAudio();
+        App.pluck(Number(dot.getAttribute('data-midi')), 0, 1.4, 0.4);
+      } else {
+        strumShape(curShape());
+      }
+    });
+    els.practice.addEventListener('click', function () {
+      // the fretboard applies root+scale, switches tabs and starts the runner
+      App.emit('fb:practice', { root: ex.rootPc, scale: els.practice.dataset.scale });
     });
 
     els.seg.addEventListener('click', function (e) {
@@ -918,7 +982,7 @@
       st.sevenths = v;
       App.store.set('ch.sevenths', v);
       updateSegUI();
-      renderKeyChords();
+      renderInKey();
       renderPalette();
     });
     els.preset.addEventListener('change', function () {
@@ -954,25 +1018,15 @@
 
   function init(rootEl) {
     App.injectCSS('chords', CSS);
-    App.injectCSS('chords-views',
-      '.ch-tab{font-family:ui-monospace,Consolas,Menlo,monospace;font-size:13px;line-height:1.45;' +
-        'margin:0;padding:8px 10px;color:var(--text);background:var(--card2);' +
-        'border:1px solid var(--line);border-radius:8px;white-space:pre}' +
-      '.ch-necksvg{overflow:visible}' +
-      '.ch-shape .ch-tab{pointer-events:none}'
-    );
     loadState();
     buildDOM(rootEl);
     fillSelects();
 
-    els.libRoot.value = String(lib.rootPc);
-    els.libQuality.value = lib.quality;
     els.bpm.value = st.bpm;
     els.bars.value = String(st.barsPerChord);
     updateSegUI();
 
     wire();
-    paintViewSeg();
     renderKeyLabel();
 
     // stay linked to the fretboard's scale: seed from its saved state now,
@@ -982,8 +1036,7 @@
       if (d) applyFbScale(d.root, d.scale, false);
     });
 
-    renderKeyChords();
-    renderLibrary();
+    exLoad(ex.rootPc, ex.quality, { persist: false });
     renderPalette();
     renderTrack();
     updatePlayBtn();
@@ -994,16 +1047,12 @@
     if (!scale || !Theory.SCALES[scale] || Theory.SCALES[scale].steps.length !== 7) return;
     st.keyPc = validPc(root);
     st.scaleId = scale;
-    lib.rootPc = validPc(root);
     App.store.set('ch.key', st.keyPc);
     App.store.set('ch.scale', st.scaleId);
-    App.store.set('ch.libRoot', lib.rootPc);
-    els.libRoot.value = String(lib.rootPc);
     renderKeyLabel();
     if (!quiet) {           // live change: refresh what is on screen
-      renderKeyChords();
       renderPalette();
-      renderLibrary();
+      exRender();           // board colors + in-key chips + function line follow the key
     }
   }
 
@@ -1023,8 +1072,7 @@
 
   function onShow() {
     renderKeyLabel();
-    renderKeyChords(); // key or degree palette may have changed while away
-    renderLibrary();
+    exRender(); // key or degree palette may have changed while away
   }
 
   App.register('chords', { init: init, onShow: onShow, onHide: onHide, onKey: onKey });

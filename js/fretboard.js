@@ -907,20 +907,27 @@
     for (var s = 0; s < 6; s++) labels.push(Theory.pcName(Theory.mod12(tun.midi[s]), pf));
 
     if (state.tabOri === 'v') {
-      var head = '', i;
-      for (i = 0; i < 6; i++) head += (labels[i] + '   ').slice(0, 3);
-      var lines = [head.replace(/\s+$/, '')];
+      // the tab rotated 90\u00b0 to line up with the vertical fretboard: strings
+      // are columns in the same left-to-right order as the board (lefty
+      // flips), drawn as real string lines \u2014 but the fret numbers stay
+      // upright so they read normally
+      var order = [], i;
+      for (i = 0; i < 6; i++) order.push(state.lefty ? 5 - i : i);
+      var head = '';
+      for (i = 0; i < 6; i++) head += (labels[order[i]] + '   ').slice(0, 3);
+      var lines = ['<span class="fbv-l">' + head.replace(/\s+$/, '') + '</span>'];
       for (i = 0; i < ex.seq.length; i++) {
         var n = ex.path[ex.seq[i]];
         var line = '';
-        for (var s2 = 0; s2 < 6; s2++) {
+        for (var c2 = 0; c2 < 6; c2++) {
+          var s2 = order[c2];
           if (s2 === n.s) {
             var pc = Theory.mod12(n.midi);
             var cell = (String(n.f) + '   ').slice(0, 3);
             line += '<span class="fbv-n' + (info.pcToStep.get(pc) === 0 ? ' fbv-root' : '') +
               '" data-step="' + i + '" style="color:' + noteColor(info, pc) + '">' + cell + '</span>';
           } else {
-            line += '\u00b7  ';
+            line += '<span class="fbv-l">\u2502  </span>';
           }
         }
         lines.push(line);
@@ -1474,6 +1481,8 @@
         'padding:14px 16px;color:var(--text);white-space:pre;min-height:120px}' +
       '.fbv-n{font-weight:700;border-radius:4px}' +
       '.fbv-n.fbv-root{text-decoration:underline}' +
+      '.fbv-l{color:var(--muted);opacity:0.55}' + // vertical-tab string lines + header
+
       '.fbv-n.now{background:var(--accent);color:#1c1206 !important;box-shadow:0 0 10px var(--accent-glow)}' +
       '.fb-sheetwrap{overflow-x:auto;background:var(--card2);border:1px solid var(--line);' +
         'border-radius:10px;padding:12px 14px;min-height:140px}' +
