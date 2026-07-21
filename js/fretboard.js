@@ -749,6 +749,16 @@
     return pr.path[pr.seq[step % pr.seq.length]];
   }
 
+  // phrase length for the runner's velocity accents: group patterns accent
+  // each group start, intervals the lower note of each pair, plain runs the
+  // beat (or every 4th note at one-note-per-beat)
+  function prAccentEvery() {
+    var g = /^g([3-7])$/.exec(pr.pattern);
+    if (g) return parseInt(g[1], 10);
+    if (/^i/.test(pr.pattern)) return 2;
+    return pr.rate > 1 ? pr.rate : 4;
+  }
+
   function prTick() {
     // if a main-thread stall left us behind the audio clock, jump forward —
     // a short gap beats a burst of silent past-dated notes
@@ -758,12 +768,21 @@
       var node = pr.path[pr.seq[pr.idx % pr.seq.length]];
       var nextNode = pr.path[pr.seq[(pr.idx + 1) % pr.seq.length]];
       var when = pr.nextT - pr.ctx.currentTime;
-      if (pr.sound) App.pluck(node.midi, when, 0.55, 0.32);
+      if (pr.sound) {
+        // let each note ring a little past the next (legato, tempo-aware)
+        // instead of gating everything at a fixed 0.55 s
+        var spn = 60 / pr.bpm / pr.rate;
+        var dur = Math.max(0.5, Math.min(1.7, spn * 1.5));
+        // phrasing: group starts / beats pop a touch, upstrokes sit softer
+        var accent = pr.idx % prAccentEvery() === 0;
+        var up = pr.dirs && pr.dirs[pr.idx % pr.dirs.length] === 'u';
+        App.pluck(node.midi, when, dur, (accent ? 0.4 : 0.3) * (up ? 0.92 : 1));
+      }
       if (pr.click) {
         var o = pr.ctx.createOscillator(), gn = pr.ctx.createGain();
         o.type = 'sine';
         o.frequency.value = 1150;
-        gn.gain.setValueAtTime(0.22, pr.nextT);
+        gn.gain.setValueAtTime(0.15, pr.nextT);
         gn.gain.exponentialRampToValueAtTime(0.0001, pr.nextT + 0.03);
         o.connect(gn);
         gn.connect(pr.ctx.destination);

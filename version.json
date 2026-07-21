@@ -1,5 +1,5 @@
 {
-  "version": "0.19.0",
+  "version": "0.20.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "Practice with real picking technique: a new Picking setting on the fretboard runner (alternate, economy/sweep, all-down, all-up) animates the stroke for every note. New in Settings: choose fingered or picked bass for the Jam backing tracks. Plus everything from 0.18: sampled guitar notes everywhere, humanized jam feel, and electric + nylon comp guitars."
+  "notes": "Scale playback sounds like actual playing now: notes ring naturally into each other (tempo-aware), group starts and beats get a gentle accent, upstrokes sit a touch softer, and the guide click is quieter. New in Settings: pick the note sound for the whole app \u2014 steel, electric, nylon or synth. Plus the 0.19 picking trainer and fingered/picked bass choice."
 }
