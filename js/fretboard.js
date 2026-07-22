@@ -879,9 +879,12 @@
   }
 
   function tabSystemHTML(ex, labels, info, from, to) {
+    // player's-eye string order: low E on the TOP line, the way you see your
+    // own strings looking down at the neck (classic published tab is the
+    // mirror of this — high e on top — and that read wrong mid-practice)
     var rows = [], s, i, r, lw = 0;
     for (s = 0; s < 6; s++) if (labels[s].length > lw) lw = labels[s].length;
-    for (s = 5; s >= 0; s--) {
+    for (s = 0; s <= 5; s++) {
       rows.push({ s: s, html: labels[s] + new Array(lw - labels[s].length + 1).join(' ') + '|' });
     }
     for (i = from; i < to; i++) {
