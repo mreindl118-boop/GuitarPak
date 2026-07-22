@@ -1,5 +1,5 @@
 {
-  "version": "0.22.0",
+  "version": "0.23.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "The chord explorer now knows every voicing: for any chord it finds all the playable fingerings up and down the whole neck (open shapes, barres, and generated position voicings with the root in the bass), each one a tap away on the voicing chips."
+  "notes": "The chord explorer now follows your key: pick a scale in the top bar and its tonic chord loads onto the neck automatically. The page is reorganized to read naturally - key chords first, then the chord with its voicings low-to-high, the neck, and the theory. Also in this update: every playable voicing for every chord across the whole neck, and a fix for diminished-7th chords that rendered a fourth off."
 }
