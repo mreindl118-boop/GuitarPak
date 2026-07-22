@@ -1,5 +1,5 @@
 {
-  "version": "0.21.1",
+  "version": "0.23.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "Horizontal tab now reads from the player's perspective: low E is the top line, exactly what you see looking down at your own neck. Plus 0.21's chord explorer fretboard with built-in theory and the aligned vertical tab."
+  "notes": "The chord explorer now follows your key: pick a scale in the top bar and its tonic chord loads onto the neck automatically. The page is reorganized to read naturally - key chords first, then the chord with its voicings low-to-high, the neck, and the theory. Also in this update: every playable voicing for every chord across the whole neck, and a fix for diminished-7th chords that rendered a fourth off."
 }

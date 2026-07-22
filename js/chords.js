@@ -475,7 +475,8 @@
     opts = opts || {};
     ex.rootPc = validPc(rootPc);
     ex.quality = Theory.QUALITIES[quality] ? quality : 'maj';
-    try { ex.shapes = Theory.chordShapes(ex.rootPc, ex.quality); } catch (e) { ex.shapes = []; }
+    // every playable voicing across the neck (curated shapes + generated sweep)
+    try { ex.shapes = Theory.chordVoicings(ex.rootPc, ex.quality); } catch (e) { ex.shapes = []; }
     ex.shapeIdx = 0;
     els.exRoot.value = String(ex.rootPc);
     els.exQuality.value = ex.quality;
@@ -825,14 +826,8 @@
     root.innerHTML =
       '<div class="card">' +
         '<h2>Chord explorer</h2>' +
-        '<div class="row">' +
-          '<span class="ch-exname" id="ch-ex-name"></span>' +
-          '<label class="field">Root<select id="ch-ex-root"></select></label>' +
-          '<label class="field">Chord<select id="ch-ex-quality"></select></label>' +
-          '<button type="button" class="btn primary" id="ch-ex-strum">Strum</button>' +
-          '<button type="button" class="btn" id="ch-ex-add" title="Append this chord to the progression below">+ Progression</button>' +
-        '</div>' +
-        '<div class="ch-inkeyrow"><span class="ch-field"><span>In the key</span></span>' +
+        // 1. where most journeys start: the chords of the current key
+        '<div class="ch-inkeyrow">' +
           '<span class="chip" id="ch-key-label" title="Key and scale come from the bar at the top"></span>' +
           '<span class="seg" id="ch-seg">' +
             '<button type="button" data-v="0">Triads</button>' +
@@ -840,8 +835,19 @@
           '</span>' +
           '<span id="ch-inkey" class="ch-inkeyrow" style="margin-top:0"></span>' +
         '</div>' +
+        // 2. the chord itself: name, free pickers, actions
+        '<div class="row" style="margin-top:16px">' +
+          '<span class="ch-exname" id="ch-ex-name"></span>' +
+          '<label class="field">Root<select id="ch-ex-root"></select></label>' +
+          '<label class="field">Chord<select id="ch-ex-quality"></select></label>' +
+          '<button type="button" class="btn primary" id="ch-ex-strum">Strum</button>' +
+          '<button type="button" class="btn" id="ch-ex-add" title="Append this chord to the progression below">+ Progression</button>' +
+        '</div>' +
+        // 3. every voicing across the neck, then the neck itself
+        '<div class="ch-field" style="margin-top:12px"><span>Voicings &mdash; low to high</span></div>' +
+        '<div class="ch-shapesel" id="ch-shapesel" style="margin-top:7px"></div>' +
         '<div class="ch-boardwrap" id="ch-board" title="Tap the neck to strum; tap a note to hear it"></div>' +
-        '<div class="ch-shapesel" id="ch-shapesel"></div>' +
+        '<div class="muted small">Tap anywhere on the neck to strum &middot; tap a single note to hear it alone.</div>' +
         '<div class="ch-theory">' +
           '<div class="ch-tones" id="ch-tones"></div>' +
           '<div class="muted small" id="ch-formula"></div>' +
@@ -984,6 +990,9 @@
       updateSegUI();
       renderInKey();
       renderPalette();
+      // showing the tonic? follow the depth switch (G <-> Gmaj7)
+      var tonic = keyTonic();
+      if (tonic && ex.rootPc === tonic.rootPc) exLoad(tonic.rootPc, tonic.quality, {});
     });
     els.preset.addEventListener('change', function () {
       var id = els.preset.value;
@@ -1036,10 +1045,22 @@
       if (d) applyFbScale(d.root, d.scale, false);
     });
 
-    exLoad(ex.rootPc, ex.quality, { persist: false });
+    // open on the tonic chord of the current key — the explorer starts where
+    // the scale in the bar points (stored chord is the fallback)
+    var tonic = keyTonic();
+    if (tonic) exLoad(tonic.rootPc, tonic.quality, { persist: false });
+    else exLoad(ex.rootPc, ex.quality, { persist: false });
     renderPalette();
     renderTrack();
     updatePlayBtn();
+  }
+
+  // the tonic chord of the current key/scale ({rootPc, quality} or null)
+  function keyTonic() {
+    try {
+      var dia = Theory.diatonic(st.keyPc, st.scaleId, st.sevenths);
+      return dia.length ? dia[0] : null;
+    } catch (e) { return null; }
   }
 
   function applyFbScale(root, scale, quiet) {
@@ -1052,7 +1073,11 @@
     renderKeyLabel();
     if (!quiet) {           // live change: refresh what is on screen
       renderPalette();
-      exRender();           // board colors + in-key chips + function line follow the key
+      // the explorer is LINKED to the scale: picking a key loads its tonic
+      // chord (I of major, i of minor, ...) onto the neck
+      var tonic = keyTonic();
+      if (tonic) exLoad(tonic.rootPc, tonic.quality, {});
+      else exRender();      // non-diatonic edge: just recolor what's shown
     }
   }
 
