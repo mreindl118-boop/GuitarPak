@@ -475,7 +475,8 @@
     opts = opts || {};
     ex.rootPc = validPc(rootPc);
     ex.quality = Theory.QUALITIES[quality] ? quality : 'maj';
-    try { ex.shapes = Theory.chordShapes(ex.rootPc, ex.quality); } catch (e) { ex.shapes = []; }
+    // every playable voicing across the neck (curated shapes + generated sweep)
+    try { ex.shapes = Theory.chordVoicings(ex.rootPc, ex.quality); } catch (e) { ex.shapes = []; }
     ex.shapeIdx = 0;
     els.exRoot.value = String(ex.rootPc);
     els.exQuality.value = ex.quality;

@@ -1,5 +1,5 @@
 {
-  "version": "0.21.1",
+  "version": "0.22.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "Horizontal tab now reads from the player's perspective: low E is the top line, exactly what you see looking down at your own neck. Plus 0.21's chord explorer fretboard with built-in theory and the aligned vertical tab."
+  "notes": "The chord explorer now knows every voicing: for any chord it finds all the playable fingerings up and down the whole neck (open shapes, barres, and generated position voicings with the root in the bass), each one a tap away on the voicing chips."
 }
