@@ -1,5 +1,5 @@
 {
-  "version": "0.21.0",
+  "version": "0.21.1",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "The Chords tab is rebuilt around a real fretboard: pick any chord (or tap the in-key chips) and see it on a big neck, strum it by tapping, hear single notes, cycle voicings, and read the built-in theory - the chord spelled out, its role in your key, and a scale to solo over it with a one-tap jump to practice. The progression player's current chord now lights up the neck live. The vertical tab view now lines up with the fretboard as real rotated tablature with upright, readable numbers. Includes 0.20's natural scale playback and note-sound setting."
+  "notes": "Horizontal tab now reads from the player's perspective: low E is the top line, exactly what you see looking down at your own neck. Plus 0.21's chord explorer fretboard with built-in theory and the aligned vertical tab."
 }
