@@ -21,7 +21,9 @@
  *       -> [ { deg:1..7, rootPc, quality, roman, name } ]
  *   Theory.resolveProgression(preset, keyPc)    -> [ { rootPc, quality, roman, name } ] (one per bar/step)
  *   Theory.chordShapes(rootPc, quality)     -> [ { frets:[6] (-1 mute, 0 open, else absolute fret),
- *                                                 baseFret, label } ]
+ *                                                 baseFret, label } ]  (curated shapes)
+ *   Theory.chordVoicings(rootPc, quality)   -> same shape objects, but every playable
+ *                                              voicing across the neck (curated + generated)
  *   Theory.chordVoicing(frets, tuningMidi?) -> midi numbers for sounding strings (low first)
  *   Theory.chordName(rootPc, quality, preferFlat)
  *   Theory.fretMidi(stringIdx, fret, tuningId='standard')   stringIdx 0 = low E
@@ -125,7 +127,7 @@ window.Theory = (function () {
     { quality: 'sus4', rootString: 1, offsets: [-1, 0, 2, 2, 3, 0],   label: 'Asus4 shape' },
     { quality: 'dim',  rootString: 1, offsets: [-1, 0, 1, 2, 1, -1],  label: 'dim shape' },
     { quality: 'm7b5', rootString: 1, offsets: [-1, 0, 1, 0, 1, -1],  label: 'm7♭5 shape' },
-    { quality: 'dim7', rootString: 3, offsets: [-1, -1, 0, 1, 0, 1],  label: 'dim7 shape' },
+    { quality: 'dim7', rootString: 2, offsets: [-1, -1, 0, 1, 0, 1],  label: 'dim7 shape' },
     { quality: 'aug',  rootString: 0, offsets: [0, 3, 2, 1, 1, 0],    label: 'aug shape' }
   ];
   var OPEN_STRING_PCS = [4, 9, 2, 7, 11, 4];
@@ -311,6 +313,86 @@ window.Theory = (function () {
     return m === 99 ? 0 : m;
   }
 
+  // Every playable fingering of a chord across the whole neck: the curated
+  // shapes first (Open / E-shape barre / ...), then a generated sweep — for
+  // each 4-fret window the search keeps fingerings whose sounded strings are
+  // contiguous (mutes only at the edges), keep the root in the bass, cover
+  // the chord's essential tones (the 5th may drop from 7th chords), and use
+  // at most four distinct fretted frets (a hand). Best voicing per window,
+  // deduped, sorted low to high.
+  function chordVoicings(rootPc, quality) {
+    rootPc = mod12(rootPc);
+    var q = QUALITIES[quality] || QUALITIES.maj;
+    var pcs = q.intervals.map(function (iv) { return mod12(rootPc + iv); });
+    var pcSet = new Set(pcs);
+    var required = new Set(pcs);
+    if (q.intervals.length >= 4 && q.intervals.indexOf(7) !== -1) {
+      required.delete(mod12(rootPc + 7)); // 7th chords survive without the 5th
+    }
+    var tun = TUNINGS.standard.midi;
+    var out = chordShapes(rootPc, quality).slice();
+    var seen = new Set(out.map(function (sh) { return sh.frets.join(','); }));
+    var labels = {};
+    out.forEach(function (sh) { labels[sh.label] = true; });
+
+    function score(frets) {
+      var i, first = -1, last = -1, n = 0;
+      for (i = 0; i < 6; i++) {
+        if (frets[i] >= 0) { if (first === -1) first = i; last = i; n++; }
+      }
+      if (n < 4) return -1;
+      for (i = first; i <= last; i++) if (frets[i] < 0) return -1; // no inner mutes
+      if (mod12(tun[first] + frets[first]) !== rootPc) return -1;  // root in the bass
+      var have = new Set(), fretted = new Set(), sum = 0;
+      for (i = first; i <= last; i++) {
+        have.add(mod12(tun[i] + frets[i]));
+        if (frets[i] > 0) { fretted.add(frets[i]); sum += frets[i]; }
+      }
+      var ok = true;
+      required.forEach(function (pc) { if (!have.has(pc)) ok = false; });
+      if (!ok || fretted.size > 4) return -1;
+      // more strings beats fewer; a complete chord (5th included) beats a
+      // shell; lower positions win ties
+      return n * 100 + (have.size >= Math.min(pcs.length, 4) ? 50 : 0) - sum * 0.5;
+    }
+
+    for (var base = 1; base <= 11; base++) {
+      var cands = [], s, f;
+      for (s = 0; s < 6; s++) {
+        var c = [-1];
+        if (base <= 2 && pcSet.has(mod12(tun[s]))) c.push(0);
+        for (f = base; f < base + 4; f++) {
+          if (pcSet.has(mod12(tun[s] + f))) c.push(f);
+        }
+        cands.push(c);
+      }
+      var best = null, bestScore = 0;
+      var frets = [-1, -1, -1, -1, -1, -1];
+      (function dfs(si) {
+        if (si === 6) {
+          var sc = score(frets);
+          if (sc > bestScore) { bestScore = sc; best = frets.slice(); }
+          return;
+        }
+        for (var k = 0; k < cands[si].length; k++) {
+          frets[si] = cands[si][k];
+          dfs(si + 1);
+        }
+        frets[si] = -1;
+      })(0);
+      if (!best) continue;
+      var key = best.join(',');
+      if (seen.has(key)) continue;
+      seen.add(key);
+      var label = 'Fret ' + (minPositive(best) || 1);
+      while (labels[label]) label += ' ·';
+      labels[label] = true;
+      out.push(makeShape(best, label));
+    }
+    out.sort(function (a, b) { return minPositive(a.frets) - minPositive(b.frets); });
+    return out;
+  }
+
   function makeShape(frets, label) {
     var pos = frets.filter(function (f) { return f > 0; });
     var maxF = pos.length ? Math.max.apply(null, pos) : 0;
@@ -469,6 +551,7 @@ window.Theory = (function () {
     diatonic: diatonic,
     resolveProgression: resolveProgression,
     chordShapes: chordShapes,
+    chordVoicings: chordVoicings,
     chordVoicing: chordVoicing,
     chordName: chordName,
     fretMidi: fretMidi,

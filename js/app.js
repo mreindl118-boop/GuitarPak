@@ -31,7 +31,7 @@ window.App = (function () {
   // ---- auto-update ----
   // version.json on GitHub is the source of truth. Web builds refresh through
   // the service worker; the APK build (file://) links to the new APK download.
-  var APP_VERSION = '0.21.1';
+  var APP_VERSION = '0.24.1';
   var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
 
   function verNum(v) {
@@ -118,13 +118,16 @@ window.App = (function () {
   // of random detune and level variation so repeated notes don't sound
   // stamped out; the synth voice stays as the automatic fallback and is
   // exposed as App.pluckSynth for callers that want it on purpose.
+  // trim = per-set loudness compensation, RMS-measured against the old
+  // FluidR3 renders when the sets moved to MusyngKite (which records much
+  // quieter for the guitars)
   var PLUCK_SETS = {
-    steel: { dir: 'samples/guitar/', notes: {
+    steel: { dir: 'samples/guitar/', trim: 2.8, notes: {
       40: 'E2', 45: 'A2', 48: 'C3', 50: 'D3', 53: 'F3', 55: 'G3', 57: 'A3',
       59: 'B3', 62: 'D4', 64: 'E4', 67: 'G4', 72: 'C5', 76: 'E5' } },
-    electric: { dir: 'samples/eguitar/', notes: {
+    electric: { dir: 'samples/eguitar/', trim: 4.8, notes: {
       40: 'E2', 45: 'A2', 50: 'D3', 55: 'G3', 59: 'B3', 64: 'E4', 67: 'G4', 72: 'C5' } },
-    nylon: { dir: 'samples/nylon/', notes: {
+    nylon: { dir: 'samples/nylon/', trim: 3.2, notes: {
       40: 'E2', 45: 'A2', 50: 'D3', 55: 'G3', 59: 'B3', 64: 'E4', 67: 'G4', 72: 'C5' } }
   };
   var pluckRaw = { steel: {}, electric: {}, nylon: {} };  // tone -> midi -> bytes
@@ -197,7 +200,7 @@ window.App = (function () {
       src.buffer = bank[best];
       // ±4 cents; midi may be fractional (tuner calibration) — that's fine here
       src.playbackRate.value = Math.pow(2, (midi - best + (Math.random() - 0.5) * 0.08) / 12);
-      var lv = gain * 1.4 * (0.92 + Math.random() * 0.16);
+      var lv = gain * (PLUCK_SETS[tone] ? PLUCK_SETS[tone].trim : 1.4) * (0.92 + Math.random() * 0.16);
       var g = ctx.createGain();
       g.gain.setValueAtTime(0.0001, t);
       g.gain.linearRampToValueAtTime(lv, t + 0.003);

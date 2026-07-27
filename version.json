@@ -1,5 +1,5 @@
 {
-  "version": "0.21.1",
+  "version": "0.24.1",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "Horizontal tab now reads from the player's perspective: low E is the top line, exactly what you see looking down at your own neck. Plus 0.21's chord explorer fretboard with built-in theory and the aligned vertical tab."
+  "notes": "Removes double-tap zoom on the fretboard - two quick taps on a note now just play the note twice; zooming stays on pinch and the +/- and Fit buttons. Plus the real MusyngKite guitar sound, the tonic-linked chord explorer, the full voicing library, and the light-mode dropdown fix."
 }
