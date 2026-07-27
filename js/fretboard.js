@@ -458,7 +458,7 @@
   var vb = { w: 0, h: 0 };  // current SVG viewBox size
   var zoom = 1;
   var ZMAX = 3.5;
-  var suppressClick = false; // true briefly after pan / pinch / double-tap
+  var suppressClick = false; // true briefly after pan / pinch
 
   var BASE_MAX_W = 520; // cap so wide desktop stages don't blow the board up
 
@@ -534,7 +534,6 @@
   function wireViewport() {
     var wrap = els.scroll;
     var pinch = null;
-    var lastTap = { t: 0, x: 0 };
     var swipe = null; // fullscreen mode-switch flick (7-note scales only)
 
     wrap.addEventListener('touchstart', function (e) {
@@ -576,30 +575,14 @@
         if (Date.now() - swipe.t < 400 && Math.abs(sdx) >= 60 &&
             Math.abs(sdx) > 2 * Math.abs(sdy) && !panned) {
           swipe = null;
-          lastTap.t = 0; // a flick is not half of a double-tap
           endGesture();
           setMode(state.mode + (sdx < 0 ? 1 : -1)); // swipe left = next mode
           flashMode();
           return;
         }
       }
-      // double-tap toggles whole-neck fit <-> fill-height, centred on the tap
-      if (e.changedTouches.length === 1 && e.touches.length === 0) {
-        var x = e.changedTouches[0].clientX;
-        var y = e.changedTouches[0].clientY;
-        var now = Date.now();
-        if (now - lastTap.t < 320 && Math.abs(x - lastTap.x) < 44) {
-          e.preventDefault();
-          endGesture();
-          var fitZ = minZoom(wrap);
-          if (fitZ >= 0.999) setZoom(zoom > 1.05 ? 1 : 2.2, x, y);
-          else setZoom(zoom > fitZ * 1.05 ? fitZ : 1, x, y);
-          lastTap.t = 0;
-        } else {
-          lastTap.t = now;
-          lastTap.x = x;
-        }
-      }
+      // no double-tap zoom here on purpose: two quick taps on a note must
+      // just play the note twice (zoom stays on pinch / the +/- buttons)
     }, { passive: false });
 
     // trackpad pinch / Ctrl+wheel on desktop
@@ -1615,7 +1598,7 @@
           '<div class="row tight fb-legend" id="fb-legend"></div>' +
           '<h3 id="fb-info-title"></h3>' +
           '<div class="row tight" id="fb-info-notes"></div>' +
-          '<div class="muted small" style="margin-top:12px">Scroll down the neck &middot; pinch or Ctrl+scroll to zoom &middot; double-tap toggles whole-neck view</div>' +
+          '<div class="muted small" style="margin-top:12px">Scroll down the neck &middot; pinch or Ctrl+scroll to zoom &middot; the Fit button shows the whole neck</div>' +
         '</div>' +
       '</div>';
 
@@ -1820,7 +1803,7 @@
     // one delegated listener survives every board re-render
     els.scroll.addEventListener('click', function (e) {
       if (els.settings.classList.contains('open')) { els.settings.classList.remove('open'); return; }
-      if (suppressClick) return; // tail end of a pan / pinch / double-tap
+      if (suppressClick) return; // tail end of a pan / pinch
       var hit = e.target.closest ? e.target.closest('.fb-hit') : null;
       if (!hit) return;
       var sIdx = parseInt(hit.getAttribute('data-fb-s'), 10);

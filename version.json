@@ -1,5 +1,5 @@
 {
-  "version": "0.24.0",
+  "version": "0.24.1",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "Real guitar sound: all guitar and bass samples upgraded to the much richer MusyngKite soundfont (MIT) - strums and notes now ring like an actual guitar instead of a harpsichord, with levels rebalanced per instrument. Plus the tonic-linked chord explorer, the complete voicing library, and the light-mode dropdown fix."
+  "notes": "Removes double-tap zoom on the fretboard - two quick taps on a note now just play the note twice; zooming stays on pinch and the +/- and Fit buttons. Plus the real MusyngKite guitar sound, the tonic-linked chord explorer, the full voicing library, and the light-mode dropdown fix."
 }
