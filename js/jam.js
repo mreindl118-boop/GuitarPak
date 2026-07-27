@@ -165,9 +165,15 @@
     return best;
   }
 
+  // per-set loudness trim: the MusyngKite guitar renders sit well below the
+  // FluidR3 keys/pad levels, and its fingered bass sits well above (measured
+  // RMS ratios at the switch)
+  var SET_TRIM = { guitar: 2.0, eguitar: 3.5, nylon: 2.3, bass: 0.35, bassp: 1.0, keys: 1, pad: 1 };
+
   function playSample(setId, midi, t, dur, gain, attack, release) {
     var anchor = nearestSample(setId, midi);
     if (anchor == null) return false;
+    gain *= SET_TRIM[setId] || 1;
     var src = ctx.createBufferSource();
     src.buffer = sampleBuf[setId + '/' + anchor];
     src.playbackRate.value = Math.pow(2, (midi - anchor) / 12);

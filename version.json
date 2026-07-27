@@ -1,5 +1,5 @@
 {
-  "version": "0.23.1",
+  "version": "0.24.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "Fixes the zigzag pattern that filled every dropdown in light mode - the arrow icon was accidentally tiling across the control. Dropdowns now show their proper face and a single arrow in both themes. Plus 0.23's tonic-linked chord explorer and 0.22's complete voicing library with the dim7 fix."
+  "notes": "Real guitar sound: all guitar and bass samples upgraded to the much richer MusyngKite soundfont (MIT) - strums and notes now ring like an actual guitar instead of a harpsichord, with levels rebalanced per instrument. Plus the tonic-linked chord explorer, the complete voicing library, and the light-mode dropdown fix."
 }
