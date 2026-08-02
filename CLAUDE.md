@@ -8,7 +8,8 @@ wrapper. GitHub: https://github.com/mreindl118-boop/GuitarPak
 ```
 index.html        tab shell; loads theory → app → modules → App.boot()
 css/style.css     design system ("stage gear": #131114 ground, #ffab47 amber,
-                  Barlow / Barlow Condensed from fonts/)
+                  Bebas Neue display + Barlow body from fonts/; chord names
+                  use --font-condensed — Bebas is caps-only)
 js/theory.js      pure music-theory engine (scales, tunings, chords, diatonic
                   harmony, progressions) — no DOM
 js/app.js         shell: module registry, tab switching, shared AudioContext +

@@ -30,6 +30,14 @@
   font-weight: 700;
   src: url('../fonts/barlowcond-700.woff2') format('woff2');
 }
+/* display face — iconic poster caps (single weight; caps-only, so anything
+   mixed-case that must stay readable pins itself to Barlow Condensed) */
+@font-face {
+  font-family: 'Bebas Neue';
+  font-style: normal;
+  font-weight: 400 700;
+  src: url('../fonts/bebasneue-400.ttf') format('truetype');
+}
 
 :root {
   --bg: #131114;
@@ -52,7 +60,8 @@
   --purple: #b48ef0;
   --radius: 14px;
   --font-body: 'Barlow', 'Segoe UI', system-ui, sans-serif;
-  --font-display: 'Barlow Condensed', 'Segoe UI', system-ui, sans-serif;
+  --font-display: 'Bebas Neue', 'Barlow Condensed', 'Segoe UI', system-ui, sans-serif;
+  --font-condensed: 'Barlow Condensed', 'Segoe UI', system-ui, sans-serif; /* mixed-case display (chord names) */
 }
 
 /* ---------- light theme (toggled by the ◐ button; persisted app.theme) ---------- */
@@ -92,10 +101,12 @@
 }
 :root[data-theme="light"] select {
   background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='7'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23b96a10' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"),
-    linear-gradient(180deg, #fffdf9 0%, #f4eee5 100%);
-  background-repeat: no-repeat, no-repeat;
-  background-position: right 11px center, 0 0;
-  background-size: auto, 100% 100%;
+    linear-gradient(#cbc0af, #cbc0af),
+    linear-gradient(180deg, #fffdf9 0%, #efe8dc 100%);
+  background-repeat: no-repeat, no-repeat, no-repeat;
+  background-position: right 13px center, right 34px center, 0 0;
+  background-size: auto, 1px 62%, 100% 100%;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 2px 6px rgba(0, 0, 0, 0.1);
 }
 :root[data-theme="light"] input[type="range"]::-webkit-slider-runnable-track {
   background: #e2dacd;
@@ -170,9 +181,9 @@ html, body {
   align-items: center;
   gap: 10px;
   font-family: var(--font-display);
-  font-size: 25px;
+  font-size: 27px;
   font-weight: 700;
-  letter-spacing: 1.5px;
+  letter-spacing: 2.5px;
   text-transform: uppercase;
   white-space: nowrap;
 }
@@ -228,10 +239,10 @@ html, body {
 .ctxbar select, .ctxbar input[type="number"] {
   padding: 6px 9px;
   font-size: 14px;
-  border-radius: 7px;
+  border-radius: 8px;
 }
 
-.ctxbar select { padding-right: 28px; }
+.ctxbar select { padding: 6px 38px 6px 10px; }
 .ctxbar input[type="number"] { width: 68px; }
 
 #cx-met { padding: 6px 14px; }
@@ -441,19 +452,29 @@ select, input[type="number"], input[type="text"] {
   box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.35);
 }
 
-/* chevron + face as LAYERED backgrounds, with repeat/position/size stated
-   explicitly — a shorthand override elsewhere must never be able to tile the
-   chevron across the control */
+/* Dropdowns read as app buttons: raised face, chevron in its own zone behind
+   a hairline separator. All layers carry explicit repeat/position/size — a
+   shorthand override elsewhere must never be able to tile the chevron. */
 select {
   appearance: none;
   -webkit-appearance: none;
-  padding-right: 32px;
+  padding: 10px 40px 10px 13px;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
   background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='7'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23ffab47' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"),
-    linear-gradient(180deg, #1b1518 0%, #251f22 100%);
-  background-repeat: no-repeat, no-repeat;
-  background-position: right 11px center, 0 0;
-  background-size: auto, 100% 100%;
+    linear-gradient(var(--ctl-border), var(--ctl-border)),
+    linear-gradient(180deg, #342c30 0%, #221c1f 100%);
+  background-repeat: no-repeat, no-repeat, no-repeat;
+  background-position: right 13px center, right 34px center, 0 0;
+  background-size: auto, 1px 62%, 100% 100%;
+  box-shadow: inset 0 1px 0 var(--line-soft), 0 2px 6px rgba(0, 0, 0, 0.3);
+  transition: border-color 120ms ease, box-shadow 120ms ease;
 }
+
+select:hover { border-color: rgba(255, 171, 71, 0.55); }
+select:active { box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.4); }
+select option { background: var(--card); color: var(--text); font-weight: 500; }
 
 select:focus, input:focus { outline: none; border-color: rgba(255, 171, 71, 0.6); }
 

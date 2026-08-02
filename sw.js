@@ -1,5 +1,5 @@
 /* GuitarLab service worker — cache-first so the app works fully offline once visited. */
-var CACHE = 'guitarlab-v42';
+var CACHE = 'guitarlab-v43';
 var ASSETS = [
   '.',
   'index.html',
@@ -8,6 +8,7 @@ var ASSETS = [
   'fonts/barlow-500.woff2',
   'fonts/barlowcond-600.woff2',
   'fonts/barlowcond-700.woff2',
+  'fonts/bebasneue-400.ttf',
   'js/theory.js',
   'js/app.js',
   'js/metronome.js',
@@ -33,13 +34,15 @@ var ASSETS = [
   'samples/guitar/D3.mp3', 'samples/guitar/F3.mp3', 'samples/guitar/G3.mp3',
   'samples/guitar/A3.mp3', 'samples/guitar/B3.mp3', 'samples/guitar/D4.mp3',
   'samples/guitar/E4.mp3', 'samples/guitar/G4.mp3', 'samples/guitar/C5.mp3',
-  'samples/guitar/E5.mp3',
+  'samples/guitar/E5.mp3', 'samples/guitar/A5.mp3', 'samples/guitar/C6.mp3',
   'samples/eguitar/E2.mp3', 'samples/eguitar/A2.mp3', 'samples/eguitar/D3.mp3',
   'samples/eguitar/G3.mp3', 'samples/eguitar/B3.mp3', 'samples/eguitar/E4.mp3',
-  'samples/eguitar/G4.mp3', 'samples/eguitar/C5.mp3',
+  'samples/eguitar/G4.mp3', 'samples/eguitar/C5.mp3', 'samples/eguitar/E5.mp3',
+  'samples/eguitar/A5.mp3',
   'samples/nylon/E2.mp3', 'samples/nylon/A2.mp3', 'samples/nylon/D3.mp3',
   'samples/nylon/G3.mp3', 'samples/nylon/B3.mp3', 'samples/nylon/E4.mp3',
-  'samples/nylon/G4.mp3', 'samples/nylon/C5.mp3'
+  'samples/nylon/G4.mp3', 'samples/nylon/C5.mp3', 'samples/nylon/E5.mp3',
+  'samples/nylon/A5.mp3'
 ];
 
 self.addEventListener('install', function (e) {

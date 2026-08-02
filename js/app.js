@@ -31,7 +31,7 @@ window.App = (function () {
   // ---- auto-update ----
   // version.json on GitHub is the source of truth. Web builds refresh through
   // the service worker; the APK build (file://) links to the new APK download.
-  var APP_VERSION = '0.24.1';
+  var APP_VERSION = '0.25.0';
   var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
 
   function verNum(v) {
@@ -124,11 +124,13 @@ window.App = (function () {
   var PLUCK_SETS = {
     steel: { dir: 'samples/guitar/', trim: 2.8, notes: {
       40: 'E2', 45: 'A2', 48: 'C3', 50: 'D3', 53: 'F3', 55: 'G3', 57: 'A3',
-      59: 'B3', 62: 'D4', 64: 'E4', 67: 'G4', 72: 'C5', 76: 'E5' } },
+      59: 'B3', 62: 'D4', 64: 'E4', 67: 'G4', 72: 'C5', 76: 'E5', 81: 'A5', 84: 'C6' } },
     electric: { dir: 'samples/eguitar/', trim: 4.8, notes: {
-      40: 'E2', 45: 'A2', 50: 'D3', 55: 'G3', 59: 'B3', 64: 'E4', 67: 'G4', 72: 'C5' } },
+      40: 'E2', 45: 'A2', 50: 'D3', 55: 'G3', 59: 'B3', 64: 'E4', 67: 'G4', 72: 'C5',
+      76: 'E5', 81: 'A5' } },
     nylon: { dir: 'samples/nylon/', trim: 3.2, notes: {
-      40: 'E2', 45: 'A2', 50: 'D3', 55: 'G3', 59: 'B3', 64: 'E4', 67: 'G4', 72: 'C5' } }
+      40: 'E2', 45: 'A2', 50: 'D3', 55: 'G3', 59: 'B3', 64: 'E4', 67: 'G4', 72: 'C5',
+      76: 'E5', 81: 'A5' } }
   };
   var pluckRaw = { steel: {}, electric: {}, nylon: {} };  // tone -> midi -> bytes
   var pluckBuf = { steel: {}, electric: {}, nylon: {} };  // tone -> midi -> AudioBuffer
@@ -195,7 +197,11 @@ window.App = (function () {
       var d = Math.abs(midi - m);
       if (d < bd) { bd = d; best = Number(m); }
     }
-    if (best !== null && bd <= 4.5) {
+    // as long as the bank is decoded, always pitch-shift the nearest anchor —
+    // a far shift still sounds like a guitar, the synth fallback does not
+    // (that fallback above the old top anchor was the "harpsichord above
+    // fret 12" bug)
+    if (best !== null) {
       var src = ctx.createBufferSource();
       src.buffer = bank[best];
       // ±4 cents; midi may be fractional (tuner calibration) — that's fine here

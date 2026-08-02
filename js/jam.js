@@ -655,7 +655,7 @@
       '.jam-track{display:flex;flex-wrap:wrap;gap:8px;min-height:40px;align-items:center}' +
       '.jam-bar.active{border-color:var(--accent);color:var(--accent);' +
         'box-shadow:0 0 14px rgba(255,171,71,0.3)}' +
-      '.jam-now{font-family:var(--font-display);font-size:26px;font-weight:600;letter-spacing:1px;min-height:32px}' +
+      '.jam-now{font-family:var(--font-condensed,var(--font-display));font-size:26px;font-weight:600;letter-spacing:1px;min-height:32px}' + // chord names are mixed-case
       '.jam-pal{cursor:pointer}.jam-bar{cursor:pointer}'
     );
 

@@ -1,5 +1,5 @@
 {
-  "version": "0.24.1",
+  "version": "0.25.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "Removes double-tap zoom on the fretboard - two quick taps on a note now just play the note twice; zooming stays on pinch and the +/- and Fit buttons. Plus the real MusyngKite guitar sound, the tonic-linked chord explorer, the full voicing library, and the light-mode dropdown fix."
+  "notes": "High-neck notes above the 12th fret now ring with the same real guitar sound as everything else (new high sample notes; no more synth fallback). Dropdowns are restyled as proper app buttons with a clear arrow zone. And the whole app wears a new iconic display face - Bebas Neue - across the brand, tabs, headings and big numerals."
 }
