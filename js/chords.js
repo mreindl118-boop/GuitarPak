@@ -773,8 +773,10 @@
   // ---------------- init ----------------
 
   var CSS = '' +
-    '.ch-exname{font-family:var(--font-display);font-size:34px;font-weight:700;' +
-      'letter-spacing:1px;line-height:1;min-width:90px;}' +
+    // chord names are mixed-case ("Gm7") — the caps-only display face would
+    // flatten them, so they stay on the condensed face
+    '.ch-exname{font-family:var(--font-condensed,var(--font-display));font-size:34px;' +
+      'font-weight:700;letter-spacing:1px;line-height:1;min-width:90px;}' +
     '.ch-boardwrap{overflow-x:auto;margin-top:12px;}' +
     '.ch-bsvg{display:block;width:100%;min-width:540px;max-width:760px;height:auto;cursor:pointer;}' +
     '.ch-bdot{cursor:pointer;}' +
