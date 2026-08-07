@@ -719,7 +719,7 @@
       if (!el) return;
       if (pr.pick === 'off' || !d) { el.style.display = 'none'; return; }
       el.style.display = '';
-      el.textContent = d === 'd' ? '⊓' : '∨';
+      el.innerHTML = App.icon(d === 'd' ? 'pickdown' : 'pickup', 20);
       el.title = d === 'd' ? 'Downstroke' : 'Upstroke';
       el.classList.remove('fb-sd', 'fb-su');
       void el.offsetWidth; // restart the nudge animation
@@ -1153,10 +1153,10 @@
 
   function prPlayBtn(running) {
     var b = document.getElementById('fb-pr-play');
-    if (b) b.innerHTML = running ? '&#10074;&#10074; Pause' : '&#9654; Play';
+    if (b) b.innerHTML = running ? App.icon('pause', 14) + ' Pause' : App.icon('play', 14) + ' Play';
     var m = document.getElementById('fb-playmax'); // fullscreen twin
     if (m) {
-      m.innerHTML = running ? '&#10074;&#10074;' : '&#9654;';
+      m.innerHTML = App.icon(running ? 'pause' : 'play', 17);
       m.classList.toggle('on', !!running);
     }
   }
@@ -1545,7 +1545,10 @@
       '@keyframes fb-modeflash{0%{opacity:0}12%{opacity:1}70%{opacity:1}100%{opacity:0}}' +
       '.fb-toolbar{flex:0 0 auto}' +
       '.fb-practice{flex:0 0 auto}' +
-      '.fb-practice select,.fb-practice input[type=number]{padding:6px 8px;font-size:13px}' +
+      // compact strip controls — selects KEEP room for the chevron on the right
+      // (an equal-padding reset here once slid option text under the chevron)
+      '.fb-practice select{padding:6px 26px 6px 9px;font-size:13px;background-position:right 8px center}' +
+      '.fb-practice input[type=number]{padding:6px 8px;font-size:13px}' +
       '.fb-title{font-family:var(--font-display);font-size:19px;font-weight:600;letter-spacing:1px;' +
         'text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:42vw}' +
       '.fb-gearbtn{font-size:17px;line-height:1;padding:6px 10px}' +
@@ -1611,7 +1614,7 @@
       '<div class="card fb-board" id="fb-board">' +
         '<div class="row tight spread fb-toolbar">' +
           '<span class="row tight">' +
-            '<button type="button" class="btn sm fb-gearbtn" id="fb-gear" title="Scale &amp; board settings" aria-label="Settings">&#9881;</button>' +
+            '<button type="button" class="btn sm fb-gearbtn" id="fb-gear" title="Scale &amp; board settings" aria-label="Settings">' + App.icon('sliders', 15) + '</button>' +
             '<span class="fb-title" id="fb-title"></span>' +
             '<button type="button" class="chip" id="fb-jamchip" style="display:none" title="Tap to switch the board to this mode"></button>' +
           '</span>' +
@@ -1622,19 +1625,19 @@
               '<option value="sheet">Sheet</option>' +
             '</select>' +
             '<span class="row tight" id="fb-boardctl">' +
-            '<button type="button" class="btn sm" id="fb-zout" aria-label="Zoom out">&minus;</button>' +
+            '<button type="button" class="btn sm" id="fb-zout" aria-label="Zoom out">' + App.icon('minus', 14) + '</button>' +
             '<span class="chip" id="fb-zlabel">100%</span>' +
-            '<button type="button" class="btn sm" id="fb-zin" aria-label="Zoom in">+</button>' +
+            '<button type="button" class="btn sm" id="fb-zin" aria-label="Zoom in">' + App.icon('plus', 14) + '</button>' +
             '<button type="button" class="btn sm" id="fb-zfit">Fit</button>' +
-            '<button type="button" class="btn sm" id="fb-rotate" title="Rotate the board (vertical / horizontal neck)" aria-label="Rotate the fretboard">&#8635;</button>' +
-            '<button type="button" class="btn sm" id="fb-max" title="Fullscreen" aria-label="Fullscreen">&#x26F6;</button>' +
+            '<button type="button" class="btn sm" id="fb-rotate" title="Rotate the board (vertical / horizontal neck)" aria-label="Rotate the fretboard">' + App.icon('rotate', 14) + '</button>' +
+            '<button type="button" class="btn sm" id="fb-max" title="Fullscreen" aria-label="Fullscreen">' + App.icon('expand', 14) + '</button>' +
             '</span>' +
           '</span>' +
         '</div>' +
         '<div class="row tight fb-posrow" id="fb-posrow" style="display:none"></div>' +
         '<div class="row tight fb-practice">' +
-          '<button type="button" class="btn sm primary" id="fb-pr-play">&#9654; Play</button>' +
-          '<button type="button" class="btn sm" id="fb-pr-reset" title="Back to the first note">&#8634;</button>' +
+          '<button type="button" class="btn sm primary" id="fb-pr-play">' + App.icon('play', 14) + ' Play</button>' +
+          '<button type="button" class="btn sm" id="fb-pr-reset" title="Back to the first note">' + App.icon('restart', 14) + '</button>' +
           '<select id="fb-pr-type" title="Pattern type">' +
             '<option value="scale">Scale</option>' +
             '<option value="group">Groups</option>' +
@@ -1652,11 +1655,11 @@
           '<button type="button" class="chip fb-chip" id="fb-pr-sslock" style="display:none" ' +
             'title="Lock the one-string run to the current mode&#39;s box. Off (default): slide the whole string.">Mode box</button>' +
           '<div class="seg" id="fb-pr-dir" title="Direction — applies to every pattern">' +
-            '<button type="button" data-fbdir="up" title="Ascending">&#8593;</button>' +
-            '<button type="button" data-fbdir="down" title="Descending">&#8595;</button>' +
-            '<button type="button" data-fbdir="updown" title="Up, then back down">&#8597;</button>' +
+            '<button type="button" data-fbdir="up" title="Ascending" aria-label="Ascending">' + App.icon('up', 15) + '</button>' +
+            '<button type="button" data-fbdir="down" title="Descending" aria-label="Descending">' + App.icon('down', 15) + '</button>' +
+            '<button type="button" data-fbdir="updown" title="Up, then back down" aria-label="Up, then back down">' + App.icon('updown', 15) + '</button>' +
           '</div>' +
-          '<select id="fb-pr-pick" title="Pick strokes — the animated symbol shows the stroke for each note (&#8851; down, &#8744; up)">' +
+          '<select id="fb-pr-pick" title="Pick strokes — the animated symbol shows the stroke for each note">' +
             '<option value="alt">Alternate</option>' +
             '<option value="eco">Economy</option>' +
             '<option value="down">All down</option>' +
@@ -1702,8 +1705,8 @@
         '<div class="fb-scroll" id="fb-scroll"></div>' +
         '<div class="fb-tabout" id="fb-tabout" style="display:none"></div>' +
         '<div class="fb-sheetwrap" id="fb-sheetwrap" style="display:none"></div>' +
-        '<button type="button" class="fb-exitmax" id="fb-exitmax" title="Exit fullscreen" aria-label="Exit fullscreen">&#10005;</button>' +
-        '<button type="button" class="fb-exitmax fb-playmax" id="fb-playmax" title="Play / pause the exercise" aria-label="Play or pause the practice exercise">&#9654;</button>' +
+        '<button type="button" class="fb-exitmax" id="fb-exitmax" title="Exit fullscreen" aria-label="Exit fullscreen">' + App.icon('close', 17) + '</button>' +
+        '<button type="button" class="fb-exitmax fb-playmax" id="fb-playmax" title="Play / pause the exercise" aria-label="Play or pause the practice exercise">' + App.icon('play', 17) + '</button>' +
         '<span class="fb-exitmax fb-strokemax fb-stroke" id="fb-strokemax" aria-hidden="true" style="display:none"></span>' +
         '<div class="fb-settings" id="fb-settings">' +
           '<div class="row">' +
@@ -1958,7 +1961,7 @@
   function setMax(on) {
     maxMode = on;
     els.board.classList.toggle('fb-max', on);
-    els.maxBtn.innerHTML = on ? '&#10005;' : '&#x26F6;';
+    els.maxBtn.innerHTML = App.icon(on ? 'close' : 'expand', 14);
     els.maxBtn.title = on ? 'Exit fullscreen' : 'Fullscreen';
     document.body.style.overflow = on ? 'hidden' : '';
     if (on) {

@@ -26,15 +26,17 @@
     </svg>
     Guitar<em>Lab</em> <span class="tag">alpha</span>
   </div>
-  <nav class="tabs" id="tabs">
-    <button class="tab" data-panel="metronome">Metronome</button>
-    <button class="tab" data-panel="fretboard">Fretboard</button>
-    <button class="tab" data-panel="chords">Chords</button>
-    <button class="tab" data-panel="jam">Jam</button>
-    <button class="tab" data-panel="tuner">Tuner</button>
-    <button class="tab" data-panel="trainer">Trainer</button>
-    <button class="tab" data-panel="theory">Theory</button>
-    <button class="tab" data-panel="settings" aria-label="Settings">&#9881;</button>
+  <nav class="nav" id="tabs">
+    <select id="nav-select" aria-label="Go to page">
+      <option value="metronome">Metronome</option>
+      <option value="fretboard">Fretboard</option>
+      <option value="chords">Chords</option>
+      <option value="jam">Jam</option>
+      <option value="tuner">Tuner</option>
+      <option value="trainer">Trainer</option>
+      <option value="theory">Theory</option>
+      <option value="settings">Settings</option>
+    </select>
   </nav>
   <div class="ctxbar" id="ctxbar">
     <label class="cx-field">Key<select id="cx-root"></select></label>
@@ -42,7 +44,7 @@
     <label class="cx-field" id="cx-mode-wrap">Mode<select id="cx-mode"></select></label>
     <label class="cx-field">BPM<input id="cx-bpm" type="number" min="30" max="280" step="1"></label>
     <label class="cx-field">Time<select id="cx-sig"></select></label>
-    <button type="button" class="btn sm" id="cx-met" title="Start / stop the metronome (works on every tab)">&#9654;</button>
+    <button type="button" class="btn sm" id="cx-met" title="Start / stop the metronome (works on every tab)" aria-label="Start or stop the metronome"></button>
   </div>
 </header>
 <main>

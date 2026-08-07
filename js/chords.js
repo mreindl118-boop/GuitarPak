@@ -856,7 +856,7 @@
           '<div class="ch-fnline" id="ch-fn"></div>' +
           '<div class="row tight"><span class="muted small">Solo over it with</span>' +
             '<span class="chip" id="ch-suggest-name"></span>' +
-            '<button type="button" class="btn sm" id="ch-practice" title="Set up the fretboard with this scale and start the practice runner">Practice it &#8594;</button>' +
+            '<button type="button" class="btn sm" id="ch-practice" title="Set up the fretboard with this scale and start the practice runner">Practice it ' + App.icon('right', 13) + '</button>' +
           '</div>' +
         '</div>' +
       '</div>' +

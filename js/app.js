@@ -31,7 +31,7 @@ window.App = (function () {
   // ---- auto-update ----
   // version.json on GitHub is the source of truth. Web builds refresh through
   // the service worker; the APK build (file://) links to the new APK download.
-  var APP_VERSION = '0.30.0';
+  var APP_VERSION = '0.31.0';
   var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
 
   function verNum(v) {
@@ -97,6 +97,39 @@ window.App = (function () {
 
   function register(name, mod) {
     modules[name] = mod;
+  }
+
+  // ---- inline SVG icon set ----
+  // Every pictographic control renders one of these instead of a bare unicode
+  // glyph: characters like U+2195 fall back to emoji on iOS and broke the
+  // practice strip. stroke/fill = currentColor, so icons follow button color.
+  var ICONS = {
+    play: '<path d="M8 5.4v13.2L18.6 12z" fill="currentColor" stroke="none"/>',
+    pause: '<path d="M8.5 5.5v13M15.5 5.5v13" stroke-width="2.6"/>',
+    stop: '<rect x="6.5" y="6.5" width="11" height="11" rx="1.5" fill="currentColor" stroke="none"/>',
+    restart: '<polyline points="1.5 4.5 1.5 10.5 7.5 10.5"/><path d="M3.8 15a9 9 0 1 0 2-9.5L1.5 10"/>',
+    rotate: '<polyline points="22.5 4.5 22.5 10.5 16.5 10.5"/><path d="M20.2 15a9 9 0 1 1-2-9.5l4.3 4.5"/>',
+    up: '<path d="M12 19V5"/><polyline points="5 12 12 5 19 12"/>',
+    down: '<path d="M12 5v14"/><polyline points="19 12 12 19 5 12"/>',
+    updown: '<path d="M12 4.5v15"/><polyline points="8 8.5 12 4.5 16 8.5"/><polyline points="16 15.5 12 19.5 8 15.5"/>',
+    left: '<path d="M19 12H5"/><polyline points="12 19 5 12 12 5"/>',
+    right: '<path d="M5 12h14"/><polyline points="12 5 19 12 12 19"/>',
+    expand: '<path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>',
+    close: '<path d="M18 6 6 18M6 6l12 12"/>',
+    sliders: '<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"/><path d="M1.5 14h5M9.5 8h5M17.5 16h5"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    minus: '<path d="M5 12h14"/>',
+    pickdown: '<path d="M6 19.5v-9a6 6 0 0 1 12 0v9"/>',
+    pickup: '<path d="M5 5.5 12 19l7-13.5"/>'
+  };
+
+  function icon(name, size) {
+    var d = ICONS[name];
+    if (!d) return '';
+    var s = size || 18;
+    return '<svg class="ic" width="' + s + '" height="' + s + '" viewBox="0 0 24 24" fill="none" ' +
+      'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ' +
+      'aria-hidden="true" focusable="false">' + d + '</svg>';
   }
 
   function getAudio() {
@@ -396,6 +429,8 @@ window.App = (function () {
       try { modules[active].onHide(); } catch (e) { console.error(active + '.onHide', e); }
     }
     active = name;
+    var nav = document.getElementById('nav-select');
+    if (nav && nav.value !== name) nav.value = name;
     document.querySelectorAll('.tab').forEach(function (b) {
       b.classList.toggle('active', b.dataset.panel === name);
     });
@@ -515,11 +550,12 @@ window.App = (function () {
     // metronome transport: one button, live on every tab
     var met = document.getElementById('cx-met');
     if (met) {
+      met.innerHTML = icon('play', 14);
       met.addEventListener('click', function () { emit('met:toggle', {}); });
       on('met:state', function (d) {
         var runs = !!(d && d.running);
         met.classList.toggle('on', runs);
-        met.innerHTML = runs ? '&#9632;' : '&#9654;';
+        met.innerHTML = runs ? icon('stop', 14) : icon('play', 14);
         if (!runs) met.classList.remove('tick');
       });
       var tickTimer = null;
@@ -558,10 +594,20 @@ window.App = (function () {
       }
     });
 
-    document.getElementById('tabs').addEventListener('click', function (e) {
-      var btn = e.target.closest('.tab');
-      if (btn) switchTo(btn.dataset.panel);
-    });
+    // single page-picker menu (native select = native picker sheet on mobile)
+    var navSel = document.getElementById('nav-select');
+    if (navSel) {
+      navSel.addEventListener('change', function () {
+        if (PANEL_ORDER.indexOf(this.value) !== -1) switchTo(this.value);
+      });
+    }
+    var tabsEl = document.getElementById('tabs');
+    if (tabsEl) {
+      tabsEl.addEventListener('click', function (e) {
+        var btn = e.target.closest('.tab');
+        if (btn) switchTo(btn.dataset.panel);
+      });
+    }
 
     document.addEventListener('keydown', function (e) {
       var t = e.target;
@@ -609,6 +655,7 @@ window.App = (function () {
 
   return {
     register: register,
+    icon: icon,
     getAudio: getAudio,
     pluck: pluck,
     pluckSynth: pluckSynth,

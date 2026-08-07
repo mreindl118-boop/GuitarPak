@@ -384,8 +384,8 @@
         '<div class="row tight">' +
           '<button type="button" class="btn primary" id="th-cp-go">Start circle practice</button>' +
           '<span class="seg" id="th-cp-dir">' +
-            '<button type="button" data-thdir="1" title="Clockwise — up a fifth each step">5ths &#8594;</button>' +
-            '<button type="button" data-thdir="-1" title="Counter-clockwise — up a fourth each step">&#8592; 4ths</button>' +
+            '<button type="button" data-thdir="1" title="Clockwise — up a fifth each step">5ths ' + App.icon('right', 13) + '</button>' +
+            '<button type="button" data-thdir="-1" title="Counter-clockwise — up a fourth each step">' + App.icon('left', 13) + ' 4ths</button>' +
             '<button type="button" data-thdir="0" title="Jump to a random key each step — the real test">Random</button>' +
           '</span>' +
           '<label class="field">Bars / key<select id="th-cp-bars">' +
@@ -407,8 +407,8 @@
         '<h3 class="th-mt">Related keys</h3>' +
         '<div class="row tight" id="th-related"></div>' +
         '<div class="row tight th-mt">' +
-          '<button type="button" class="btn" id="th-open-chords">Open in Chords &#8594;</button>' +
-          '<button type="button" class="btn primary" id="th-practice">Practice this scale &#8594;</button>' +
+          '<button type="button" class="btn" id="th-open-chords">Open in Chords ' + App.icon('right', 14) + '</button>' +
+          '<button type="button" class="btn primary" id="th-practice">Practice this scale ' + App.icon('right', 14) + '</button>' +
         '</div>' +
       '</div>' +
       '<div class="card">' +
