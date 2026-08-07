@@ -53,6 +53,7 @@
           '<label class="field">Input<select id="set-midi-in"></select></label>' +
           '<label class="field">LED output<select id="set-midi-out"></select></label>' +
           '<button type="button" class="btn sm" id="set-midi-test" title="Briefly lights a C major arpeggio on the device">Light test</button>' +
+          '<button type="button" class="btn sm" id="set-midi-bt" style="display:none" title="Open the system Bluetooth MIDI pairing sheet">Pair Bluetooth&hellip;</button>' +
         '</div>' +
         '<div class="fb-field" style="margin-top:14px">Pitch-bend range' +
           '<div class="seg" id="set-midi-bend">' +
@@ -162,7 +163,10 @@
       }
       fill(midiIn, App.midi.inputs, App.midi.inputId);
       fill(midiOut, App.midi.outputs, App.midi.outputId);
-      midiMsg.textContent = App.midi.inputs.length ? '' : 'Connected — plug in a keyboard and it will appear here.';
+      document.getElementById('set-midi-bt').style.display = App.midi.native ? '' : 'none';
+      midiMsg.textContent = App.midi.inputs.length ? '' :
+        (App.midi.native ? 'Connected — pair your keyboard with the Bluetooth button.' :
+          'Connected — plug in a keyboard and it will appear here.');
     }
 
     midiEnable.addEventListener('click', function () {
@@ -173,6 +177,9 @@
     App.on('midi:state', paintMidi);
     midiIn.addEventListener('change', function () { App.midi.setInput(this.value); });
     midiOut.addEventListener('change', function () { App.midi.setOutput(this.value); });
+    document.getElementById('set-midi-bt').addEventListener('click', function () {
+      App.midi.bluetooth();
+    });
     document.getElementById('set-midi-test').addEventListener('click', function () {
       if (!App.midi.hasOutput) { midiMsg.textContent = 'No LED output selected.'; return; }
       [60, 64, 67, 72].forEach(function (m, i) {

@@ -1,57 +1,78 @@
-/* GuitarLab MIDI service — Web MIDI in/out for USB/Bluetooth keyboards
+/* GuitarLab MIDI service — MIDI in/out for USB/Bluetooth keyboards
  * (ROLI LUMI, Launchkey, any class-compliant controller).
  *
- * Loaded right after app.js so every module can use it. Exposes App.midi and
- * broadcasts on the App bus:
+ * Two backends behind one App.midi surface:
+ *   - Web MIDI API (Chrome/Edge desktop + Android)
+ *   - the iOS wrapper's CoreMIDI bridge (window.webkit.messageHandlers.midi
+ *     + window.__glMIDI callbacks) — Bluetooth MIDI on iPad included, with a
+ *     native pairing sheet via App.midi.bluetooth()
+ *
+ * Loaded right after app.js so every module can use it. Broadcasts on the bus:
  *   'midi:state'    {supported, ready, inputName, outputName}
  *   'midi:note'     {on, midi, vel, chan}      note on/off (vel 0-127)
  *   'midi:bend'     {chan, semis}              pitch bend in semitones
  *   'midi:pressure' {chan, val}                channel pressure 0-127
  *
- * Input niceties: MPE-style per-note expression works out of the box because
- * bend/pressure are reported per channel and consumers apply them to the
- * notes held on that channel (ROLI sends each key on its own channel).
+ * MPE-style per-note expression works out of the box because bend/pressure
+ * are reported per channel and consumers apply them to the notes held on
+ * that channel (ROLI sends each key on its own channel).
  *
- * Output: light(midi, vel) / dark(midi) send note messages to the chosen
- * output — most LED keyboards (LUMI included) light incoming notes, with
- * velocity driving brightness/color intensity. lumiSync() additionally
- * pushes the app's current root + scale to a ROLI LUMI over SysEx (community
- * -documented protocol, EXPERIMENTAL — harmless no-op on other devices),
- * so the keyboard's own key lights follow the app's key.
+ * Output: light(midi, vel) / dark(midi) send note messages — most LED
+ * keyboards (LUMI included) light incoming notes, velocity as brightness.
+ * lumiSync() additionally pushes the app's root + scale to a ROLI LUMI over
+ * SysEx (community-documented protocol, EXPERIMENTAL — a harmless no-op on
+ * other devices).
  *
- * Everything is opt-in from Settings (browser permission prompt happens on
- * Enable). Web MIDI needs Chrome/Edge (desktop or Android); it does not
- * exist in iOS Safari or the APK's WebView — the UI says so instead of
- * breaking.
+ * Everything is opt-in from Settings. Where neither backend exists (iOS
+ * Safari PWA, the Android APK's WebView), the UI says so instead of breaking.
  */
 (function () {
   'use strict';
 
-  var access = null;
+  var native = !!(window.webkit && window.webkit.messageHandlers &&
+                  window.webkit.messageHandlers.midi);
+
+  var access = null;                    // Web MIDI backend
   var input = null, output = null;
-  var held = {};            // midi -> vel (currently held notes, any channel)
+  var nativeReady = false;              // CoreMIDI bridge backend
+  var nativePorts = { inputs: [], outputs: [] };
+  var nativeInId = null, nativeOutId = null;
+  var held = {};                        // midi -> vel (currently held notes)
   var bendRange = App.store.get('midi.bendRange', 2);
   if ([2, 12, 48].indexOf(bendRange) === -1) bendRange = 2;
 
-  function supported() { return typeof navigator !== 'undefined' && !!navigator.requestMIDIAccess; }
+  function post(msg) {
+    try { window.webkit.messageHandlers.midi.postMessage(msg); } catch (e) { /* bridge gone */ }
+  }
+
+  function supported() { return native || (typeof navigator !== 'undefined' && !!navigator.requestMIDIAccess); }
+  function ready() { return native ? nativeReady : !!access; }
+
+  function portName(list, id) {
+    for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i].name;
+    return null;
+  }
 
   function announce() {
     App.emit('midi:state', {
       supported: supported(),
-      ready: !!access,
-      inputName: input ? (input.name || 'input') : null,
-      outputName: output ? (output.name || 'output') : null
+      ready: ready(),
+      inputName: native ? portName(nativePorts.inputs, nativeInId)
+                        : (input ? (input.name || 'input') : null),
+      outputName: native ? portName(nativePorts.outputs, nativeOutId)
+                         : (output ? (output.name || 'output') : null)
     });
   }
 
   function listPorts(map) {
+    if (native) return nativePorts[map].slice();
     var out = [];
     if (access) access[map].forEach(function (p) { out.push({ id: p.id, name: p.name || p.id }); });
     return out;
   }
 
-  function onMsg(e) {
-    var d = e.data;
+  // one complete channel message -> app events
+  function dispatch(d) {
     if (!d || d.length < 2) return;
     var st = d[0] & 0xf0, chan = d[0] & 0x0f;
     if (st === 0x90 && d[2] > 0) {
@@ -65,20 +86,45 @@
       App.emit('midi:bend', { chan: chan, semis: (raw / 8192) * bendRange });
     } else if (st === 0xd0) {
       App.emit('midi:pressure', { chan: chan, val: d[1] });
-    } else if (st === 0xa0) { // poly aftertouch -> treat as pressure for that channel
+    } else if (st === 0xa0) { // poly aftertouch -> pressure for that channel
       App.emit('midi:pressure', { chan: chan, val: d[2] });
     }
   }
 
-  function pickInput(id) {
+  function onMsg(e) { dispatch(e.data); }
+
+  // CoreMIDI packets can pack several messages (and use running status) in
+  // one byte string — split into complete messages before dispatching
+  var MSG_LEN = { 0x80: 3, 0x90: 3, 0xa0: 3, 0xb0: 3, 0xc0: 2, 0xd0: 2, 0xe0: 3 };
+
+  function splitAndDispatch(bytes) {
+    var i = 0, lastStatus = 0;
+    while (i < bytes.length) {
+      var b = bytes[i];
+      if (b === 0xf0) {              // sysex: skip to F7 (we don't consume it)
+        while (i < bytes.length && bytes[i] !== 0xf7) i++;
+        i++;
+        continue;
+      }
+      if (b >= 0xf8) { i++; continue; }        // realtime
+      var status = b >= 0x80 ? b : lastStatus; // running status
+      if (b >= 0x80) i++;
+      var len = MSG_LEN[status & 0xf0];
+      if (!status || !len) { i++; continue; }
+      lastStatus = status;
+      var msg = [status];
+      for (var k = 1; k < len && i < bytes.length; k++, i++) msg.push(bytes[i]);
+      if (msg.length === len) dispatch(msg);
+    }
+  }
+
+  // ---- Web MIDI backend ----
+
+  function pickWebInput(id) {
     if (input) { try { input.onmidimessage = null; } catch (e) {} }
     input = null;
-    if (access && id) {
-      access.inputs.forEach(function (p) { if (p.id === id) input = p; });
-    }
-    if (!input && access) { // first available
-      access.inputs.forEach(function (p) { if (!input) input = p; });
-    }
+    if (access && id) access.inputs.forEach(function (p) { if (p.id === id) input = p; });
+    if (!input && access) access.inputs.forEach(function (p) { if (!input) input = p; });
     if (input) {
       input.onmidimessage = onMsg;
       App.store.set('midi.inputId', input.id);
@@ -86,19 +132,45 @@
     announce();
   }
 
-  function pickOutput(id) {
+  function pickWebOutput(id) {
     output = null;
-    if (access && id) {
-      access.outputs.forEach(function (p) { if (p.id === id) output = p; });
-    }
-    if (!output && access) {
-      access.outputs.forEach(function (p) { if (!output) output = p; });
-    }
+    if (access && id) access.outputs.forEach(function (p) { if (p.id === id) output = p; });
+    if (!output && access) access.outputs.forEach(function (p) { if (!output) output = p; });
     if (output) App.store.set('midi.outputId', output.id);
     announce();
   }
 
+  // ---- native (CoreMIDI bridge) backend ----
+
+  window.__glMIDI = {
+    onports: function (p) {
+      if (!p) return;
+      nativePorts.inputs = (p.inputs || []).map(function (x) { return { id: x.id, name: x.name }; });
+      nativePorts.outputs = (p.outputs || []).map(function (x) { return { id: x.id, name: x.name }; });
+      // restore / default picks
+      var storedIn = App.store.get('midi.inputId', null);
+      nativeInId = portName(nativePorts.inputs, storedIn) !== null ? storedIn
+        : (nativePorts.inputs.length ? nativePorts.inputs[0].id : null);
+      var storedOut = App.store.get('midi.outputId', null);
+      nativeOutId = portName(nativePorts.outputs, storedOut) !== null ? storedOut
+        : (nativePorts.outputs.length ? nativePorts.outputs[0].id : null);
+      if (nativeOutId !== null) post({ cmd: 'setOutput', id: nativeOutId });
+      announce();
+    },
+    onmidi: function (srcId, bytes) {
+      if (!nativeReady || !bytes) return;
+      if (nativeInId !== null && srcId !== 0 && srcId !== nativeInId) return;
+      splitAndDispatch(bytes);
+    }
+  };
+
   function enable() {
+    if (native) {
+      nativeReady = true;
+      post({ cmd: 'init' });
+      announce();
+      return Promise.resolve();
+    }
     if (!supported()) { announce(); return Promise.reject(new Error('no Web MIDI')); }
     if (access) { announce(); return Promise.resolve(access); }
     // sysex first (LUMI sync needs it); plain fallback if the user declines
@@ -107,13 +179,46 @@
     }).then(function (a) {
       access = a;
       a.onstatechange = function () {
-        pickInput(App.store.get('midi.inputId', null));
-        pickOutput(App.store.get('midi.outputId', null));
+        pickWebInput(App.store.get('midi.inputId', null));
+        pickWebOutput(App.store.get('midi.outputId', null));
       };
-      pickInput(App.store.get('midi.inputId', null));
-      pickOutput(App.store.get('midi.outputId', null));
+      pickWebInput(App.store.get('midi.inputId', null));
+      pickWebOutput(App.store.get('midi.outputId', null));
       return a;
     });
+  }
+
+  function setInput(id) {
+    if (native) {
+      nativeInId = typeof id === 'string' ? parseInt(id, 10) : id;
+      if (isNaN(nativeInId)) nativeInId = null;
+      App.store.set('midi.inputId', nativeInId);
+      announce();
+      return;
+    }
+    pickWebInput(id);
+  }
+
+  function setOutput(id) {
+    if (native) {
+      nativeOutId = typeof id === 'string' ? parseInt(id, 10) : id;
+      if (isNaN(nativeOutId)) nativeOutId = null;
+      App.store.set('midi.outputId', nativeOutId);
+      if (nativeOutId !== null) post({ cmd: 'setOutput', id: nativeOutId });
+      announce();
+      return;
+    }
+    pickWebOutput(id);
+  }
+
+  function hasOutput() {
+    return native ? nativeOutId !== null : !!output;
+  }
+
+  function sendBytes(bytes) {
+    if (native) { post({ cmd: 'send', data: bytes }); return; }
+    if (!output) return;
+    try { output.send(bytes); } catch (e) { /* port gone */ }
   }
 
   // ---- LED output (generic: devices light incoming notes) ----
@@ -121,21 +226,17 @@
   var lit = {};
 
   function light(midi, vel) {
-    if (!output) return;
+    if (!hasOutput()) return;
     midi = Math.max(0, Math.min(127, Math.round(midi)));
-    try {
-      output.send([0x90, midi, Math.max(1, Math.min(127, Math.round(vel == null ? 100 : vel)))]);
-      lit[midi] = true;
-    } catch (e) { /* port gone */ }
+    sendBytes([0x90, midi, Math.max(1, Math.min(127, Math.round(vel == null ? 100 : vel)))]);
+    lit[midi] = true;
   }
 
   function dark(midi) {
-    if (!output) return;
+    if (!hasOutput()) return;
     midi = Math.max(0, Math.min(127, Math.round(midi)));
-    try {
-      output.send([0x80, midi, 0]);
-      delete lit[midi];
-    } catch (e) { /* port gone */ }
+    sendBytes([0x80, midi, 0]);
+    delete lit[midi];
   }
 
   function allDark() {
@@ -158,10 +259,9 @@
   }
 
   function lumiCmd(cmd) {
-    if (!output) return;
+    if (!hasOutput()) return;
     while (cmd.length < 8) cmd.push(0);
-    var msg = [0xf0, 0x00, 0x21, 0x10, 0x77, 0x00].concat(cmd, [lumiChecksum(cmd), 0xf7]);
-    try { output.send(msg); } catch (e) { /* sysex not granted / port gone */ }
+    sendBytes([0xf0, 0x00, 0x21, 0x10, 0x77, 0x00].concat(cmd, [lumiChecksum(cmd), 0xf7]));
   }
 
   function lumiSync() {
@@ -181,12 +281,13 @@
 
   App.midi = {
     get supported() { return supported(); },
-    get ready() { return !!access; },
+    get native() { return native; },
+    get ready() { return ready(); },
     get inputs() { return listPorts('inputs'); },
     get outputs() { return listPorts('outputs'); },
-    get inputId() { return input ? input.id : null; },
-    get outputId() { return output ? output.id : null; },
-    get hasOutput() { return !!output; },
+    get inputId() { return native ? nativeInId : (input ? input.id : null); },
+    get outputId() { return native ? nativeOutId : (output ? output.id : null); },
+    get hasOutput() { return hasOutput(); },
     get held() { return Object.keys(held).map(Number); },
     get bendRange() { return bendRange; },
     setBendRange: function (r) {
@@ -194,8 +295,9 @@
       App.store.set('midi.bendRange', bendRange);
     },
     enable: enable,
-    setInput: pickInput,
-    setOutput: pickOutput,
+    setInput: setInput,
+    setOutput: setOutput,
+    bluetooth: function () { if (native) post({ cmd: 'bluetooth' }); },
     light: light,
     dark: dark,
     allDark: allDark,
