@@ -1,5 +1,5 @@
 {
-  "version": "0.32.2",
+  "version": "0.33.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "The piano now matches the fretboard's mode focus: with a 7-note scale, one octave starting on the mode's tonic glows at full color while the rest of the keyboard sits at half opacity - and the Play button runs exactly that octave, tonic to tonic. The view auto-centers on the highlighted octave too."
+  "notes": "The piano grows up: rotate the keyboard between a landscape strip and a portrait column that scales to your screen, and practice on it with the fretboard's full engine - scale/group/interval patterns, direction, shared tempo, notes-per-beat, loop pauses (start / top-of-scale / both), note and click toggles, and a runner that lights each key as it sounds. Exercises run the highlighted mode octave, tonic to tonic."
 }
