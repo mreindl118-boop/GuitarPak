@@ -98,6 +98,70 @@
     });
   }
 
+  // held MIDI-keyboard voices: key = chan + '-' + midi. Kept open until
+  // note-off so hold length is the player's (long/short presses), and so
+  // per-channel bend (ROLI key wiggle) and pressure shape the live note.
+  var heldVoices = {};
+
+  function noteOn(midi, vel, chan) {
+    var ctx;
+    try { ctx = App.getAudio(); } catch (e) { return; }
+    decodeAll(ctx);
+    var gain = 0.12 + Math.pow((vel || 100) / 127, 1.4) * 0.62; // hard/soft
+    var best = null, bd = 99;
+    for (var m in buf) {
+      var d = Math.abs(midi - m);
+      if (d < bd) { bd = d; best = Number(m); }
+    }
+    if (best === null) { App.pluckSynth(midi, 0, 1.2, gain * 0.8); return; }
+    var t = ctx.currentTime;
+    var src = ctx.createBufferSource();
+    src.buffer = buf[best];
+    var base = Math.pow(2, (midi - best) / 12);
+    src.playbackRate.value = base;
+    var g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(gain, t + 0.004);
+    src.connect(g);
+    g.connect(ctx.destination);
+    src.start(t);
+    var key = chan + '-' + midi;
+    if (heldVoices[key]) noteOff(midi, chan); // retrigger
+    heldVoices[key] = { src: src, g: g, base: base, gain: gain, chan: chan };
+  }
+
+  function noteOff(midi, chan) {
+    var key = chan + '-' + midi;
+    var v = heldVoices[key];
+    if (!v) return;
+    delete heldVoices[key];
+    try {
+      var t = App.getAudio().currentTime;
+      v.g.gain.cancelScheduledValues(t);
+      v.g.gain.setValueAtTime(Math.max(0.0001, v.g.gain.value), t);
+      v.g.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+      v.src.stop(t + 0.35);
+    } catch (e) { /* context gone */ }
+  }
+
+  function bendChan(chan, semis) {
+    for (var k in heldVoices) {
+      var v = heldVoices[k];
+      if (v.chan === chan) v.src.playbackRate.value = v.base * Math.pow(2, semis / 12);
+    }
+  }
+
+  function pressChan(chan, val) {
+    var ctx;
+    try { ctx = App.getAudio(); } catch (e) { return; }
+    for (var k in heldVoices) {
+      var v = heldVoices[k];
+      if (v.chan === chan) {
+        v.g.gain.setTargetAtTime(v.gain * (0.35 + (val / 127) * 1.0), ctx.currentTime, 0.05);
+      }
+    }
+  }
+
   function play(midi, when, dur, gain) {
     var ctx;
     try { ctx = App.getAudio(); } catch (e) { return; }
@@ -246,8 +310,27 @@
     running: false, idx: 0, seq: null, path: [],
     pattern: 'scale', dir: 'up', bpm: 120, rate: 1, sound: true, click: true,
     pause: 0, pausePos: 'end', pausedAtIdx: -1, turn: -1,
+    guide: false, guiding: false, target: -1,  // Guide: advance on the played note
     timer: null, raf: 0, nextT: 0, vis: [], ctx: null
   };
+
+  // LED guidance on a connected MIDI keyboard: the sounding note bright, the
+  // upcoming note dim — "play this, this is next". Cleared on stop.
+  var led = { cur: -1, next: -1 };
+
+  function ledGuide(cur, next) {
+    if (!App.midi || !App.midi.hasOutput) return;
+    if (led.cur !== -1 && led.cur !== cur && led.cur !== next) App.midi.dark(led.cur);
+    if (led.next !== -1 && led.next !== next && led.next !== cur) App.midi.dark(led.next);
+    if (cur !== -1) App.midi.light(cur, 120);
+    if (next !== -1 && next !== cur) App.midi.light(next, 25);
+    led.cur = cur; led.next = next;
+  }
+
+  function ledClear() {
+    if (App.midi && App.midi.hasOutput) App.midi.allDark();
+    led.cur = led.next = -1;
+  }
 
   function ppSeq(path, pattern, dir) {
     var seq = Theory.exerciseSeq(path, pattern, dir);
@@ -319,7 +402,8 @@
         o.start(pp.nextT);
         o.stop(pp.nextT + 0.05);
       }
-      pp.vis.push({ t: pp.nextT, midi: node.midi, step: pp.idx });
+      var nxt = pp.path[pp.seq[(pp.idx + 1) % pp.seq.length]];
+      pp.vis.push({ t: pp.nextT, midi: node.midi, next: nxt ? nxt.midi : -1, step: pp.idx });
       if (pp.vis.length > 64) pp.vis.shift();
       pp.idx++;
       pp.nextT += spn;
@@ -357,6 +441,7 @@
       var spn = 60 / pp.bpm / pp.rate;
       pressKey(hit.midi, Math.max(120, spn * 700));
       ppRing(hit.midi);
+      ledGuide(hit.midi, hit.next);
       ppStatus((hit.step % pp.seq.length) + 1 + ' / ' + pp.seq.length);
     }
     pp.raf = requestAnimationFrame(ppDraw);
@@ -368,7 +453,51 @@
     }
   }
 
+  // ---- Guide mode: the app shows the note (screen ring + bright LED, next
+  // note dim) and WAITS — you advance by playing the right key on the MIDI
+  // keyboard or tapping it on screen. Wrong notes flash the status. ----
+
+  function guideTarget() {
+    var node = pp.path[pp.seq[pp.idx % pp.seq.length]];
+    var nxt = pp.path[pp.seq[(pp.idx + 1) % pp.seq.length]];
+    pp.target = node.midi;
+    ppRing(node.midi);
+    ledGuide(node.midi, nxt ? nxt.midi : -1);
+    var pf = preferFlat();
+    ppStatus('play ' + Theory.midiName(node.midi, pf) + ' · ' +
+      ((pp.idx % pp.seq.length) + 1) + ' / ' + pp.seq.length);
+  }
+
+  function guideStart() {
+    pp.path = practicePath();
+    if (!pp.path.length) { ppStatus('no notes'); return; }
+    pp.seq = ppSeq(pp.path, pp.pattern, pp.dir);
+    pp.guiding = true;
+    App.wake.acquire('pn-run');
+    ppPlayBtn(true);
+    guideTarget();
+  }
+
+  function guideCheck(midi) {
+    if (!pp.guiding) return;
+    if (midi === pp.target) {
+      pressKey(midi, 160);
+      pp.idx++;
+      guideTarget();
+    } else if (Theory.mod12(midi) !== Theory.mod12(pp.target)) {
+      ppStatus('not that one — play ' + Theory.midiName(pp.target, preferFlat()));
+    }
+  }
+
+  function guideStop() {
+    if (!pp.guiding) return;
+    pp.guiding = false;
+    App.wake.release('pn-run');
+    ppPlayBtn(false);
+  }
+
   function ppStart() {
+    if (pp.guide) { guideStart(); return; }
     pp.path = practicePath();
     if (!pp.path.length) { ppStatus('no notes'); return; }
     pp.seq = ppSeq(pp.path, pp.pattern, pp.dir);
@@ -391,12 +520,14 @@
   }
 
   function ppPause() {
-    if (!pp.running) return;
+    guideStop();
+    if (!pp.running) { ledClear(); return; }
     if (pp.timer) { clearInterval(pp.timer); pp.timer = null; }
     if (pp.raf) { cancelAnimationFrame(pp.raf); pp.raf = 0; }
     pp.running = false;
     pp.vis.length = 0;
     App.wake.release('pn-run');
+    ledClear();
     ppPlayBtn(false);
   }
 
@@ -409,12 +540,13 @@
     ppStatus('');
   }
 
-  function ppToggle() { if (pp.running) ppPause(); else ppStart(); }
+  function ppToggle() { if (pp.running || pp.guiding) ppPause(); else ppStart(); }
 
   function ppRebuild() {
     pp.idx = 0;
     pp.pausedAtIdx = -1;
     if (pp.running) { pp.path = practicePath(); pp.seq = ppSeq(pp.path, pp.pattern, pp.dir); }
+    if (pp.guiding) { pp.path = practicePath(); pp.seq = ppSeq(pp.path, pp.pattern, pp.dir); guideTarget(); }
   }
 
   // ---------------- jam follow (chord-over-keys, like the fretboard rings) ----------------
@@ -518,6 +650,8 @@
           '</select>' +
           '<label class="row tight small muted" style="gap:5px"><input type="checkbox" id="pn-sound">Notes</label>' +
           '<label class="row tight small muted" style="gap:5px"><input type="checkbox" id="pn-click">Click</label>' +
+          '<button type="button" class="chip fb-chip" id="pn-guide" ' +
+            'title="Guide mode: the app lights the note to play (on screen and on a connected MIDI keyboard&#39;s LEDs) and waits for you to play it — advance at your own pace">Guide</button>' +
           '<span class="muted small" id="pn-status"></span>' +
         '</div>' +
         '<div class="pn-stage" id="pn-stage"></div>' +
@@ -670,6 +804,16 @@
     els.playBtn.addEventListener('click', ppToggle);
     document.getElementById('pn-reset').addEventListener('click', ppStop);
 
+    pp.guide = !!App.store.get('pn.pr.guide', false);
+    var guideChip = document.getElementById('pn-guide');
+    guideChip.classList.toggle('active', pp.guide);
+    guideChip.addEventListener('click', function () {
+      pp.guide = !pp.guide;
+      App.store.set('pn.pr.guide', pp.guide);
+      this.classList.toggle('active', pp.guide);
+      ppStop(); // mode switch restarts cleanly
+    });
+
     // pointerdown (not click) so keys feel instant, like the tap pads
     els.stage.addEventListener('pointerdown', function (e) {
       var k = e.target.closest ? e.target.closest('.pn-key') : null;
@@ -678,7 +822,22 @@
       if (isNaN(midi)) return;
       play(midi, 0, 1.6, 0.55);
       pressKey(midi);
+      guideCheck(midi);
     });
+
+    // ---- MIDI keyboard: expressive input + guide answers, on every tab ----
+    App.on('midi:note', function (d) {
+      if (!d) return;
+      if (d.on) {
+        noteOn(d.midi, d.vel, d.chan);
+        pressKey(d.midi, 200);
+        guideCheck(d.midi);
+      } else {
+        noteOff(d.midi, d.chan);
+      }
+    });
+    App.on('midi:bend', function (d) { if (d) bendChan(d.chan, d.semis); });
+    App.on('midi:pressure', function (d) { if (d) pressChan(d.chan, d.val); });
 
     // shared context: follow key/scale/mode changes from the bar, theory page…
     App.on('fb:set', function () { render(); ppRebuild(); });
@@ -709,4 +868,7 @@
     onShow: onShow,
     onHide: onHide
   });
+
+  // the sampled piano voice, shared with other modules (chords' piano voicings)
+  App.pianoPlay = play;
 })();
