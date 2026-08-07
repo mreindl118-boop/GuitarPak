@@ -33,7 +33,18 @@
 
   function curRoot() { var v = App.store.get('fb.root', 9); return (typeof v === 'number' && v >= 0 && v < 12) ? Math.floor(v) : 9; }
   function curScale() { var v = App.store.get('fb.scale', 'minorPent'); return Theory.SCALES[v] ? v : 'minorPent'; }
+  function curMode() { var v = App.store.get('fb.mode', 1); return (typeof v === 'number' && v >= 1 && v <= 7) ? Math.floor(v) : 1; }
   function preferFlat() { return Theory.FLAT_KEYS.has(curRoot()); }
+
+  // the piano's twin of the fretboard's mode box: for 7-note scales, one
+  // octave starting on the modal tonic (placed in the octave above C3, where
+  // the scale player lives). Keys inside it draw at full color, in-scale keys
+  // outside fade to half — same rule as the fretboard.
+  function modeWindow(info) {
+    if (!info || info.steps.length !== 7) return null;
+    var m0 = 48 + Theory.mod12(curRoot() + info.steps[curMode() - 1]);
+    return [m0, m0 + 12];
+  }
 
   // ---------------- sampled piano voice ----------------
   // FluidR3 piano anchors (samples/CREDITS.md), nearest-anchor pitch shift —
@@ -114,6 +125,7 @@
     var pf = preferFlat();
     var info = Theory.scaleInfo(root, scaleId, pf);
     var cols = degColors();
+    var mwin = modeWindow(info);
 
     els.title.textContent = Theory.pcName(root, pf) + ' ' + Theory.SCALES[scaleId].name;
 
@@ -144,11 +156,14 @@
       }
       if (inScale) {
         var col = cols[step % 7];
+        // mode dimming hits the dot + label only — jam rings stay full so a
+        // sounding chord reads clearly across the whole keyboard
+        var dim = mwin && (midi < mwin[0] || midi > mwin[1]) ? ' opacity="0.5"' : '';
         dots += '<g class="pn-dotg" data-midi="' + midi + '" data-pc="' + pc + '">' +
           '<circle class="pn-jamring" data-pc="' + pc + '" cx="' + cx + '" cy="' + cy + '" r="15.5" fill="none"/>' +
           '<circle cx="' + cx + '" cy="' + cy + '" r="11.5" fill="' + col + '"' +
-          (isRoot ? ' stroke="#ffffff" stroke-width="2"' : '') + '/>' +
-          '<text class="pn-dott" x="' + cx + '" y="' + (cy + 3.5) + '" text-anchor="middle">' +
+          (isRoot ? ' stroke="#ffffff" stroke-width="2"' : '') + dim + '/>' +
+          '<text class="pn-dott" x="' + cx + '" y="' + (cy + 3.5) + '" text-anchor="middle"' + dim + '>' +
           keyLabel(midi, info, pf) + '</text></g>';
       }
     }
@@ -170,9 +185,12 @@
   }
 
   function scrollToRoot() {
-    // land the view on the octave around middle C where the scale player lives
-    var rootMidi = 48 + Theory.mod12(curRoot());
-    var x = whiteIndex(rootMidi) * W;
+    // land the view on the highlighted octave (modal window for 7-note
+    // scales, root octave otherwise)
+    var info = Theory.scaleInfo(curRoot(), curScale(), preferFlat());
+    var mwin = modeWindow(info);
+    var lo = mwin ? mwin[0] : 48 + Theory.mod12(curRoot());
+    var x = whiteIndex(lo) * W;
     els.stage.scrollLeft = Math.max(0, x - els.stage.clientWidth / 4);
   }
 
@@ -201,9 +219,18 @@
   function psPlay() {
     if (ps.playing) { psStop(); return; }
     var info = Theory.scaleInfo(curRoot(), curScale(), preferFlat());
-    var rootMidi = 48 + Theory.mod12(curRoot());
-    var up = info.steps.map(function (s) { return rootMidi + s; });
-    up.push(rootMidi + 12);
+    var mwin = modeWindow(info);
+    var up = [];
+    if (mwin) {
+      // play the highlighted octave: the mode, tonic to tonic
+      for (var m = mwin[0]; m <= mwin[1]; m++) {
+        if (info.pcSet.has(Theory.mod12(m))) up.push(m);
+      }
+    } else {
+      var rootMidi = 48 + Theory.mod12(curRoot());
+      up = info.steps.map(function (s) { return rootMidi + s; });
+      up.push(rootMidi + 12);
+    }
     var seq = up.concat(up.slice(0, up.length - 1).reverse());
     var bpm = Math.max(30, Math.min(280, parseInt(App.store.get('met.bpm', 120), 10) || 120));
     var spb = 60 / bpm;
