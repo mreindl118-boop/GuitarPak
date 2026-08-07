@@ -1,5 +1,5 @@
 {
-  "version": "0.25.0",
+  "version": "0.26.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "High-neck notes above the 12th fret now ring with the same real guitar sound as everything else (new high sample notes; no more synth fallback). Dropdowns are restyled as proper app buttons with a clear arrow zone. And the whole app wears a new iconic display face - Bebas Neue - across the brand, tabs, headings and big numerals."
+  "notes": "The guitar is finally a guitar: all three guitar voices now use real recorded instrument notes (tonejs-instruments' community-recorded samples) instead of soundfont renders - warm attack, long natural ring, no harpsichord anywhere on the neck. Levels rebalanced, memory kept lean. Plus 0.25's full-neck coverage, button-style dropdowns and the Bebas Neue text overhaul."
 }

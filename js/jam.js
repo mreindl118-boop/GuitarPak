@@ -102,10 +102,12 @@
     bassp:   { dir: 'samples/bassp/',   notes: { 28: 'E1', 33: 'A1', 38: 'D2', 43: 'G2', 48: 'C3' } },
     keys:    { dir: 'samples/keys/',    notes: { 48: 'C3', 52: 'E3', 57: 'A3', 60: 'C4', 64: 'E4', 69: 'A4', 72: 'C5' } },
     pad:     { dir: 'samples/pad/',     notes: { 48: 'C3', 59: 'B3', 64: 'E4', 67: 'G4', 72: 'C5' } },
-    guitar:  { dir: 'samples/guitar/',  notes: { 40: 'E2', 45: 'A2', 48: 'C3', 50: 'D3', 53: 'F3', 55: 'G3',
-                                                 57: 'A3', 59: 'B3', 62: 'D4', 64: 'E4', 67: 'G4', 72: 'C5', 76: 'E5' } },
-    eguitar: { dir: 'samples/eguitar/', notes: { 40: 'E2', 45: 'A2', 50: 'D3', 55: 'G3', 59: 'B3', 64: 'E4', 67: 'G4', 72: 'C5' } },
-    nylon:   { dir: 'samples/nylon/',   notes: { 40: 'E2', 45: 'A2', 50: 'D3', 55: 'G3', 59: 'B3', 64: 'E4', 67: 'G4', 72: 'C5' } }
+    guitar:  { dir: 'samples/guitar/',  notes: { 40: 'E2', 45: 'A2', 48: 'C3', 52: 'E3', 55: 'G3', 59: 'B3',
+                                                 64: 'E4', 67: 'G4', 69: 'A4', 72: 'C5', 74: 'D5' } },
+    eguitar: { dir: 'samples/eguitar/', notes: { 40: 'E2', 45: 'A2', 48: 'C3', 57: 'A3', 66: 'Fs4', 69: 'A4',
+                                                 72: 'C5', 78: 'Fs5', 81: 'A5' } },
+    nylon:   { dir: 'samples/nylon/',   notes: { 40: 'E2', 45: 'A2', 50: 'D3', 55: 'G3', 59: 'B3', 64: 'E4',
+                                                 69: 'A4', 74: 'D5', 76: 'E5', 81: 'A5' } }
   };
 
   var GUITAR_COMPS = { guitar: 1, eguitar: 1, nylon: 1 };
@@ -133,7 +135,7 @@
         xhr.onload = function () {
           if ((xhr.status !== 200 && xhr.status !== 0) || !xhr.response) return;
           ctx.decodeAudioData(xhr.response, function (buf) {
-            sampleBuf[setId + '/' + m] = buf;
+            sampleBuf[setId + '/' + m] = jamCondense(buf, 2.8);
             samplesLoaded++;
             sampleInfo();
           }, function () { /* undecodable — synth fallback */ });
@@ -142,6 +144,21 @@
         try { xhr.send(); } catch (e) { /* file access blocked — synth fallback */ }
       });
     });
+  }
+
+  // mono + capped length with a fade: the recorded guitars ring 10+ s but no
+  // jam hit sustains past ~2.5 s — keeps decoded-PCM memory small
+  function jamCondense(buf, secs) {
+    var sr = buf.sampleRate;
+    var n = Math.min(buf.length, Math.floor(secs * sr));
+    var out = ctx.createBuffer(1, n, sr);
+    var dst = out.getChannelData(0);
+    var a = buf.getChannelData(0);
+    var b = buf.numberOfChannels > 1 ? buf.getChannelData(1) : null;
+    for (var i = 0; i < n; i++) dst[i] = b ? (a[i] + b[i]) * 0.5 : a[i];
+    var fade = Math.min(n, Math.floor(0.2 * sr));
+    for (i = 0; i < fade; i++) dst[n - 1 - i] *= i / fade;
+    return out;
   }
 
   function sampleInfo() {
@@ -168,7 +185,7 @@
   // per-set loudness trim: the MusyngKite guitar renders sit well below the
   // FluidR3 keys/pad levels, and its fingered bass sits well above (measured
   // RMS ratios at the switch)
-  var SET_TRIM = { guitar: 2.0, eguitar: 3.5, nylon: 2.3, bass: 0.35, bassp: 1.0, keys: 1, pad: 1 };
+  var SET_TRIM = { guitar: 0.25, eguitar: 0.48, nylon: 0.18, bass: 0.35, bassp: 1.0, keys: 1, pad: 1 };
 
   function playSample(setId, midi, t, dur, gain, attack, release) {
     var anchor = nearestSample(setId, midi);

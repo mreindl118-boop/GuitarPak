@@ -31,7 +31,7 @@ window.App = (function () {
   // ---- auto-update ----
   // version.json on GitHub is the source of truth. Web builds refresh through
   // the service worker; the APK build (file://) links to the new APK download.
-  var APP_VERSION = '0.25.0';
+  var APP_VERSION = '0.26.0';
   var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
 
   function verNum(v) {
@@ -118,19 +118,20 @@ window.App = (function () {
   // of random detune and level variation so repeated notes don't sound
   // stamped out; the synth voice stays as the automatic fallback and is
   // exposed as App.pluckSynth for callers that want it on purpose.
-  // trim = per-set loudness compensation, RMS-measured against the old
-  // FluidR3 renders when the sets moved to MusyngKite (which records much
-  // quieter for the guitars)
+  // The guitar banks are REAL recorded notes (tonejs-instruments, see
+  // samples/CREDITS.md) — long natural ring at mastered level, unlike the
+  // soundfont renders that read as harpsichord. trim = per-set loudness
+  // compensation, RMS-measured at each source switch.
   var PLUCK_SETS = {
-    steel: { dir: 'samples/guitar/', trim: 2.8, notes: {
-      40: 'E2', 45: 'A2', 48: 'C3', 50: 'D3', 53: 'F3', 55: 'G3', 57: 'A3',
-      59: 'B3', 62: 'D4', 64: 'E4', 67: 'G4', 72: 'C5', 76: 'E5', 81: 'A5', 84: 'C6' } },
-    electric: { dir: 'samples/eguitar/', trim: 4.8, notes: {
-      40: 'E2', 45: 'A2', 50: 'D3', 55: 'G3', 59: 'B3', 64: 'E4', 67: 'G4', 72: 'C5',
-      76: 'E5', 81: 'A5' } },
-    nylon: { dir: 'samples/nylon/', trim: 3.2, notes: {
-      40: 'E2', 45: 'A2', 50: 'D3', 55: 'G3', 59: 'B3', 64: 'E4', 67: 'G4', 72: 'C5',
-      76: 'E5', 81: 'A5' } }
+    steel: { dir: 'samples/guitar/', trim: 0.35, notes: {
+      40: 'E2', 45: 'A2', 48: 'C3', 52: 'E3', 55: 'G3', 59: 'B3',
+      64: 'E4', 67: 'G4', 69: 'A4', 72: 'C5', 74: 'D5' } },
+    electric: { dir: 'samples/eguitar/', trim: 0.67, notes: {
+      40: 'E2', 45: 'A2', 48: 'C3', 57: 'A3', 66: 'Fs4', 69: 'A4',
+      72: 'C5', 78: 'Fs5', 81: 'A5' } },
+    nylon: { dir: 'samples/nylon/', trim: 0.26, notes: {
+      40: 'E2', 45: 'A2', 50: 'D3', 55: 'G3', 59: 'B3', 64: 'E4',
+      69: 'A4', 74: 'D5', 76: 'E5', 81: 'A5' } }
   };
   var pluckRaw = { steel: {}, electric: {}, nylon: {} };  // tone -> midi -> bytes
   var pluckBuf = { steel: {}, electric: {}, nylon: {} };  // tone -> midi -> AudioBuffer
@@ -166,6 +167,22 @@ window.App = (function () {
     });
   }
 
+  // keep only what playback uses: the recordings ring for 10+ seconds, but a
+  // pluck never sustains past ~2 s — a mono 3.2 s window with a fade keeps
+  // ~85% of the decoded-PCM memory out of RAM
+  function condense(buf, secs) {
+    var sr = buf.sampleRate;
+    var n = Math.min(buf.length, Math.floor(secs * sr));
+    var out = audioCtx.createBuffer(1, n, sr);
+    var dst = out.getChannelData(0);
+    var a = buf.getChannelData(0);
+    var b = buf.numberOfChannels > 1 ? buf.getChannelData(1) : null;
+    for (var i = 0; i < n; i++) dst[i] = b ? (a[i] + b[i]) * 0.5 : a[i];
+    var fade = Math.min(n, Math.floor(0.25 * sr));
+    for (i = 0; i < fade; i++) dst[n - 1 - i] *= i / fade;
+    return out;
+  }
+
   function decodeGuitar() {
     if (!audioCtx) return;
     Object.keys(pluckRaw).forEach(function (tone) {
@@ -173,7 +190,7 @@ window.App = (function () {
         var bytes = pluckRaw[tone][m];
         delete pluckRaw[tone][m]; // decodeAudioData detaches the buffer
         audioCtx.decodeAudioData(bytes, function (buf) {
-          pluckBuf[tone][m] = buf;
+          pluckBuf[tone][m] = condense(buf, 3.2);
           pluckReadyN[tone]++;
         }, function () { /* undecodable — synth fallback */ });
       });
