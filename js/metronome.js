@@ -23,7 +23,24 @@
 (function () {
   'use strict';
 
-  var SIGS = ['2/4', '3/4', '4/4', '5/4', '6/8', '7/8', '9/8', '12/8'];
+  var SIGS = ['2/4', '3/4', '4/4', '5/4', '6/8', '7/8', '9/8', '12/8']; // suggestions only — any N/D types in
+
+  // free-form time signature: 1-32 beats over 1/2/4/8/16/32. Returns the
+  // normalized "N/D" string or null. The beat unit stays the denominator note
+  // (x/8 = eighths per minute, x/16 = sixteenths per minute, and so on).
+  function parseSig(v) {
+    var m = /^\s*(\d{1,2})\s*\/\s*(\d{1,2})\s*$/.exec(String(v || ''));
+    if (!m) return null;
+    var n = parseInt(m[1], 10), d = parseInt(m[2], 10);
+    if (n < 1 || n > 32) return null;
+    if ([1, 2, 4, 8, 16, 32].indexOf(d) === -1) return null;
+    return n + '/' + d;
+  }
+
+  // click voices — pick a different one for the bar tone (beat 1), the main
+  // beats and the upbeats/subdivisions; metronome-tab settings, persisted
+  var SOUND_ORDER = ['beep', 'wood', 'tick', 'clave', 'bell'];
+  var SOUND_NAMES = { beep: 'Beep', wood: 'Woodblock', tick: 'Tick', clave: 'Clave', bell: 'Cowbell' };
   var SUBDIVS = [
     { id: 'quarter',   label: 'Quarter (beats only)' },
     { id: 'eighth',    label: 'Eighth' },
@@ -43,6 +60,7 @@
   var sig = '4/4';
   var subdiv = 'quarter';
   var vol = 80;
+  var snd = { acc: 'beep', beat: 'beep', sub: 'beep' }; // met.sndAcc/sndBeat/sndSub
   var trainer = { on: false, inc: 5, bars: 4, target: 160 };
   var levels = []; // per beat dot: 2 = accent, 1 = normal, 0 = muted
 
@@ -107,7 +125,9 @@
     '  <input type="range" id="met-bpm-slider" class="met-wide" min="30" max="280" step="1">',
     '  <div class="row met-mt">',
     '    <label class="field">Time signature',
-    '      <select id="met-sig"></select>',
+    '      <input type="text" id="met-sig" list="met-sig-list" maxlength="5" autocomplete="off"',
+    '             title="Type any signature, e.g. 7/16, 11/8, 13/4 — beats over 1, 2, 4, 8, 16 or 32" style="width:76px">',
+    '      <datalist id="met-sig-list"></datalist>',
     '    </label>',
     '    <div class="met-dots" id="met-dots"></div>',
     '  </div>',
@@ -118,6 +138,11 @@
     '    <label class="field"><span>Volume (<span id="met-vol-val">80</span>%)</span>',
     '      <input type="range" id="met-vol" min="0" max="100" step="1">',
     '    </label>',
+    '  </div>',
+    '  <div class="row met-mt">',
+    '    <label class="field">Bar tone (beat 1)<select id="met-snd-acc"></select></label>',
+    '    <label class="field">Beat tone<select id="met-snd-beat"></select></label>',
+    '    <label class="field">Upbeat tone<select id="met-snd-sub"></select></label>',
     '  </div>',
     '  <div class="row met-mt">',
     '    <button class="btn big primary" id="met-startstop" type="button">Start</button>',
@@ -168,8 +193,10 @@
 
   function load() {
     bpm = clampInt(App.store.get('met.bpm', 120), 30, 280, 120);
-    sig = App.store.get('met.sig', '4/4');
-    if (SIGS.indexOf(sig) === -1) sig = '4/4';
+    sig = parseSig(App.store.get('met.sig', '4/4')) || '4/4';
+    snd.acc = SOUND_ORDER.indexOf(App.store.get('met.sndAcc', 'beep')) !== -1 ? App.store.get('met.sndAcc', 'beep') : 'beep';
+    snd.beat = SOUND_ORDER.indexOf(App.store.get('met.sndBeat', 'beep')) !== -1 ? App.store.get('met.sndBeat', 'beep') : 'beep';
+    snd.sub = SOUND_ORDER.indexOf(App.store.get('met.sndSub', 'beep')) !== -1 ? App.store.get('met.sndSub', 'beep') : 'beep';
     subdiv = App.store.get('met.subdiv', 'quarter');
     if (!SUBN[subdiv]) subdiv = 'quarter';
     vol = clampInt(App.store.get('met.vol', 80), 0, 100, 80);
@@ -228,7 +255,9 @@
   // ---- beat dots ----
 
   function applySig(next) {
-    sig = SIGS.indexOf(next) !== -1 ? next : '4/4';
+    var p = parseSig(next);
+    if (!p) { if (els.sig) els.sig.value = sig; return; } // unparseable — keep what we had
+    sig = p;
     App.store.set('met.sig', sig);
     levels = defaultLevels(); // rebuild with beat 1 accented
     litIndex = -1;
@@ -276,6 +305,72 @@
     osc.stop(t + CLICK_DECAY + 0.02);
   }
 
+  var metNoise = null;
+  function noise() {
+    if (metNoise) return metNoise;
+    var len = Math.floor(ctx.sampleRate * 0.1);
+    metNoise = ctx.createBuffer(1, len, ctx.sampleRate);
+    var d = metNoise.getChannelData(0);
+    for (var i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    return metNoise;
+  }
+
+  // one scheduled hit in the chosen voice. freq carries the role's register
+  // (accent high, sub low) so a voice still differentiates the roles.
+  function voice(t, kind, freq, gain) {
+    if (kind === 'tick') { // tiny high tick — a hi-hat-like whisper
+      var src = ctx.createBufferSource(); src.buffer = noise();
+      var hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 7000;
+      var g = ctx.createGain();
+      g.gain.setValueAtTime(gain, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.02);
+      src.connect(hp); hp.connect(g); g.connect(masterGain);
+      src.start(t); src.stop(t + 0.03);
+      return;
+    }
+    if (kind === 'wood') { // woodblock: pitched knock + noise snap
+      var o = ctx.createOscillator(); o.type = 'triangle';
+      o.frequency.setValueAtTime(freq * 0.9, t);
+      o.frequency.exponentialRampToValueAtTime(freq * 0.55, t + 0.03);
+      var g2 = ctx.createGain();
+      g2.gain.setValueAtTime(gain * 1.2, t);
+      g2.gain.exponentialRampToValueAtTime(0.0001, t + 0.045);
+      o.connect(g2); g2.connect(masterGain); o.start(t); o.stop(t + 0.06);
+      var s2 = ctx.createBufferSource(); s2.buffer = noise();
+      var bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 2400; bp.Q.value = 2;
+      var g3 = ctx.createGain();
+      g3.gain.setValueAtTime(gain * 0.5, t);
+      g3.gain.exponentialRampToValueAtTime(0.0001, t + 0.02);
+      s2.connect(bp); bp.connect(g3); g3.connect(masterGain);
+      s2.start(t); s2.stop(t + 0.03);
+      return;
+    }
+    if (kind === 'clave') { // hard bright knock
+      var o2 = ctx.createOscillator(); o2.type = 'sine';
+      o2.frequency.value = Math.max(1800, freq * 1.6);
+      var g4 = ctx.createGain();
+      g4.gain.setValueAtTime(gain * 1.1, t);
+      g4.gain.exponentialRampToValueAtTime(0.0001, t + 0.035);
+      o2.connect(g4); g4.connect(masterGain); o2.start(t); o2.stop(t + 0.05);
+      return;
+    }
+    if (kind === 'bell') { // cowbell: two detuned squares through a bandpass
+      var g5 = ctx.createGain();
+      g5.gain.setValueAtTime(gain * 0.8, t);
+      g5.gain.exponentialRampToValueAtTime(0.0001, t + 0.11);
+      var bp2 = ctx.createBiquadFilter(); bp2.type = 'bandpass';
+      bp2.frequency.value = Math.max(500, freq * 0.6); bp2.Q.value = 1.2;
+      [1, 1.48].forEach(function (mul) {
+        var ob = ctx.createOscillator(); ob.type = 'square';
+        ob.frequency.value = 540 * mul;
+        ob.connect(bp2); ob.start(t); ob.stop(t + 0.12);
+      });
+      bp2.connect(g5); g5.connect(masterGain);
+      return;
+    }
+    click(t, freq, gain); // 'beep' and anything unknown
+  }
+
   function barDone() {
     barCount++;
     if (trainer.on && barCount % trainer.bars === 0 && bpm < trainer.target) {
@@ -298,13 +393,13 @@
       var n = SUBN[subdiv];
       if (curSub === 0) {
         var lvl = levels[curBeat];
-        if (lvl === 2) click(nextTime, FREQ_ACCENT, GAIN_ACCENT);
-        else if (lvl === 1) click(nextTime, FREQ_NORMAL, GAIN_NORMAL);
+        if (lvl === 2) voice(nextTime, snd.acc, FREQ_ACCENT, GAIN_ACCENT);
+        else if (lvl === 1) voice(nextTime, snd.beat, FREQ_NORMAL, GAIN_NORMAL);
         // muted (0): schedule no sound, but still advance and light the dot
         visQueue.push({ t: nextTime, beat: curBeat });
         if (visQueue.length > 128) visQueue.shift(); // background-tab safety
       } else {
-        click(nextTime, FREQ_SUB, GAIN_SUB);
+        voice(nextTime, snd.sub, FREQ_SUB, GAIN_SUB);
       }
       nextTime += (60 / bpm) / n;
       curSub++;
@@ -456,29 +551,42 @@
     els.volVal = $('met-vol-val');
     els.startStop = $('met-startstop');
     els.err = $('met-err');
+    els.sndAcc = $('met-snd-acc');
+    els.sndBeat = $('met-snd-beat');
+    els.sndSub = $('met-snd-sub');
     els.trOn = $('met-tr-on');
     els.trInc = $('met-tr-inc');
     els.trBars = $('met-tr-bars');
     els.trTarget = $('met-tr-target');
     els.trStatus = $('met-tr-status');
 
-    // populate selects
+    // populate selects (sig is a free-typed input; the datalist just suggests)
     var i, opts = '';
     for (i = 0; i < SIGS.length; i++) {
-      opts += '<option value="' + SIGS[i] + '">' + SIGS[i] + '</option>';
+      opts += '<option value="' + SIGS[i] + '"></option>';
     }
-    els.sig.innerHTML = opts;
+    document.getElementById('met-sig-list').innerHTML = opts;
     opts = '';
     for (i = 0; i < SUBDIVS.length; i++) {
       opts += '<option value="' + SUBDIVS[i].id + '">' + SUBDIVS[i].label + '</option>';
     }
     els.subdiv.innerHTML = opts;
+    opts = '';
+    for (i = 0; i < SOUND_ORDER.length; i++) {
+      opts += '<option value="' + SOUND_ORDER[i] + '">' + SOUND_NAMES[SOUND_ORDER[i]] + '</option>';
+    }
+    els.sndAcc.innerHTML = opts;
+    els.sndBeat.innerHTML = opts;
+    els.sndSub.innerHTML = opts;
 
     // initial values from persisted settings
     els.bpmDisplay.textContent = String(bpm);
     els.slider.value = String(bpm);
     els.sig.value = sig;
     els.subdiv.value = subdiv;
+    els.sndAcc.value = snd.acc;
+    els.sndBeat.value = snd.beat;
+    els.sndSub.value = snd.sub;
     els.vol.value = String(vol);
     els.volVal.textContent = String(vol);
     els.trOn.checked = trainer.on;
@@ -501,11 +609,23 @@
     }
     els.slider.addEventListener('input', function () { setBpm(els.slider.value); });
 
-    // signature + dots
+    // signature + dots — free-typed; applySig validates and normalizes
     els.sig.addEventListener('change', function () {
       applySig(this.value);
+      this.value = sig; // show the normalized (or unchanged) signature
       App.emit('sig', { sig: sig, source: 'met' }); // context bar mirrors it
     });
+
+    // click voices — persisted, used by the scheduler wherever the click runs
+    function wireSnd(sel, key, storeKey) {
+      sel.addEventListener('change', function () {
+        snd[key] = SOUND_ORDER.indexOf(sel.value) !== -1 ? sel.value : 'beep';
+        App.store.set(storeKey, snd[key]);
+      });
+    }
+    wireSnd(els.sndAcc, 'acc', 'met.sndAcc');
+    wireSnd(els.sndBeat, 'beat', 'met.sndBeat');
+    wireSnd(els.sndSub, 'sub', 'met.sndSub');
 
     // the context bar (or anything else) changed the signature
     App.on('sig', function (d) {

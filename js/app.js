@@ -31,7 +31,7 @@ window.App = (function () {
   // ---- auto-update ----
   // version.json on GitHub is the source of truth. Web builds refresh through
   // the service worker; the APK build (file://) links to the new APK download.
-  var APP_VERSION = '0.29.0';
+  var APP_VERSION = '0.30.0';
   var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
 
   function verNum(v) {
@@ -455,13 +455,26 @@ window.App = (function () {
       mode.innerHTML = o;
     }
 
+    // custom typed signatures (metronome tab) get their own option so the bar
+    // can always DISPLAY the real signature, whatever it is
+    function showSig(v) {
+      if (!/^\d{1,2}\/\d{1,2}$/.test(String(v))) v = '4/4';
+      var has = false, i;
+      for (i = 0; i < sig.options.length; i++) if (sig.options[i].value === v) { has = true; break; }
+      if (!has) {
+        var o = document.createElement('option');
+        o.value = o.textContent = v;
+        sig.appendChild(o);
+      }
+      sig.value = v;
+    }
+
     function refreshAll() {
       root.value = String(curRoot());
       scale.value = curScale();
       refreshModeSel();
       bpm.value = String(Math.max(30, Math.min(280, parseInt(store.get('met.bpm', 120), 10) || 120)));
-      var sv = store.get('met.sig', '4/4');
-      sig.value = CX_SIGS.indexOf(sv) !== -1 ? sv : '4/4';
+      showSig(store.get('met.sig', '4/4'));
     }
     refreshAll();
 
@@ -524,7 +537,7 @@ window.App = (function () {
       if (d && d.source !== 'bar') bpm.value = String(Math.max(30, Math.min(280, Math.round(d.bpm))));
     });
     on('sig', function (d) {
-      if (d && d.source !== 'bar' && CX_SIGS.indexOf(d.sig) !== -1) sig.value = d.sig;
+      if (d && d.source !== 'bar') showSig(d.sig);
     });
   }
 

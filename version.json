@@ -1,5 +1,5 @@
 {
-  "version": "0.29.0",
+  "version": "0.30.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "One-string practice is now visibly what it always should have been: a sliding scale up the ENTIRE string - the board lights the whole string, dims the others, and drops the mode box (a new 'Mode box' chip locks it back on if you want position work). And looping practice breathes: add a 1-4 beat rest at the start, end or both sides of each loop, with the click counting you through the gap."
+  "notes": "Metronome grows up: pick separate tones for beat 1, main beats and upbeats (beep, woodblock, tick, clave, cowbell - saved settings), and TYPE any time signature you want - 7/16, 11/8, 13/4, anything up to 32 beats over 1-32. Circle practice gets practical: a Random key mode and a choice of what plays on each key change - tonic chord, I-IV-V-I, or a jazz ii-V-I cadence timed to your tempo."
 }
