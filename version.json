@@ -1,5 +1,5 @@
 {
-  "version": "0.33.0",
+  "version": "0.34.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "The piano grows up: rotate the keyboard between a landscape strip and a portrait column that scales to your screen, and practice on it with the fretboard's full engine - scale/group/interval patterns, direction, shared tempo, notes-per-beat, loop pauses (start / top-of-scale / both), note and click toggles, and a runner that lights each key as it sounds. Exercises run the highlighted mode octave, tonic to tonic."
+  "notes": "New Songs tab: paste any six-line ASCII guitar tab or import a MIDI file - parsed entirely on your device - and practice it with the app's engine: play through with your guitar tone, loop any bar range to drill a section, slow it down with the shared tempo and steps-per-beat, tap any note in the tab to jump there, and one tap applies the song's detected key to the whole app so the fretboard, piano and chords light up in it. Save songs to a local library."
 }
