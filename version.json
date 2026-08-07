@@ -1,5 +1,5 @@
 {
-  "version": "0.34.0",
+  "version": "0.35.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "New Songs tab: paste any six-line ASCII guitar tab or import a MIDI file - parsed entirely on your device - and practice it with the app's engine: play through with your guitar tone, loop any bar range to drill a section, slow it down with the shared tempo and steps-per-beat, tap any note in the tab to jump there, and one tap applies the song's detected key to the whole app so the fretboard, piano and chords light up in it. Save songs to a local library."
+  "notes": "MIDI keyboard support (ROLI and friends): connect in Settings and play the app's piano with velocity, key-wiggle pitch bend and pressure. LED guidance on the device: practice runs light the current note bright and the next note dim, the chord explorer lights the chord's keys, and the new Guide mode waits for YOU to play each lit note before moving on. Plus piano chords in the chord explorer - every chord drawn on a keyboard, tap to hear it, and playing it on your MIDI keyboard confirms the match. Experimental ROLI LUMI key/scale sync included."
 }

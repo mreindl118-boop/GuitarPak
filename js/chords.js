@@ -468,6 +468,105 @@
     renderBoard();
     renderTheory();
     renderInKey();
+    renderPianoChord();
+  }
+
+  // ---------------- piano voicing (chords on the keys) ----------------
+
+  var PN_WHITE = [0, 2, 4, 5, 7, 9, 11];
+  var PN_LO = 60, PN_HI = 84; // C4..C6 — every close root-position voicing fits
+
+  function pianoChordMidis() {
+    var q = Theory.QUALITIES[ex.quality];
+    if (!q) return [];
+    var base = PN_LO + Theory.mod12(ex.rootPc);
+    return q.intervals.map(function (iv) { return base + iv; });
+  }
+
+  function renderPianoChord() {
+    if (!els.pnWrap) return;
+    var midis = pianoChordMidis();
+    var W = 30, H = 110, BW = 19, BH = 66;
+    var kinfo = keyInfo();
+    var pal = degPalette();
+    function wIdx(m) {
+      var n = 0;
+      for (var i = PN_LO; i < m; i++) if (PN_WHITE.indexOf(Theory.mod12(i)) !== -1) n++;
+      return n;
+    }
+    var whites = '', blacks = '', dots = '';
+    for (var m = PN_LO; m <= PN_HI; m++) {
+      var pc = Theory.mod12(m);
+      var isW = PN_WHITE.indexOf(pc) !== -1;
+      var x, cx, cy;
+      if (isW) {
+        x = wIdx(m) * W;
+        whites += '<rect class="ch-pnw" data-chpn="' + m + '" x="' + x + '" y="0" width="' + W + '" height="' + H + '" rx="3"/>';
+        cx = x + W / 2; cy = H - 16;
+      } else {
+        x = wIdx(m) * W - BW / 2;
+        blacks += '<rect class="ch-pnb" data-chpn="' + m + '" x="' + x + '" y="0" width="' + BW + '" height="' + BH + '" rx="2"/>';
+        cx = x + BW / 2; cy = BH - 12;
+      }
+      var ti = midis.indexOf(m);
+      if (ti !== -1) {
+        var iv = Theory.QUALITIES[ex.quality].intervals[ti];
+        var tone = keyTone(kinfo, pal, Theory.mod12(m));
+        dots += '<circle cx="' + cx + '" cy="' + cy + '" r="8.5" fill="' + tone.color + '"' +
+          (iv === 0 ? ' stroke="#ffffff" stroke-width="1.8"' : '') + '/>' +
+          '<text class="ch-pnlbl" x="' + cx + '" y="' + (cy + 3) + '" text-anchor="middle">' +
+          esc(IV_LABELS[Theory.mod12(iv)] || String(iv)) + '</text>';
+      }
+    }
+    var totalW = (wIdx(PN_HI) + 1) * W;
+    els.pnWrap.innerHTML = '<svg viewBox="0 0 ' + totalW + ' ' + H + '" width="' + totalW +
+      '" height="' + H + '" xmlns="http://www.w3.org/2000/svg">' + whites + blacks + dots + '</svg>';
+
+    // with a MIDI keyboard connected: light the chord tones on the device
+    // (only while the Chords page is in front — the piano runner owns the
+    // LEDs elsewhere) and invite a played match
+    if (App.midi && App.midi.ready) {
+      if (App.midi.hasOutput && App.active === 'chords') {
+        App.midi.allDark();
+        midis.forEach(function (mm) { App.midi.light(mm, 90); });
+      }
+      els.pnMatch.style.display = '';
+      els.pnMatch.classList.remove('ch-matched');
+      els.pnMatch.textContent = 'Play it on your keyboard…';
+    } else {
+      els.pnMatch.style.display = 'none';
+    }
+  }
+
+  function pianoStrum() {
+    var midis = pianoChordMidis();
+    if (!App.pianoPlay) return;
+    App.getAudio();
+    midis.forEach(function (m, i) { App.pianoPlay(m, i * 0.035, 1.9, 0.5); });
+  }
+
+  var matchTimer = null;
+
+  function checkPlayedChord() {
+    if (!App.midi || !els.pnMatch || els.pnMatch.style.display === 'none') return;
+    var heldPcs = {};
+    App.midi.held.forEach(function (m) { heldPcs[Theory.mod12(m)] = true; });
+    var heldList = Object.keys(heldPcs);
+    if (heldList.length < 3) return;
+    var q = Theory.QUALITIES[ex.quality];
+    var want = {};
+    q.intervals.forEach(function (iv) { want[Theory.mod12(ex.rootPc + iv)] = true; });
+    var allWanted = Object.keys(want).every(function (pc) { return heldPcs[pc]; });
+    var nothingExtra = heldList.every(function (pc) { return want[pc]; });
+    if (allWanted && nothingExtra) {
+      els.pnMatch.textContent = 'Matched — ' + exName() + '!';
+      els.pnMatch.classList.add('ch-matched');
+      if (matchTimer) clearTimeout(matchTimer);
+      matchTimer = setTimeout(function () {
+        els.pnMatch.classList.remove('ch-matched');
+        els.pnMatch.textContent = 'Play it on your keyboard…';
+      }, 2500);
+    }
   }
 
   // load a chord onto the neck. opts: {persist, strum}
@@ -778,6 +877,12 @@
     '.ch-exname{font-family:var(--font-condensed,var(--font-display));font-size:34px;' +
       'font-weight:700;letter-spacing:1px;line-height:1;min-width:90px;}' +
     '.ch-boardwrap{overflow-x:auto;margin-top:12px;}' +
+    '.ch-pnwrap{overflow-x:auto;margin-top:8px;}' +
+    '.ch-pnwrap svg{display:block;cursor:pointer;}' +
+    '.ch-pnw{fill:#f7f3ea;stroke:#b9b0a2;stroke-width:1;}' +
+    '.ch-pnb{fill:#221d20;stroke:#000;stroke-width:1;}' +
+    '.ch-pnlbl{font:700 10px var(--font-body);fill:#1c1206;}' +
+    '#ch-pn-match.ch-matched{border-color:var(--green);color:var(--green);}' +
     '.ch-bsvg{display:block;width:100%;min-width:540px;max-width:760px;height:auto;cursor:pointer;}' +
     '.ch-bdot{cursor:pointer;}' +
     '.ch-bdot:hover{stroke:#ffffff;stroke-width:2;}' +
@@ -859,6 +964,17 @@
             '<button type="button" class="btn sm" id="ch-practice" title="Set up the fretboard with this scale and start the practice runner">Practice it ' + App.icon('right', 13) + '</button>' +
           '</div>' +
         '</div>' +
+        // 4. the same chord on the piano — tap to hear it; with a MIDI
+        // keyboard connected the tones light on the device and playing them
+        // together confirms the match
+        '<div class="row tight spread" style="margin-top:16px">' +
+          '<div class="ch-field"><span>Piano voicing</span></div>' +
+          '<span class="row tight">' +
+            '<button type="button" class="btn sm" id="ch-pn-play" title="Hear the chord on piano">' + App.icon('play', 13) + ' Piano</button>' +
+            '<span class="chip" id="ch-pn-match" style="display:none">Play it on your keyboard&hellip;</span>' +
+          '</span>' +
+        '</div>' +
+        '<div class="ch-pnwrap" id="ch-pnwrap" title="Tap to hear the chord on piano"></div>' +
       '</div>' +
       '<div class="card">' +
         '<h2>Progression player</h2>' +
@@ -918,6 +1034,9 @@
     els.countin = document.getElementById('ch-countin');
     els.play = document.getElementById('ch-play');
     els.status = document.getElementById('ch-status');
+    els.pnWrap = document.getElementById('ch-pnwrap');
+    els.pnPlay = document.getElementById('ch-pn-play');
+    els.pnMatch = document.getElementById('ch-pn-match');
   }
 
   function addOption(sel, value, label) {
@@ -951,6 +1070,20 @@
       exLoad(ex.rootPc, els.exQuality.value, { strum: true });
     });
     els.exStrum.addEventListener('click', function () { strumShape(curShape()); });
+    els.pnPlay.addEventListener('click', pianoStrum);
+    els.pnWrap.addEventListener('click', function (e) {
+      var k = e.target.closest ? e.target.closest('[data-chpn]') : null;
+      if (k && App.pianoPlay) {
+        App.getAudio();
+        App.pianoPlay(parseInt(k.getAttribute('data-chpn'), 10), 0, 1.6, 0.5);
+      } else {
+        pianoStrum();
+      }
+    });
+    // MIDI keyboard: held notes matching the chord confirm it; a connect /
+    // disconnect repaints the panel (match chip + device LEDs)
+    App.on('midi:note', function (d) { if (d && d.on) checkPlayedChord(); });
+    App.on('midi:state', function () { renderPianoChord(); });
     els.exAdd.addEventListener('click', function () {
       appendChord({ rootPc: ex.rootPc, quality: ex.quality,
         roman: keyFunction().roman, name: exName() });
@@ -1085,6 +1218,7 @@
 
   function onHide() {
     stopPlayback();
+    if (App.midi && App.midi.hasOutput) App.midi.allDark(); // hand LEDs back
   }
 
   function onKey(e) {
