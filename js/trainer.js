@@ -426,7 +426,7 @@
           '<button class="btn primary" id="tr-pr-chal">Random challenge</button>' +
         '</div>' +
         '<div class="mid-display tr-prompt" id="tr-pr-cur">Press a button for a prompt…</div>' +
-        '<button class="btn primary sm" id="tr-pr-go" style="display:none" title="Set up the fretboard and start practicing">Go &rarr; Fretboard</button>' +
+        '<button class="btn primary sm" id="tr-pr-go" style="display:none" title="Set up the fretboard and start practicing">Go ' + App.icon('right', 13) + ' Fretboard</button>' +
         '<div class="small muted" id="tr-pr-prevhead" style="display:none">Previous</div>' +
         '<ul class="list tr-prompt-hist" id="tr-pr-hist"></ul>' +
       '</div>' +

@@ -1,5 +1,5 @@
 {
-  "version": "0.30.0",
+  "version": "0.31.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "Metronome grows up: pick separate tones for beat 1, main beats and upbeats (beep, woodblock, tick, clave, cowbell - saved settings), and TYPE any time signature you want - 7/16, 11/8, 13/4, anything up to 32 beats over 1-32. Circle practice gets practical: a Random key mode and a choice of what plays on each key change - tonic chord, I-IV-V-I, or a jazz ii-V-I cadence timed to your tempo."
+  "notes": "Big visual overhaul: a clean native-app look with flat surfaces and hairline borders in both themes, the tab row replaced by one compact page menu (more room for what matters), and every symbol redrawn as a crisp built-in icon - no more emoji boxes or arrows on iOS. Also fixes dropdown text sliding under the arrow in the practice strip."
 }

@@ -152,7 +152,7 @@
 
       '<div class="card" id="tun-game-card">' +
       '<h2>Note finder game</h2>' +
-      '<div id="tun-hint" class="tun-hint">▲ Start listening in the Tuner card first — ' +
+      '<div id="tun-hint" class="tun-hint">' + App.icon('up', 13) + ' Start listening in the Tuner card first — ' +
       'the game listens on the same microphone. Targets use standard tuning.</div>' +
       '<div class="tun-target-line">' +
       '<span id="tun-target"></span><span id="tun-eq"> = </span><span id="tun-answer">?</span>' +
