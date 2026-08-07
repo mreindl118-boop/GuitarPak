@@ -25,6 +25,7 @@ js/chords.js      │ DOM ids/CSS prefixed met-/fb-/ch-/jam-/tun-/tr-
 js/jam.js         │
 js/tuner.js       │
 js/trainer.js     │
+js/theorytab.js   │ (theory: circle of fifths + key guide + degree ear quiz)
 js/settings.js    ┘ (settings: app-level prefs — theme dark/light/auto)
 samples/          MIT FluidR3 instrument MP3s (see samples/CREDITS.md)
 android/          APK project — build.ps1 (no Gradle: javac→d8→aapt→zipalign→
