@@ -25,6 +25,8 @@ js/chords.js      │ DOM ids/CSS prefixed met-/fb-/ch-/jam-/tun-/tr-
 js/piano.js       │ (piano: keyboard twin of the fretboard — degree-colored
                   │  keys, shared fb.colors palette, sampled piano voice,
                   │  follows fb:set/fb:scale + jam:chord)
+js/songs.js       │ (songs: user-imported ASCII tab / MIDI parsed on-device,
+                  │  bar-loop player at shared tempo, key detect → fb:set)
 js/jam.js         │
 js/tuner.js       │
 js/trainer.js     │
