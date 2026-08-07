@@ -170,8 +170,9 @@
       '" data-th-scale="' + scale + '">' + esc(label) + '</button>';
   }
 
-  function strumDia(d) {
-    App.getAudio(); // inside the user gesture
+  function strumDia(d, when) {
+    App.getAudio(); // inside the user gesture (or with a running ctx)
+    when = when || 0;
     var shapes = [];
     try { shapes = Theory.chordShapes(d.rootPc, d.quality); } catch (e) { /* fall through */ }
     var v;
@@ -182,7 +183,7 @@
       v = Theory.QUALITIES[d.quality].intervals.map(function (iv) { return r + iv; });
     }
     var gap = 0.028 + Math.random() * 0.015;
-    for (var i = 0; i < v.length; i++) App.pluck(v[i], i * gap, 1.5, 0.3);
+    for (var i = 0; i < v.length; i++) App.pluck(v[i], when + i * gap, 1.5, 0.3);
   }
 
   // hear the key you just landed on: tonic chord for diatonic scales, the
@@ -200,8 +201,20 @@
   // and the new tonic is strummed. Sit on the Fretboard tab and practice each
   // key as it lands — the theory module keeps counting in the background.
 
-  var cp = { on: false, dir: 1, bars: 2, count: 0 };
+  // dir: 1 = up a fifth, -1 = up a fourth, 0 = random key each step
+  // cue: what announces the new key — tonic strum, or a cadence that
+  // establishes it (I-IV-V-I, or the jazz ii-V-I), timed to the beat
+  var cp = { on: false, dir: 1, bars: 2, count: 0, cue: 'tonic' };
   var metRunning = false;
+
+  function playCue() {
+    var dia = [];
+    try { dia = Theory.diatonic(curRoot(), curScale(), false); } catch (e) { /* not 7-note */ }
+    if (!dia.length || cp.cue === 'tonic') { strumTonic(); return; }
+    var beat = 60 / Math.max(30, Math.min(280, parseInt(App.store.get('met.bpm', 120), 10) || 120));
+    var degs = cp.cue === '251' ? [1, 4, 0] : [0, 3, 4, 0];
+    for (var i = 0; i < degs.length; i++) strumDia(dia[degs[i]], i * beat);
+  }
 
   function cpPaint() {
     if (!els.cpGo) return;
@@ -218,10 +231,15 @@
 
   function cpStatusNow() {
     var root = curRoot();
-    var nxt = Theory.mod12(root + (cp.dir > 0 ? 7 : 5));
+    var nextTxt;
+    if (cp.dir === 0) {
+      nextTxt = 'a surprise key';
+    } else {
+      var nxt = Theory.mod12(root + (cp.dir > 0 ? 7 : 5));
+      nextTxt = Theory.pcName(nxt, Theory.FLAT_KEYS.has(nxt));
+    }
     els.cpStatus.textContent = 'Now ' + Theory.pcName(root, Theory.FLAT_KEYS.has(root)) +
-      ' — next ' + Theory.pcName(nxt, Theory.FLAT_KEYS.has(nxt)) +
-      ' in ' + cp.bars + (cp.bars === 1 ? ' bar' : ' bars') + '.';
+      ' — next ' + nextTxt + ' in ' + cp.bars + (cp.bars === 1 ? ' bar' : ' bars') + '.';
   }
 
   function cpToggle() {
@@ -238,11 +256,16 @@
   }
 
   function cpAdvance() {
-    // move the root a fifth (or a fourth) and KEEP the current scale type —
-    // works for any scale, and the circle highlight follows for major/minor
-    var root = Theory.mod12(curRoot() + (cp.dir > 0 ? 7 : 5));
+    // move the root a fifth / a fourth / anywhere (random), KEEPING the
+    // current scale type — the circle highlight follows for major/minor
+    var root;
+    if (cp.dir === 0) {
+      do { root = Math.floor(Math.random() * 12); } while (root === curRoot());
+    } else {
+      root = Theory.mod12(curRoot() + (cp.dir > 0 ? 7 : 5));
+    }
     setKey(root, curScale());
-    strumTonic(); // audio ctx is already running (metronome) — no gesture needed
+    playCue(); // audio ctx is already running (metronome) — no gesture needed
     cpStatusNow();
   }
 
@@ -363,10 +386,15 @@
           '<span class="seg" id="th-cp-dir">' +
             '<button type="button" data-thdir="1" title="Clockwise — up a fifth each step">5ths &#8594;</button>' +
             '<button type="button" data-thdir="-1" title="Counter-clockwise — up a fourth each step">&#8592; 4ths</button>' +
+            '<button type="button" data-thdir="0" title="Jump to a random key each step — the real test">Random</button>' +
           '</span>' +
           '<label class="field">Bars / key<select id="th-cp-bars">' +
             '<option value="1">1</option><option value="2">2</option>' +
             '<option value="4">4</option><option value="8">8</option></select></label>' +
+          '<label class="field">On change<select id="th-cp-cue">' +
+            '<option value="tonic">Tonic chord</option>' +
+            '<option value="cadence">I&ndash;IV&ndash;V&ndash;I</option>' +
+            '<option value="251">ii&ndash;V&ndash;I</option></select></label>' +
         '</div>' +
         '<div class="muted small th-mt" id="th-cp-status"></div>' +
       '</div>' +
@@ -404,6 +432,7 @@
     els.cpGo = document.getElementById('th-cp-go');
     els.cpDir = document.getElementById('th-cp-dir');
     els.cpBars = document.getElementById('th-cp-bars');
+    els.cpCue = document.getElementById('th-cp-cue');
     els.cpStatus = document.getElementById('th-cp-status');
     els.qBtns = document.getElementById('th-qbtns');
     els.qPlay = document.getElementById('th-qplay');
@@ -421,17 +450,26 @@
     });
 
     // circle practice wiring
-    cp.dir = App.store.get('th.cpDir', 1) === -1 ? -1 : 1;
+    var sd = App.store.get('th.cpDir', 1);
+    cp.dir = (sd === -1 || sd === 0) ? sd : 1;
     cp.bars = [1, 2, 4, 8].indexOf(App.store.get('th.cpBars', 2)) !== -1 ? App.store.get('th.cpBars', 2) : 2;
+    var sc = App.store.get('th.cpCue', 'tonic');
+    cp.cue = ['tonic', 'cadence', '251'].indexOf(sc) !== -1 ? sc : 'tonic';
     els.cpBars.value = String(cp.bars);
+    els.cpCue.value = cp.cue;
     els.cpGo.addEventListener('click', cpToggle);
     els.cpDir.addEventListener('click', function (e) {
       var b = e.target.closest('button[data-thdir]');
       if (!b) return;
-      cp.dir = parseInt(b.getAttribute('data-thdir'), 10) === -1 ? -1 : 1;
+      var v = parseInt(b.getAttribute('data-thdir'), 10);
+      cp.dir = (v === -1 || v === 0) ? v : 1;
       App.store.set('th.cpDir', cp.dir);
       cpPaint();
       if (cp.on) cpStatusNow();
+    });
+    els.cpCue.addEventListener('change', function () {
+      cp.cue = ['tonic', 'cadence', '251'].indexOf(this.value) !== -1 ? this.value : 'tonic';
+      App.store.set('th.cpCue', cp.cue);
     });
     els.cpBars.addEventListener('change', function () {
       var v = parseInt(this.value, 10);
