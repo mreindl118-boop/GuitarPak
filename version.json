@@ -1,5 +1,5 @@
 {
-  "version": "0.31.0",
+  "version": "0.31.1",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "Big visual overhaul: a clean native-app look with flat surfaces and hairline borders in both themes, the tab row replaced by one compact page menu (more room for what matters), and every symbol redrawn as a crisp built-in icon - no more emoji boxes or arrows on iOS. Also fixes dropdown text sliding under the arrow in the practice strip."
+  "notes": "One-string practice gets its string picker back: tap the E A D G B e buttons to choose the string, just like before - no more cramped dropdown. (Plus the full v0.31 native-look overhaul: one page menu instead of tabs, crisp built-in icons, flat clean surfaces in both themes.)"
 }

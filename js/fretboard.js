@@ -1235,7 +1235,8 @@
     var groupSel = document.getElementById('fb-pr-group');
     var ivSel = document.getElementById('fb-pr-iv');
     var stripEl = document.getElementById('fb-pr-strings');
-    var strSel = document.getElementById('fb-pr-string');
+    var ssEl = document.getElementById('fb-pr-sstrings');
+    var ssSel = 5;     // one-string: the chosen string (low E = 0 .. high e = 5)
     var strMask = 63; // intervals: bit s = string s enabled (low E = bit 0)
     var IVL = { 2: '2nds', 3: '3rds', 4: '4ths', 5: '5ths', 6: '6ths', 7: '7ths', 8: 'Octaves',
       9: '9ths', 10: '10ths', 11: '11ths', 12: '12ths', 13: '13ths', 14: '14ths', 15: '15ths', 16: '16ths' };
@@ -1246,20 +1247,29 @@
     function fillStringSel() {
       var tun = Theory.TUNINGS[state.tuning];
       var pf = preferFlat();
-      var h = '', s;
-      for (s = 5; s >= 0; s--) { // high e first, labeled 1st..6th + note
-        h += '<option value="' + s + '">' + (6 - s) + ' \u00b7 ' +
-          Theory.pcName(Theory.mod12(tun.midi[s]), pf) + '</option>';
+      // low E .. high e, guitar order; high e lowercased so the two E strings
+      // read apart at a glance
+      function strName(s) {
+        var n = Theory.pcName(Theory.mod12(tun.midi[s]), pf);
+        return s === 5 ? n.toLowerCase() : n;
       }
-      strSel.innerHTML = h;
-      // interval string chips: low E .. high e, tap to toggle
+      var s;
+      // interval string chips: tap to toggle any combination
       var c = '';
       for (s = 0; s < 6; s++) {
         c += '<button type="button" class="chip fb-chip fb-strchip' +
           ((strMask & (1 << s)) ? ' active' : '') + '" data-fbstr="' + s + '">' +
-          Theory.pcName(Theory.mod12(tun.midi[s]), pf) + '</button>';
+          strName(s) + '</button>';
       }
       stripEl.innerHTML = c;
+      // one-string chips: same row, exactly one active
+      c = '';
+      for (s = 0; s < 6; s++) {
+        c += '<button type="button" class="chip fb-chip fb-strchip' +
+          (s === ssSel ? ' active' : '') + '" data-fbsstr="' + s + '">' +
+          strName(s) + '</button>';
+      }
+      ssEl.innerHTML = c;
     }
     fillStringSel();
 
@@ -1274,6 +1284,16 @@
       patternChanged();
     });
 
+    ssEl.addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-fbsstr]');
+      if (!b) return;
+      ssSel = parseInt(b.getAttribute('data-fbsstr'), 10);
+      ssEl.querySelectorAll('button[data-fbsstr]').forEach(function (x) {
+        x.classList.toggle('active', parseInt(x.getAttribute('data-fbsstr'), 10) === ssSel);
+      });
+      patternChanged();
+    });
+
     // decompose the stored token into the type + sub-selects
     function decompose() {
       var p = pr.pattern, mm;
@@ -1284,7 +1304,8 @@
         strMask = mm[2] ? (parseInt(mm[2], 10) & 63) || 63 : 63;
         fillStringSel(); // repaint chips to the mask
       } else if ((mm = /^ss([0-5])$/.exec(p))) {
-        typeSel.value = 'string'; strSel.value = mm[1];
+        typeSel.value = 'string'; ssSel = parseInt(mm[1], 10);
+        fillStringSel(); // repaint chips to the selection
       } else {
         typeSel.value = 'scale';
       }
@@ -1297,7 +1318,7 @@
       groupSel.style.display = t === 'group' ? '' : 'none';
       ivSel.style.display = t === 'interval' ? '' : 'none';
       stripEl.style.display = t === 'interval' ? '' : 'none';
-      strSel.style.display = t === 'string' ? '' : 'none';
+      ssEl.style.display = t === 'string' ? '' : 'none';
       var lockBtn = document.getElementById('fb-pr-sslock');
       if (lockBtn) {
         lockBtn.style.display = t === 'string' ? '' : 'none';
@@ -1309,7 +1330,7 @@
       var t = typeSel.value;
       if (t === 'group') return 'g' + groupSel.value;
       if (t === 'interval') return 'i' + ivSel.value + (strMask !== 63 ? 'm' + strMask : '');
-      if (t === 'string') return 'ss' + strSel.value;
+      if (t === 'string') return 'ss' + ssSel;
       return 'scale';
     }
 
@@ -1326,7 +1347,6 @@
     typeSel.addEventListener('change', patternChanged);
     groupSel.addEventListener('change', patternChanged);
     ivSel.addEventListener('change', patternChanged);
-    strSel.addEventListener('change', patternChanged);
     decompose();
 
     var bpm = document.getElementById('fb-pr-bpm');
@@ -1651,7 +1671,7 @@
           '</select>' +
           '<select id="fb-pr-iv" title="Interval" style="display:none"></select>' +
           '<span class="row tight" id="fb-pr-strings" title="Tap strings on or off" style="display:none"></span>' +
-          '<select id="fb-pr-string" title="Which string" style="display:none"></select>' +
+          '<span class="row tight" id="fb-pr-sstrings" title="Pick the string to run" style="display:none"></span>' +
           '<button type="button" class="chip fb-chip" id="fb-pr-sslock" style="display:none" ' +
             'title="Lock the one-string run to the current mode&#39;s box. Off (default): slide the whole string.">Mode box</button>' +
           '<div class="seg" id="fb-pr-dir" title="Direction — applies to every pattern">' +
