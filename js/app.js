@@ -26,12 +26,12 @@ window.App = (function () {
   var modules = {};
   var active = null;
   var audioCtx = null;
-  var PANEL_ORDER = ['metronome', 'fretboard', 'chords', 'jam', 'tuner', 'trainer', 'theory', 'settings'];
+  var PANEL_ORDER = ['metronome', 'fretboard', 'chords', 'piano', 'jam', 'tuner', 'trainer', 'theory', 'settings'];
 
   // ---- auto-update ----
   // version.json on GitHub is the source of truth. Web builds refresh through
   // the service worker; the APK build (file://) links to the new APK download.
-  var APP_VERSION = '0.31.1';
+  var APP_VERSION = '0.32.0';
   var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
 
   function verNum(v) {
