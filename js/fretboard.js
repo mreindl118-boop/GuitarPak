@@ -459,6 +459,8 @@
   var zoom = 1;
   var ZMAX = 3.5;
   var suppressClick = false; // true briefly after pan / pinch
+  var touchActive = false;   // a finger is on the board — auto-scroll must not fight it
+  var lastAutoScroll = 0;    // rate limiter: overlapping smooth scrolls are the "jumping" bug
 
   var BASE_MAX_W = 520; // cap so wide desktop stages don't blow the board up
 
@@ -537,6 +539,7 @@
     var swipe = null; // fullscreen mode-switch flick (7-note scales only)
 
     wrap.addEventListener('touchstart', function (e) {
+      touchActive = true;
       swipe = e.touches.length === 1
         ? { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now(), sl: wrap.scrollLeft }
         : null;
@@ -560,7 +563,15 @@
       }
     }, { passive: false });
 
+    wrap.addEventListener('touchcancel', function (e) {
+      if (e.touches.length === 0) { touchActive = false; }
+    }, { passive: true });
+
     wrap.addEventListener('touchend', function (e) {
+      if (e.touches.length === 0) {
+        touchActive = false;
+        lastAutoScroll = Date.now() + 400; // give momentum scrolling room to settle
+      }
       if (pinch) {
         if (e.touches.length === 0) { pinch = null; endGesture(); }
         return;
@@ -642,6 +653,7 @@
   function scrollToFret(f) {
     var svg = els.scroll && els.scroll.querySelector('svg');
     if (!svg || !vb.h) return;
+    if (touchActive) return; // never yank the board out from under a finger
     var nutX = LABEL_W + OPEN_W;
     var x = f <= 0 ? 0 : nutX + (f - 1) * FRET_W;
     if (state.orient === 'h') {
@@ -816,21 +828,30 @@
     pr.raf = requestAnimationFrame(prDraw);
   }
 
-  // keep the active ring inside the middle band of the stage
+  // keep the active ring inside the middle band of the stage.
+  // Two guards stop the board from "spazzing": never scroll while a finger is
+  // down (auto-scroll vs. pan/pinch is a tug-of-war), and never issue a new
+  // smooth scroll while the previous one may still be animating (overlapping
+  // smooth scrolls jitter and jump, especially on iOS).
   function prScrollTo(node) {
     var wrap = els.scroll;
     var svg = document.getElementById('fb-svg');
     if (!wrap || !svg) return;
+    if (touchActive) return;
+    var now = Date.now();
+    if (now < lastAutoScroll + 450) return;
     var scale = svg.getBoundingClientRect().width / vb.w;
     var along = node.cx * scale; // screen distance along the neck
     if (state.orient === 'h') {
       var lt = Math.max(0, along - wrap.clientWidth * 0.45);
       if (Math.abs(wrap.scrollLeft - lt) > wrap.clientWidth * 0.22) {
+        lastAutoScroll = now;
         wrap.scrollTo({ left: lt, behavior: 'smooth' });
       }
     } else {
       var target = Math.max(0, along - wrap.clientHeight * 0.45);
       if (Math.abs(wrap.scrollTop - target) > wrap.clientHeight * 0.22) {
+        lastAutoScroll = now;
         wrap.scrollTo({ top: target, behavior: 'smooth' });
       }
     }

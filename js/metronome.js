@@ -567,7 +567,10 @@
     // Only the beat-dot animation pauses; visibilitychange (in init) stops
     // playback when the whole app is minimized or the screen turns off.
     onHide: function () {
-      if (raf) { cancelAnimationFrame(raf); raf = 0; }
+      // keep the draw loop running across in-app tab switches: met:beat
+      // drives the context-bar pulse AND the Theory tab's circle practice,
+      // both of which live outside this panel. visibilitychange still stops
+      // everything when the whole app hides.
     },
     onShow: function () {
       if (running && !raf) raf = requestAnimationFrame(draw);

@@ -1,5 +1,5 @@
 {
-  "version": "0.27.0",
+  "version": "0.28.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "New Theory tab: an interactive circle of fifths that re-keys the whole app with a tap, a key guide showing your scale's notes, intervals, chords and related keys (with one-tap jumps to the Chords tab and the practice runner), and a degree ear trainer that uses the same colors as the fretboard. Plus 0.26's real recorded guitar samples."
+  "notes": "Circle of fifths, now a practice tool: tap any key to hear its tonic, and start Circle Practice to let the metronome walk the whole app around the circle - the key advances every 1/2/4/8 bars (in fifths or fourths), strums the new tonic, and the fretboard follows so you can practice each key as it lands. Also fixes the fretboard jumping around during practice: auto-scroll no longer fights your fingers or itself."
 }

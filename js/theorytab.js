@@ -185,6 +185,67 @@
     for (var i = 0; i < v.length; i++) App.pluck(v[i], i * gap, 1.5, 0.3);
   }
 
+  // hear the key you just landed on: tonic chord for diatonic scales, the
+  // bare root for everything else
+  function strumTonic() {
+    var dia = [];
+    try { dia = Theory.diatonic(curRoot(), curScale(), false); } catch (e) { /* not 7-note */ }
+    if (dia.length) strumDia(dia[0]);
+    else App.pluck(quizRootMidi(), 0, 1.3, 0.35);
+  }
+
+  // ---------------- circle practice: the metronome walks the circle ----------------
+  // While running, every N bars of the metronome the WHOLE APP advances one
+  // step around the circle (clockwise = up a fifth, counter = up a fourth)
+  // and the new tonic is strummed. Sit on the Fretboard tab and practice each
+  // key as it lands — the theory module keeps counting in the background.
+
+  var cp = { on: false, dir: 1, bars: 2, count: 0 };
+  var metRunning = false;
+
+  function cpPaint() {
+    if (!els.cpGo) return;
+    els.cpGo.textContent = cp.on ? 'Stop circle practice' : 'Start circle practice';
+    els.cpGo.classList.toggle('danger', cp.on);
+    els.cpGo.classList.toggle('primary', !cp.on);
+    els.cpDir.querySelectorAll('button').forEach(function (b) {
+      b.classList.toggle('active', parseInt(b.getAttribute('data-thdir'), 10) === cp.dir);
+    });
+    if (!cp.on) {
+      els.cpStatus.textContent = 'The metronome walks the whole app around the circle — practice each key as it lands.';
+    }
+  }
+
+  function cpStatusNow() {
+    var root = curRoot();
+    var nxt = Theory.mod12(root + (cp.dir > 0 ? 7 : 5));
+    els.cpStatus.textContent = 'Now ' + Theory.pcName(root, Theory.FLAT_KEYS.has(root)) +
+      ' — next ' + Theory.pcName(nxt, Theory.FLAT_KEYS.has(nxt)) +
+      ' in ' + cp.bars + (cp.bars === 1 ? ' bar' : ' bars') + '.';
+  }
+
+  function cpToggle() {
+    if (cp.on) {
+      cp.on = false;
+      cpPaint();
+      return;
+    }
+    cp.on = true;
+    cp.count = 0;
+    if (!metRunning) App.emit('met:toggle', {}); // synchronous — still inside the click
+    cpPaint();
+    cpStatusNow();
+  }
+
+  function cpAdvance() {
+    // move the root a fifth (or a fourth) and KEEP the current scale type —
+    // works for any scale, and the circle highlight follows for major/minor
+    var root = Theory.mod12(curRoot() + (cp.dir > 0 ? 7 : 5));
+    setKey(root, curScale());
+    strumTonic(); // audio ctx is already running (metronome) — no gesture needed
+    cpStatusNow();
+  }
+
   // ---------------- card 3: degree ear trainer ----------------
 
   var quiz = { active: false, deg: -1, streak: 0, best: 0 };
@@ -294,8 +355,20 @@
     rootEl.innerHTML =
       '<div class="card">' +
         '<h2>Circle of fifths</h2>' +
-        '<div class="muted small">Tap any key to move the whole app there &mdash; outer ring majors, inner ring their relative minors. Neighbors share all but one note.</div>' +
+        '<div class="muted small">Tap any key to hear it and move the whole app there &mdash; outer ring majors, inner ring their relative minors. Neighbors share all but one note.</div>' +
         '<div class="th-circlewrap" id="th-circle"></div>' +
+        '<h3 class="th-mt">Circle practice</h3>' +
+        '<div class="row tight">' +
+          '<button type="button" class="btn primary" id="th-cp-go">Start circle practice</button>' +
+          '<span class="seg" id="th-cp-dir">' +
+            '<button type="button" data-thdir="1" title="Clockwise — up a fifth each step">5ths &#8594;</button>' +
+            '<button type="button" data-thdir="-1" title="Counter-clockwise — up a fourth each step">&#8592; 4ths</button>' +
+          '</span>' +
+          '<label class="field">Bars / key<select id="th-cp-bars">' +
+            '<option value="1">1</option><option value="2">2</option>' +
+            '<option value="4">4</option><option value="8">8</option></select></label>' +
+        '</div>' +
+        '<div class="muted small th-mt" id="th-cp-status"></div>' +
       '</div>' +
       '<div class="card">' +
         '<h2 id="th-guide-title"></h2>' +
@@ -328,6 +401,10 @@
     els.chords = document.getElementById('th-chords');
     els.chordsRow = document.getElementById('th-chordwrap');
     els.related = document.getElementById('th-related');
+    els.cpGo = document.getElementById('th-cp-go');
+    els.cpDir = document.getElementById('th-cp-dir');
+    els.cpBars = document.getElementById('th-cp-bars');
+    els.cpStatus = document.getElementById('th-cp-status');
     els.qBtns = document.getElementById('th-qbtns');
     els.qPlay = document.getElementById('th-qplay');
     els.qNext = document.getElementById('th-qnext');
@@ -339,7 +416,39 @@
       if (!t) return;
       if (t.hasAttribute('data-th-maj')) setKey(parseInt(t.getAttribute('data-th-maj'), 10), 'major');
       else setKey(parseInt(t.getAttribute('data-th-min'), 10), 'aeolian');
+      strumTonic(); // hear where you landed (inside the tap gesture)
+      if (cp.on) cpStatusNow();
     });
+
+    // circle practice wiring
+    cp.dir = App.store.get('th.cpDir', 1) === -1 ? -1 : 1;
+    cp.bars = [1, 2, 4, 8].indexOf(App.store.get('th.cpBars', 2)) !== -1 ? App.store.get('th.cpBars', 2) : 2;
+    els.cpBars.value = String(cp.bars);
+    els.cpGo.addEventListener('click', cpToggle);
+    els.cpDir.addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-thdir]');
+      if (!b) return;
+      cp.dir = parseInt(b.getAttribute('data-thdir'), 10) === -1 ? -1 : 1;
+      App.store.set('th.cpDir', cp.dir);
+      cpPaint();
+      if (cp.on) cpStatusNow();
+    });
+    els.cpBars.addEventListener('change', function () {
+      var v = parseInt(this.value, 10);
+      cp.bars = [1, 2, 4, 8].indexOf(v) !== -1 ? v : 2;
+      App.store.set('th.cpBars', cp.bars);
+      if (cp.on) cpStatusNow();
+    });
+    App.on('met:state', function (d) {
+      metRunning = !!(d && d.running);
+      if (!metRunning && cp.on) { cp.on = false; cpPaint(); } // metronome stopped = drill over
+    });
+    App.on('met:beat', function (d) {
+      if (!cp.on || !d || d.beat !== 0) return; // count bar starts only
+      cp.count++;
+      if (cp.count > cp.bars) { cpAdvance(); cp.count = 1; }
+    });
+    cpPaint();
 
     els.chords.addEventListener('click', function (e) {
       var b = e.target.closest('.th-chord');
