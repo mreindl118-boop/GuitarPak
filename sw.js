@@ -1,5 +1,5 @@
 /* GuitarLab service worker — cache-first so the app works fully offline once visited. */
-var CACHE = 'guitarlab-v50';
+var CACHE = 'guitarlab-v51';
 var ASSETS = [
   '.',
   'index.html',
@@ -14,6 +14,7 @@ var ASSETS = [
   'js/metronome.js',
   'js/fretboard.js',
   'js/chords.js',
+  'js/piano.js',
   'js/jam.js',
   'js/tuner.js',
   'js/trainer.js',

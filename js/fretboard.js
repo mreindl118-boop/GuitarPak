@@ -653,8 +653,9 @@
     running: false, idx: 0, seq: null, path: [], dirs: null,
     pattern: 'scale', dir: 'up', pick: 'alt', bpm: 80, rate: 1, sound: true, click: true,
     ssLock: false,            // one-string runs the WHOLE string unless locked to the mode box
-    pause: 0, pausePos: 'end', // 1-4 beat rest at the loop seam (start | end | both)
+    pause: 0, pausePos: 'end', // 1-4 beat rest around the loop (start | end | both)
     pausedAtIdx: -1,
+    turn: -1,                 // up-down runs: seq position after the top note (the "end" of the scale)
     timer: null, raf: 0, nextT: 0, vis: [], ctx: null
   };
 
@@ -707,6 +708,10 @@
     var seq = Theory.exerciseSeq(path, pattern, dir);
     // pick strokes ride along with every seq rebuild so they can never drift
     pr.dirs = Theory.pickDirs(path, seq, pr.pick === 'off' ? 'alt' : pr.pick);
+    // up-down sequences are ascent + mirrored descent (top played once), so
+    // the first descent note sits at len/2 + 1 — that's where a "top of the
+    // scale" rest belongs
+    pr.turn = dir === 'updown' && seq.length >= 4 ? seq.length / 2 + 1 : -1;
     return seq;
   }
 
@@ -796,18 +801,30 @@
     if (pr.nextT < pr.ctx.currentTime + 0.01) pr.nextT = pr.ctx.currentTime + 0.05;
     var horizon = pr.ctx.currentTime + 0.25;
     while (pr.nextT < horizon) {
-      // loop seam: rest for the configured beats before the next pass
-      // ("start" and "end" meet here; "both" doubles the gap). pausedAtIdx
-      // guards the wrap so a pause that crosses the horizon isn't re-added
+      // loop rests. One-way runs only have the wrap seam, where "start" and
+      // "end" collapse ("both" doubles the gap). Up-down runs have two real
+      // sides: the bottom (wrap seam) and the top (the turnaround) — "start"
+      // rests at the bottom, "end" at the top, "both" at both. pausedAtIdx
+      // guards each spot so a rest that crosses the horizon isn't re-added
       // by the next scheduler tick.
-      if (pr.pause > 0 && pr.idx > 0 && pr.idx % pr.seq.length === 0 &&
-          pr.pausedAtIdx !== pr.idx) {
-        pr.pausedAtIdx = pr.idx;
-        var restBeats = pr.pausePos === 'both' ? pr.pause * 2 : pr.pause;
-        var beatLen = 60 / pr.bpm;
-        for (var rb = 0; rb < restBeats; rb++) prRestClick(pr.nextT + rb * beatLen);
-        pr.nextT += restBeats * beatLen;
-        continue; // re-check the horizon before scheduling the note
+      if (pr.pause > 0 && pr.pausedAtIdx !== pr.idx) {
+        var pos = pr.idx % pr.seq.length;
+        var restBeats = 0;
+        if (pr.idx > 0 && pos === 0) {          // bottom / wrap seam
+          restBeats = pr.turn > 0 ?
+            ((pr.pausePos === 'start' || pr.pausePos === 'both') ? pr.pause : 0) :
+            (pr.pausePos === 'both' ? pr.pause * 2 : pr.pause);
+        } else if (pr.turn > 0 && pos === pr.turn &&
+                   (pr.pausePos === 'end' || pr.pausePos === 'both')) { // top
+          restBeats = pr.pause;
+        }
+        if (restBeats > 0) {
+          pr.pausedAtIdx = pr.idx;
+          var beatLen = 60 / pr.bpm;
+          for (var rb = 0; rb < restBeats; rb++) prRestClick(pr.nextT + rb * beatLen);
+          pr.nextT += restBeats * beatLen;
+          continue; // re-check the horizon before scheduling the note
+        }
       }
       var node = pr.path[pr.seq[pr.idx % pr.seq.length]];
       var nextNode = pr.path[pr.seq[(pr.idx + 1) % pr.seq.length]];
@@ -1339,6 +1356,7 @@
       App.store.set('fb.pr.pattern', pr.pattern);
       paintPatternUI();
       pr.idx = 0;
+      pr.pausedAtIdx = -1;
       if (pr.running) { pr.path = prPath(); pr.seq = prSeq(pr.path, pr.pattern, pr.dir); }
       renderBoard(); // one-string dimming / mode-band visibility follow the pattern
       renderAltView();
@@ -1375,6 +1393,7 @@
       App.store.set('fb.pr.dir', pr.dir);
       paintDir();
       pr.idx = 0;
+      pr.pausedAtIdx = -1;
       if (pr.running) { pr.path = prPath(); pr.seq = prSeq(pr.path, pr.pattern, pr.dir); }
       renderAltView();
     });
@@ -1699,7 +1718,7 @@
             '<option value="2">2-beat pause</option><option value="3">3-beat pause</option>' +
             '<option value="4">4-beat pause</option>' +
           '</select>' +
-          '<select id="fb-pr-pausepos" title="Where the rest sits in the loop" style="display:none">' +
+          '<select id="fb-pr-pausepos" title="Where the rest sits — on up-and-down runs: start = bottom of the loop, end = top of the scale, both = both" style="display:none">' +
             '<option value="start">at start</option><option value="end">at end</option>' +
             '<option value="both">both sides</option>' +
           '</select>' +
@@ -1913,6 +1932,7 @@
       }
       saveState();
       pr.idx = 0;
+      pr.pausedAtIdx = -1;
       if (pr.running) { pr.path = prPath(); pr.seq = prSeq(pr.path, pr.pattern, pr.dir); }
       renderAll();
       // the scale really did change — downstream followers (chords) get the
