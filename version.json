@@ -1,5 +1,5 @@
 {
-  "version": "0.32.0",
+  "version": "0.32.1",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "New Piano tab: a full keyboard colored by scale degree with the same palette as the fretboard - keys follow your key/scale from the bar, labels switch between notes/intervals/degrees, every key plays a real piano sound, the scale plays at your tempo, and Jam chords light up the keys live. Also fixes practice pauses: up-and-down runs can now rest at the bottom, the TOP of the scale, or both sides - and a rest is never skipped after changing patterns mid-run."
+  "notes": "The selected mode now really stands out on the fretboard: notes inside the mode's box glow at full color while everything outside fades to half opacity, so the position you're practicing is obvious at a glance."
 }

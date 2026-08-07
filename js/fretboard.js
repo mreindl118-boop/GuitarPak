@@ -294,10 +294,12 @@
       '" height="' + (boardBot - boardTop) + '" rx="4" fill="var(--panel)"/>');
 
     // mode practice window (7-note scales): a soft band marking where the
-    // exercise runs — the notes themselves never change or hide. Hidden for a
-    // free one-string run (whole string IS the exercise); shown when locked.
+    // exercise runs — notes inside it draw at full color, everything outside
+    // fades to half so the selected mode's box pops. Hidden for a free
+    // one-string run (whole string IS the exercise); shown when locked.
+    var mband = null;
     if (isHept() && (ssStr < 0 || ssLockOn)) {
-      var mwin = modeWindow(state.mode);
+      var mwin = mband = modeWindow(state.mode);
       var bx0 = mwin[0] === 0 ? LABEL_W : nutX + (mwin[0] - 1) * FRET_W;
       var bx1 = nutX + Math.min(mwin[1], N) * FRET_W;
       s.push('<rect x="' + bx0 + '" y="' + boardTop + '" width="' + (bx1 - bx0) +
@@ -369,7 +371,11 @@
         else if (state.display === 'degrees') label = String(step + 1);
         else label = Theory.pcName(pc, pf);
         var cx = fx(colCX(f));
-        var dim = ssStr >= 0 && !onSS ? ' opacity="0.3"' : '';
+        // one-string dimming wins; otherwise the mode box keeps full color and
+        // everything outside it sits back at half opacity
+        var dim = '';
+        if (ssStr >= 0 && !onSS) dim = ' opacity="0.3"';
+        else if (mband && (f < mband[0] || f > mband[1])) dim = ' opacity="0.5"';
         s.push('<circle cx="' + cx + '" cy="' + cy + '" r="11.5" fill="' + fill + '"' +
           (step === 0 ? ' stroke="#ffffff" stroke-width="1.6"' : '') + dim + '/>');
         s.push('<text x="' + cx + '" y="' + (cy + 3.5) +
