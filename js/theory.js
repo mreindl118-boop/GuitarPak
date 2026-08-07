@@ -437,10 +437,17 @@ window.Theory = (function () {
     for (f = 0; f < 12; f++) {
       if (mod12(t0 + f) === mod12(opts.rootPc)) { rootFret = f; break; }
     }
-    // single-string pattern: every scale tone along ONE string, whole neck
+    // single-string pattern: every scale tone along ONE string — the WHOLE
+    // neck by default (a sliding scale up the string, never mode-locked);
+    // opts.fretWindow [lo, hi] optionally constrains it (the "mode box" lock)
     if (typeof opts.singleString === 'number' && opts.singleString >= 0 && opts.singleString <= 5) {
+      var lo = 0, hi = maxFret;
+      if (opts.fretWindow && opts.fretWindow.length === 2) {
+        lo = Math.max(0, opts.fretWindow[0]);
+        hi = Math.min(maxFret, opts.fretWindow[1]);
+      }
       var sp = [];
-      for (var sf = 0; sf <= maxFret; sf++) {
+      for (var sf = lo; sf <= hi; sf++) {
         var sm = tun.midi[opts.singleString] + sf;
         if (info.pcSet.has(mod12(sm))) sp.push({ s: opts.singleString, f: sf, midi: sm });
       }
