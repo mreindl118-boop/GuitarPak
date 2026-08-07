@@ -4,16 +4,26 @@
  * (fb.colors, customizable there), the key/scale follow the shared context
  * bar exactly like every other page (fb:set / fb:scale on the bus), labels
  * switch between note names / intervals / degrees, every key is playable
- * with a real sampled piano voice, a scale player runs at the shared tempo
- * (met.bpm), and the Jam tab's sounding chord lights up the keys live
- * (jam:chord / jam:stopped), mirroring the fretboard's chord rings.
+ * with a real sampled piano voice, and the Jam tab's sounding chord lights
+ * up the keys live (jam:chord / jam:stopped).
+ *
+ * The keyboard rotates like the fretboard (pn.orient h|v — landscape strip
+ * or a portrait column you scroll down), and it carries the fretboard's
+ * whole practice engine: scale / group / interval patterns, direction,
+ * shared tempo (met.bpm + tempo event), notes-per-beat, loop pauses with
+ * start / end (top of the scale) / both-sides placement, note + click
+ * toggles, and a runner that lights each key as it sounds. For 7-note
+ * scales the exercise runs the highlighted modal octave, tonic to tonic.
  * DOM ids / CSS classes are prefixed pn-.
  */
 (function () {
   'use strict';
 
   var els = {};
-  var state = { display: 'notes' }; // notes | intervals | degrees (pn.display)
+  var state = {
+    display: 'notes',  // notes | intervals | degrees  (pn.display)
+    orient: 'h'        // h = landscape strip, v = portrait column (pn.orient)
+  };
   var jamLast = null;
 
   // keyboard range: C2..C6 — brackets the guitar's practical range
@@ -37,13 +47,27 @@
   function preferFlat() { return Theory.FLAT_KEYS.has(curRoot()); }
 
   // the piano's twin of the fretboard's mode box: for 7-note scales, one
-  // octave starting on the modal tonic (placed in the octave above C3, where
-  // the scale player lives). Keys inside it draw at full color, in-scale keys
-  // outside fade to half — same rule as the fretboard.
+  // octave starting on the modal tonic (placed in the octave above C3).
+  // Keys inside it draw at full color, in-scale keys outside fade to half —
+  // and the practice runner plays exactly this window.
   function modeWindow(info) {
     if (!info || info.steps.length !== 7) return null;
     var m0 = 48 + Theory.mod12(curRoot() + info.steps[curMode() - 1]);
     return [m0, m0 + 12];
+  }
+
+  // practice path: the highlighted octave (modal window for 7-note scales,
+  // root octave otherwise), tonic to tonic
+  function practicePath() {
+    var info = Theory.scaleInfo(curRoot(), curScale(), preferFlat());
+    var mwin = modeWindow(info);
+    var lo = mwin ? mwin[0] : 48 + Theory.mod12(curRoot());
+    var hi = mwin ? mwin[1] : lo + 12;
+    var path = [];
+    for (var m = lo; m <= hi && m <= HI; m++) {
+      if (info.pcSet.has(Theory.mod12(m))) path.push({ midi: m });
+    }
+    return path;
   }
 
   // ---------------- sampled piano voice ----------------
@@ -159,7 +183,7 @@
         // mode dimming hits the dot + label only — jam rings stay full so a
         // sounding chord reads clearly across the whole keyboard
         var dim = mwin && (midi < mwin[0] || midi > mwin[1]) ? ' opacity="0.5"' : '';
-        dots += '<g class="pn-dotg" data-midi="' + midi + '" data-pc="' + pc + '">' +
+        dots += '<g class="pn-dotg" data-midi="' + midi + '" data-pc="' + pc + '" data-cx="' + cx + '" data-cy="' + cy + '">' +
           '<circle class="pn-jamring" data-pc="' + pc + '" cx="' + cx + '" cy="' + cy + '" r="15.5" fill="none"/>' +
           '<circle cx="' + cx + '" cy="' + cy + '" r="11.5" fill="' + col + '"' +
           (isRoot ? ' stroke="#ffffff" stroke-width="2"' : '') + dim + '/>' +
@@ -168,10 +192,18 @@
       }
     }
 
+    var TH = H + 24;
+    // horizontal: natural strip, scrolls sideways. Vertical: the whole group
+    // rotates 90° cw as ONE unit (fretboard convention) into a portrait
+    // column that scales to the container and scrolls down.
+    var horiz = state.orient === 'h';
+    els.stage.classList.toggle('pn-v', !horiz);
     els.stage.innerHTML =
-      '<svg id="pn-svg" viewBox="0 0 ' + totalW + ' ' + (H + 24) + '" width="' + totalW +
-      '" height="' + (H + 24) + '" xmlns="http://www.w3.org/2000/svg">' +
-      whites + blacks + dots + labels + '</svg>';
+      '<svg id="pn-svg" viewBox="0 0 ' + (horiz ? totalW + ' ' + TH : TH + ' ' + totalW) + '"' +
+      (horiz ? ' width="' + totalW + '" height="' + TH + '"' : '') +
+      ' xmlns="http://www.w3.org/2000/svg">' +
+      (horiz ? '<g id="pn-rot">' : '<g id="pn-rot" transform="rotate(90) translate(0,-' + TH + ')">') +
+      whites + blacks + dots + labels + '</g></svg>';
 
     if (jamLast) jamPaint(jamLast); // fresh svg — reapply the live chord overlay
 
@@ -184,14 +216,17 @@
     els.legend.innerHTML = lg;
   }
 
-  function scrollToRoot() {
-    // land the view on the highlighted octave (modal window for 7-note
-    // scales, root octave otherwise)
+  function scrollToWindow() {
     var info = Theory.scaleInfo(curRoot(), curScale(), preferFlat());
     var mwin = modeWindow(info);
     var lo = mwin ? mwin[0] : 48 + Theory.mod12(curRoot());
-    var x = whiteIndex(lo) * W;
-    els.stage.scrollLeft = Math.max(0, x - els.stage.clientWidth / 4);
+    var frac = (whiteIndex(lo) * W) / (whiteIndex(HI) * W + W);
+    if (state.orient === 'h') {
+      els.stage.scrollLeft = Math.max(0, frac * els.stage.scrollWidth - els.stage.clientWidth / 4);
+    } else {
+      var svg = els.stage.querySelector('svg');
+      if (svg) window.scrollTo({ top: els.stage.offsetTop + frac * svg.getBoundingClientRect().height - 220 });
+    }
   }
 
   // ---------------- interaction ----------------
@@ -205,44 +240,181 @@
     setTimeout(function () { k.classList.remove('pn-down'); }, dur || 180);
   }
 
-  // scale player: root octave up and back down at the shared tempo
-  var ps = { timers: [], playing: false };
+  // ---------------- practice runner (fretboard engine on the keys) ----------------
 
-  function psStop() {
-    ps.timers.forEach(clearTimeout);
-    ps.timers.length = 0;
-    ps.playing = false;
-    App.wake.release('pn-run');
-    els.playBtn.innerHTML = App.icon('play', 14) + ' Play scale';
+  var pp = {
+    running: false, idx: 0, seq: null, path: [],
+    pattern: 'scale', dir: 'up', bpm: 120, rate: 1, sound: true, click: true,
+    pause: 0, pausePos: 'end', pausedAtIdx: -1, turn: -1,
+    timer: null, raf: 0, nextT: 0, vis: [], ctx: null
+  };
+
+  function ppSeq(path, pattern, dir) {
+    var seq = Theory.exerciseSeq(path, pattern, dir);
+    // up-down sequences are ascent + mirrored descent (top played once): the
+    // first descent note sits at len/2 + 1 — where a "top of the scale" rest
+    // belongs (same rule as the fretboard runner)
+    pp.turn = dir === 'updown' && seq.length >= 4 ? seq.length / 2 + 1 : -1;
+    return seq;
   }
 
-  function psPlay() {
-    if (ps.playing) { psStop(); return; }
-    var info = Theory.scaleInfo(curRoot(), curScale(), preferFlat());
-    var mwin = modeWindow(info);
-    var up = [];
-    if (mwin) {
-      // play the highlighted octave: the mode, tonic to tonic
-      for (var m = mwin[0]; m <= mwin[1]; m++) {
-        if (info.pcSet.has(Theory.mod12(m))) up.push(m);
+  function ppStatus(msg) {
+    if (els.status) els.status.textContent = msg || '';
+  }
+
+  function ppRestClick(t) {
+    if (!pp.click) return;
+    var o = pp.ctx.createOscillator(), gn = pp.ctx.createGain();
+    o.type = 'sine';
+    o.frequency.value = 1150;
+    gn.gain.setValueAtTime(0.09, t);
+    gn.gain.exponentialRampToValueAtTime(0.0001, t + 0.03);
+    o.connect(gn);
+    gn.connect(pp.ctx.destination);
+    o.start(t);
+    o.stop(t + 0.05);
+  }
+
+  function ppTick() {
+    if (pp.nextT < pp.ctx.currentTime + 0.01) pp.nextT = pp.ctx.currentTime + 0.05;
+    var horizon = pp.ctx.currentTime + 0.25;
+    while (pp.nextT < horizon) {
+      // loop rests — same semantics as the fretboard: one-way runs rest at
+      // the wrap seam ("both" doubles it); up-down runs rest at the bottom
+      // ("start"), the top turnaround ("end"), or both sides
+      if (pp.pause > 0 && pp.pausedAtIdx !== pp.idx) {
+        var pos = pp.idx % pp.seq.length;
+        var restBeats = 0;
+        if (pp.idx > 0 && pos === 0) {
+          restBeats = pp.turn > 0 ?
+            ((pp.pausePos === 'start' || pp.pausePos === 'both') ? pp.pause : 0) :
+            (pp.pausePos === 'both' ? pp.pause * 2 : pp.pause);
+        } else if (pp.turn > 0 && pos === pp.turn &&
+                   (pp.pausePos === 'end' || pp.pausePos === 'both')) {
+          restBeats = pp.pause;
+        }
+        if (restBeats > 0) {
+          pp.pausedAtIdx = pp.idx;
+          var beatLen = 60 / pp.bpm;
+          for (var rb = 0; rb < restBeats; rb++) ppRestClick(pp.nextT + rb * beatLen);
+          pp.nextT += restBeats * beatLen;
+          continue;
+        }
       }
-    } else {
-      var rootMidi = 48 + Theory.mod12(curRoot());
-      up = info.steps.map(function (s) { return rootMidi + s; });
-      up.push(rootMidi + 12);
+      var node = pp.path[pp.seq[pp.idx % pp.seq.length]];
+      var when = pp.nextT - pp.ctx.currentTime;
+      var spn = 60 / pp.bpm / pp.rate;
+      if (pp.sound) {
+        var dur = Math.max(0.5, Math.min(1.7, spn * 1.5));
+        play(node.midi, when, dur, pp.idx % (pp.rate > 1 ? pp.rate : 4) === 0 ? 0.55 : 0.42);
+      }
+      if (pp.click) {
+        var o = pp.ctx.createOscillator(), gn = pp.ctx.createGain();
+        o.type = 'sine';
+        o.frequency.value = 1150;
+        gn.gain.setValueAtTime(0.15, pp.nextT);
+        gn.gain.exponentialRampToValueAtTime(0.0001, pp.nextT + 0.03);
+        o.connect(gn);
+        gn.connect(pp.ctx.destination);
+        o.start(pp.nextT);
+        o.stop(pp.nextT + 0.05);
+      }
+      pp.vis.push({ t: pp.nextT, midi: node.midi, step: pp.idx });
+      if (pp.vis.length > 64) pp.vis.shift();
+      pp.idx++;
+      pp.nextT += spn;
     }
-    var seq = up.concat(up.slice(0, up.length - 1).reverse());
-    var bpm = Math.max(30, Math.min(280, parseInt(App.store.get('met.bpm', 120), 10) || 120));
-    var spb = 60 / bpm;
-    try { App.getAudio(); } catch (e) { return; }
-    ps.playing = true;
+  }
+
+  function ppRing(midi) {
+    var svg = document.getElementById('pn-svg');
+    if (!svg) return;
+    var rot = document.getElementById('pn-rot');
+    var ring = document.getElementById('pn-now');
+    var g = svg.querySelector('.pn-dotg[data-midi="' + midi + '"]');
+    if (!g) { if (ring) ring.setAttribute('opacity', '0'); return; }
+    if (!ring) {
+      ring = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      ring.setAttribute('id', 'pn-now');
+      ring.setAttribute('r', '15.5');
+      ring.setAttribute('fill', 'none');
+      ring.setAttribute('stroke', 'var(--accent)');
+      ring.setAttribute('stroke-width', '3.5');
+      ring.setAttribute('pointer-events', 'none');
+      rot.appendChild(ring);
+    }
+    ring.setAttribute('opacity', '1');
+    ring.setAttribute('cx', g.getAttribute('data-cx'));
+    ring.setAttribute('cy', g.getAttribute('data-cy'));
+  }
+
+  function ppDraw() {
+    if (!pp.running) return;
+    var now = pp.ctx.currentTime;
+    var hit = null;
+    while (pp.vis.length && pp.vis[0].t <= now) hit = pp.vis.shift();
+    if (hit) {
+      var spn = 60 / pp.bpm / pp.rate;
+      pressKey(hit.midi, Math.max(120, spn * 700));
+      ppRing(hit.midi);
+      ppStatus((hit.step % pp.seq.length) + 1 + ' / ' + pp.seq.length);
+    }
+    pp.raf = requestAnimationFrame(ppDraw);
+  }
+
+  function ppPlayBtn(running) {
+    if (els.playBtn) {
+      els.playBtn.innerHTML = running ? App.icon('pause', 14) + ' Pause' : App.icon('play', 14) + ' Play';
+    }
+  }
+
+  function ppStart() {
+    pp.path = practicePath();
+    if (!pp.path.length) { ppStatus('no notes'); return; }
+    pp.seq = ppSeq(pp.path, pp.pattern, pp.dir);
+    try { pp.ctx = App.getAudio(); } catch (e) { ppStatus('audio unavailable'); return; }
+    pp.vis.length = 0;
+    pp.pausedAtIdx = -1;
+    pp.nextT = pp.ctx.currentTime + 0.15;
+    if (pp.pause > 0 && pp.idx % pp.seq.length === 0 &&
+        (pp.pausePos === 'start' || pp.pausePos === 'both')) {
+      var b0 = 60 / pp.bpm;
+      for (var pi = 0; pi < pp.pause; pi++) ppRestClick(pp.nextT + pi * b0);
+      pp.nextT += pp.pause * b0;
+    }
+    pp.running = true;
     App.wake.acquire('pn-run');
-    els.playBtn.innerHTML = App.icon('stop', 14) + ' Stop';
-    seq.forEach(function (midi, i) {
-      play(midi, i * spb, Math.max(0.5, spb * 1.5), 0.5);
-      ps.timers.push(setTimeout(function () { pressKey(midi, Math.max(140, spb * 700)); }, i * spb * 1000));
-    });
-    ps.timers.push(setTimeout(psStop, seq.length * spb * 1000 + 400));
+    pp.timer = setInterval(ppTick, 25);
+    ppTick();
+    pp.raf = requestAnimationFrame(ppDraw);
+    ppPlayBtn(true);
+  }
+
+  function ppPause() {
+    if (!pp.running) return;
+    if (pp.timer) { clearInterval(pp.timer); pp.timer = null; }
+    if (pp.raf) { cancelAnimationFrame(pp.raf); pp.raf = 0; }
+    pp.running = false;
+    pp.vis.length = 0;
+    App.wake.release('pn-run');
+    ppPlayBtn(false);
+  }
+
+  function ppStop() {
+    ppPause();
+    pp.idx = 0;
+    pp.pausedAtIdx = -1;
+    var ring = document.getElementById('pn-now');
+    if (ring) ring.setAttribute('opacity', '0');
+    ppStatus('');
+  }
+
+  function ppToggle() { if (pp.running) ppPause(); else ppStart(); }
+
+  function ppRebuild() {
+    pp.idx = 0;
+    pp.pausedAtIdx = -1;
+    if (pp.running) { pp.path = practicePath(); pp.seq = ppSeq(pp.path, pp.pattern, pp.dir); }
   }
 
   // ---------------- jam follow (chord-over-keys, like the fretboard rings) ----------------
@@ -267,6 +439,10 @@
       '.pn-title{font-family:var(--font-display);font-size:19px;font-weight:600;letter-spacing:1px;text-transform:uppercase}' +
       '.pn-stage{overflow-x:auto;-webkit-overflow-scrolling:touch;padding:6px 2px 2px;touch-action:pan-x}' +
       '.pn-stage svg{display:block}' +
+      // portrait column: the rotated keyboard scales to a comfortable width
+      // and the page scrolls down it, exactly like the vertical fretboard
+      '.pn-stage.pn-v{overflow-x:visible;touch-action:auto;display:flex;justify-content:center}' +
+      '.pn-stage.pn-v svg{width:min(360px,94%);height:auto}' +
       '.pn-key{cursor:pointer;transition:filter 80ms ease}' +
       // ivory + ebony in both themes — this is the instrument, not chrome
       '.pn-w{fill:#f7f3ea;stroke:#b9b0a2;stroke-width:1}' +
@@ -280,7 +456,11 @@
       '.pn-jamring.on{opacity:0.95}' +
       '.pn-jamring.root{stroke:var(--accent);stroke-width:3.5}' +
       '.pn-leg{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);font-weight:600}' +
-      '.pn-legend{margin-top:12px}'
+      '.pn-legend{margin-top:12px}' +
+      // compact practice strip — selects keep chevron clearance (fretboard rule)
+      '.pn-practice{margin-top:12px}' +
+      '.pn-practice select{padding:6px 26px 6px 9px;font-size:13px;background-position:right 8px center}' +
+      '.pn-practice input[type=number]{padding:6px 8px;font-size:13px}'
     );
 
     rootEl.innerHTML =
@@ -293,24 +473,70 @@
               '<button type="button" data-pnmode="intervals">Intervals</button>' +
               '<button type="button" data-pnmode="degrees">Degrees</button>' +
             '</div>' +
-            '<button type="button" class="btn sm primary" id="pn-play"></button>' +
+            '<button type="button" class="btn sm" id="pn-rotate" title="Rotate the keyboard (portrait / landscape)" aria-label="Rotate the keyboard">' + App.icon('rotate', 14) + '</button>' +
           '</span>' +
+        '</div>' +
+        '<div class="row tight pn-practice">' +
+          '<button type="button" class="btn sm primary" id="pn-play">' + App.icon('play', 14) + ' Play</button>' +
+          '<button type="button" class="btn sm" id="pn-reset" title="Back to the first note">' + App.icon('restart', 14) + '</button>' +
+          '<select id="pn-type" title="Pattern type">' +
+            '<option value="scale">Scale</option>' +
+            '<option value="group">Groups</option>' +
+            '<option value="interval">Intervals</option>' +
+          '</select>' +
+          '<select id="pn-group" title="Notes per group" style="display:none">' +
+            '<option value="3">3s</option><option value="4">4s</option>' +
+            '<option value="5">5s</option><option value="6">6s</option>' +
+            '<option value="7">7s</option>' +
+          '</select>' +
+          '<select id="pn-iv" title="Interval" style="display:none">' +
+            '<option value="2">2nds</option><option value="3">3rds</option>' +
+            '<option value="4">4ths</option><option value="5">5ths</option>' +
+            '<option value="6">6ths</option><option value="7">7ths</option>' +
+            '<option value="8">Octaves</option>' +
+          '</select>' +
+          '<div class="seg" id="pn-dir" title="Direction">' +
+            '<button type="button" data-pndir="up" title="Ascending" aria-label="Ascending">' + App.icon('up', 15) + '</button>' +
+            '<button type="button" data-pndir="down" title="Descending" aria-label="Descending">' + App.icon('down', 15) + '</button>' +
+            '<button type="button" data-pndir="updown" title="Up, then back down" aria-label="Up, then back down">' + App.icon('updown', 15) + '</button>' +
+          '</div>' +
+          '<input type="number" id="pn-bpm" min="30" max="280" step="1" title="Tempo (BPM) — linked to the metronome" style="width:70px">' +
+          '<select id="pn-rate" title="Notes per beat">' +
+            '<option value="1">1 / beat</option>' +
+            '<option value="2">8ths</option>' +
+            '<option value="3">Triplets</option>' +
+            '<option value="4">16ths</option>' +
+          '</select>' +
+          '<select id="pn-pause" title="Rest between loop repeats — smooths looping practice">' +
+            '<option value="0">No pause</option><option value="1">1-beat pause</option>' +
+            '<option value="2">2-beat pause</option><option value="3">3-beat pause</option>' +
+            '<option value="4">4-beat pause</option>' +
+          '</select>' +
+          '<select id="pn-pausepos" title="Where the rest sits — on up-and-down runs: start = bottom, end = top of the scale, both = both" style="display:none">' +
+            '<option value="start">at start</option><option value="end">at end</option>' +
+            '<option value="both">both sides</option>' +
+          '</select>' +
+          '<label class="row tight small muted" style="gap:5px"><input type="checkbox" id="pn-sound">Notes</label>' +
+          '<label class="row tight small muted" style="gap:5px"><input type="checkbox" id="pn-click">Click</label>' +
+          '<span class="muted small" id="pn-status"></span>' +
         '</div>' +
         '<div class="pn-stage" id="pn-stage"></div>' +
         '<div class="row tight pn-legend" id="pn-legend"></div>' +
-        '<div class="muted small" style="margin-top:10px">Tap a key to hear it. Colors, key and scale are shared with the fretboard ' +
-          '&mdash; change them in the bar above, and customize the degree colors in the fretboard settings. ' +
-          'The Play button runs the scale at the shared tempo, and the Jam tab&#39;s chords light up here live.</div>' +
+        '<div class="muted small" style="margin-top:10px">Tap a key to hear it. Colors, key, scale and tempo are shared with the rest of the app ' +
+          '&mdash; the practice runner plays the highlighted octave with the same patterns, direction and loop pauses as the fretboard, ' +
+          'and the Jam tab&#39;s chords light up here live.</div>' +
       '</div>';
 
     els.title = document.getElementById('pn-title');
     els.stage = document.getElementById('pn-stage');
     els.legend = document.getElementById('pn-legend');
     els.playBtn = document.getElementById('pn-play');
-    els.playBtn.innerHTML = App.icon('play', 14) + ' Play scale';
+    els.status = document.getElementById('pn-status');
 
     state.display = String(App.store.get('pn.display', 'notes'));
     if (!/^(notes|intervals|degrees)$/.test(state.display)) state.display = 'notes';
+    state.orient = App.store.get('pn.orient', 'h') === 'v' ? 'v' : 'h';
+
     var seg = document.getElementById('pn-display');
     function paintSeg() {
       seg.querySelectorAll('button').forEach(function (b) {
@@ -327,7 +553,122 @@
       render();
     });
 
-    els.playBtn.addEventListener('click', psPlay);
+    document.getElementById('pn-rotate').addEventListener('click', function () {
+      state.orient = state.orient === 'h' ? 'v' : 'h';
+      App.store.set('pn.orient', state.orient);
+      render();
+      scrollToWindow();
+    });
+
+    // ---- practice strip wiring (persisted under pn.pr.*; tempo is met.bpm) ----
+    pp.pattern = String(App.store.get('pn.pr.pattern', 'scale'));
+    if (!/^(scale|g[3-7]|i[2-8])$/.test(pp.pattern)) pp.pattern = 'scale';
+    pp.dir = String(App.store.get('pn.pr.dir', 'up'));
+    if (!/^(up|down|updown)$/.test(pp.dir)) pp.dir = 'up';
+    pp.bpm = Math.max(30, Math.min(280, parseInt(App.store.get('met.bpm', 120), 10) || 120));
+    pp.rate = [1, 2, 3, 4].indexOf(App.store.get('pn.pr.rate', 1)) !== -1 ? App.store.get('pn.pr.rate', 1) : 1;
+    pp.pause = Math.max(0, Math.min(4, parseInt(App.store.get('pn.pr.pause', 0), 10) || 0));
+    pp.pausePos = String(App.store.get('pn.pr.pausePos', 'end'));
+    if (!/^(start|end|both)$/.test(pp.pausePos)) pp.pausePos = 'end';
+    pp.sound = App.store.get('pn.pr.sound', true) !== false;
+    pp.click = !!App.store.get('pn.pr.click', false);
+
+    var typeSel = document.getElementById('pn-type');
+    var groupSel = document.getElementById('pn-group');
+    var ivSel = document.getElementById('pn-iv');
+    var mm;
+    if ((mm = /^g([3-7])$/.exec(pp.pattern))) { typeSel.value = 'group'; groupSel.value = mm[1]; }
+    else if ((mm = /^i([2-8])$/.exec(pp.pattern))) { typeSel.value = 'interval'; ivSel.value = mm[1]; }
+    else typeSel.value = 'scale';
+
+    function paintPattern() {
+      groupSel.style.display = typeSel.value === 'group' ? '' : 'none';
+      ivSel.style.display = typeSel.value === 'interval' ? '' : 'none';
+    }
+    paintPattern();
+
+    function patternChanged() {
+      pp.pattern = typeSel.value === 'group' ? 'g' + groupSel.value :
+        typeSel.value === 'interval' ? 'i' + ivSel.value : 'scale';
+      App.store.set('pn.pr.pattern', pp.pattern);
+      paintPattern();
+      ppRebuild();
+    }
+    typeSel.addEventListener('change', patternChanged);
+    groupSel.addEventListener('change', patternChanged);
+    ivSel.addEventListener('change', patternChanged);
+
+    var dirSeg = document.getElementById('pn-dir');
+    function paintDir() {
+      dirSeg.querySelectorAll('button').forEach(function (b) {
+        b.classList.toggle('active', b.getAttribute('data-pndir') === pp.dir);
+      });
+    }
+    paintDir();
+    dirSeg.addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-pndir]');
+      if (!b) return;
+      pp.dir = b.getAttribute('data-pndir');
+      App.store.set('pn.pr.dir', pp.dir);
+      paintDir();
+      ppRebuild();
+    });
+
+    var bpmInp = document.getElementById('pn-bpm');
+    bpmInp.value = String(pp.bpm);
+    bpmInp.addEventListener('change', function () {
+      var v = parseInt(this.value, 10);
+      if (isNaN(v)) v = 120;
+      v = Math.max(30, Math.min(280, v));
+      this.value = String(v);
+      pp.bpm = v;
+      App.store.set('met.bpm', v);
+      App.emit('tempo', { bpm: v, source: 'pn' });
+    });
+    App.on('tempo', function (d) {
+      if (!d || d.source === 'pn') return;
+      pp.bpm = Math.max(30, Math.min(280, Math.round(d.bpm)));
+      bpmInp.value = String(pp.bpm);
+    });
+
+    var rateSel = document.getElementById('pn-rate');
+    rateSel.value = String(pp.rate);
+    rateSel.addEventListener('change', function () {
+      var v = parseInt(this.value, 10);
+      pp.rate = (v >= 1 && v <= 4) ? v : 1;
+      App.store.set('pn.pr.rate', pp.rate);
+    });
+
+    var pauseSel = document.getElementById('pn-pause');
+    var pausePosSel = document.getElementById('pn-pausepos');
+    pauseSel.value = String(pp.pause);
+    pausePosSel.value = pp.pausePos;
+    pausePosSel.style.display = pp.pause > 0 ? '' : 'none';
+    pauseSel.addEventListener('change', function () {
+      pp.pause = Math.max(0, Math.min(4, parseInt(this.value, 10) || 0));
+      App.store.set('pn.pr.pause', pp.pause);
+      pausePosSel.style.display = pp.pause > 0 ? '' : 'none';
+    });
+    pausePosSel.addEventListener('change', function () {
+      pp.pausePos = /^(start|end|both)$/.test(this.value) ? this.value : 'end';
+      App.store.set('pn.pr.pausePos', pp.pausePos);
+    });
+
+    var soundChk = document.getElementById('pn-sound');
+    var clickChk = document.getElementById('pn-click');
+    soundChk.checked = pp.sound;
+    clickChk.checked = pp.click;
+    soundChk.addEventListener('change', function () {
+      pp.sound = !!this.checked;
+      App.store.set('pn.pr.sound', pp.sound);
+    });
+    clickChk.addEventListener('change', function () {
+      pp.click = !!this.checked;
+      App.store.set('pn.pr.click', pp.click);
+    });
+
+    els.playBtn.addEventListener('click', ppToggle);
+    document.getElementById('pn-reset').addEventListener('click', ppStop);
 
     // pointerdown (not click) so keys feel instant, like the tap pads
     els.stage.addEventListener('pointerdown', function (e) {
@@ -339,11 +680,16 @@
       pressKey(midi);
     });
 
-    // shared context: follow key/scale changes from the bar, fretboard, theory…
-    App.on('fb:set', function () { render(); });
-    App.on('fb:scale', function () { render(); });
+    // shared context: follow key/scale/mode changes from the bar, theory page…
+    App.on('fb:set', function () { render(); ppRebuild(); });
+    App.on('fb:scale', function () { render(); ppRebuild(); });
     App.on('jam:chord', function (ev) { jamLast = ev; jamPaint(ev); });
     App.on('jam:stopped', function () { jamLast = null; jamPaint(null); });
+
+    // pause (keep position) when the whole app goes to the background
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) ppPause();
+    });
 
     prefetch();
     render();
@@ -351,11 +697,11 @@
 
   function onShow() {
     render();       // palette may have been customized in the fretboard settings
-    scrollToRoot();
+    scrollToWindow();
   }
 
   function onHide() {
-    psStop();
+    ppPause();      // exercise pauses (keeps its place) when leaving the tab
   }
 
   App.register('piano', {
