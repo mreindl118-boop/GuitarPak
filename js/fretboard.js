@@ -268,6 +268,12 @@
     var win = null;
     if (isPent() && state.pos > 0) win = boxWindow(state.pos, info.pcSet);
 
+    // one-string practice: the run slides the WHOLE string, so the board must
+    // show it that way — full-neck dots on the practiced string, other strings
+    // dimmed, and no mode band unless the "Mode box" lock is on
+    var ssStr = ssString();
+    var ssLockOn = ssStr >= 0 && pr.ssLock && isHept();
+
     var boardTop = TOP - 15;
     var boardBot = TOP + 5 * GAP + 15;
     var s = [];
@@ -288,8 +294,9 @@
       '" height="' + (boardBot - boardTop) + '" rx="4" fill="var(--panel)"/>');
 
     // mode practice window (7-note scales): a soft band marking where the
-    // exercise runs — the notes themselves never change or hide
-    if (isHept()) {
+    // exercise runs — the notes themselves never change or hide. Hidden for a
+    // free one-string run (whole string IS the exercise); shown when locked.
+    if (isHept() && (ssStr < 0 || ssLockOn)) {
       var mwin = modeWindow(state.mode);
       var bx0 = mwin[0] === 0 ? LABEL_W : nutX + (mwin[0] - 1) * FRET_W;
       var bx1 = nutX + Math.min(mwin[1], N) * FRET_W;
@@ -348,10 +355,13 @@
     for (r = 0; r < 6; r++) {
       var si = 5 - r;
       var cy = rowY(r);
+      var onSS = si === ssStr; // the string a one-string run slides along
       for (f = 0; f <= N; f++) {
         var pc = Theory.mod12(tun.midi[si] + f);
         if (!info.pcSet.has(pc)) continue;
-        if (win && (f < win[0] || f > win[1])) continue;
+        // the pent-box filter never hides the practiced string — its whole
+        // length is the exercise
+        if (win && (f < win[0] || f > win[1]) && !onSS) continue;
         var step = info.pcToStep.get(pc);
         var fill = DEG_COLORS[step % 7];
         var label;
@@ -359,11 +369,12 @@
         else if (state.display === 'degrees') label = String(step + 1);
         else label = Theory.pcName(pc, pf);
         var cx = fx(colCX(f));
+        var dim = ssStr >= 0 && !onSS ? ' opacity="0.3"' : '';
         s.push('<circle cx="' + cx + '" cy="' + cy + '" r="11.5" fill="' + fill + '"' +
-          (step === 0 ? ' stroke="#ffffff" stroke-width="1.6"' : '') + '/>');
+          (step === 0 ? ' stroke="#ffffff" stroke-width="1.6"' : '') + dim + '/>');
         s.push('<text x="' + cx + '" y="' + (cy + 3.5) +
-          '" text-anchor="middle" font-size="10.5" font-weight="700" fill="' + DEG_TEXT + '">' +
-          label + '</text>');
+          '" text-anchor="middle" font-size="10.5" font-weight="700" fill="' + DEG_TEXT + '"' +
+          dim + '>' + label + '</text>');
       }
     }
 
@@ -641,8 +652,17 @@
   var pr = {
     running: false, idx: 0, seq: null, path: [], dirs: null,
     pattern: 'scale', dir: 'up', pick: 'alt', bpm: 80, rate: 1, sound: true, click: true,
+    ssLock: false,            // one-string runs the WHOLE string unless locked to the mode box
+    pause: 0, pausePos: 'end', // 1-4 beat rest at the loop seam (start | end | both)
+    pausedAtIdx: -1,
     timer: null, raf: 0, nextT: 0, vis: [], ctx: null
   };
+
+  // active one-string pattern? -> string index, else -1
+  function ssString() {
+    var m = /^ss([0-5])$/.exec(pr.pattern);
+    return m ? parseInt(m[1], 10) : -1;
+  }
 
   function colCX2(f) {
     var nutX = LABEL_W + OPEN_W;
@@ -676,6 +696,7 @@
       rootPc: state.root, scaleId: state.scale, tuningId: state.tuning,
       maxFret: state.frets, mode: state.mode, pentBox: isPent() ? state.pos : 0,
       singleString: ss ? parseInt(ss[1], 10) : undefined,
+      fretWindow: (ss && pr.ssLock && isHept()) ? modeWindow(state.mode) : undefined,
       stringMask: im ? parseInt(im[1], 10) : undefined
     }).map(function (n) {
       return { s: n.s, f: n.f, midi: n.midi, cx: colCX2(n.f), cy: rowY2(n.s) };
@@ -754,12 +775,40 @@
     return pr.rate > 1 ? pr.rate : 4;
   }
 
+  // a rest beat's soft tick — the pulse keeps going through the pause so the
+  // loop stays locked to the beat
+  function prRestClick(t) {
+    if (!pr.click) return;
+    var o = pr.ctx.createOscillator(), gn = pr.ctx.createGain();
+    o.type = 'sine';
+    o.frequency.value = 1150;
+    gn.gain.setValueAtTime(0.09, t);
+    gn.gain.exponentialRampToValueAtTime(0.0001, t + 0.03);
+    o.connect(gn);
+    gn.connect(pr.ctx.destination);
+    o.start(t);
+    o.stop(t + 0.05);
+  }
+
   function prTick() {
     // if a main-thread stall left us behind the audio clock, jump forward —
     // a short gap beats a burst of silent past-dated notes
     if (pr.nextT < pr.ctx.currentTime + 0.01) pr.nextT = pr.ctx.currentTime + 0.05;
     var horizon = pr.ctx.currentTime + 0.25;
     while (pr.nextT < horizon) {
+      // loop seam: rest for the configured beats before the next pass
+      // ("start" and "end" meet here; "both" doubles the gap). pausedAtIdx
+      // guards the wrap so a pause that crosses the horizon isn't re-added
+      // by the next scheduler tick.
+      if (pr.pause > 0 && pr.idx > 0 && pr.idx % pr.seq.length === 0 &&
+          pr.pausedAtIdx !== pr.idx) {
+        pr.pausedAtIdx = pr.idx;
+        var restBeats = pr.pausePos === 'both' ? pr.pause * 2 : pr.pause;
+        var beatLen = 60 / pr.bpm;
+        for (var rb = 0; rb < restBeats; rb++) prRestClick(pr.nextT + rb * beatLen);
+        pr.nextT += restBeats * beatLen;
+        continue; // re-check the horizon before scheduling the note
+      }
       var node = pr.path[pr.seq[pr.idx % pr.seq.length]];
       var nextNode = pr.path[pr.seq[(pr.idx + 1) % pr.seq.length]];
       var when = pr.nextT - pr.ctx.currentTime;
@@ -1118,7 +1167,15 @@
     pr.seq = prSeq(pr.path, pr.pattern, pr.dir);
     try { pr.ctx = App.getAudio(); } catch (e) { prStatus('audio unavailable'); return; }
     pr.vis.length = 0;
+    pr.pausedAtIdx = -1;
     pr.nextT = pr.ctx.currentTime + 0.15;
+    // count-in rest before the very first note when the pause sits at the start
+    if (pr.pause > 0 && pr.idx % pr.seq.length === 0 &&
+        (pr.pausePos === 'start' || pr.pausePos === 'both')) {
+      var b0 = 60 / pr.bpm;
+      for (var pi = 0; pi < pr.pause; pi++) prRestClick(pr.nextT + pi * b0);
+      pr.nextT += pr.pause * b0;
+    }
     pr.running = true;
     App.wake.acquire('fb-run');
     pr.timer = setInterval(prTick, 25);
@@ -1164,6 +1221,10 @@
     if (!/^(up|down|updown)$/.test(pr.dir)) pr.dir = 'up';
     pr.pick = String(App.store.get('fb.pr.pick', 'alt'));
     if (!/^(alt|eco|down|up|off)$/.test(pr.pick)) pr.pick = 'alt';
+    pr.ssLock = !!App.store.get('fb.pr.ssLock', false);
+    pr.pause = Math.max(0, Math.min(4, parseInt(App.store.get('fb.pr.pause', 0), 10) || 0));
+    pr.pausePos = String(App.store.get('fb.pr.pausePos', 'end'));
+    if (!/^(start|end|both)$/.test(pr.pausePos)) pr.pausePos = 'end';
     // tempo is SHARED with the metronome — met.bpm is the single source of truth
     pr.bpm = Math.max(30, Math.min(280, parseInt(App.store.get('met.bpm', 100), 10) || 100));
     pr.rate = App.store.get('fb.pr.rate', 1);
@@ -1237,6 +1298,11 @@
       ivSel.style.display = t === 'interval' ? '' : 'none';
       stripEl.style.display = t === 'interval' ? '' : 'none';
       strSel.style.display = t === 'string' ? '' : 'none';
+      var lockBtn = document.getElementById('fb-pr-sslock');
+      if (lockBtn) {
+        lockBtn.style.display = t === 'string' ? '' : 'none';
+        lockBtn.classList.toggle('active', pr.ssLock);
+      }
     }
 
     function compose() {
@@ -1253,6 +1319,7 @@
       paintPatternUI();
       pr.idx = 0;
       if (pr.running) { pr.path = prPath(); pr.seq = prSeq(pr.path, pr.pattern, pr.dir); }
+      renderBoard(); // one-string dimming / mode-band visibility follow the pattern
       renderAltView();
       if (/^ss/.test(pr.pattern) && state.view === 'board') scrollToFret(0);
     }
@@ -1291,6 +1358,34 @@
       if (pr.running) { pr.path = prPath(); pr.seq = prSeq(pr.path, pr.pattern, pr.dir); }
       renderAltView();
     });
+    // one-string "Mode box" lock (default off: the run slides the whole string)
+    var lockBtn = document.getElementById('fb-pr-sslock');
+    lockBtn.addEventListener('click', function () {
+      pr.ssLock = !pr.ssLock;
+      App.store.set('fb.pr.ssLock', pr.ssLock);
+      lockBtn.classList.toggle('active', pr.ssLock);
+      pr.idx = 0;
+      if (pr.running) { pr.path = prPath(); pr.seq = prSeq(pr.path, pr.pattern, pr.dir); }
+      renderBoard();
+      renderAltView();
+    });
+
+    // loop pauses: 1-4 beats at the seam (start / end / both sides)
+    var pauseSel = document.getElementById('fb-pr-pause');
+    var pausePosSel = document.getElementById('fb-pr-pausepos');
+    pauseSel.value = String(pr.pause);
+    pausePosSel.value = pr.pausePos;
+    pausePosSel.style.display = pr.pause > 0 ? '' : 'none';
+    pauseSel.addEventListener('change', function () {
+      pr.pause = Math.max(0, Math.min(4, parseInt(this.value, 10) || 0));
+      App.store.set('fb.pr.pause', pr.pause);
+      pausePosSel.style.display = pr.pause > 0 ? '' : 'none';
+    });
+    pausePosSel.addEventListener('change', function () {
+      pr.pausePos = /^(start|end|both)$/.test(this.value) ? this.value : 'end';
+      App.store.set('fb.pr.pausePos', pr.pausePos);
+    });
+
     var pickSel = document.getElementById('fb-pr-pick');
     pickSel.value = pr.pick;
     pickSel.addEventListener('change', function () {
@@ -1554,6 +1649,8 @@
           '<select id="fb-pr-iv" title="Interval" style="display:none"></select>' +
           '<span class="row tight" id="fb-pr-strings" title="Tap strings on or off" style="display:none"></span>' +
           '<select id="fb-pr-string" title="Which string" style="display:none"></select>' +
+          '<button type="button" class="chip fb-chip" id="fb-pr-sslock" style="display:none" ' +
+            'title="Lock the one-string run to the current mode&#39;s box. Off (default): slide the whole string.">Mode box</button>' +
           '<div class="seg" id="fb-pr-dir" title="Direction — applies to every pattern">' +
             '<button type="button" data-fbdir="up" title="Ascending">&#8593;</button>' +
             '<button type="button" data-fbdir="down" title="Descending">&#8595;</button>' +
@@ -1573,6 +1670,15 @@
             '<option value="2">8ths</option>' +
             '<option value="3">Triplets</option>' +
             '<option value="4">16ths</option>' +
+          '</select>' +
+          '<select id="fb-pr-pause" title="Rest between loop repeats — smooths looping practice">' +
+            '<option value="0">No pause</option><option value="1">1-beat pause</option>' +
+            '<option value="2">2-beat pause</option><option value="3">3-beat pause</option>' +
+            '<option value="4">4-beat pause</option>' +
+          '</select>' +
+          '<select id="fb-pr-pausepos" title="Where the rest sits in the loop" style="display:none">' +
+            '<option value="start">at start</option><option value="end">at end</option>' +
+            '<option value="both">both sides</option>' +
           '</select>' +
           '<label class="row tight small muted" style="gap:5px"><input type="checkbox" id="fb-pr-sound">Notes</label>' +
           '<label class="row tight small muted" style="gap:5px"><input type="checkbox" id="fb-pr-click">Click</label>' +
