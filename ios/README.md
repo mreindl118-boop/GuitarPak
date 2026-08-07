@@ -1,46 +1,58 @@
-# GuitarLab — iPad/iPhone wrapper (WKWebView)
+# GuitarLab — native iPad/iPhone app (WKWebView + CoreMIDI)
 
-The exact analog of `android/`: a full-screen WKWebView serving the bundled
-web app, with the same native bridges (microphone permission, keep-screen-on,
-external links to Safari).
+The analog of `android/`: a full-screen WKWebView serving the bundled web
+app, with native bridges the web can't get on iOS by itself:
 
-## What you need (none of this exists in the cloud session)
+- **CoreMIDI bridge** (`MIDIBridge.swift`) — the big one. WebKit has no Web
+  MIDI, so the wrapper feeds CoreMIDI to the web app instead:
+  USB **and Bluetooth** MIDI keyboards (ROLI LUMI!), input with velocity /
+  per-key bend / pressure, LED output, LUMI SysEx, plus the system
+  **Bluetooth MIDI pairing sheet** (a "Pair Bluetooth…" button appears in the
+  app's Settings when running in this wrapper). `js/midi.js` auto-detects the
+  bridge — the exact same web code drives Web MIDI in Chrome and CoreMIDI here.
+- Microphone permission (tuner), keep-screen-on, external links to Safari.
 
-- A Mac with **Xcode 15+**
-- **XcodeGen** (`brew install xcodegen`) — generates the `.xcodeproj` from
-  `project.yml`, so no binary project file lives in git
-- An **Apple ID** (free: 7-day sideload to your own devices via Xcode) or an
-  **Apple Developer account** ($99/yr: TestFlight + App Store)
+## Getting it built (three paths)
 
-## Build steps
+### A. No Mac at all — GitHub Actions + sideload  ← easiest today
+1. Run the **"iOS app (unsigned IPA)"** workflow on GitHub (Actions tab →
+   Run workflow; it also runs automatically when `ios/**` changes on main).
+2. Download the `GuitarLab-unsigned-ipa` artifact.
+3. Install **AltStore** (altstore.io) or **SideStore** — their desktop helper
+   runs on Windows — and sideload the IPA onto the iPad with your free
+   Apple ID. Free-account apps re-sign every 7 days (AltStore automates the
+   refresh when the iPad is on your Wi-Fi).
 
+### B. A Mac with Xcode (borrowed counts)
 ```sh
+brew install xcodegen
 cd ios
 ./sync-web.sh          # copy the web app into ios/WebAssets/
 xcodegen               # generate GuitarLab.xcodeproj
 open GuitarLab.xcodeproj
 ```
+Pick your team under Signing & Capabilities, select the iPad, Run. Free
+Apple ID = 7-day resign; paid Developer account = 1-year certs + TestFlight.
 
-Then in Xcode: select your team under Signing & Capabilities, pick your iPad
-as the destination, and Run.
+### C. Apple Developer account ($99/yr) — the "real app" path
+Same build, then archive → TestFlight (easy installs + updates for friends)
+or App Store. This is the only route with friction-free updates.
 
-## How the pieces map to the Android wrapper
+## How the pieces map across platforms
 
-| Concern              | android/                          | ios/                                       |
-|----------------------|-----------------------------------|--------------------------------------------|
+| Concern              | android/                          | ios/                                        |
+|----------------------|-----------------------------------|---------------------------------------------|
 | Web bundle           | `assets/` in the APK              | `WebAssets/` folder reference in the bundle |
-| Mic permission       | `onPermissionRequest` + runtime   | `WKUIDelegate` grant + `NSMicrophoneUsageDescription` |
+| MIDI                 | (WebView: none)                   | CoreMIDI bridge, incl. Bluetooth pairing    |
+| Mic permission       | `onPermissionRequest` + runtime   | `WKUIDelegate` grant + usage description    |
 | Keep screen on       | `FLAG_KEEP_SCREEN_ON` bridge      | `isIdleTimerDisabled` via script message    |
-| External links       | `Intent.ACTION_VIEW`              | `UIApplication.open`, policy = cancel      |
-| JS-side hook         | `window.GuitarLabHost`            | same object, injected as a user script     |
-
-The web app already speaks this bridge (`GuitarLabHost.setKeepScreenOn`), so
-no web changes are needed — the same code drives both wrappers.
+| External links       | `Intent.ACTION_VIEW`              | `UIApplication.open`, policy = cancel       |
+| JS-side hooks        | `window.GuitarLabHost`            | same + `messageHandlers.midi` / `__glMIDI`  |
 
 ## Updates
 
-The in-app update checker works here too (fetches `version.json` from GitHub),
-but iOS cannot install an IPA from a link — the button opens the download page
-in Safari, and actual app updates ship through TestFlight/App Store (or a
-re-run from Xcode). For friction-free updates on iPad, the PWA
-(Add to Home Screen from Safari) remains the recommended install.
+The in-app checker still fetches `version.json`, but iOS can't install an
+IPA from a link — updates ship by re-running the workflow + re-sideloading
+(AltStore can auto-update from a source URL), via TestFlight, or through
+Xcode. The PWA (Add to Home Screen in Safari) remains the zero-friction
+install when MIDI isn't needed.

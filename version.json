@@ -1,5 +1,5 @@
 {
-  "version": "0.35.0",
+  "version": "0.36.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "MIDI keyboard support (ROLI and friends): connect in Settings and play the app's piano with velocity, key-wiggle pitch bend and pressure. LED guidance on the device: practice runs light the current note bright and the next note dim, the chord explorer lights the chord's keys, and the new Guide mode waits for YOU to play each lit note before moving on. Plus piano chords in the chord explorer - every chord drawn on a keyboard, tap to hear it, and playing it on your MIDI keyboard confirms the match. Experimental ROLI LUMI key/scale sync included."
+  "notes": "Native iPad app groundwork: the iOS wrapper now has a full CoreMIDI bridge, so as a native app the ROLI connects over Bluetooth ON the iPad - same expressive input, LED guidance and LUMI sync as Chrome, plus a system Bluetooth pairing button right in Settings. A cloud build workflow produces the installable iPad app without needing a Mac (sideload with AltStore). Web app unchanged in the browser."
 }

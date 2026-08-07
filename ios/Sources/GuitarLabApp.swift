@@ -26,6 +26,8 @@ struct WebShell: UIViewRepresentable {
 
         // window.GuitarLabHost — the same bridge object the Android wrapper
         // exposes, so the web app's App.wake code drives both platforms.
+        // The presence of messageHandlers.midi is what flips js/midi.js into
+        // its native-bridge backend (CoreMIDI instead of Web MIDI).
         let bridge = """
         window.GuitarLabHost = {
           setKeepScreenOn: function (on) {
@@ -36,10 +38,12 @@ struct WebShell: UIViewRepresentable {
         config.userContentController.addUserScript(WKUserScript(
             source: bridge, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         config.userContentController.add(context.coordinator, name: "wake")
+        config.userContentController.add(context.coordinator, name: "midi")
 
         let web = WKWebView(frame: .zero, configuration: config)
         web.uiDelegate = context.coordinator
         web.navigationDelegate = context.coordinator
+        context.coordinator.midiBridge.webView = web
         web.scrollView.contentInsetAdjustmentBehavior = .never
         web.isOpaque = false
         web.backgroundColor = UIColor(red: 0.075, green: 0.067, blue: 0.078, alpha: 1)
@@ -56,6 +60,8 @@ struct WebShell: UIViewRepresentable {
     final class Coordinator: NSObject, WKUIDelegate, WKNavigationDelegate,
                              WKScriptMessageHandler {
 
+        let midiBridge = MIDIBridge()
+
         // Tuner mic: grant capture to our own bundled pages; iOS shows its own
         // system permission prompt the first time (NSMicrophoneUsageDescription).
         func webView(_ webView: WKWebView,
@@ -66,13 +72,34 @@ struct WebShell: UIViewRepresentable {
             decisionHandler(type == .microphone ? .grant : .deny)
         }
 
-        // GuitarLabHost.setKeepScreenOn(bool) -> idle timer
+        // GuitarLabHost.setKeepScreenOn(bool) -> idle timer;
+        // messageHandlers.midi -> CoreMIDI bridge commands
         func userContentController(_ userContentController: WKUserContentController,
                                    didReceive message: WKScriptMessage) {
-            guard message.name == "wake" else { return }
-            let on = (message.body as? Bool) ?? false
-            DispatchQueue.main.async {
-                UIApplication.shared.isIdleTimerDisabled = on
+            if message.name == "wake" {
+                let on = (message.body as? Bool) ?? false
+                DispatchQueue.main.async {
+                    UIApplication.shared.isIdleTimerDisabled = on
+                }
+                return
+            }
+            guard message.name == "midi", let body = message.body as? [String: Any],
+                  let cmd = body["cmd"] as? String else { return }
+            DispatchQueue.main.async { [midiBridge] in
+                switch cmd {
+                case "init":
+                    midiBridge.start()
+                case "send":
+                    if let data = body["data"] as? [Any] {
+                        midiBridge.send(data.compactMap { ($0 as? NSNumber)?.uint8Value })
+                    }
+                case "setOutput":
+                    if let id = (body["id"] as? NSNumber)?.intValue { midiBridge.setOutput(id: id) }
+                case "bluetooth":
+                    midiBridge.presentBluetoothPairing()
+                default:
+                    break
+                }
             }
         }
 
