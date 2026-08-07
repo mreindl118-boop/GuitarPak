@@ -1,5 +1,5 @@
 {
-  "version": "0.26.0",
+  "version": "0.27.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "The guitar is finally a guitar: all three guitar voices now use real recorded instrument notes (tonejs-instruments' community-recorded samples) instead of soundfont renders - warm attack, long natural ring, no harpsichord anywhere on the neck. Levels rebalanced, memory kept lean. Plus 0.25's full-neck coverage, button-style dropdowns and the Bebas Neue text overhaul."
+  "notes": "New Theory tab: an interactive circle of fifths that re-keys the whole app with a tap, a key guide showing your scale's notes, intervals, chords and related keys (with one-tap jumps to the Chords tab and the practice runner), and a degree ear trainer that uses the same colors as the fretboard. Plus 0.26's real recorded guitar samples."
 }
