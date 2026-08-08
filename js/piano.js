@@ -26,6 +26,33 @@
   };
   var jamLast = null;
 
+  // ---- QWERTY keyboard input (iPad Magic Keyboard, any physical keyboard) ----
+  // Ableton/GarageBand-style default: home row = white keys, top row = black
+  // keys, Z/X shift octaves. Mapped by e.code (physical position, so it works
+  // on any layout), fully remappable from the panel, persisted pn.qwMap.
+  var QW_DEFAULT = {
+    KeyA: 0, KeyW: 1, KeyS: 2, KeyE: 3, KeyD: 4, KeyF: 5, KeyT: 6,
+    KeyG: 7, KeyY: 8, KeyH: 9, KeyU: 10, KeyJ: 11, KeyK: 12, KeyO: 13,
+    KeyL: 14, KeyP: 15, Semicolon: 16
+  };
+  var qw = { on: true, oct: 0, map: null, held: {}, learn: -1 };
+
+  function qwBase() { return 60 + qw.oct * 12; } // C4 by default, Z/X shifts
+
+  function qwKeyLabel(code) {
+    if (/^Key([A-Z])$/.test(code)) return code.slice(3);
+    if (/^Digit([0-9])$/.test(code)) return code.slice(5);
+    return { Semicolon: ';', Quote: "'", Comma: ',', Period: '.', Slash: '/',
+      BracketLeft: '[', BracketRight: ']', Backquote: '`', Minus: '-', Equal: '=' }[code] || code;
+  }
+
+  function qwCodeFor(offset) {
+    for (var c in qw.map) if (qw.map[c] === offset) return c;
+    return null;
+  }
+
+  function qwSaveMap() { App.store.set('pn.qwMap', qw.map); }
+
   // keyboard range: C2..C6 — brackets the guitar's practical range
   var LO = 36, HI = 84;
   var WHITE_PCS = [0, 2, 4, 5, 7, 9, 11];
@@ -241,6 +268,19 @@
         blacks += '<rect class="pn-key pn-b" data-midi="' + midi + '" data-pc="' + pc + '" x="' + x +
           '" y="0" width="' + BW + '" height="' + BH + '" rx="3"/>';
         cx = x + BW / 2; cy = BH - 18;
+      }
+      // QWERTY hints: the computer key that plays this piano key right now
+      if (qw.on) {
+        var qOff = midi - qwBase();
+        if (qOff >= 0 && qOff <= 16) {
+          var qc = qwCodeFor(qOff);
+          if (qc) {
+            // white hints sit below the black-key zone where the key is clear
+            labels += '<text class="' + (isWhite ? 'pn-qwl' : 'pn-qwlb') + '" x="' +
+              (isWhite ? x + W / 2 : x + BW / 2) + '" y="' + (isWhite ? BH + 24 : 18) +
+              '" text-anchor="middle">' + qwKeyLabel(qc) + '</text>';
+          }
+        }
       }
       if (inScale) {
         var col = cols[step % 7];
@@ -549,6 +589,90 @@
     if (pp.guiding) { pp.path = practicePath(); pp.seq = ppSeq(pp.path, pp.pattern, pp.dir); guideTarget(); }
   }
 
+  // ---------------- QWERTY input handling ----------------
+
+  function qwTyping(e) {
+    var t = e.target;
+    return t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
+  }
+
+  function qwFlashOctave() {
+    ppStatus('keys octave: ' + Theory.midiName(qwBase(), false) + ' – ' +
+      Theory.midiName(Math.min(HI, qwBase() + 16), false));
+  }
+
+  function qwDown(e) {
+    if (App.active !== 'piano' || !qw.on || qwTyping(e) || e.repeat ||
+        e.ctrlKey || e.metaKey || e.altKey) return;
+    // remap capture: the next key pressed claims the slot being edited
+    if (qw.learn >= 0) {
+      e.preventDefault();
+      e.stopPropagation();
+      var off = qw.learn;
+      var old = qwCodeFor(off);
+      if (old) delete qw.map[old];
+      delete qw.map[e.code]; // a key maps to one note only
+      qw.map[e.code] = off;
+      qw.learn = -1;
+      qwSaveMap();
+      renderQwPanel();
+      render();
+      return;
+    }
+    if (e.code === 'KeyZ' || e.code === 'KeyX') {
+      var next = qw.oct + (e.code === 'KeyZ' ? -1 : 1);
+      // keep the whole 17-key window on the drawn keyboard
+      if (qwBase() + (e.code === 'KeyZ' ? -12 : 12) >= LO &&
+          qwBase() + (e.code === 'KeyZ' ? -12 : 12) + 16 <= HI + 4) {
+        qw.oct = next;
+        App.store.set('pn.qwOct', qw.oct);
+        render();
+        qwFlashOctave();
+      }
+      e.preventDefault();
+      return;
+    }
+    var off2 = qw.map[e.code];
+    if (off2 === undefined) return;
+    var midi = qwBase() + off2;
+    if (midi < LO || midi > HI) return;
+    e.preventDefault();
+    qw.held[e.code] = midi;
+    noteOn(midi, 100, 99); // pseudo-channel for computer-keyboard voices
+    pressKeyHold(midi, true);
+    guideCheck(midi);
+  }
+
+  function qwUp(e) {
+    var midi = qw.held[e.code];
+    if (midi === undefined) return;
+    delete qw.held[e.code];
+    noteOff(midi, 99);
+    pressKeyHold(midi, false);
+  }
+
+  // held visual (press for as long as the computer key is down)
+  function pressKeyHold(midi, down) {
+    var svg = document.getElementById('pn-svg');
+    if (!svg) return;
+    var k = svg.querySelector('.pn-key[data-midi="' + midi + '"]');
+    if (k) k.classList.toggle('pn-down', down);
+  }
+
+  function renderQwPanel() {
+    if (!els.qwPanel) return;
+    var NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B', 'C', 'C#', 'D', 'D#', 'E'];
+    var h = '';
+    for (var off = 0; off <= 16; off++) {
+      var code = qwCodeFor(off);
+      h += '<button type="button" class="chip pn-qwslot' + (qw.learn === off ? ' active' : '') +
+        '" data-pnqw="' + off + '" title="Tap, then press the key you want for this note">' +
+        '<b>' + NOTE_NAMES[off] + (off >= 12 ? "'" : '') + '</b>' +
+        (qw.learn === off ? 'press a key…' : (code ? qwKeyLabel(code) : '—')) + '</button>';
+    }
+    els.qwSlots.innerHTML = h;
+  }
+
   // ---------------- jam follow (chord-over-keys, like the fretboard rings) ----------------
 
   function jamPaint(ev) {
@@ -589,6 +713,14 @@
       '.pn-jamring.root{stroke:var(--accent);stroke-width:3.5}' +
       '.pn-leg{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);font-weight:600}' +
       '.pn-legend{margin-top:12px}' +
+      // QWERTY key hints on the drawn keys + the remap panel
+      '.pn-qwl{font:600 10px var(--font-body);fill:#8d8375;pointer-events:none}' +
+      '.pn-qwlb{font:600 10px var(--font-body);fill:#b9b0a2;pointer-events:none}' +
+      '.pn-qwpanel{display:none;margin-top:12px;padding:12px 14px;background:var(--card2);' +
+        'border:1px solid var(--line);border-radius:12px}' +
+      '.pn-qwpanel.open{display:block}' +
+      '.pn-qwslot{cursor:pointer;font-family:inherit;color:var(--text);gap:6px}' +
+      '.pn-qwslot b{color:var(--accent);font-size:12px}' +
       // compact practice strip — selects keep chevron clearance (fretboard rule)
       '.pn-practice{margin-top:12px}' +
       '.pn-practice select{padding:6px 26px 6px 9px;font-size:13px;background-position:right 8px center}' +
@@ -605,8 +737,17 @@
               '<button type="button" data-pnmode="intervals">Intervals</button>' +
               '<button type="button" data-pnmode="degrees">Degrees</button>' +
             '</div>' +
+            '<button type="button" class="chip fb-chip" id="pn-qw" title="Play the piano with your computer or iPad keyboard — home row = white keys, top row = black keys, Z/X shift octaves">Keys</button>' +
+            '<button type="button" class="btn sm" id="pn-qwmap" title="Remap which computer key plays which note">Remap</button>' +
             '<button type="button" class="btn sm" id="pn-rotate" title="Rotate the keyboard (portrait / landscape)" aria-label="Rotate the keyboard">' + App.icon('rotate', 14) + '</button>' +
           '</span>' +
+        '</div>' +
+        '<div class="pn-qwpanel" id="pn-qwpanel">' +
+          '<div class="row tight" id="pn-qwslots"></div>' +
+          '<div class="row tight" style="margin-top:10px">' +
+            '<button type="button" class="btn sm" id="pn-qwreset">Reset layout</button>' +
+            '<span class="muted small">Tap a note, then press the key you want for it. Z / X move the whole layout an octave down / up.</span>' +
+          '</div>' +
         '</div>' +
         '<div class="row tight pn-practice">' +
           '<button type="button" class="btn sm primary" id="pn-play">' + App.icon('play', 14) + ' Play</button>' +
@@ -656,9 +797,10 @@
         '</div>' +
         '<div class="pn-stage" id="pn-stage"></div>' +
         '<div class="row tight pn-legend" id="pn-legend"></div>' +
-        '<div class="muted small" style="margin-top:10px">Tap a key to hear it. Colors, key, scale and tempo are shared with the rest of the app ' +
-          '&mdash; the practice runner plays the highlighted octave with the same patterns, direction and loop pauses as the fretboard, ' +
-          'and the Jam tab&#39;s chords light up here live.</div>' +
+        '<div class="muted small" style="margin-top:10px">Tap a key to hear it &mdash; or play with a MIDI keyboard, or any typing keyboard ' +
+          '(iPad Magic Keyboard included): home row = white keys, top row = black keys, Z / X shift octaves, Remap to customize. ' +
+          'Colors, key, scale and tempo are shared with the rest of the app; the practice runner plays the highlighted octave ' +
+          'with the same patterns, direction and loop pauses as the fretboard, and the Jam tab&#39;s chords light up here live.</div>' +
       '</div>';
 
     els.title = document.getElementById('pn-title');
@@ -670,6 +812,56 @@
     state.display = String(App.store.get('pn.display', 'notes'));
     if (!/^(notes|intervals|degrees)$/.test(state.display)) state.display = 'notes';
     state.orient = App.store.get('pn.orient', 'h') === 'v' ? 'v' : 'h';
+
+    // QWERTY input: persisted toggle, octave, custom map
+    qw.on = App.store.get('pn.qw', true) !== false;
+    qw.oct = parseInt(App.store.get('pn.qwOct', 0), 10) || 0;
+    if (qw.oct < -2 || qw.oct > 1) qw.oct = 0;
+    var storedMap = App.store.get('pn.qwMap', null);
+    qw.map = {};
+    if (storedMap && typeof storedMap === 'object') {
+      Object.keys(storedMap).forEach(function (c) {
+        var v = parseInt(storedMap[c], 10);
+        if (v >= 0 && v <= 16 && /^[A-Za-z0-9]+$/.test(c)) qw.map[c] = v;
+      });
+    }
+    if (!Object.keys(qw.map).length) {
+      Object.keys(QW_DEFAULT).forEach(function (c) { qw.map[c] = QW_DEFAULT[c]; });
+    }
+    els.qwPanel = document.getElementById('pn-qwpanel');
+    els.qwSlots = document.getElementById('pn-qwslots');
+    var qwChip = document.getElementById('pn-qw');
+    qwChip.classList.toggle('active', qw.on);
+    qwChip.addEventListener('click', function () {
+      qw.on = !qw.on;
+      App.store.set('pn.qw', qw.on);
+      this.classList.toggle('active', qw.on);
+      if (!qw.on) els.qwPanel.classList.remove('open');
+      render();
+    });
+    document.getElementById('pn-qwmap').addEventListener('click', function () {
+      els.qwPanel.classList.toggle('open');
+      qw.learn = -1;
+      renderQwPanel();
+    });
+    els.qwSlots.addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-pnqw]');
+      if (!b) return;
+      var off = parseInt(b.getAttribute('data-pnqw'), 10);
+      qw.learn = qw.learn === off ? -1 : off;
+      renderQwPanel();
+    });
+    document.getElementById('pn-qwreset').addEventListener('click', function () {
+      qw.map = {};
+      Object.keys(QW_DEFAULT).forEach(function (c) { qw.map[c] = QW_DEFAULT[c]; });
+      qw.learn = -1;
+      qwSaveMap();
+      renderQwPanel();
+      render();
+    });
+    document.addEventListener('keydown', qwDown);
+    document.addEventListener('keyup', qwUp);
+    renderQwPanel();
 
     var seg = document.getElementById('pn-display');
     function paintSeg() {
@@ -861,6 +1053,11 @@
 
   function onHide() {
     ppPause();      // exercise pauses (keeps its place) when leaving the tab
+    // release any computer-keyboard notes whose keyup we'll never see
+    Object.keys(qw.held).forEach(function (c) {
+      noteOff(qw.held[c], 99);
+      delete qw.held[c];
+    });
   }
 
   App.register('piano', {
