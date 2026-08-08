@@ -30,11 +30,14 @@
   // Ableton/GarageBand-style default: home row = white keys, top row = black
   // keys, Z/X shift octaves. Mapped by e.code (physical position, so it works
   // on any layout), fully remappable from the panel, persisted pn.qwMap.
+  // every letter earns a note: I/O/P carry the upper black keys (aligned to
+  // where they sit over K/L/;) and Quote extends the whites to F' — 19 slots
   var QW_DEFAULT = {
     KeyA: 0, KeyW: 1, KeyS: 2, KeyE: 3, KeyD: 4, KeyF: 5, KeyT: 6,
-    KeyG: 7, KeyY: 8, KeyH: 9, KeyU: 10, KeyJ: 11, KeyK: 12, KeyO: 13,
-    KeyL: 14, KeyP: 15, Semicolon: 16
+    KeyG: 7, KeyY: 8, KeyH: 9, KeyU: 10, KeyJ: 11, KeyK: 12, KeyI: 13,
+    KeyL: 14, KeyO: 15, Semicolon: 16, Quote: 17, KeyP: 18
   };
+  var QW_SLOTS = 19; // chromatic offsets 0..18 from the base note
   var qw = { on: true, oct: 0, map: null, held: {}, learn: -1 };
 
   function qwBase() { return 60 + qw.oct * 12; } // C4 by default, Z/X shifts
@@ -73,13 +76,20 @@
   function curMode() { var v = App.store.get('fb.mode', 1); return (typeof v === 'number' && v >= 1 && v <= 7) ? Math.floor(v) : 1; }
   function preferFlat() { return Theory.FLAT_KEYS.has(curRoot()); }
 
+  // which hand the practice is for (pn.hand): decides WHERE the practice
+  // window sits (right hand above middle C, left hand an octave below —
+  // where that hand actually plays) and which fingering numbers are shown
+  var hand = 'right';
+
+  function handBase() { return hand === 'left' ? 36 : 48; }
+
   // the piano's twin of the fretboard's mode box: for 7-note scales, one
-  // octave starting on the modal tonic (placed in the octave above C3).
-  // Keys inside it draw at full color, in-scale keys outside fade to half —
-  // and the practice runner plays exactly this window.
+  // octave starting on the modal tonic, placed in the register the chosen
+  // hand plays. Keys inside it draw at full color, in-scale keys outside
+  // fade to half — and the practice runner plays exactly this window.
   function modeWindow(info) {
     if (!info || info.steps.length !== 7) return null;
-    var m0 = 48 + Theory.mod12(curRoot() + info.steps[curMode() - 1]);
+    var m0 = handBase() + Theory.mod12(curRoot() + info.steps[curMode() - 1]);
     return [m0, m0 + 12];
   }
 
@@ -88,13 +98,30 @@
   function practicePath() {
     var info = Theory.scaleInfo(curRoot(), curScale(), preferFlat());
     var mwin = modeWindow(info);
-    var lo = mwin ? mwin[0] : 48 + Theory.mod12(curRoot());
+    var lo = mwin ? mwin[0] : handBase() + Theory.mod12(curRoot());
     var hi = mwin ? mwin[1] : lo + 12;
     var path = [];
     for (var m = lo; m <= hi && m <= HI; m++) {
       if (info.pcSet.has(Theory.mod12(m))) path.push({ midi: m });
     }
     return path;
+  }
+
+  // standard scale fingering per ascending path position (1 = thumb …
+  // 5 = pinky). Right hand ascends 1-2-3, 1-2-3-4, 5 on the top; the left
+  // hand's ascending fingering is exactly the right hand's mirrored — which
+  // also makes descents come out right, since a note keeps its finger
+  // whichever direction the pattern moves through it.
+  function fingerFor(pathIdx, n) {
+    var rh;
+    if (n === 8) rh = [1, 2, 3, 1, 2, 3, 4, 5];        // 7-note scales
+    else if (n === 6) rh = [1, 2, 3, 1, 2, 5];          // pentatonics
+    else {
+      rh = [];
+      for (var i = 0; i < n; i++) rh.push(i === n - 1 ? 5 : (i % 3) + 1);
+    }
+    if (pathIdx < 0 || pathIdx >= n) return 0;
+    return hand === 'left' ? rh[n - 1 - pathIdx] : rh[pathIdx];
   }
 
   // ---------------- sampled piano voice — the TONE LIBRARY ----------------
@@ -287,7 +314,14 @@
     var cols = degColors();
     var mwin = modeWindow(info);
 
+    // fingering notation for the practice window: each key in the window
+    // shows which finger plays it (for the chosen hand)
+    var ppath = practicePath();
+    var fingerMap = {};
+    ppath.forEach(function (n, i) { fingerMap[n.midi] = fingerFor(i, ppath.length); });
+
     els.title.textContent = Theory.pcName(root, pf) + ' ' + Theory.SCALES[scaleId].name;
+    updateOctLabel();
 
     var whites = '', blacks = '', dots = '', labels = '';
     var totalW = 0;
@@ -317,15 +351,20 @@
       // QWERTY hints: the computer key that plays this piano key right now
       if (qw.on) {
         var qOff = midi - qwBase();
-        if (qOff >= 0 && qOff <= 16) {
+        if (qOff >= 0 && qOff < QW_SLOTS) {
           var qc = qwCodeFor(qOff);
           if (qc) {
             // white hints sit below the black-key zone where the key is clear
             labels += '<text class="' + (isWhite ? 'pn-qwl' : 'pn-qwlb') + '" x="' +
-              (isWhite ? x + W / 2 : x + BW / 2) + '" y="' + (isWhite ? BH + 24 : 18) +
+              (isWhite ? x + W / 2 : x + BW / 2) + '" y="' + (isWhite ? BH + 14 : 18) +
               '" text-anchor="middle">' + qwKeyLabel(qc) + '</text>';
           }
         }
+      }
+      // fingering numbers above the practice-window dots (1=thumb … 5=pinky)
+      if (fingerMap[midi]) {
+        labels += '<text class="' + (isWhite ? 'pn-fing' : 'pn-fingb') + '" x="' + cx +
+          '" y="' + (cy - 17) + '" text-anchor="middle">' + fingerMap[midi] + '</text>';
       }
       if (inScale) {
         var col = cols[step % 7];
@@ -527,6 +566,7 @@
       pressKey(hit.midi, Math.max(120, spn * 700));
       ppRing(hit.midi);
       ledGuide(hit.midi, hit.next);
+      showFinger(pp.seq[hit.step % pp.seq.length]);
       ppStatus((hit.step % pp.seq.length) + 1 + ' / ' + pp.seq.length);
     }
     pp.raf = requestAnimationFrame(ppDraw);
@@ -543,14 +583,28 @@
   // keyboard or tapping it on screen. Wrong notes flash the status. ----
 
   function guideTarget() {
-    var node = pp.path[pp.seq[pp.idx % pp.seq.length]];
+    var pathIdx = pp.seq[pp.idx % pp.seq.length];
+    var node = pp.path[pathIdx];
     var nxt = pp.path[pp.seq[(pp.idx + 1) % pp.seq.length]];
     pp.target = node.midi;
     ppRing(node.midi);
     ledGuide(node.midi, nxt ? nxt.midi : -1);
+    showFinger(pathIdx);
     var pf = preferFlat();
-    ppStatus('play ' + Theory.midiName(node.midi, pf) + ' · ' +
+    var fing = fingerFor(pathIdx, pp.path.length);
+    ppStatus('play ' + Theory.midiName(node.midi, pf) +
+      (fing ? ' · finger ' + fing : '') + ' · ' +
       ((pp.idx % pp.seq.length) + 1) + ' / ' + pp.seq.length);
+  }
+
+  // big fingering readout next to the strip while the exercise runs
+  function showFinger(pathIdx) {
+    var el = document.getElementById('pn-finger');
+    if (!el) return;
+    var f = pp.path && pp.path.length ? fingerFor(pathIdx, pp.path.length) : 0;
+    if (!f) { el.style.display = 'none'; return; }
+    el.style.display = '';
+    el.textContent = f;
   }
 
   function guideStart() {
@@ -622,6 +676,8 @@
     pp.pausedAtIdx = -1;
     var ring = document.getElementById('pn-now');
     if (ring) ring.setAttribute('opacity', '0');
+    var fing = document.getElementById('pn-finger');
+    if (fing) fing.style.display = 'none';
     ppStatus('');
   }
 
@@ -652,7 +708,28 @@
 
   function qwFlashOctave() {
     ppStatus('keys octave: ' + Theory.midiName(qwBase(), false) + ' – ' +
-      Theory.midiName(Math.min(HI, qwBase() + 16), false));
+      Theory.midiName(Math.min(HI, qwBase() + QW_SLOTS - 1), false));
+  }
+
+  // shift the typing-keyboard layout by whole octaves (Z/X or the on-page
+  // selector), keeping the whole window on the drawn keyboard
+  function qwShift(dir) {
+    var nb = qwBase() + dir * 12;
+    if (nb < LO || nb + QW_SLOTS - 1 > HI + 6) return;
+    qw.oct += dir;
+    App.store.set('pn.qwOct', qw.oct);
+    render();
+    qwFlashOctave();
+  }
+
+  function updateOctLabel() {
+    var el = document.getElementById('pn-octlabel');
+    if (el) {
+      el.textContent = Theory.midiName(qwBase(), false) + ' – ' +
+        Theory.midiName(Math.min(HI, qwBase() + QW_SLOTS - 1), false);
+    }
+    var row = document.getElementById('pn-octrow');
+    if (row) row.style.display = qw.on ? '' : 'none';
   }
 
   function qwDown(e) {
@@ -674,15 +751,7 @@
       return;
     }
     if (e.code === 'KeyZ' || e.code === 'KeyX') {
-      var next = qw.oct + (e.code === 'KeyZ' ? -1 : 1);
-      // keep the whole 17-key window on the drawn keyboard
-      if (qwBase() + (e.code === 'KeyZ' ? -12 : 12) >= LO &&
-          qwBase() + (e.code === 'KeyZ' ? -12 : 12) + 16 <= HI + 4) {
-        qw.oct = next;
-        App.store.set('pn.qwOct', qw.oct);
-        render();
-        qwFlashOctave();
-      }
+      qwShift(e.code === 'KeyZ' ? -1 : 1);
       e.preventDefault();
       return;
     }
@@ -715,9 +784,9 @@
 
   function renderQwPanel() {
     if (!els.qwPanel) return;
-    var NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B', 'C', 'C#', 'D', 'D#', 'E'];
+    var NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B', 'C', 'C#', 'D', 'D#', 'E', 'F', 'F#'];
     var h = '';
-    for (var off = 0; off <= 16; off++) {
+    for (var off = 0; off < QW_SLOTS; off++) {
       var code = qwCodeFor(off);
       h += '<button type="button" class="chip pn-qwslot' + (qw.learn === off ? ' active' : '') +
         '" data-pnqw="' + off + '" title="Tap, then press the key you want for this note">' +
@@ -777,6 +846,10 @@
       '.pn-qwpanel.open{display:block}' +
       '.pn-qwslot{cursor:pointer;font-family:inherit;color:var(--text);gap:6px}' +
       '.pn-qwslot b{color:var(--accent);font-size:12px}' +
+      // fingering numbers over the practice-window dots
+      '.pn-fing{font:700 11px var(--font-body);fill:#a3562a}' +
+      '.pn-fingb{font:700 11px var(--font-body);fill:#e8c48a}' +
+      '#pn-octlabel{font-variant-numeric:tabular-nums}' +
       // compact practice strip — selects keep chevron clearance (fretboard rule)
       '.pn-practice{margin-top:12px}' +
       '.pn-practice select{padding:6px 26px 6px 9px;font-size:13px;background-position:right 8px center}' +
@@ -794,6 +867,11 @@
               '<button type="button" data-pnmode="degrees">Degrees</button>' +
             '</div>' +
             '<button type="button" class="chip fb-chip" id="pn-qw" title="Play the piano with your computer or iPad keyboard — home row = white keys, top row = black keys, Z/X shift octaves">Keys</button>' +
+            '<span class="row tight" id="pn-octrow" title="Which octaves the typing keys cover (Z / X also shift)">' +
+              '<button type="button" class="btn sm" id="pn-octdn" aria-label="Keys octave down">' + App.icon('minus', 13) + '</button>' +
+              '<span class="chip" id="pn-octlabel"></span>' +
+              '<button type="button" class="btn sm" id="pn-octup" aria-label="Keys octave up">' + App.icon('plus', 13) + '</button>' +
+            '</span>' +
             '<button type="button" class="btn sm" id="pn-qwmap" title="Remap which computer key plays which note">Remap</button>' +
             '<button type="button" class="btn sm" id="pn-rotate" title="Rotate the keyboard (portrait / landscape)" aria-label="Rotate the keyboard">' + App.icon('rotate', 14) + '</button>' +
           '</span>' +
@@ -829,6 +907,11 @@
             '<button type="button" data-pndir="down" title="Descending" aria-label="Descending">' + App.icon('down', 15) + '</button>' +
             '<button type="button" data-pndir="updown" title="Up, then back down" aria-label="Up, then back down">' + App.icon('updown', 15) + '</button>' +
           '</div>' +
+          '<div class="seg" id="pn-handseg" title="Which hand you&#39;re practicing — sets where the practice octave sits (right above middle C, left an octave below) and the fingering numbers on the keys">' +
+            '<button type="button" data-pnhand="right">R hand</button>' +
+            '<button type="button" data-pnhand="left">L hand</button>' +
+          '</div>' +
+          '<span class="fb-stroke" id="pn-finger" style="display:none" title="Finger for the sounding note (1=thumb … 5=pinky)"></span>' +
           '<input type="number" id="pn-bpm" min="30" max="280" step="1" title="Tempo (BPM) — linked to the metronome" style="width:70px">' +
           '<select id="pn-rate" title="Notes per beat">' +
             '<option value="1">1 / beat</option>' +
@@ -878,7 +961,7 @@
     if (storedMap && typeof storedMap === 'object') {
       Object.keys(storedMap).forEach(function (c) {
         var v = parseInt(storedMap[c], 10);
-        if (v >= 0 && v <= 16 && /^[A-Za-z0-9]+$/.test(c)) qw.map[c] = v;
+        if (v >= 0 && v < QW_SLOTS && /^[A-Za-z0-9]+$/.test(c)) qw.map[c] = v;
       });
     }
     if (!Object.keys(qw.map).length) {
@@ -907,6 +990,8 @@
       qw.learn = qw.learn === off ? -1 : off;
       renderQwPanel();
     });
+    document.getElementById('pn-octdn').addEventListener('click', function () { qwShift(-1); });
+    document.getElementById('pn-octup').addEventListener('click', function () { qwShift(1); });
     document.getElementById('pn-qwreset').addEventListener('click', function () {
       qw.map = {};
       Object.keys(QW_DEFAULT).forEach(function (c) { qw.map[c] = QW_DEFAULT[c]; });
@@ -1051,6 +1136,26 @@
 
     els.playBtn.addEventListener('click', ppToggle);
     document.getElementById('pn-reset').addEventListener('click', ppStop);
+
+    // hand selection: practice register + fingering
+    hand = App.store.get('pn.hand', 'right') === 'left' ? 'left' : 'right';
+    var handSeg = document.getElementById('pn-handseg');
+    function paintHand() {
+      handSeg.querySelectorAll('button').forEach(function (b) {
+        b.classList.toggle('active', b.getAttribute('data-pnhand') === hand);
+      });
+    }
+    paintHand();
+    handSeg.addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-pnhand]');
+      if (!b) return;
+      hand = b.getAttribute('data-pnhand') === 'left' ? 'left' : 'right';
+      App.store.set('pn.hand', hand);
+      paintHand();
+      ppRebuild();
+      render();
+      scrollToWindow();
+    });
 
     pp.guide = !!App.store.get('pn.pr.guide', false);
     var guideChip = document.getElementById('pn-guide');

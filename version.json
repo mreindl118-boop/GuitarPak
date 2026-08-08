@@ -1,5 +1,5 @@
 {
-  "version": "0.40.0",
+  "version": "0.41.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "Tab and Notation are now their own pages in the menu - full-size tablature and sheet music of your exercise with their own transport, and the practice runner keeps playing as you hop between Fretboard, Tab and Notation. Pressed keys now light up amber for exactly as long as you hold them - on screen taps, your typing keyboard AND your MIDI/ROLI keyboard - on both the Piano tab and the chord explorer's keyboard, which now also carries the same scale-degree coloring as everywhere else."
+  "notes": "Piano practice learns hands and fingers: pick R hand or L hand and the practice octave moves to where that hand plays, every key in the window shows its fingering number (1=thumb to 5=pinky), a big finger readout follows the exercise, and Guide mode tells you note AND finger. Typing keys: I, O and P now play the upper black keys, ' extends the range, and a visible octave selector joins the Piano tab (Z/X still work)."
 }
