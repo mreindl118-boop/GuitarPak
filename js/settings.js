@@ -32,6 +32,16 @@
           '</div>' +
         '</div>' +
         '<div class="muted small set-theme-note">The voice for fretboard taps, scale practice, chord strums and trainer notes.</div>' +
+        '<div class="fb-field" style="margin-top:14px">Piano sound' +
+          '<div class="seg" id="set-ptone">' +
+            '<button type="button" data-ptone="grand">Grand</button>' +
+            '<button type="button" data-ptone="bright">Bright</button>' +
+            '<button type="button" data-ptone="electric">Electric</button>' +
+            '<button type="button" data-ptone="organ">Organ</button>' +
+          '</div>' +
+        '</div>' +
+        '<div class="muted small set-theme-note">The Piano tab, MIDI keyboard and chord piano voicings. All open source: ' +
+          'Grand is a real recorded Salamander grand; Bright, Electric and Organ are FluidR3 / MusyngKite voices.</div>' +
         '<div class="fb-field" style="margin-top:14px">Bass guitar' +
           '<div class="seg" id="set-bass">' +
             '<button type="button" data-bass-style="finger">Fingered</button>' +
@@ -106,6 +116,26 @@
     });
 
     paintTone();
+
+    var ptoneSeg = document.getElementById('set-ptone');
+
+    function paintPtone() {
+      var tone = App.pianoTone;
+      ptoneSeg.querySelectorAll('button').forEach(function (b) {
+        b.classList.toggle('active', b.getAttribute('data-ptone') === tone);
+      });
+    }
+
+    ptoneSeg.addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-ptone]');
+      if (!b) return;
+      App.setPianoTone(b.getAttribute('data-ptone'));
+      paintPtone();
+      // a quick preview so tones can be compared without leaving Settings
+      try { App.pianoPlay(60, 0, 1.2, 0.5); } catch (err) { /* audio not ready */ }
+    });
+
+    paintPtone();
 
     var bassSeg = document.getElementById('set-bass');
 

@@ -97,32 +97,74 @@
     return path;
   }
 
-  // ---------------- sampled piano voice ----------------
-  // FluidR3 piano anchors (samples/CREDITS.md), nearest-anchor pitch shift —
-  // the same approach as App.pluck, with a synth fallback until decoded.
+  // ---------------- sampled piano voice — the TONE LIBRARY ----------------
+  // All open source (samples/CREDITS.md): grand = Salamander Grand (real
+  // recording, via tonejs-instruments), bright = FluidR3 piano, electric =
+  // MusyngKite EP, organ = MusyngKite drawbar. Same anchor notes per set,
+  // nearest-anchor pitch shift, synth fallback until decoded. trim = RMS-
+  // measured loudness compensation per set. Chosen in Settings
+  // (app.pianoTone, App.setPianoTone).
+  var PIANO_SETS = {
+    grand: { dir: 'samples/piano2/', trim: 0.21 },
+    bright: { dir: 'samples/keys/', trim: 1.0 },
+    electric: { dir: 'samples/epiano/', trim: 1.57 },
+    organ: { dir: 'samples/organ/', trim: 1.17 }
+  };
   var ANCHORS = { 48: 'C3', 52: 'E3', 57: 'A3', 60: 'C4', 64: 'E4', 69: 'A4', 72: 'C5' };
-  var raw = {}, buf = {}, fetched = false;
+  var raw = { grand: {}, bright: {}, electric: {}, organ: {} };
+  var buf = { grand: {}, bright: {}, electric: {}, organ: {} };
+  var readyN = { grand: 0, bright: 0, electric: 0, organ: 0 };
+  var fetched = {};
 
-  function prefetch() {
-    if (fetched) return;
-    fetched = true;
+  function pianoTonePref() {
+    var t = App.store.get('app.pianoTone', 'grand');
+    return PIANO_SETS[t] ? t : 'grand';
+  }
+
+  function setPianoTone(tone) {
+    if (!PIANO_SETS[tone]) tone = 'grand';
+    App.store.set('app.pianoTone', tone);
+    prefetch(tone); // start loading now; notes switch over as it decodes
+  }
+
+  function prefetch(tone) {
+    tone = tone || pianoTonePref();
+    if (!PIANO_SETS[tone] || fetched[tone]) return;
+    fetched[tone] = true;
     Object.keys(ANCHORS).forEach(function (m) {
       var xhr = new XMLHttpRequest();
-      xhr.open('GET', 'samples/keys/' + ANCHORS[m] + '.mp3', true);
+      xhr.open('GET', PIANO_SETS[tone].dir + ANCHORS[m] + '.mp3', true);
       xhr.responseType = 'arraybuffer';
       xhr.onload = function () {
-        if ((xhr.status === 200 || xhr.status === 0) && xhr.response) raw[m] = xhr.response;
+        if ((xhr.status === 200 || xhr.status === 0) && xhr.response) raw[tone][m] = xhr.response;
       };
       try { xhr.send(); } catch (e) { /* blocked — synth fallback */ }
     });
   }
 
   function decodeAll(ctx) {
-    Object.keys(raw).forEach(function (m) {
-      var bytes = raw[m];
-      delete raw[m]; // decodeAudioData detaches the buffer
-      ctx.decodeAudioData(bytes, function (b) { buf[m] = b; }, function () { /* fallback */ });
+    Object.keys(raw).forEach(function (tone) {
+      Object.keys(raw[tone]).forEach(function (m) {
+        var bytes = raw[tone][m];
+        delete raw[tone][m]; // decodeAudioData detaches the buffer
+        ctx.decodeAudioData(bytes, function (b) {
+          buf[tone][m] = b;
+          readyN[tone]++;
+        }, function () { /* fallback */ });
+      });
     });
+  }
+
+  // the decoded bank for the chosen tone (any ready bank stands in while
+  // the chosen one is still decoding) + its loudness trim
+  function pianoBank() {
+    var tone = pianoTonePref();
+    if (!readyN[tone]) {
+      for (var t in readyN) {
+        if (readyN[t]) return { bank: buf[t], trim: PIANO_SETS[t].trim };
+      }
+    }
+    return { bank: buf[tone], trim: PIANO_SETS[tone].trim };
   }
 
   // held MIDI-keyboard voices: key = chan + '-' + midi. Kept open until
@@ -134,16 +176,17 @@
     var ctx;
     try { ctx = App.getAudio(); } catch (e) { return; }
     decodeAll(ctx);
-    var gain = 0.12 + Math.pow((vel || 100) / 127, 1.4) * 0.62; // hard/soft
+    var pb = pianoBank();
+    var gain = (0.12 + Math.pow((vel || 100) / 127, 1.4) * 0.62) * pb.trim; // hard/soft
     var best = null, bd = 99;
-    for (var m in buf) {
+    for (var m in pb.bank) {
       var d = Math.abs(midi - m);
       if (d < bd) { bd = d; best = Number(m); }
     }
     if (best === null) { App.pluckSynth(midi, 0, 1.2, gain * 0.8); return; }
     var t = ctx.currentTime;
     var src = ctx.createBufferSource();
-    src.buffer = buf[best];
+    src.buffer = pb.bank[best];
     var base = Math.pow(2, (midi - best) / 12);
     src.playbackRate.value = base;
     var g = ctx.createGain();
@@ -197,14 +240,16 @@
     dur = dur || 1.6;
     gain = gain == null ? 0.5 : gain;
     var t = ctx.currentTime + when;
+    var pb = pianoBank();
+    gain *= pb.trim;
     var best = null, bd = 99;
-    for (var m in buf) {
+    for (var m in pb.bank) {
       var d = Math.abs(midi - m);
       if (d < bd) { bd = d; best = Number(m); }
     }
     if (best === null) { App.pluckSynth(midi, when, dur, gain * 0.8); return; }
     var src = ctx.createBufferSource();
-    src.buffer = buf[best];
+    src.buffer = pb.bank[best];
     src.playbackRate.value = Math.pow(2, (midi - best) / 12);
     var g = ctx.createGain();
     g.gain.setValueAtTime(0.0001, t);
@@ -591,9 +636,18 @@
 
   // ---------------- QWERTY input handling ----------------
 
+  // block QWERTY notes only where the user is actually TYPING text. Selects,
+  // checkboxes and buttons keep focus after a tap/change — swallowing letters
+  // there caused "you must click into the keyboard first" — so they don't count.
   function qwTyping(e) {
     var t = e.target;
-    return t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
+    if (!t) return false;
+    if (t.isContentEditable || t.tagName === 'TEXTAREA') return true;
+    if (t.tagName === 'INPUT') {
+      var ty = String(t.type || 'text').toLowerCase();
+      return ty !== 'checkbox' && ty !== 'radio' && ty !== 'range' && ty !== 'button';
+    }
+    return false;
   }
 
   function qwFlashOctave() {
@@ -1066,6 +1120,9 @@
     onHide: onHide
   });
 
-  // the sampled piano voice, shared with other modules (chords' piano voicings)
+  // the sampled piano voice, shared with other modules (chords' piano
+  // voicings), plus the tone-library setting surface for the Settings tab
   App.pianoPlay = play;
+  App.setPianoTone = setPianoTone;
+  Object.defineProperty(App, 'pianoTone', { get: pianoTonePref });
 })();

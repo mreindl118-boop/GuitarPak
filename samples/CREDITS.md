@@ -20,6 +20,9 @@ the **FluidR3 General MIDI** soundfont by Frank Wen.
 | `bassp/` | Electric Bass (pick) | MusyngKite |
 | `keys/` | Electric Piano 1 | FluidR3 GM |
 | `pad/` | Pad 2 (warm) | FluidR3 GM |
+| `piano2/` | Grand piano (recorded — Salamander Grand by Alexander Holm, CC-BY) | tonejs-instruments |
+| `epiano/` | Electric Piano 1 | MusyngKite |
+| `organ/` | Drawbar Organ | MusyngKite |
 
 FluidR3 (c) Frank Wen; MP3 renders via midi-js-soundfonts (c) Benjamin
 Gleitzman. Drum sounds in GuitarLab remain synthesized in Web Audio (no
