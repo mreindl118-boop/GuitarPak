@@ -1,5 +1,5 @@
 {
-  "version": "0.37.1",
+  "version": "0.38.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "Mode playback corrected: box runs span the FULL position again - ascending starts on the low root and climbs through the high root to the mode's final top note; descending starts from that top note. Also: double-tap-to-zoom is now disabled everywhere in the app (pinch zoom and scrolling still work) - no more accidental page zooms while tapping pads, keys or the boards."
+  "notes": "The chord library learns four languages: a new View picker shows every chord as a guitar neck, a full piano keyboard, big tablature, or real musical notation on a treble staff - all colored by scale degree so the same tone wears the same color everywhere. Tap any view to hear the chord, and MIDI keyboard matching works in every view."
 }
