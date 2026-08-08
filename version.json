@@ -1,5 +1,5 @@
 {
-  "version": "0.36.1",
+  "version": "0.37.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "Practice runs now finish where they should: mode-box (and pentatonic-box) exercises end on the root at the top of the box instead of stopping on whichever scale note happened to fit the position - so groups-of-3 and every other pattern resolve home on the final note."
+  "notes": "Type to play: the Piano tab now works with any typing keyboard - iPad Magic Keyboard included. Home row plays the white keys, top row the black keys, Z/X shift octaves, and the key letters are drawn right on the piano so you always know what's where. Fully remappable: tap Remap, pick a note, press the key you want. Works with Guide mode too - answer the lit note from your keyboard."
 }
