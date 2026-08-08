@@ -31,7 +31,7 @@ window.App = (function () {
   // ---- auto-update ----
   // version.json on GitHub is the source of truth. Web builds refresh through
   // the service worker; the APK build (file://) links to the new APK download.
-  var APP_VERSION = '0.38.0';
+  var APP_VERSION = '0.39.0';
   var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
 
   function verNum(v) {
@@ -599,6 +599,7 @@ window.App = (function () {
     if (navSel) {
       navSel.addEventListener('change', function () {
         if (PANEL_ORDER.indexOf(this.value) !== -1) switchTo(this.value);
+        this.blur(); // keep focus off the menu so keyboard input reaches the page
       });
     }
     var tabsEl = document.getElementById('tabs');

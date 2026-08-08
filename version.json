@@ -1,5 +1,5 @@
 {
-  "version": "0.38.0",
+  "version": "0.39.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "The chord library learns four languages: a new View picker shows every chord as a guitar neck, a full piano keyboard, big tablature, or real musical notation on a treble staff - all colored by scale degree so the same tone wears the same color everywhere. Tap any view to hear the chord, and MIDI keyboard matching works in every view."
+  "notes": "Piano tone library (all open source): choose Grand (a real recorded Salamander grand - the new default), Bright, Electric or Organ in Settings, with a preview note on tap. The tone drives the Piano tab, your MIDI keyboard and the chord piano voicings. Also fixed: keyboard input works immediately - no more clicking into the page after using a dropdown before your typing keys make sound."
 }
