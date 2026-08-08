@@ -58,6 +58,7 @@
     sevenths: false,
     bpm: 90,
     barsPerChord: 1,
+    view: 'guitar',         // guitar | piano | tab | sheet (ch.view)
     track: []               // [{ rootPc, quality, roman }]
   };
 
@@ -130,6 +131,8 @@
     st.sevenths = !!g('ch.sevenths', false);
     st.bpm = clampBpm(g('ch.bpm', 90));
     st.barsPerChord = Number(g('ch.barsPerChord', 1)) === 2 ? 2 : 1;
+    var v = g('ch.view', 'guitar');
+    st.view = /^(guitar|piano|tab|sheet)$/.test(v) ? v : 'guitar';
 
     st.track = [];
     var tr = g('ch.track', []);
@@ -469,6 +472,120 @@
     renderTheory();
     renderInKey();
     renderPianoChord();
+    renderChTab();
+    renderChSheet();
+  }
+
+  // which representation fills the main display (persisted ch.view)
+  function applyChView() {
+    var v = st.view;
+    els.board.style.display = v === 'guitar' ? '' : 'none';
+    els.boardHint.style.display = v === 'guitar' ? '' : 'none';
+    els.tabWrap.style.display = v === 'tab' ? '' : 'none';
+    els.sheetWrap.style.display = v === 'sheet' ? '' : 'none';
+    els.pnWrap.style.display = v === 'piano' ? '' : 'none';
+    els.pnWrap.classList.toggle('ch-pnbig', v === 'piano');
+    // voicing chips drive the guitar-based views
+    els.shapeRow.style.display = v === 'piano' ? 'none' : '';
+  }
+
+  // ---------------- tablature view: the current voicing as a tab column ----------------
+
+  function renderChTab() {
+    if (!els.tabWrap) return;
+    var shape = curShape();
+    var kinfo = keyInfo();
+    var pal = degPalette();
+    var LABELS = ['E', 'A', 'D', 'G', 'B', 'e']; // string 0 (low) .. 5 (high)
+    var tun = Theory.TUNINGS.standard.midi;
+    var h = '';
+    for (var li = 5; li >= 0; li--) { // high e on top
+      var f = shape ? shape.frets[li] : -1;
+      var cell;
+      if (f < 0) {
+        cell = '<span class="ch-tabx">x</span>';
+      } else {
+        var pc = Theory.mod12(tun[li] + f);
+        var tone = keyTone(kinfo, pal, pc);
+        cell = '<span class="ch-tabn" style="color:' + tone.color + '">' + f + '</span>';
+      }
+      h += LABELS[li] + ' |--' + cell + '--|\n';
+    }
+    els.tabWrap.innerHTML = '<pre class="ch-tabpre">' + h + '</pre>' +
+      '<div class="muted small">' + (shape ? esc(shape.label || '') + ' &middot; ' : '') +
+      'numbers colored by scale degree &middot; tap to strum</div>';
+  }
+
+  // ---------------- notation view: the voicing on a treble staff ----------------
+
+  var CH_LETTER_POS = { C: 0, D: 1, E: 2, F: 3, G: 4, A: 5, B: 6 };
+
+  function chSheetNote(midi, pf) {
+    var written = midi + 12; // guitar written an octave above sounding pitch
+    var name = Theory.pcName(Theory.mod12(written), pf);
+    var letter = name[0];
+    var acc = name.length > 1 ? name[1] : '';
+    var oct = Math.floor(written / 12) - 1;
+    return { pos: CH_LETTER_POS[letter] + 7 * oct, acc: acc, pc: Theory.mod12(midi) };
+  }
+
+  function renderChSheet() {
+    if (!els.sheetWrap) return;
+    var shape = curShape();
+    if (!shape) { els.sheetWrap.innerHTML = ''; return; }
+    var midis = Theory.chordVoicing(shape.frets);
+    var kinfo = keyInfo();
+    var pal = degPalette();
+    var pf = Theory.FLAT_KEYS.has(st.keyPc);
+    var GAP = 10, LEFT = 70, W = 320;
+    var topPad = 6 * GAP, staffH = 8 * GAP;
+    var H = staffH + topPad * 2;
+    var E4POS = 30; // bottom staff line
+    var notes = midis.map(function (m) { return chSheetNote(m, pf); })
+      .sort(function (a, b) { return a.pos - b.pos; });
+    var svg = ['<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + W + ' ' + H +
+      '" width="' + W + '" height="' + H + '">'];
+    for (var l = 0; l < 5; l++) {
+      var ly = topPad + staffH - l * 2 * GAP;
+      svg.push('<line x1="10" y1="' + ly + '" x2="' + (W - 10) + '" y2="' + ly +
+        '" stroke="var(--muted)" stroke-width="1" opacity="0.75"/>');
+    }
+    svg.push('<text x="14" y="' + (topPad + staffH - GAP) + '" font-size="' + (staffH * 0.95) +
+      '" fill="var(--text)" font-family="serif">𝄞</text>');
+    var x = LEFT + 90;
+    var prevPos = null, offset = false, accN = 0;
+    notes.forEach(function (sn) {
+      var y = topPad + staffH - (sn.pos - E4POS) * GAP;
+      // seconds can't stack — alternate note heads to the right (engraving rule)
+      offset = prevPos !== null && sn.pos - prevPos === 1 ? !offset : false;
+      prevPos = sn.pos;
+      var nx = x + (offset ? 15 : 0);
+      var lp;
+      for (lp = E4POS - 2; lp >= sn.pos - (sn.pos % 2); lp -= 2) {
+        if (lp < E4POS) svg.push('<line x1="' + (nx - 12) + '" y1="' + (topPad + staffH - (lp - E4POS) * GAP) +
+          '" x2="' + (nx + 12) + '" y2="' + (topPad + staffH - (lp - E4POS) * GAP) +
+          '" stroke="var(--muted)" stroke-width="1"/>');
+      }
+      for (lp = E4POS + 10; lp <= sn.pos; lp += 2) {
+        svg.push('<line x1="' + (nx - 12) + '" y1="' + (topPad + staffH - (lp - E4POS) * GAP) +
+          '" x2="' + (nx + 12) + '" y2="' + (topPad + staffH - (lp - E4POS) * GAP) +
+          '" stroke="var(--muted)" stroke-width="1"/>');
+      }
+      var tone = keyTone(kinfo, pal, sn.pc);
+      var isRoot = sn.pc === Theory.mod12(ex.rootPc);
+      svg.push('<ellipse cx="' + nx + '" cy="' + y + '" rx="7.5" ry="5.6" fill="' + tone.color + '"' +
+        (isRoot ? ' stroke="#ffffff" stroke-width="1.6"' : '') + '/>');
+      if (sn.acc) {
+        // stagger accidentals leftward so close ones stay readable
+        svg.push('<text x="' + (x - 22 - (accN % 2) * 14) + '" y="' + (y + 5) +
+          '" font-size="15" fill="' + tone.color + '" font-weight="700">' +
+          (sn.acc === '#' ? '♯' : '♭') + '</text>');
+        accN++;
+      }
+    });
+    svg.push('</svg>');
+    els.sheetWrap.innerHTML = svg.join('') +
+      '<div class="muted small">Written an octave above sounding pitch (guitar convention) &middot; noteheads colored by scale degree &middot; tap to strum</div>';
   }
 
   // ---------------- piano voicing (chords on the keys) ----------------
@@ -879,6 +996,17 @@
     '.ch-boardwrap{overflow-x:auto;margin-top:12px;}' +
     '.ch-pnwrap{overflow-x:auto;margin-top:8px;}' +
     '.ch-pnwrap svg{display:block;cursor:pointer;}' +
+    '.ch-pnwrap.ch-pnbig{margin-top:12px;}' +
+    '.ch-pnwrap.ch-pnbig svg{width:100%;min-width:540px;max-width:760px;height:auto;}' +
+    '.ch-tabwrap{margin-top:12px;}' +
+    '.ch-tabpre{font-family:ui-monospace,Consolas,Menlo,monospace;font-size:22px;line-height:1.5;' +
+      'background:var(--card2);border:1px solid var(--line);border-radius:10px;' +
+      'padding:16px 20px;margin:0;color:var(--muted);cursor:pointer;display:inline-block;}' +
+    '.ch-tabn{font-weight:700;}' +
+    '.ch-tabx{opacity:0.55;}' +
+    '.ch-sheetwrap{margin-top:12px;overflow-x:auto;background:var(--card2);border:1px solid var(--line);' +
+      'border-radius:10px;padding:12px 14px;cursor:pointer;}' +
+    '.ch-sheetwrap svg{display:block;}' +
     '.ch-pnw{fill:#f7f3ea;stroke:#b9b0a2;stroke-width:1;}' +
     '.ch-pnb{fill:#221d20;stroke:#000;stroke-width:1;}' +
     '.ch-pnlbl{font:700 10px var(--font-body);fill:#1c1206;}' +
@@ -942,19 +1070,29 @@
           '</span>' +
           '<span id="ch-inkey" class="ch-inkeyrow" style="margin-top:0"></span>' +
         '</div>' +
-        // 2. the chord itself: name, free pickers, actions
+        // 2. the chord itself: name, free pickers, view, actions
         '<div class="row" style="margin-top:16px">' +
           '<span class="ch-exname" id="ch-ex-name"></span>' +
           '<label class="field">Root<select id="ch-ex-root"></select></label>' +
           '<label class="field">Chord<select id="ch-ex-quality"></select></label>' +
+          '<label class="field">View<select id="ch-view" title="See the chord as a guitar neck, piano keys, tablature or notation">' +
+            '<option value="guitar">Guitar</option>' +
+            '<option value="piano">Piano</option>' +
+            '<option value="tab">Tab</option>' +
+            '<option value="sheet">Notation</option>' +
+          '</select></label>' +
           '<button type="button" class="btn primary" id="ch-ex-strum">Strum</button>' +
           '<button type="button" class="btn" id="ch-ex-add" title="Append this chord to the progression below">+ Progression</button>' +
         '</div>' +
-        // 3. every voicing across the neck, then the neck itself
-        '<div class="ch-field" style="margin-top:12px"><span>Voicings &mdash; low to high</span></div>' +
-        '<div class="ch-shapesel" id="ch-shapesel" style="margin-top:7px"></div>' +
+        // 3. every voicing across the neck, then the chord in the chosen view
+        '<div id="ch-shaperow">' +
+          '<div class="ch-field" style="margin-top:12px"><span>Voicings &mdash; low to high</span></div>' +
+          '<div class="ch-shapesel" id="ch-shapesel" style="margin-top:7px"></div>' +
+        '</div>' +
         '<div class="ch-boardwrap" id="ch-board" title="Tap the neck to strum; tap a note to hear it"></div>' +
-        '<div class="muted small">Tap anywhere on the neck to strum &middot; tap a single note to hear it alone.</div>' +
+        '<div class="ch-tabwrap" id="ch-tabwrap" style="display:none" title="Tap to strum"></div>' +
+        '<div class="ch-sheetwrap" id="ch-sheetwrap" style="display:none" title="Tap to strum"></div>' +
+        '<div class="muted small" id="ch-boardhint">Tap anywhere on the neck to strum &middot; tap a single note to hear it alone.</div>' +
         '<div class="ch-theory">' +
           '<div class="ch-tones" id="ch-tones"></div>' +
           '<div class="muted small" id="ch-formula"></div>' +
@@ -964,17 +1102,14 @@
             '<button type="button" class="btn sm" id="ch-practice" title="Set up the fretboard with this scale and start the practice runner">Practice it ' + App.icon('right', 13) + '</button>' +
           '</div>' +
         '</div>' +
-        // 4. the same chord on the piano — tap to hear it; with a MIDI
-        // keyboard connected the tones light on the device and playing them
-        // together confirms the match
-        '<div class="row tight spread" style="margin-top:16px">' +
-          '<div class="ch-field"><span>Piano voicing</span></div>' +
-          '<span class="row tight">' +
-            '<button type="button" class="btn sm" id="ch-pn-play" title="Hear the chord on piano">' + App.icon('play', 13) + ' Piano</button>' +
-            '<span class="chip" id="ch-pn-match" style="display:none">Play it on your keyboard&hellip;</span>' +
-          '</span>' +
-        '</div>' +
+        // 4. the same chord on the piano — the main display in Piano view;
+        // with a MIDI keyboard connected the tones light on the device and
+        // playing them together confirms the match (any view)
         '<div class="ch-pnwrap" id="ch-pnwrap" title="Tap to hear the chord on piano"></div>' +
+        '<div class="row tight" style="margin-top:10px">' +
+          '<button type="button" class="btn sm" id="ch-pn-play" title="Hear the chord on piano">' + App.icon('play', 13) + ' Piano</button>' +
+          '<span class="chip" id="ch-pn-match" style="display:none">Play it on your keyboard&hellip;</span>' +
+        '</div>' +
       '</div>' +
       '<div class="card">' +
         '<h2>Progression player</h2>' +
@@ -1037,6 +1172,11 @@
     els.pnWrap = document.getElementById('ch-pnwrap');
     els.pnPlay = document.getElementById('ch-pn-play');
     els.pnMatch = document.getElementById('ch-pn-match');
+    els.view = document.getElementById('ch-view');
+    els.tabWrap = document.getElementById('ch-tabwrap');
+    els.sheetWrap = document.getElementById('ch-sheetwrap');
+    els.boardHint = document.getElementById('ch-boardhint');
+    els.shapeRow = document.getElementById('ch-shaperow');
   }
 
   function addOption(sel, value, label) {
@@ -1070,6 +1210,16 @@
       exLoad(ex.rootPc, els.exQuality.value, { strum: true });
     });
     els.exStrum.addEventListener('click', function () { strumShape(curShape()); });
+    els.view.value = st.view;
+    els.view.addEventListener('change', function () {
+      if (!/^(guitar|piano|tab|sheet)$/.test(this.value)) return;
+      st.view = this.value;
+      App.store.set('ch.view', st.view);
+      applyChView();
+      exRender();
+    });
+    els.tabWrap.addEventListener('click', function () { strumShape(curShape()); });
+    els.sheetWrap.addEventListener('click', function () { strumShape(curShape()); });
     els.pnPlay.addEventListener('click', pianoStrum);
     els.pnWrap.addEventListener('click', function (e) {
       var k = e.target.closest ? e.target.closest('[data-chpn]') : null;
@@ -1094,6 +1244,8 @@
       ex.shapeIdx = Number(b.dataset.i) || 0;
       renderShapeChips();
       renderBoard();
+      renderChTab();   // tab + notation views follow the chosen voicing
+      renderChSheet();
       strumShape(curShape());
     });
     els.inkey.addEventListener('click', function (e) {
@@ -1182,6 +1334,7 @@
 
     // open on the tonic chord of the current key — the explorer starts where
     // the scale in the bar points (stored chord is the fallback)
+    applyChView();
     var tonic = keyTonic();
     if (tonic) exLoad(tonic.rootPc, tonic.quality, { persist: false });
     else exLoad(ex.rootPc, ex.quality, { persist: false });
