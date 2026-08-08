@@ -23,8 +23,10 @@ js/fretboard.js   │ App.register(name, {init, onShow, onHide, onKey})
 js/chords.js      │ DOM ids/CSS prefixed met-/fb-/ch-/jam-/tun-/tr-
                   │ (chords: chord-explorer neck + theory panel + progression
                   │  player; the neck follows the sounding chord live)
-                  │ (fretboard: one page, three views — board / tab / sheet
-                  │  via the fb-view dropdown; the runner plays in all three)
+                  │ (fretboard.js also registers the 'tab' and 'notation'
+                  │  PAGES — thin panels over the same state + runner; the
+                  │  runner keeps playing across the fb/tab/notation trio,
+                  │  pauses on leaving it)
 js/piano.js       │ (piano: keyboard twin of the fretboard — degree-colored
                   │  keys, shared fb.colors palette, sampled piano voice,
                   │  follows fb:set/fb:scale + jam:chord)

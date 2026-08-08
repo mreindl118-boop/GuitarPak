@@ -633,6 +633,11 @@
           (iv === 0 ? ' stroke="#ffffff" stroke-width="1.8"' : '') + '/>' +
           '<text class="ch-pnlbl" x="' + cx + '" y="' + (cy + 3) + '" text-anchor="middle">' +
           esc(IV_LABELS[Theory.mod12(iv)] || String(iv)) + '</text>';
+      } else if (kinfo && kinfo.pcSet.has(pc)) {
+        // uniform coloration with the Piano tab: in-scale keys carry their
+        // degree color everywhere, sitting back so chord tones pop
+        var stone = keyTone(kinfo, pal, pc);
+        dots += '<circle cx="' + cx + '" cy="' + cy + '" r="5.5" fill="' + stone.color + '" opacity="0.4"/>';
       }
     }
     var totalW = (wIdx(PN_HI) + 1) * W;
@@ -996,6 +1001,8 @@
     '.ch-boardwrap{overflow-x:auto;margin-top:12px;}' +
     '.ch-pnwrap{overflow-x:auto;margin-top:8px;}' +
     '.ch-pnwrap svg{display:block;cursor:pointer;}' +
+    '.ch-pnw.ch-pndown{fill:#ffce7d;stroke:#e8912a;}' +
+    '.ch-pnb.ch-pndown{fill:#b9791f;stroke:#e8912a;}' +
     '.ch-pnwrap.ch-pnbig{margin-top:12px;}' +
     '.ch-pnwrap.ch-pnbig svg{width:100%;min-width:540px;max-width:760px;height:auto;}' +
     '.ch-tabwrap{margin-top:12px;}' +
@@ -1230,9 +1237,15 @@
         pianoStrum();
       }
     });
-    // MIDI keyboard: held notes matching the chord confirm it; a connect /
+    // MIDI keyboard: held notes light the on-screen keys (same amber press
+    // as the Piano tab) and matching the chord confirms it; connect /
     // disconnect repaints the panel (match chip + device LEDs)
-    App.on('midi:note', function (d) { if (d && d.on) checkPlayedChord(); });
+    App.on('midi:note', function (d) {
+      if (!d) return;
+      var k = els.pnWrap.querySelector('[data-chpn="' + d.midi + '"]');
+      if (k) k.classList.toggle('ch-pndown', !!d.on);
+      if (d.on) checkPlayedChord();
+    });
     App.on('midi:state', function () { renderPianoChord(); });
     els.exAdd.addEventListener('click', function () {
       appendChord({ rootPc: ex.rootPc, quality: ex.quality,
