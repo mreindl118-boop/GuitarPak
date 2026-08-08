@@ -1,5 +1,5 @@
 {
-  "version": "0.41.0",
+  "version": "0.42.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "Piano practice learns hands and fingers: pick R hand or L hand and the practice octave moves to where that hand plays, every key in the window shows its fingering number (1=thumb to 5=pinky), a big finger readout follows the exercise, and Guide mode tells you note AND finger. Typing keys: I, O and P now play the upper black keys, ' extends the range, and a visible octave selector joins the Piano tab (Z/X still work)."
+  "notes": "Jam rebuilt from the ground up as an auto-band: pick a genre (Rock, Pop, Blues Shuffle, Funk, Ballad, Latin) and it writes a song — intro, verse, chorus, ending — that follows YOUR key from the context bar and re-harmonizes live when you change it. Shape the song with section editing (repeats, bars per chord, add/remove chords from the diatonic palette), an energy dial, a swing slider, and a per-instrument mixer. Tap a palette chord (or play one on MIDI) while the band plays to vamp on it, hit Finish for a real ending. Your old progressions migrate automatically."
 }
