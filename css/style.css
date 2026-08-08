@@ -105,6 +105,10 @@
 html, body {
   margin: 0;
   padding: 0;
+  /* no double-tap-to-zoom anywhere — taps on pads/keys/boards must never
+     zoom the page. Pinch-zoom and panning stay available (manipulation),
+     and elements that restrict further (pan-x boards) keep their own rules. */
+  touch-action: manipulation;
   color: var(--text);
   font-family: var(--font-body);
   font-size: 15px;
