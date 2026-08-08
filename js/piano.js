@@ -753,12 +753,14 @@
       // and the page scrolls down it, exactly like the vertical fretboard
       '.pn-stage.pn-v{overflow-x:visible;touch-action:manipulation;display:flex;justify-content:center}' +
       '.pn-stage.pn-v svg{width:min(360px,94%);height:auto}' +
-      '.pn-key{cursor:pointer;transition:filter 80ms ease}' +
+      '.pn-key{cursor:pointer;transition:fill 60ms ease}' +
       // ivory + ebony in both themes — this is the instrument, not chrome
       '.pn-w{fill:#f7f3ea;stroke:#b9b0a2;stroke-width:1}' +
       '.pn-b{fill:#221d20;stroke:#000;stroke-width:1}' +
-      '.pn-key.pn-down{filter:brightness(0.82)}' +
-      '.pn-b.pn-down{filter:brightness(1.7)}' +
+      // pressed keys light AMBER, unmistakably — held for the length of the
+      // press, from screen taps, QWERTY and MIDI alike
+      '.pn-w.pn-down{fill:#ffce7d;stroke:#e8912a}' +
+      '.pn-b.pn-down{fill:#b9791f;stroke:#e8912a}' +
       '.pn-dotg{pointer-events:none}' +
       '.pn-dott{font:700 11px var(--font-body);fill:#1c1206}' +
       '.pn-oct{font:600 11px var(--font-body);fill:var(--muted)}' +
@@ -1071,15 +1073,18 @@
       guideCheck(midi);
     });
 
-    // ---- MIDI keyboard: expressive input + guide answers, on every tab ----
+    // ---- MIDI keyboard: expressive input + guide answers, on every tab.
+    // The on-screen key stays lit for EXACTLY as long as the physical key
+    // is held — same visual language as QWERTY input. ----
     App.on('midi:note', function (d) {
       if (!d) return;
       if (d.on) {
         noteOn(d.midi, d.vel, d.chan);
-        pressKey(d.midi, 200);
+        pressKeyHold(d.midi, true);
         guideCheck(d.midi);
       } else {
         noteOff(d.midi, d.chan);
+        pressKeyHold(d.midi, false);
       }
     });
     App.on('midi:bend', function (d) { if (d) bendChan(d.chan, d.semis); });

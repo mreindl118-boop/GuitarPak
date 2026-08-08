@@ -1,5 +1,5 @@
 {
-  "version": "0.39.0",
+  "version": "0.40.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "Piano tone library (all open source): choose Grand (a real recorded Salamander grand - the new default), Bright, Electric or Organ in Settings, with a preview note on tap. The tone drives the Piano tab, your MIDI keyboard and the chord piano voicings. Also fixed: keyboard input works immediately - no more clicking into the page after using a dropdown before your typing keys make sound."
+  "notes": "Tab and Notation are now their own pages in the menu - full-size tablature and sheet music of your exercise with their own transport, and the practice runner keeps playing as you hop between Fretboard, Tab and Notation. Pressed keys now light up amber for exactly as long as you hold them - on screen taps, your typing keyboard AND your MIDI/ROLI keyboard - on both the Piano tab and the chord explorer's keyboard, which now also carries the same scale-degree coloring as everywhere else."
 }

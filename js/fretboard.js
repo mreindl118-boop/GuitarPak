@@ -70,7 +70,10 @@
     var ori = App.store.get('fb.orient', 'v');
     if (ori === 'v' || ori === 'h') state.orient = ori;
     var vw = App.store.get('fb.view', 'board');
-    if (vw === 'board' || vw === 'tab' || vw === 'sheet') state.view = vw;
+    // view is derived from the active PAGE now (Fretboard / Tab / Notation
+    // are top-level tabs sharing this module's state + runner)
+    state.view = 'board';
+    if (vw) { /* legacy fb.view value ignored */ }
     var to = App.store.get('tab.orient', 'h');
     if (to === 'h' || to === 'v') state.tabOri = to;
     var vf = App.store.get('tab.fit', 'fit');
@@ -932,6 +935,7 @@
   function prStatus(text) {
     var el = document.getElementById('fb-pr-status');
     if (el) el.textContent = text;
+    document.querySelectorAll('.fb-alt-status').forEach(function (s) { s.textContent = text; });
   }
 
   // ---------------- alternate views: tab + sheet (linked to everything) ----
@@ -1136,42 +1140,28 @@
     else if (state.view === 'sheet') renderSheetView();
   }
 
+  // layout controls live on the Tab / Notation pages (class .fb-vo, no ids —
+  // the same state drives both panels' segs)
   function paintViewOpts() {
-    var vo = document.getElementById('fb-viewopts');
-    if (!vo) return;
-    vo.style.display = state.view === 'board' ? 'none' : '';
-    document.getElementById('fb-vo-ori').style.display = state.view === 'tab' ? '' : 'none';
-    document.getElementById('fb-vo-fit').style.display =
-      (state.view === 'tab' && state.tabOri === 'v') ? 'none' : '';
-    vo.querySelectorAll('[data-fbvori]').forEach(function (b) {
-      b.classList.toggle('active', b.getAttribute('data-fbvori') === state.tabOri);
-    });
-    vo.querySelectorAll('[data-fbvfit]').forEach(function (b) {
-      b.classList.toggle('active', b.getAttribute('data-fbvfit') === state.vFit);
-    });
-    vo.querySelectorAll('[data-fbvsize]').forEach(function (b) {
-      b.classList.toggle('active', b.getAttribute('data-fbvsize') === state.vSize);
+    document.querySelectorAll('.fb-vo').forEach(function (vo) {
+      var fit = vo.querySelector('.fb-vo-fit');
+      if (fit) fit.style.display = (vo.getAttribute('data-kind') === 'tab' && state.tabOri === 'v') ? 'none' : '';
+      vo.querySelectorAll('[data-fbvori]').forEach(function (b) {
+        b.classList.toggle('active', b.getAttribute('data-fbvori') === state.tabOri);
+      });
+      vo.querySelectorAll('[data-fbvfit]').forEach(function (b) {
+        b.classList.toggle('active', b.getAttribute('data-fbvfit') === state.vFit);
+      });
+      vo.querySelectorAll('[data-fbvsize]').forEach(function (b) {
+        b.classList.toggle('active', b.getAttribute('data-fbvsize') === state.vSize);
+      });
     });
   }
 
   function applyView() {
-    var board = state.view === 'board';
-    els.scroll.style.display = board ? '' : 'none';
-    els.tabout.style.display = state.view === 'tab' ? '' : 'none';
-    els.sheetwrap.style.display = state.view === 'sheet' ? '' : 'none';
-    document.getElementById('fb-boardctl').style.display = board ? '' : 'none';
-    renderPosRow();          // pent boxes are board-pertinent
-    if (!board) els.posrow.style.display = 'none';
-    paintViewOpts();
-    if (board) applyZoom();
+    renderPosRow();
+    applyZoom();
     renderAltView();
-  }
-
-  function setView(v) {
-    if (v !== 'board' && v !== 'tab' && v !== 'sheet') return;
-    state.view = v;
-    App.store.set('fb.view', v);
-    applyView();             // the runner keeps playing across view switches
   }
 
   function prPlayBtn(running) {
@@ -1182,6 +1172,10 @@
       m.innerHTML = App.icon(running ? 'pause' : 'play', 17);
       m.classList.toggle('on', !!running);
     }
+    // transports on the Tab / Notation pages mirror the runner too
+    document.querySelectorAll('.fb-alt-play').forEach(function (ab) {
+      ab.innerHTML = running ? App.icon('pause', 14) + ' Pause' : App.icon('play', 14) + ' Play';
+    });
   }
 
   function prStart() {
@@ -1664,11 +1658,6 @@
             '<button type="button" class="chip" id="fb-jamchip" style="display:none" title="Tap to switch the board to this mode"></button>' +
           '</span>' +
           '<span class="row tight">' +
-            '<select id="fb-view" title="How to see the exercise">' +
-              '<option value="board">Fretboard</option>' +
-              '<option value="tab">Tab</option>' +
-              '<option value="sheet">Sheet</option>' +
-            '</select>' +
             '<span class="row tight" id="fb-boardctl">' +
             '<button type="button" class="btn sm" id="fb-zout" aria-label="Zoom out">' + App.icon('minus', 14) + '</button>' +
             '<span class="chip" id="fb-zlabel">100%</span>' +
@@ -1732,24 +1721,7 @@
           '<label class="row tight small muted" style="gap:5px"><input type="checkbox" id="fb-pr-click">Click</label>' +
           '<span class="muted small" id="fb-pr-status"></span>' +
         '</div>' +
-        '<div class="row tight" id="fb-viewopts" style="display:none">' +
-          '<div class="fb-field" id="fb-vo-ori">View' +
-            '<div class="seg"><button type="button" data-fbvori="h">Horizontal</button>' +
-            '<button type="button" data-fbvori="v">Vertical</button></div>' +
-          '</div>' +
-          '<div class="fb-field">Layout' +
-            '<div class="seg" id="fb-vo-fit"><button type="button" data-fbvfit="fit">Fit</button>' +
-            '<button type="button" data-fbvfit="scroll">Scroll</button></div>' +
-          '</div>' +
-          '<div class="fb-field">Size' +
-            '<div class="seg" id="fb-vo-size"><button type="button" data-fbvsize="s">S</button>' +
-            '<button type="button" data-fbvsize="m">M</button>' +
-            '<button type="button" data-fbvsize="l">L</button></div>' +
-          '</div>' +
-        '</div>' +
         '<div class="fb-scroll" id="fb-scroll"></div>' +
-        '<div class="fb-tabout" id="fb-tabout" style="display:none"></div>' +
-        '<div class="fb-sheetwrap" id="fb-sheetwrap" style="display:none"></div>' +
         '<button type="button" class="fb-exitmax" id="fb-exitmax" title="Exit fullscreen" aria-label="Exit fullscreen">' + App.icon('close', 17) + '</button>' +
         '<button type="button" class="fb-exitmax fb-playmax" id="fb-playmax" title="Play / pause the exercise" aria-label="Play or pause the practice exercise">' + App.icon('play', 17) + '</button>' +
         '<span class="fb-exitmax fb-strokemax fb-stroke" id="fb-strokemax" aria-hidden="true" style="display:none"></span>' +
@@ -1787,8 +1759,8 @@
     els.display = document.getElementById('fb-display');
     els.lefty = document.getElementById('fb-lefty');
     els.posrow = document.getElementById('fb-posrow');
-    els.tabout = document.getElementById('fb-tabout');
-    els.sheetwrap = document.getElementById('fb-sheetwrap');
+    // els.tabout / els.sheetwrap are assigned when the Tab / Notation pages
+    // build their panels (altInit below) — they live in those panels now
     els.scroll = document.getElementById('fb-scroll');
     els.legend = document.getElementById('fb-legend');
     els.infoTitle = document.getElementById('fb-info-title');
@@ -1849,28 +1821,6 @@
       renderBoard(); renderInfo(); renderLegend();
     });
 
-    document.getElementById('fb-view').value = state.view;
-    document.getElementById('fb-view').addEventListener('change', function () {
-      setView(this.value);
-    });
-    document.getElementById('fb-viewopts').addEventListener('click', function (e) {
-      var b = e.target.closest('button');
-      if (!b) return;
-      if (b.hasAttribute('data-fbvori')) {
-        state.tabOri = b.getAttribute('data-fbvori');
-        App.store.set('tab.orient', state.tabOri);
-      } else if (b.hasAttribute('data-fbvfit')) {
-        state.vFit = b.getAttribute('data-fbvfit');
-        App.store.set('tab.fit', state.vFit);
-      } else if (b.hasAttribute('data-fbvsize')) {
-        state.vSize = b.getAttribute('data-fbvsize');
-        App.store.set('tab.size', state.vSize);
-      } else {
-        return;
-      }
-      paintViewOpts();
-      renderAltView();
-    });
     window.addEventListener('resize', function () {
       if (state.view !== 'board' && state.vFit === 'fit') renderAltView();
     });
@@ -2032,13 +1982,27 @@
     applyZoom();
   }
 
+  // Fretboard / Tab / Notation are three pages over ONE exercise: moving
+  // between them keeps the runner playing (like the old in-page views did).
+  // Leaving the trio pauses it. onHide fires before App.active updates, so
+  // the check is deferred a tick.
+  var TRIO = ['fretboard', 'tab', 'notation'];
+
+  function maybePause() {
+    setTimeout(function () {
+      if (TRIO.indexOf(App.active) === -1) prPause();
+    }, 0);
+  }
+
   function onShow() {
+    state.view = 'board';
+    renderPosRow();
     applyZoom(); // stage had zero size while the tab was hidden
   }
 
   function onHide() {
     clearFlash(); // plucked notes decay on their own (~1.2 s envelope in App.pluck)
-    prPause();    // exercise pauses (keeps its place) when leaving the tab
+    maybePause(); // keeps playing if the destination is Tab / Notation
     if (maxMode) setMax(false);
     if (els.settings) els.settings.classList.remove('open');
   }
@@ -2047,5 +2011,82 @@
     init: init,
     onShow: onShow,
     onHide: onHide
+  });
+
+  // ---------------- Tab + Notation as full pages ----------------
+  // Thin panels over the fretboard module's state and runner: a transport
+  // that mirrors the practice strip, layout controls (orientation for tab,
+  // fit + size for both), and the shared render targets.
+
+  function altInit(rootEl, kind) {
+    var isTab = kind === 'tab';
+    rootEl.innerHTML =
+      '<div class="card">' +
+        '<div class="row tight spread">' +
+          '<span class="fb-title" id="fb-' + kind + '-title"></span>' +
+          '<div class="row tight fb-vo" data-kind="' + (isTab ? 'tab' : 'sheet') + '">' +
+            (isTab ?
+              '<div class="seg"><button type="button" data-fbvori="h">Horizontal</button>' +
+              '<button type="button" data-fbvori="v">Vertical</button></div>' : '') +
+            '<div class="seg fb-vo-fit"><button type="button" data-fbvfit="fit">Fit</button>' +
+            '<button type="button" data-fbvfit="scroll">Scroll</button></div>' +
+            '<div class="seg"><button type="button" data-fbvsize="s">S</button>' +
+            '<button type="button" data-fbvsize="m">M</button>' +
+            '<button type="button" data-fbvsize="l">L</button></div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="row tight" style="margin-top:12px">' +
+          '<button type="button" class="btn sm primary fb-alt-play">' + App.icon('play', 14) + ' Play</button>' +
+          '<button type="button" class="btn sm fb-alt-reset" title="Back to the first note">' + App.icon('restart', 14) + '</button>' +
+          '<span class="muted small fb-alt-status"></span>' +
+          '<span class="muted small">Pattern, tempo &amp; pauses live on the Fretboard page &mdash; this follows the same exercise.</span>' +
+        '</div>' +
+        '<div class="' + (isTab ? 'fb-tabout" id="fb-tabout' : 'fb-sheetwrap" id="fb-sheetwrap') + '" style="margin-top:12px"></div>' +
+      '</div>';
+
+    if (isTab) els.tabout = document.getElementById('fb-tabout');
+    else els.sheetwrap = document.getElementById('fb-sheetwrap');
+
+    rootEl.querySelector('.fb-alt-play').addEventListener('click', prToggle);
+    rootEl.querySelector('.fb-alt-reset').addEventListener('click', function () { prStop(); });
+    rootEl.querySelector('.fb-vo').addEventListener('click', function (e) {
+      var b = e.target.closest('button');
+      if (!b) return;
+      if (b.hasAttribute('data-fbvori')) {
+        state.tabOri = b.getAttribute('data-fbvori');
+        App.store.set('tab.orient', state.tabOri);
+      } else if (b.hasAttribute('data-fbvfit')) {
+        state.vFit = b.getAttribute('data-fbvfit');
+        App.store.set('tab.fit', state.vFit);
+      } else if (b.hasAttribute('data-fbvsize')) {
+        state.vSize = b.getAttribute('data-fbvsize');
+        App.store.set('tab.size', state.vSize);
+      } else {
+        return;
+      }
+      paintViewOpts();
+      renderAltView();
+    });
+    paintViewOpts();
+  }
+
+  function altShow(kind) {
+    state.view = kind === 'tab' ? 'tab' : 'sheet';
+    var t = document.getElementById('fb-' + kind + '-title');
+    if (t && els.title) t.textContent = els.title.textContent;
+    paintViewOpts();
+    renderAltView();
+  }
+
+  App.register('tab', {
+    init: function (el) { altInit(el, 'tab'); },
+    onShow: function () { altShow('tab'); },
+    onHide: maybePause
+  });
+
+  App.register('notation', {
+    init: function (el) { altInit(el, 'notation'); },
+    onShow: function () { altShow('notation'); },
+    onHide: maybePause
   });
 })();
