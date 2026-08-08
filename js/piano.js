@@ -697,7 +697,7 @@
       '.pn-stage svg{display:block}' +
       // portrait column: the rotated keyboard scales to a comfortable width
       // and the page scrolls down it, exactly like the vertical fretboard
-      '.pn-stage.pn-v{overflow-x:visible;touch-action:auto;display:flex;justify-content:center}' +
+      '.pn-stage.pn-v{overflow-x:visible;touch-action:manipulation;display:flex;justify-content:center}' +
       '.pn-stage.pn-v svg{width:min(360px,94%);height:auto}' +
       '.pn-key{cursor:pointer;transition:filter 80ms ease}' +
       // ivory + ebony in both themes — this is the instrument, not chrome

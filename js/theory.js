@@ -483,22 +483,10 @@ window.Theory = (function () {
       }
     }
     path.sort(function (a, b) { return a.midi - b.midi || a.s - b.s; });
-    path = path.filter(function (n, i) { return i === 0 || n.midi !== path[i - 1].midi; });
-    // box runs end where they began: the window anchors on the tonic (scale
-    // root, modal tonic, or pent-box anchor) but its top edge lands on an
-    // arbitrary scale tone — trim past the HIGHEST occurrence of the starting
-    // tone so ascending patterns finish on the root at the top of the box
-    // instead of petering out mid-scale
-    if (path.length > 1) {
-      var anchorPc = mod12(path[0].midi);
-      for (var last = path.length - 1; last > 0; last--) {
-        if (mod12(path[last].midi) === anchorPc) {
-          path = path.slice(0, last + 1);
-          break;
-        }
-      }
-    }
-    return path;
+    // the full box plays: ascending runs go low root (the box anchor) through
+    // the high root and on to the mode's final note at the top of the window —
+    // usually past the high root; descending runs start from that top note
+    return path.filter(function (n, i) { return i === 0 || n.midi !== path[i - 1].midi; });
   }
 
   // Index sequence for a pattern: the pattern builds the ascending run
