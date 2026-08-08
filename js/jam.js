@@ -1,77 +1,140 @@
-/* GuitarLab jam module — backing track builder. Registers as 'jam'.
- * Synthesized drums + bass + comp instrument play a chord progression on a
- * lookahead scheduler. Keeps playing across in-app tabs (stops when the app
- * is hidden). Broadcasts the sounding chord on the App bus so the fretboard
- * can visualize scale-over-chord in real time:
- *   App.emit('jam:chord', { rootPc, quality, name, roman, tones:[pc...],
- *                           suggestedScale, suggestedName })
- *   App.emit('jam:stopped')
- * Persists under jam.* store keys.
+/* GuitarLab jam module v2 — an auto-band. Registers as 'jam'.
+ *
+ * Band-in-a-Box-style flow: pick a GENRE, hit Play, and a full band plays a
+ * complete song form (Intro → A → B → …, Finish cues the Ending) in the
+ * app's shared key. Everything above the sound layer is new:
+ *   - genre presets auto-arrange a song (sections with degree-based chords,
+ *     so changing the key in the context bar re-harmonizes LIVE)
+ *   - editable song structure: per-section chords, repeats, bars-per-chord,
+ *     sections toggle on/off
+ *   - per-instrument mixer (drums / bass / comp) with volume + mute and a
+ *     selectable comp instrument
+ *   - style & feel: energy (Chill / Groove / Push) + swing
+ *   - live re-harmonizing: tap a palette chord (or play one on a MIDI
+ *     keyboard) while the band plays to vamp on it; Resume returns to the form
+ *
+ * The SOUND layer is the maintained original: sampled instruments
+ * (samples/CREDITS.md), synthesized drums, humanization — untouched.
+ * Broadcasts the sounding chord exactly as before so the fretboard/piano
+ * follow: App.emit('jam:chord', {rootPc, quality, name, roman, tones,
+ * suggestedScale, suggestedName}) / App.emit('jam:stopped').
+ * Persists under jam2.* (old jam.track progressions migrate into section A).
  */
 (function () {
   'use strict';
-
-  // ---------------- state ----------------
-
-  var state = {
-    key: 9,             // A
-    scale: 'aeolian',
-    sevenths: false,
-    barsPerChord: 1,
-    vibe: 'rock',
-    comp: 'strum',      // guitar | eguitar | nylon | strum | pad | keys | off
-    drums: true,
-    bass: true,
-    track: []           // [{rootPc, quality, name, roman}]
-  };
 
   var els = {};
   var ctx = null;
   var noiseBuf = null;
 
-  // ---------------- vibes ----------------
-  // drums: k/s/h = 16th-step indices per 4/4 bar; swing shuffles the 8th "and"s.
-  // bass: [beat, degree] per bar. comp: [beat, durBeats, gain] per bar.
+  // ---------------- state ----------------
 
-  var VIBES = {
+  var state = {
+    genre: 'rock',
+    energy: 2,          // 1 chill · 2 groove · 3 push
+    swing: 0,           // 0..1 (seeded from the genre default on genre change)
+    comp: 'guitar',     // guitar | eguitar | nylon | keys | pad
+    mix: {
+      drums: { on: true, vol: 80 },
+      bass: { on: true, vol: 80 },
+      comp: { on: true, vol: 80 }
+    },
+    sections: [],       // [{id, on, repeats, barsPerChord, chords:[token]}]
+    selSec: 'a'
+  };
+  // chord token: {d: 1..7, q?: qualityOverride} (degree — re-harmonizes with
+  // the key) or {abs: {rootPc, quality}} (fixed — migrated progressions)
+
+  var COMP_IDS = ['guitar', 'eguitar', 'nylon', 'keys', 'pad'];
+  var SEC_LABELS = { intro: 'Intro', a: 'A', b: 'B', ending: 'Ending' };
+
+  // ---------------- genres ----------------
+  // drums: k/s/h = 16th-step indices per 4/4 bar. bass: [beat, degree].
+  // comp: [beat, durBeats, gain]. song: degree tokens per section.
+
+  var GENRES = {
     rock: {
       name: 'Rock',
-      drums: { k: [0, 8], s: [4, 12], h: [0, 2, 4, 6, 8, 10, 12, 14], swing: 0 },
+      swing: 0,
+      drums: { k: [0, 8], s: [4, 12], h: [0, 2, 4, 6, 8, 10, 12, 14] },
       bass: [[0, 'R'], [1, 'R'], [1.5, 'R'], [2, '5'], [3, 'R'], [3.5, '5']],
-      comp: [[0, 1.6, 0.5], [2, 1.2, 0.34]]
+      comp: [[0, 1.6, 0.5], [2, 1.2, 0.34]],
+      song: {
+        intro: [{ d: 1 }],
+        a: [{ d: 1 }, { d: 5 }, { d: 6 }, { d: 4 }],
+        b: [{ d: 4 }, { d: 5 }, { d: 1 }, { d: 1 }],
+        ending: [{ d: 5 }, { d: 1 }]
+      }
     },
     pop: {
       name: 'Pop',
-      drums: { k: [0, 6, 8, 14], s: [4, 12], h: [0, 2, 4, 6, 8, 10, 12, 14], swing: 0 },
+      swing: 0,
+      drums: { k: [0, 6, 8, 14], s: [4, 12], h: [0, 2, 4, 6, 8, 10, 12, 14] },
       bass: [[0, 'R'], [1.5, 'R'], [2, '5'], [3.5, '5']],
-      comp: [[0, 1.2, 0.45], [1.5, 0.8, 0.3], [2.5, 1.2, 0.3]]
+      comp: [[0, 1.2, 0.45], [1.5, 0.8, 0.3], [2.5, 1.2, 0.3]],
+      song: {
+        intro: [{ d: 1 }],
+        a: [{ d: 6 }, { d: 4 }, { d: 1 }, { d: 5 }],
+        b: [{ d: 4 }, { d: 1 }, { d: 5 }, { d: 6 }],
+        ending: [{ d: 4 }, { d: 1 }]
+      }
     },
     shuffle: {
       name: 'Blues shuffle',
-      drums: { k: [0, 8], s: [4, 12], h: [0, 2, 4, 6, 8, 10, 12, 14], swing: 1 },
+      swing: 1,
+      drums: { k: [0, 8], s: [4, 12], h: [0, 2, 4, 6, 8, 10, 12, 14] },
       bass: [[0, 'R'], [1, '3'], [2, '5'], [3, '6']],
-      comp: [[0, 1.6, 0.42], [2, 1.6, 0.34]]
+      comp: [[0, 1.6, 0.42], [2, 1.6, 0.34]],
+      song: {
+        intro: [{ d: 1, q: '7' }],
+        a: [{ d: 1, q: '7' }, { d: 1, q: '7' }, { d: 1, q: '7' }, { d: 1, q: '7' },
+            { d: 4, q: '7' }, { d: 4, q: '7' }, { d: 1, q: '7' }, { d: 1, q: '7' },
+            { d: 5, q: '7' }, { d: 4, q: '7' }, { d: 1, q: '7' }, { d: 5, q: '7' }],
+        b: [{ d: 4, q: '7' }, { d: 4, q: '7' }, { d: 1, q: '7' }, { d: 1, q: '7' }],
+        ending: [{ d: 5, q: '7' }, { d: 1, q: '7' }]
+      }
     },
     funk: {
       name: 'Funk',
-      drums: { k: [0, 3, 6, 10], s: [4, 12], h: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], swing: 0 },
+      swing: 0,
+      drums: { k: [0, 3, 6, 10], s: [4, 12], h: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] },
       bass: [[0, 'R'], [0.75, 'R8'], [1.5, '5'], [2.5, 'R'], [3, 'b7']],
-      comp: [[1.5, 0.25, 0.34], [3.5, 0.25, 0.34]]
+      comp: [[1.5, 0.25, 0.34], [3.5, 0.25, 0.34]],
+      song: {
+        intro: [{ d: 1, q: 'm7' }],
+        a: [{ d: 1, q: 'm7' }, { d: 1, q: 'm7' }, { d: 4, q: '7' }, { d: 1, q: 'm7' }],
+        b: [{ d: 6 }, { d: 5, q: '7' }, { d: 1, q: 'm7' }, { d: 1, q: 'm7' }],
+        ending: [{ d: 5, q: '7' }, { d: 1, q: 'm7' }]
+      }
     },
     ballad: {
       name: 'Ballad',
-      drums: { k: [0, 10], s: [8], h: [0, 4, 8, 12], swing: 0 },
+      swing: 0,
+      drums: { k: [0, 10], s: [8], h: [0, 4, 8, 12] },
       bass: [[0, 'R'], [2, '5']],
-      comp: [[0, 3.8, 0.4]]
+      comp: [[0, 3.8, 0.4]],
+      song: {
+        intro: [{ d: 1 }],
+        a: [{ d: 1 }, { d: 6 }, { d: 4 }, { d: 5 }],
+        b: [{ d: 2 }, { d: 5 }, { d: 1 }, { d: 6 }],
+        ending: [{ d: 4 }, { d: 1 }]
+      }
     },
     latin: {
       name: 'Latin',
-      drums: { k: [0, 6, 12], s: [8], h: [0, 2, 4, 6, 8, 10, 12, 14], swing: 0 },
+      swing: 0,
+      drums: { k: [0, 6, 12], s: [8], h: [0, 2, 4, 6, 8, 10, 12, 14] },
       bass: [[0, 'R'], [1.5, '5'], [3, 'R']],
-      comp: [[0, 1.2, 0.4], [2.5, 1.0, 0.3]]
+      comp: [[0, 1.2, 0.4], [2.5, 1.0, 0.3]],
+      song: {
+        intro: [{ d: 1 }],
+        a: [{ d: 1 }, { d: 7 }, { d: 6 }, { d: 5 }],
+        b: [{ d: 4 }, { d: 7 }, { d: 1 }, { d: 5 }],
+        ending: [{ d: 5 }, { d: 1 }]
+      }
     }
   };
-  var VIBE_ORDER = ['rock', 'pop', 'shuffle', 'funk', 'ballad', 'latin'];
+  var GENRE_ORDER = ['rock', 'pop', 'shuffle', 'funk', 'ballad', 'latin'];
 
   // context-free chord-scale suggestions ("what to shred over this chord")
   var CHORD_SCALE = {
@@ -80,6 +143,41 @@
     '7': 'mixolydian', m7b5: 'locrian', dim: 'locrian',
     dim7: 'harmonicMinor', aug: 'melodicMinor', augMaj7: 'melodicMinor'
   };
+
+  // ---------------- shared key (context bar is the single home) ----------------
+
+  function keyPc() {
+    var v = App.store.get('fb.root', 9);
+    return (typeof v === 'number' && v >= 0 && v < 12) ? Math.floor(v) : 9;
+  }
+
+  function keyScale() {
+    var v = App.store.get('fb.scale', 'major');
+    return (Theory.SCALES[v] && Theory.SCALES[v].steps.length === 7) ? v : 'major';
+  }
+
+  function diatonicChords() {
+    return Theory.diatonic(keyPc(), keyScale(), false);
+  }
+
+  // resolve a token against the CURRENT key — this is what makes a key change
+  // in the bar re-harmonize the whole song live
+  function resolveToken(tok) {
+    var pf = Theory.FLAT_KEYS.has(keyPc());
+    if (tok.abs) {
+      var pc = Theory.mod12(tok.abs.rootPc);
+      var q0 = Theory.QUALITIES[tok.abs.quality] ? tok.abs.quality : 'maj';
+      return { rootPc: pc, quality: q0, roman: '', name: Theory.chordName(pc, q0, pf) };
+    }
+    var dia = diatonicChords();
+    var d = Math.max(1, Math.min(7, tok.d || 1));
+    var base = dia[d - 1] || dia[0];
+    var q = tok.q && Theory.QUALITIES[tok.q] ? tok.q : base.quality;
+    return {
+      rootPc: base.rootPc, quality: q, roman: base.roman,
+      name: Theory.chordName(base.rootPc, q, pf)
+    };
+  }
 
   function degSemis(deg, quality) {
     var iv = (Theory.QUALITIES[quality] || Theory.QUALITIES.maj).intervals;
@@ -92,10 +190,10 @@
     return 0;
   }
 
-  // ---------------- sampled instruments (FluidR3 GM, MIT — see samples/CREDITS.md) ----------------
+  // ---------------- sampled instruments (UNCHANGED sound layer) ----------------
   // A few anchor notes per instrument, pitch-shifted between anchors at play
   // time. Loaded lazily on first Play; every voice falls back to its synth
-  // twin when a sample isn't available (offline first run, artifact build).
+  // twin when a sample isn't available.
 
   var SAMPLE_SETS = {
     bass:    { dir: 'samples/bass/',    notes: { 28: 'E1', 33: 'A1', 38: 'D2', 43: 'G2', 48: 'C3' } },
@@ -111,10 +209,7 @@
   };
 
   var GUITAR_COMPS = { guitar: 1, eguitar: 1, nylon: 1 };
-  var COMP_IDS = ['guitar', 'eguitar', 'nylon', 'strum', 'pad', 'keys', 'off'];
 
-  // humanize: ± up to `s` seconds. Scheduled hits are always a lookahead ahead
-  // of the audio clock, so small negative offsets can never land in the past.
   function hum(s) { return (Math.random() * 2 - 1) * s; }
   var sampleBuf = {};
   var samplesRequested = false;
@@ -146,8 +241,6 @@
     });
   }
 
-  // mono + capped length with a fade: the recorded guitars ring 10+ s but no
-  // jam hit sustains past ~2.5 s — keeps decoded-PCM memory small
   function jamCondense(buf, secs) {
     var sr = buf.sampleRate;
     var n = Math.min(buf.length, Math.floor(secs * sr));
@@ -163,7 +256,7 @@
 
   function sampleInfo() {
     var el = document.getElementById('jam-sinfo');
-    if (el) el.textContent = samplesLoaded > 0 ? '· sampled instruments ready (' + samplesLoaded + '/' + samplesTotal + ')' : '';
+    if (el) el.textContent = samplesLoaded > 0 ? 'sampled band ready (' + samplesLoaded + '/' + samplesTotal + ')' : '';
   }
 
   function setReady(setId) {
@@ -182,9 +275,6 @@
     return best;
   }
 
-  // per-set loudness trim: the MusyngKite guitar renders sit well below the
-  // FluidR3 keys/pad levels, and its fingered bass sits well above (measured
-  // RMS ratios at the switch)
   var SET_TRIM = { guitar: 0.25, eguitar: 0.48, nylon: 0.18, bass: 0.35, bassp: 1.0, keys: 1, pad: 1 };
 
   function playSample(setId, midi, t, dur, gain, attack, release) {
@@ -208,7 +298,7 @@
     return true;
   }
 
-  // ---------------- synth voices ----------------
+  // ---------------- synth voices (UNCHANGED) ----------------
 
   function getNoise() {
     if (noiseBuf) return noiseBuf;
@@ -257,7 +347,6 @@
   }
 
   function bassNote(t, midi, dur, gain) {
-    // app-level bass style (Settings tab): fingered or picked electric bass
     var set = App.store.get('app.bassStyle', 'finger') === 'pick' ? 'bassp' : 'bass';
     if (setReady(set) && playSample(set, midi, t, Math.max(0.25, dur), gain * 1.5)) return;
     if (set !== 'bass' && setReady('bass') && playSample('bass', midi, t, Math.max(0.25, dur), gain * 1.5)) return;
@@ -306,7 +395,6 @@
   function keysChord(t, midis, gain) {
     if (setReady('keys')) {
       for (var k = 0; k < midis.length; k++) {
-        // slight roll + per-note level so the chord doesn't hit as one block
         playSample('keys', midis[k], t + k * 0.004 + Math.random() * 0.006, 0.6,
           (gain / midis.length) * 1.7 * (0.88 + Math.random() * 0.24));
       }
@@ -334,7 +422,7 @@
     var shapes = Theory.chordShapes(ch.rootPc, ch.quality);
     if (shapes.length) return Theory.chordVoicing(shapes[0].frets);
     var iv = (Theory.QUALITIES[ch.quality] || Theory.QUALITIES.maj).intervals;
-    var root = 48 + Theory.mod12(ch.rootPc - 0); // around C3
+    var root = 48 + Theory.mod12(ch.rootPc - 0);
     var out = [];
     for (var i = 0; i < iv.length; i++) out.push(root + iv[i]);
     return out;
@@ -363,101 +451,197 @@
     };
   }
 
+  // ---------------- song form ----------------
+
+  function defaultSections(genre) {
+    var song = GENRES[genre].song;
+    return [
+      { id: 'intro', on: true, repeats: 1, barsPerChord: 1, chords: song.intro.map(clone) },
+      { id: 'a', on: true, repeats: 2, barsPerChord: 1, chords: song.a.map(clone) },
+      { id: 'b', on: true, repeats: 1, barsPerChord: 1, chords: song.b.map(clone) },
+      { id: 'ending', on: true, repeats: 1, barsPerChord: 2, chords: song.ending.map(clone) }
+    ];
+    function clone(t) { return JSON.parse(JSON.stringify(t)); }
+  }
+
+  function section(id) {
+    for (var i = 0; i < state.sections.length; i++) {
+      if (state.sections[i].id === id) return state.sections[i];
+    }
+    return null;
+  }
+
+  // flatten sections into bar lists the scheduler walks
+  function buildPlan() {
+    function barsOf(sec) {
+      var out = [];
+      if (!sec || !sec.on || !sec.chords.length) return out;
+      for (var r = 0; r < sec.repeats; r++) {
+        for (var c = 0; c < sec.chords.length; c++) {
+          for (var b = 0; b < sec.barsPerChord; b++) {
+            out.push({ tok: sec.chords[c], secId: sec.id, chordIdx: c, isStart: b === 0 });
+          }
+        }
+      }
+      return out;
+    }
+    return {
+      intro: barsOf(section('intro')),
+      loop: barsOf(section('a')).concat(barsOf(section('b'))),
+      ending: barsOf(section('ending'))
+    };
+  }
+
   // ---------------- scheduler ----------------
 
   var playing = false;
   var timer = null;
   var bpm = 100;
   var nextBarT = 0;
-  var barIdx = 0;       // counts bars since play started
-  var vis = [];         // {t, chordIdx}
+  var vis = [];
+  var plan = null;
+  var pos = { phase: 'intro', i: 0 };
+  var finishing = false;
+  var override = null;   // {tok} — live vamp; Resume clears
 
   function beatDur() { return 60 / bpm; }
 
-  function stepTime(barT, step, swing) {
+  function stepTime(barT, step) {
     var b = Math.floor(step / 4), sub = step % 4;
-    if (swing && sub === 2) return barT + b * beatDur() + beatDur() * 2 / 3;
+    if (state.swing > 0 && sub === 2) {
+      return barT + b * beatDur() + beatDur() * (0.5 + 0.1667 * state.swing);
+    }
     return barT + b * beatDur() + sub * beatDur() / 4;
   }
 
-  function scheduleBar(barT, chord, isChordStart, chordIdx) {
-    var vibe = VIBES[state.vibe];
+  // energy transforms: one knob from sparse to pushing
+  function drumsFor() {
+    var d = GENRES[state.genre].drums;
+    if (state.energy === 1) return { k: [0, 8], s: d.s.length ? [d.s[d.s.length - 1]] : [], h: [0, 4, 8, 12], ghost: true };
+    if (state.energy === 3) {
+      var k = d.k.slice();
+      if (k.indexOf(14) === -1) k.push(14);
+      return { k: k, s: d.s, h: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] };
+    }
+    return d;
+  }
+
+  function bassFor() {
+    var b = GENRES[state.genre].bass;
+    if (state.energy === 1) return [[0, 'R'], [2, '5']];
+    if (state.energy === 3) return b.concat([[3.75, 'R8']]);
+    return b;
+  }
+
+  function compFor() {
+    var c = GENRES[state.genre].comp;
+    if (state.energy === 1) return [[0, 3.8, 0.42]];
+    if (state.energy === 3) return c.concat([[2.5, 0.5, 0.3]]);
+    return c;
+  }
+
+  function scheduleBar(barT, chord, isChordStart, holdBars) {
     var i, t;
-    if (state.drums) {
-      var d = vibe.drums;
+    var mixD = state.mix.drums, mixB = state.mix.bass, mixC = state.mix.comp;
+    if (mixD.on && mixD.vol > 0) {
+      var dv = mixD.vol / 80;
+      var d = drumsFor();
       for (i = 0; i < d.k.length; i++) {
-        kick(stepTime(barT, d.k[i], d.swing) + hum(0.004), 0.78 + Math.random() * 0.14);
+        kick(stepTime(barT, d.k[i]) + hum(0.004), (0.78 + Math.random() * 0.14) * dv);
       }
       for (i = 0; i < d.s.length; i++) {
-        snare(stepTime(barT, d.s[i], d.swing) + hum(0.005), 0.44 + Math.random() * 0.12);
+        snare(stepTime(barT, d.s[i]) + hum(0.005), (d.ghost ? 0.2 : 0.44 + Math.random() * 0.12) * dv);
       }
       for (i = 0; i < d.h.length; i++) {
-        // accent the beat, keep the in-betweens lighter, ghost a few — a
-        // straight row of identical hats is what makes a machine sound like one
         var hg = (d.h[i] % 4 === 0 ? 0.26 : 0.15) * (0.85 + Math.random() * 0.3);
         if (Math.random() < 0.05) hg *= 0.4;
-        hat(stepTime(barT, d.h[i], d.swing) + hum(0.006), hg);
+        hat(stepTime(barT, d.h[i]) + hum(0.006), hg * dv);
       }
     }
-    if (state.bass) {
+    if (mixB.on && mixB.vol > 0) {
+      var bv = mixB.vol / 80;
+      var bass = bassFor();
       var root = bassRootMidi(chord.rootPc);
-      for (i = 0; i < vibe.bass.length; i++) {
-        t = barT + vibe.bass[i][0] * beatDur() + hum(0.006);
-        var next = i + 1 < vibe.bass.length ? barT + vibe.bass[i + 1][0] * beatDur() : barT + 4 * beatDur();
-        bassNote(t, root + degSemis(vibe.bass[i][1], chord.quality),
-          Math.max(0.15, next - t - 0.02), 0.5 * (0.9 + Math.random() * 0.2));
+      for (i = 0; i < bass.length; i++) {
+        t = barT + bass[i][0] * beatDur() + hum(0.006);
+        var next = i + 1 < bass.length ? barT + bass[i + 1][0] * beatDur() : barT + 4 * beatDur();
+        bassNote(t, root + degSemis(bass[i][1], chord.quality),
+          Math.max(0.15, next - t - 0.02), 0.5 * (0.9 + Math.random() * 0.2) * bv);
       }
     }
-    if (state.comp !== 'off') {
+    if (mixC.on && mixC.vol > 0) {
+      var cv = mixC.vol / 80;
       var voicing = chordVoicing(chord);
       if (state.comp === 'pad') {
-        if (isChordStart) padChord(barT, voicing.slice(-4), 4 * beatDur() * state.barsPerChord, 0.5);
+        if (isChordStart) padChord(barT, voicing.slice(-4), 4 * beatDur() * holdBars, 0.5 * cv);
       } else {
-        for (i = 0; i < vibe.comp.length; i++) {
-          t = barT + vibe.comp[i][0] * beatDur() + hum(0.008);
-          var hitGain = vibe.comp[i][2] * (0.88 + Math.random() * 0.24);
+        var comp = compFor();
+        for (i = 0; i < comp.length; i++) {
+          t = barT + comp[i][0] * beatDur() + hum(0.008);
+          var hitGain = comp[i][2] * (0.88 + Math.random() * 0.24) * cv;
           if (state.comp === 'keys') {
             keysChord(t, voicing.slice(-4), hitGain * 2.4);
             continue;
           }
-          // strummed guitars: strum speed breathes hit to hit, offbeat hits
-          // are upstrokes (high strings first), every note varies a little
           var gap = 0.008 + Math.random() * 0.012;
-          var order = vibe.comp[i][0] % 1 !== 0 ? voicing.slice().reverse() : voicing;
+          var order = comp[i][0] % 1 !== 0 ? voicing.slice().reverse() : voicing;
           var sampled = GUITAR_COMPS[state.comp] && setReady(state.comp);
           for (var v = 0; v < order.length; v++) {
             var noteGain = 0.9 + Math.random() * 0.2;
             if (sampled) {
               playSample(state.comp, order[v], t + v * gap,
-                Math.min(1.5, vibe.comp[i][1] * beatDur() + 0.35), hitGain * 0.5 * noteGain);
-            } else if (state.comp === 'strum') { // synth on purpose
-              App.pluckSynth(order[v], (t - ctx.currentTime) + v * gap,
-                Math.min(1.1, vibe.comp[i][1] * beatDur()), hitGain / 2.4 * noteGain);
-            } else { // sampled set still decoding — App.pluck picks the best voice
+                Math.min(1.5, comp[i][1] * beatDur() + 0.35), hitGain * 0.5 * noteGain);
+            } else {
               App.pluck(order[v], (t - ctx.currentTime) + v * gap,
-                Math.min(1.1, vibe.comp[i][1] * beatDur()), hitGain / 2.4 * noteGain);
+                Math.min(1.1, comp[i][1] * beatDur()), hitGain / 2.4 * noteGain);
             }
           }
         }
       }
     }
-    if (isChordStart) {
-      vis.push({ t: barT, chordIdx: chordIdx });
-      if (vis.length > 32) vis.shift();
+  }
+
+  // walk the form one bar at a time
+  function nextBarEntry() {
+    if (!plan) plan = buildPlan();
+    if (pos.phase === 'intro') {
+      if (pos.i < plan.intro.length) return plan.intro[pos.i++];
+      pos.phase = 'loop';
+      pos.i = 0;
     }
+    if (pos.phase === 'loop') {
+      if (!plan.loop.length) return null;
+      if (finishing && plan.ending.length && pos.i % plan.loop.length === 0) {
+        pos.phase = 'ending';
+        pos.i = 0;
+      } else {
+        var e = plan.loop[pos.i % plan.loop.length];
+        pos.i++;
+        return e;
+      }
+    }
+    if (pos.phase === 'ending') {
+      if (pos.i < plan.ending.length) return plan.ending[pos.i++];
+      return null; // form complete
+    }
+    return null;
   }
 
   function tick() {
-    // stall recovery: resume from now instead of scheduling silent past bars
     if (nextBarT < ctx.currentTime - 0.02) nextBarT = ctx.currentTime + 0.05;
     var horizon = ctx.currentTime + 0.3;
     var barLen = 4 * beatDur();
     while (nextBarT < horizon) {
-      if (!state.track.length) { stop(); return; }
-      var chordIdx = Math.floor(barIdx / state.barsPerChord) % state.track.length;
-      var isStart = barIdx % state.barsPerChord === 0;
-      scheduleBar(nextBarT, state.track[chordIdx], isStart, chordIdx);
-      barIdx++;
+      var entry = override ? { tok: override.tok, secId: 'vamp', chordIdx: 0, isStart: true }
+                           : nextBarEntry();
+      if (!entry) { stopSoon(nextBarT); return; }
+      var chord = resolveToken(entry.tok);
+      var holdBars = override ? 1 : (section(entry.secId) ? section(entry.secId).barsPerChord : 1);
+      scheduleBar(nextBarT, chord, entry.isStart || !!override, holdBars);
+      if (entry.isStart || override) {
+        vis.push({ t: nextBarT, chord: chord, secId: entry.secId });
+        if (vis.length > 32) vis.shift();
+      }
       nextBarT += barLen;
     }
     // visuals + bus events run off this timer (NOT rAF) so the fretboard
@@ -465,355 +649,370 @@
     var hit = null;
     while (vis.length && vis[0].t <= ctx.currentTime) hit = vis.shift();
     if (hit) {
-      paintTrack(hit.chordIdx);
-      var ch = state.track[hit.chordIdx];
-      if (ch) {
-        App.emit('jam:chord', chordEvent(ch));
-        if (els.now) els.now.textContent = ch.name + (ch.roman ? '  ·  ' + ch.roman : '');
-      }
+      paintNow(hit);
+      App.emit('jam:chord', chordEvent(hit.chord));
     }
+  }
+
+  var stopTimer = null;
+
+  function stopSoon(atT) {
+    // let the last scheduled bar ring out, then stop cleanly
+    if (stopTimer) return;
+    var ms = Math.max(0, (atT - ctx.currentTime) * 1000) + 150;
+    stopTimer = setTimeout(function () { stopTimer = null; stop(); }, ms);
   }
 
   function play() {
     if (playing) return;
-    if (!state.track.length) { els.now.textContent = 'add some chords first'; return; }
-    try { ctx = App.getAudio(); } catch (e) { els.now.textContent = 'audio unavailable'; return; }
-    loadSamples(); // lazy; first bars use synth until decoded (~a bar at most)
+    try { ctx = App.getAudio(); } catch (e) { setNow('audio unavailable', ''); return; }
+    loadSamples();
     vis.length = 0;
-    barIdx = 0;
+    plan = buildPlan();
+    if (!plan.loop.length && !plan.intro.length) { setNow('section A needs chords', ''); return; }
+    pos = { phase: plan.intro.length ? 'intro' : 'loop', i: 0 };
+    finishing = false;
+    override = null;
     nextBarT = ctx.currentTime + 0.1;
     playing = true;
     App.wake.acquire('jam-run');
     timer = setInterval(tick, 25);
     tick();
-    els.play.textContent = 'Stop';
-    setLive(true);
-    App.emit('jam:chord', chordEvent(state.track[0]));
+    updateTransport();
   }
 
   function stop() {
     if (timer) { clearInterval(timer); timer = null; }
+    if (stopTimer) { clearTimeout(stopTimer); stopTimer = null; }
     playing = false;
+    finishing = false;
+    override = null;
     App.wake.release('jam-run');
     vis.length = 0;
-    if (els.play) els.play.textContent = 'Play';
-    if (els.now) els.now.textContent = '';
-    paintTrack(-1);
-    setLive(false);
+    setNow('', '');
+    paintForm(null);
+    updateTransport();
     App.emit('jam:stopped');
   }
 
-  function setLive(on) {
-    var btn = document.querySelector('.tab[data-panel="jam"]');
-    if (btn) btn.classList.toggle('jam-live', on);
+  function finish() {
+    if (!playing) return;
+    finishing = true;
+    updateTransport();
   }
 
-  // ---------------- persistence ----------------
+  // ---------------- persistence + migration ----------------
 
-  function validChord(c) {
-    return c && typeof c.rootPc === 'number' && isFinite(c.rootPc) && Theory.QUALITIES[c.quality];
+  function validToken(t) {
+    if (!t) return false;
+    if (t.abs) return typeof t.abs.rootPc === 'number' && !!Theory.QUALITIES[t.abs.quality];
+    return typeof t.d === 'number' && t.d >= 1 && t.d <= 7;
   }
 
   function loadState() {
-    var k = App.store.get('jam.key', 9);
-    if (typeof k === 'number' && k >= 0 && k < 12) state.key = Math.floor(k);
-    var sc = App.store.get('jam.scale', 'aeolian');
-    if (Theory.SCALES[sc] && Theory.SCALES[sc].steps.length === 7) state.scale = sc;
-    state.sevenths = !!App.store.get('jam.sevenths', false);
-    var bp = App.store.get('jam.barsPerChord', 1);
-    state.barsPerChord = bp === 2 ? 2 : 1;
-    var vb = App.store.get('jam.vibe', 'rock');
-    if (VIBES[vb]) state.vibe = vb;
-    var cp = App.store.get('jam.comp', 'guitar');
-    if (COMP_IDS.indexOf(cp) !== -1) state.comp = cp;
-    // one-time: settings saved before sampled instruments existed move from
-    // the synth strum to the sampled guitar (synth stays selectable)
-    if (!App.store.get('jam.migrSamp', false)) {
-      if (state.comp === 'strum') state.comp = 'guitar';
-      App.store.set('jam.comp', state.comp);
-      App.store.set('jam.migrSamp', true);
+    var g = App.store.get;
+    if (GENRES[g('jam2.genre', 'rock')]) state.genre = g('jam2.genre', 'rock');
+    var en = parseInt(g('jam2.energy', 2), 10);
+    state.energy = (en >= 1 && en <= 3) ? en : 2;
+    var sw = parseFloat(g('jam2.swing', GENRES[state.genre].swing));
+    state.swing = (sw >= 0 && sw <= 1) ? sw : GENRES[state.genre].swing;
+    var cp = g('jam2.comp', 'guitar');
+    state.comp = COMP_IDS.indexOf(cp) !== -1 ? cp : 'guitar';
+    var mx = g('jam2.mix', null);
+    if (mx && mx.drums && mx.bass && mx.comp) {
+      ['drums', 'bass', 'comp'].forEach(function (ch) {
+        state.mix[ch].on = mx[ch].on !== false;
+        var v = parseInt(mx[ch].vol, 10);
+        state.mix[ch].vol = (v >= 0 && v <= 100) ? v : 80;
+      });
     }
-    state.drums = App.store.get('jam.drums', true) !== false;
-    state.bass = App.store.get('jam.bass', true) !== false;
-    var tr = App.store.get('jam.track', null);
-    if (Object.prototype.toString.call(tr) === '[object Array]') {
-      state.track = tr.filter(validChord).map(function (c) {
-        var pc = Theory.mod12(Math.round(c.rootPc));
+    var secs = g('jam2.sections', null);
+    if (Object.prototype.toString.call(secs) === '[object Array]' && secs.length) {
+      state.sections = secs.filter(function (s) {
+        return s && SEC_LABELS[s.id] && Object.prototype.toString.call(s.chords) === '[object Array]';
+      }).map(function (s) {
         return {
-          rootPc: pc, quality: c.quality, roman: typeof c.roman === 'string' ? c.roman : '',
-          name: typeof c.name === 'string' ? c.name : Theory.chordName(pc, c.quality, Theory.FLAT_KEYS.has(pc))
+          id: s.id, on: s.on !== false,
+          repeats: Math.max(1, Math.min(4, parseInt(s.repeats, 10) || 1)),
+          barsPerChord: parseInt(s.barsPerChord, 10) === 2 ? 2 : 1,
+          chords: s.chords.filter(validToken)
         };
       });
     }
-    bpm = Math.max(30, Math.min(280, parseInt(App.store.get('met.bpm', 100), 10) || 100));
+    if (!section('a')) state.sections = defaultSections(state.genre);
+
+    // one-time migration: an old jam.track progression becomes section A
+    if (!g('jam2.migr', false)) {
+      var old = g('jam.track', null);
+      if (Object.prototype.toString.call(old) === '[object Array]' && old.length) {
+        var toks = old.filter(function (c) {
+          return c && typeof c.rootPc === 'number' && Theory.QUALITIES[c.quality];
+        }).map(function (c) {
+          return { abs: { rootPc: Theory.mod12(Math.round(c.rootPc)), quality: c.quality } };
+        });
+        if (toks.length) section('a').chords = toks;
+      }
+      App.store.set('jam2.migr', true);
+      saveState();
+    }
+    bpm = Math.max(30, Math.min(280, parseInt(g('met.bpm', 100), 10) || 100));
   }
 
   function saveState() {
-    App.store.set('jam.key', state.key);
-    App.store.set('jam.scale', state.scale);
-    App.store.set('jam.sevenths', state.sevenths);
-    App.store.set('jam.barsPerChord', state.barsPerChord);
-    App.store.set('jam.vibe', state.vibe);
-    App.store.set('jam.comp', state.comp);
-    App.store.set('jam.drums', state.drums);
-    App.store.set('jam.bass', state.bass);
-    App.store.set('jam.track', state.track);
+    App.store.set('jam2.genre', state.genre);
+    App.store.set('jam2.energy', state.energy);
+    App.store.set('jam2.swing', state.swing);
+    App.store.set('jam2.comp', state.comp);
+    App.store.set('jam2.mix', state.mix);
+    App.store.set('jam2.sections', state.sections);
   }
 
-  // user presets: named snapshots of the whole builder
-  function getPresets() {
-    var p = App.store.get('jam.presets', []);
-    return Object.prototype.toString.call(p) === '[object Array]' ? p : [];
-  }
+  // ---------------- UI ----------------
 
-  function savePreset(name) {
-    var presets = getPresets().filter(function (p) { return p.name !== name; });
-    presets.push({
-      name: name, key: state.key, scale: state.scale, sevenths: state.sevenths,
-      barsPerChord: state.barsPerChord, vibe: state.vibe, comp: state.comp,
-      drums: state.drums, bass: state.bass, track: state.track
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
     });
-    App.store.set('jam.presets', presets);
-    renderPresetSelect();
   }
 
-  function loadPreset(name) {
-    var p = getPresets().filter(function (x) { return x.name === name; })[0];
-    if (!p) return;
-    stop();
-    if (typeof p.key === 'number') state.key = Theory.mod12(Math.round(p.key));
-    if (Theory.SCALES[p.scale]) state.scale = p.scale;
-    state.sevenths = !!p.sevenths;
-    state.barsPerChord = p.barsPerChord === 2 ? 2 : 1;
-    if (VIBES[p.vibe]) state.vibe = p.vibe;
-    if (COMP_IDS.indexOf(p.comp) !== -1) state.comp = p.comp;
-    state.drums = p.drums !== false;
-    state.bass = p.bass !== false;
-    state.track = (p.track || []).filter(validChord);
-    saveState();
-    syncControls();
-    renderPalette();
-    renderTrack();
+  function setNow(main, sub) {
+    if (els.now) els.now.textContent = main;
+    if (els.nowSub) els.nowSub.textContent = sub;
   }
 
-  function deletePreset(name) {
-    App.store.set('jam.presets', getPresets().filter(function (p) { return p.name !== name; }));
-    renderPresetSelect();
+  function paintNow(hit) {
+    var label = hit.secId === 'vamp' ? 'vamp' :
+      hit.secId === 'intro' ? 'Intro' : hit.secId === 'ending' ? 'Ending' : SEC_LABELS[hit.secId];
+    setNow(hit.chord.name, label + (hit.chord.roman ? ' · ' + hit.chord.roman : ''));
+    paintForm(hit.secId);
   }
 
-  // ---------------- rendering ----------------
+  function paintForm(activeId) {
+    if (!els.form) return;
+    els.form.querySelectorAll('[data-jsec]').forEach(function (b) {
+      b.classList.toggle('jam-onair', b.getAttribute('data-jsec') === activeId);
+    });
+  }
+
+  function updateTransport() {
+    if (!els.play) return;
+    els.play.innerHTML = playing ? App.icon('stop', 16) + ' Stop' : App.icon('play', 16) + ' Play';
+    els.finish.disabled = !playing;
+    els.finish.textContent = finishing ? 'Ending…' : 'Finish';
+    els.resume.style.display = override ? '' : 'none';
+  }
+
+  function renderForm() {
+    var h = '';
+    state.sections.forEach(function (s) {
+      var n = s.chords.length;
+      h += '<button type="button" class="chip jam-sec' + (s.id === state.selSec ? ' active' : '') +
+        (s.on ? '' : ' jam-off') + '" data-jsec="' + s.id + '">' +
+        '<b>' + SEC_LABELS[s.id] + '</b>' +
+        (s.id === 'a' || s.id === 'b' ? ' ×' + s.repeats : '') +
+        ' <span class="muted">' + n + ' ch</span></button>';
+    });
+    els.form.innerHTML = h;
+  }
+
+  function renderEditor() {
+    var s = section(state.selSec);
+    if (!s) return;
+    var h = '';
+    s.chords.forEach(function (tok, i) {
+      var ch = resolveToken(tok);
+      h += '<span class="chip jam-edch">' + esc(ch.name) +
+        (ch.roman ? ' <span class="muted">' + esc(ch.roman) + '</span>' : '') +
+        '<button type="button" class="jam-edx" data-jrm="' + i + '" aria-label="Remove ' + esc(ch.name) + '">' +
+        App.icon('close', 10) + '</button></span>';
+    });
+    if (!s.chords.length) h = '<span class="muted small">No chords — tap palette chords below to add.</span>';
+    els.edChords.innerHTML = h;
+    els.edOn.checked = s.on;
+    els.edOn.disabled = s.id === 'a';
+    els.edRep.value = String(s.repeats);
+    els.edBars.value = String(s.barsPerChord);
+    els.edTitle.textContent = SEC_LABELS[s.id] + ' section';
+  }
 
   function renderPalette() {
-    var dia = Theory.diatonic(state.key, state.scale, state.sevenths);
+    var dia = diatonicChords();
     var h = '';
-    for (var i = 0; i < dia.length; i++) {
-      h += '<button type="button" class="chip jam-pal" data-jam-i="' + i + '"><b>' + dia[i].roman +
-        '</b>&nbsp;' + dia[i].name + '</button>';
-    }
+    dia.forEach(function (d, i) {
+      h += '<button type="button" class="chip jam-pal" data-jpal="' + (i + 1) + '">' +
+        '<b>' + esc(d.roman) + '</b>' + esc(d.name) + '</button>';
+    });
     els.palette.innerHTML = h;
-    els.palette._dia = dia;
-  }
-
-  function renderTrack() {
-    if (!state.track.length) {
-      els.track.innerHTML = '<span class="muted small">Tap chords above, or load a progression preset.</span>';
-      return;
-    }
-    var h = '';
-    for (var i = 0; i < state.track.length; i++) {
-      h += '<button type="button" class="chip jam-bar" data-jam-bar="' + i + '" title="Remove">' +
-        '<b>' + state.track[i].name + '</b><span class="muted small">&nbsp;' +
-        (state.track[i].roman || '') + '</span></button>';
-    }
-    els.track.innerHTML = h;
-  }
-
-  function paintTrack(activeIdx) {
-    if (!els.track) return;
-    var kids = els.track.querySelectorAll('.jam-bar');
-    for (var i = 0; i < kids.length; i++) kids[i].classList.toggle('active', i === activeIdx);
-  }
-
-  function renderPresetSelect() {
-    var presets = getPresets();
-    var h = '<option value="">— saved tracks —</option>';
-    for (var i = 0; i < presets.length; i++) {
-      h += '<option value="' + presets[i].name.replace(/"/g, '&quot;') + '">' + presets[i].name + '</option>';
-    }
-    els.presetSel.innerHTML = h;
+    var pf = Theory.FLAT_KEYS.has(keyPc());
+    els.keyLabel.textContent = Theory.pcName(keyPc(), pf) + ' ' +
+      Theory.SCALES[keyScale()].name.replace(/\s*\(.*\)$/, '');
   }
 
   function syncControls() {
-    els.key.value = String(state.key);
-    els.scale.value = state.scale;
-    els.sev.querySelectorAll('button').forEach(function (b) {
-      b.classList.toggle('active', (b.getAttribute('data-jam-sev') === '7') === state.sevenths);
+    els.genre.value = state.genre;
+    els.energy.querySelectorAll('button').forEach(function (b) {
+      b.classList.toggle('active', parseInt(b.getAttribute('data-jen'), 10) === state.energy);
     });
-    els.vibe.value = state.vibe;
-    els.comp.value = state.comp;
-    els.drums.checked = state.drums;
-    els.bass.checked = state.bass;
-    els.bars.value = String(state.barsPerChord);
+    els.swing.value = String(Math.round(state.swing * 100));
     els.bpm.value = String(bpm);
+    els.compSel.value = state.comp;
+    ['drums', 'bass', 'comp'].forEach(function (chn) {
+      var m = state.mix[chn];
+      document.getElementById('jam-mute-' + chn).classList.toggle('active', !m.on);
+      document.getElementById('jam-vol-' + chn).value = String(m.vol);
+    });
   }
 
-  // ---------------- init ----------------
-
-  function opt(v, label, sel) {
-    return '<option value="' + v + '"' + (String(v) === String(sel) ? ' selected' : '') + '>' + label + '</option>';
+  function rebuild() {
+    plan = buildPlan();
+    if (playing) pos = { phase: 'loop', i: 0 };
   }
 
   function init(rootEl) {
     App.injectCSS('jam',
+      '.jam-now{font-family:var(--font-condensed,var(--font-display));font-size:40px;font-weight:700;line-height:1;min-height:44px}' +
+      '.jam-nowsub{font-size:13px;color:var(--muted);min-height:18px}' +
+      '.jam-sec{cursor:pointer;font-family:inherit;color:var(--text);gap:6px}' +
+      '.jam-sec b{color:var(--accent)}' +
+      '.jam-sec.jam-off{opacity:0.45}' +
+      '.jam-sec.jam-onair{border-color:var(--teal);box-shadow:0 0 10px rgba(76,201,176,0.35)}' +
+      '.jam-pal{cursor:pointer;font-family:inherit;color:var(--text);gap:7px}' +
+      '.jam-pal b{color:var(--accent)}' +
+      '.jam-pal.jam-onair{border-color:var(--teal);color:var(--teal)}' +
+      '.jam-edch{gap:7px;padding-right:7px}' +
+      '.jam-edx{background:transparent;border:none;color:var(--muted);cursor:pointer;padding:2px;display:inline-flex}' +
+      '.jam-edx:hover{color:var(--red)}' +
+      '.jam-mixrow{display:grid;grid-template-columns:86px auto 1fr;gap:12px;align-items:center;margin-top:10px}' +
+      '.jam-mixlabel{font-size:12px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:var(--label)}' +
+      '.jam-editor{margin-top:12px;padding:12px 14px;background:var(--card2);border:1px solid var(--line);border-radius:12px}' +
       '.tab.jam-live::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;' +
-        'background:var(--teal);margin-right:7px;vertical-align:1px;box-shadow:0 0 8px rgba(76,201,176,0.5);' +
-        'animation:met-pulse 0.9s ease-in-out infinite alternate;}' +
-      '.tab.active.jam-live::before{background:var(--bg);box-shadow:none;}' +
-      '.jam-track{display:flex;flex-wrap:wrap;gap:8px;min-height:40px;align-items:center}' +
-      '.jam-bar.active{border-color:var(--accent);color:var(--accent);' +
-        'box-shadow:0 0 14px rgba(255,171,71,0.3)}' +
-      '.jam-now{font-family:var(--font-condensed,var(--font-display));font-size:26px;font-weight:600;letter-spacing:1px;min-height:32px}' + // chord names are mixed-case
-      '.jam-pal{cursor:pointer}.jam-bar{cursor:pointer}'
+        'background:var(--teal);margin-right:7px;}' // legacy contract, harmless
     );
-
-    loadState();
-
-    var rootOpts = '', pc;
-    for (pc = 0; pc < 12; pc++) rootOpts += opt(pc, Theory.pcName(pc, Theory.FLAT_KEYS.has(pc)), state.key);
-    var scaleOpts = '';
-    Theory.SCALE_ORDER.forEach(function (id) {
-      if (Theory.SCALES[id].steps.length === 7) scaleOpts += opt(id, Theory.SCALES[id].name, state.scale);
-    });
-    var progOpts = '<option value="">— progression preset —</option>';
-    Theory.PROGRESSIONS.forEach(function (p) { progOpts += opt(p.id, p.name, ''); });
-    var vibeOpts = '';
-    VIBE_ORDER.forEach(function (id) { vibeOpts += opt(id, VIBES[id].name, state.vibe); });
 
     rootEl.innerHTML =
       '<div class="card">' +
-        '<h2>Backing track</h2>' +
-        '<div class="row tight">' +
-          '<label class="field">Key<select id="jam-key">' + rootOpts + '</select></label>' +
-          '<label class="field">Scale<select id="jam-scale">' + scaleOpts + '</select></label>' +
-          '<div class="fb-field">Chords<div class="seg" id="jam-sev">' +
-            '<button type="button" data-jam-sev="3">Triads</button>' +
-            '<button type="button" data-jam-sev="7">7ths</button>' +
-          '</div></div>' +
-          '<label class="field">Load<select id="jam-prog">' + progOpts + '</select></label>' +
-        '</div>' +
-        '<div class="row tight" id="jam-palette" style="margin-top:10px"></div>' +
-        '<h3 style="margin-top:16px">Track <button type="button" class="btn sm" id="jam-clear" style="margin-left:8px">Clear</button></h3>' +
-        '<div class="jam-track" id="jam-track"></div>' +
-      '</div>' +
-      '<div class="card">' +
-        '<h2>Sound</h2>' +
-        '<div class="row tight">' +
-          '<label class="field">Vibe<select id="jam-vibe">' + vibeOpts + '</select></label>' +
-          '<label class="field">Comp<select id="jam-comp">' +
-            opt('guitar', 'Steel guitar', state.comp) + opt('eguitar', 'Electric guitar', state.comp) +
-            opt('nylon', 'Nylon guitar', state.comp) + opt('strum', 'Synth pluck', state.comp) +
-            opt('pad', 'Pad', state.comp) + opt('keys', 'Keys', state.comp) +
-            opt('off', 'Off', state.comp) + '</select></label>' +
-          '<label class="row tight small muted" style="gap:5px"><input type="checkbox" id="jam-drums">Drums</label>' +
-          '<label class="row tight small muted" style="gap:5px"><input type="checkbox" id="jam-bass">Bass</label>' +
-          '<label class="field">BPM<input type="number" id="jam-bpm" min="30" max="280" style="width:74px" title="Tempo — linked to the metronome"></label>' +
-          '<label class="field">Bars/chord<select id="jam-bars">' + opt(1, '1', state.barsPerChord) + opt(2, '2', state.barsPerChord) + '</select></label>' +
+        '<h2>Band</h2>' +
+        '<div class="row">' +
+          '<label class="field">Genre<select id="jam-genre">' +
+            GENRE_ORDER.map(function (id) {
+              return '<option value="' + id + '">' + GENRES[id].name + '</option>';
+            }).join('') + '</select></label>' +
+          '<div class="fb-field">Energy<div class="seg" id="jam-energy">' +
+            '<button type="button" data-jen="1">Chill</button>' +
+            '<button type="button" data-jen="2">Groove</button>' +
+            '<button type="button" data-jen="3">Push</button></div></div>' +
+          '<label class="field">Swing<input type="range" id="jam-swing" min="0" max="100" step="5" style="width:110px"></label>' +
+          '<label class="field">BPM<input id="jam-bpm" type="number" min="30" max="280" step="1" style="width:74px"></label>' +
+          '<button type="button" class="btn sm" id="jam-newsong" title="Re-arrange the song from the genre preset (replaces your section edits)">New song</button>' +
         '</div>' +
         '<div class="row" style="margin-top:14px">' +
-          '<button type="button" class="btn big primary" id="jam-play">Play</button>' +
-          '<span class="jam-now" id="jam-now"></span>' +
+          '<button type="button" class="btn big primary" id="jam-play">' + App.icon('play', 16) + ' Play</button>' +
+          '<button type="button" class="btn" id="jam-finish" disabled title="Cue the ending and land the song">Finish</button>' +
+          '<span>' +
+            '<div class="jam-now" id="jam-now"></div>' +
+            '<div class="jam-nowsub" id="jam-nowsub"></div>' +
+          '</span>' +
+          '<span class="muted small" id="jam-sinfo"></span>' +
         '</div>' +
-        '<div class="muted small" style="margin-top:10px">While it plays, open the Fretboard tab &mdash; it highlights the chord tones and suggests a mode for every chord. <span id="jam-sinfo"></span></div>' +
+        '<div class="row tight" style="margin-top:14px">' +
+          '<span class="muted small">Form</span>' +
+          '<span class="row tight" id="jam-form"></span>' +
+        '</div>' +
+        '<div class="jam-editor">' +
+          '<div class="row tight spread">' +
+            '<h3 id="jam-edtitle" style="margin:0">A section</h3>' +
+            '<span class="row tight">' +
+              '<label class="row tight small muted" style="gap:5px"><input type="checkbox" id="jam-ed-on">In the song</label>' +
+              '<label class="row tight small muted" style="gap:5px">Repeats <select id="jam-ed-rep">' +
+                '<option>1</option><option>2</option><option>3</option><option>4</option></select></label>' +
+              '<label class="row tight small muted" style="gap:5px">Bars/chord <select id="jam-ed-bars">' +
+                '<option>1</option><option>2</option></select></label>' +
+            '</span>' +
+          '</div>' +
+          '<div class="row tight" id="jam-ed-chords" style="margin-top:10px"></div>' +
+        '</div>' +
+        '<div class="row tight" style="margin-top:14px">' +
+          '<span class="chip" id="jam-keylabel" title="Key and scale come from the bar at the top — change them there and the whole song re-harmonizes, even while playing"></span>' +
+          '<span class="row tight" id="jam-palette"></span>' +
+          '<button type="button" class="btn sm" id="jam-resume" style="display:none" title="Back to the song form">Resume form</button>' +
+        '</div>' +
+        '<div class="muted small" style="margin-top:10px">Stopped: palette chords add to the selected section. ' +
+          'Playing: tapping a palette chord (or playing a chord on your MIDI keyboard) makes the band vamp on it — Resume returns to the song.</div>' +
       '</div>' +
       '<div class="card">' +
-        '<h3>Saved tracks</h3>' +
-        '<div class="row tight">' +
-          '<input type="text" id="jam-pname" placeholder="name this track" style="width:170px">' +
-          '<button type="button" class="btn sm" id="jam-psave">Save</button>' +
-          '<select id="jam-psel"></select>' +
-          '<button type="button" class="btn sm" id="jam-pload">Load</button>' +
-          '<button type="button" class="btn sm danger" id="jam-pdel">Delete</button>' +
+        '<h2>Mixer</h2>' +
+        '<div class="jam-mixrow"><span class="jam-mixlabel">Drums</span>' +
+          '<button type="button" class="chip fb-chip" id="jam-mute-drums">Mute</button>' +
+          '<input type="range" id="jam-vol-drums" min="0" max="100" step="5"></div>' +
+        '<div class="jam-mixrow"><span class="jam-mixlabel">Bass</span>' +
+          '<button type="button" class="chip fb-chip" id="jam-mute-bass">Mute</button>' +
+          '<input type="range" id="jam-vol-bass" min="0" max="100" step="5"></div>' +
+        '<div class="jam-mixrow"><span class="jam-mixlabel">Comp</span>' +
+          '<button type="button" class="chip fb-chip" id="jam-mute-comp">Mute</button>' +
+          '<input type="range" id="jam-vol-comp" min="0" max="100" step="5"></div>' +
+        '<div class="row" style="margin-top:12px">' +
+          '<label class="field">Comp instrument<select id="jam-comp">' +
+            '<option value="guitar">Acoustic guitar</option>' +
+            '<option value="eguitar">Electric guitar</option>' +
+            '<option value="nylon">Nylon guitar</option>' +
+            '<option value="keys">Keys</option>' +
+            '<option value="pad">Pad</option></select></label>' +
+          '<span class="muted small">Bass tone (fingered / picked) lives in Settings. Kill the comp to practice comping yourself.</span>' +
         '</div>' +
       '</div>';
 
-    els.key = document.getElementById('jam-key');
-    els.scale = document.getElementById('jam-scale');
-    els.sev = document.getElementById('jam-sev');
-    els.prog = document.getElementById('jam-prog');
-    els.palette = document.getElementById('jam-palette');
-    els.track = document.getElementById('jam-track');
-    els.vibe = document.getElementById('jam-vibe');
-    els.comp = document.getElementById('jam-comp');
-    els.drums = document.getElementById('jam-drums');
-    els.bass = document.getElementById('jam-bass');
+    els.genre = document.getElementById('jam-genre');
+    els.energy = document.getElementById('jam-energy');
+    els.swing = document.getElementById('jam-swing');
     els.bpm = document.getElementById('jam-bpm');
-    els.bars = document.getElementById('jam-bars');
     els.play = document.getElementById('jam-play');
+    els.finish = document.getElementById('jam-finish');
+    els.resume = document.getElementById('jam-resume');
     els.now = document.getElementById('jam-now');
-    els.presetSel = document.getElementById('jam-psel');
+    els.nowSub = document.getElementById('jam-nowsub');
+    els.form = document.getElementById('jam-form');
+    els.palette = document.getElementById('jam-palette');
+    els.keyLabel = document.getElementById('jam-keylabel');
+    els.edChords = document.getElementById('jam-ed-chords');
+    els.edOn = document.getElementById('jam-ed-on');
+    els.edRep = document.getElementById('jam-ed-rep');
+    els.edBars = document.getElementById('jam-ed-bars');
+    els.edTitle = document.getElementById('jam-edtitle');
+    els.compSel = document.getElementById('jam-comp');
 
-    syncControls();
+    loadState();
+    renderForm();
+    renderEditor();
     renderPalette();
-    renderTrack();
-    renderPresetSelect();
+    syncControls();
 
-    els.key.addEventListener('change', function () {
-      state.key = Theory.mod12(parseInt(this.value, 10) || 0);
-      saveState(); renderPalette();
-    });
-    els.scale.addEventListener('change', function () {
-      if (Theory.SCALES[this.value]) state.scale = this.value;
-      saveState(); renderPalette();
-    });
-    els.sev.addEventListener('click', function (e) {
-      var b = e.target.closest('button[data-jam-sev]');
-      if (!b) return;
-      state.sevenths = b.getAttribute('data-jam-sev') === '7';
-      saveState(); syncControls(); renderPalette();
-    });
-    els.prog.addEventListener('change', function () {
-      var preset = null;
-      for (var i = 0; i < Theory.PROGRESSIONS.length; i++) {
-        if (Theory.PROGRESSIONS[i].id === this.value) preset = Theory.PROGRESSIONS[i];
-      }
-      if (!preset) return;
-      state.scale = preset.scale;
-      state.sevenths = !!preset.sevenths;
-      state.track = Theory.resolveProgression(preset, state.key);
-      this.value = '';
-      saveState(); syncControls(); renderPalette(); renderTrack();
-    });
-    els.palette.addEventListener('click', function (e) {
-      var b = e.target.closest('.jam-pal');
-      if (!b) return;
-      var dia = els.palette._dia || [];
-      var ch = dia[parseInt(b.getAttribute('data-jam-i'), 10)];
-      if (!ch) return;
-      state.track.push({ rootPc: ch.rootPc, quality: ch.quality, name: ch.name, roman: ch.roman });
-      saveState(); renderTrack();
-    });
-    els.track.addEventListener('click', function (e) {
-      var b = e.target.closest('.jam-bar');
-      if (!b) return;
-      state.track.splice(parseInt(b.getAttribute('data-jam-bar'), 10), 1);
-      saveState(); renderTrack();
-    });
-    document.getElementById('jam-clear').addEventListener('click', function () {
-      state.track = [];
-      saveState(); renderTrack();
-    });
-    els.vibe.addEventListener('change', function () {
-      if (VIBES[this.value]) state.vibe = this.value;
+    els.genre.addEventListener('change', function () {
+      if (!GENRES[this.value]) return;
+      state.genre = this.value;
+      state.swing = GENRES[state.genre].swing;
+      state.sections = defaultSections(state.genre);
       saveState();
+      syncControls();
+      renderForm();
+      renderEditor();
+      rebuild();
     });
-    els.comp.addEventListener('change', function () {
-      state.comp = this.value;
+    document.getElementById('jam-newsong').addEventListener('click', function () {
+      state.sections = defaultSections(state.genre);
       saveState();
+      renderForm();
+      renderEditor();
+      rebuild();
     });
-    els.drums.addEventListener('change', function () { state.drums = !!this.checked; saveState(); });
-    els.bass.addEventListener('change', function () { state.bass = !!this.checked; saveState(); });
-    els.bars.addEventListener('change', function () {
-      state.barsPerChord = this.value === '2' ? 2 : 1;
+    els.energy.addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-jen]');
+      if (!b) return;
+      state.energy = parseInt(b.getAttribute('data-jen'), 10);
+      saveState();
+      syncControls();
+    });
+    els.swing.addEventListener('input', function () {
+      state.swing = Math.max(0, Math.min(1, parseInt(this.value, 10) / 100));
       saveState();
     });
     els.bpm.addEventListener('change', function () {
@@ -825,41 +1024,135 @@
       App.emit('tempo', { bpm: bpm, source: 'jam' });
     });
     App.on('tempo', function (d) {
-      if (d.source === 'jam') return;
-      bpm = Math.max(30, Math.min(280, d.bpm));
+      if (!d || d.source === 'jam') return;
+      bpm = Math.max(30, Math.min(280, Math.round(d.bpm)));
       if (els.bpm) els.bpm.value = String(bpm);
     });
 
     els.play.addEventListener('click', function () { if (playing) stop(); else play(); });
-
-    document.getElementById('jam-psave').addEventListener('click', function () {
-      var name = document.getElementById('jam-pname').value.trim();
-      if (!name) return;
-      savePreset(name);
-      document.getElementById('jam-pname').value = '';
-    });
-    document.getElementById('jam-pload').addEventListener('click', function () {
-      if (els.presetSel.value) loadPreset(els.presetSel.value);
-    });
-    document.getElementById('jam-pdel').addEventListener('click', function () {
-      if (els.presetSel.value) deletePreset(els.presetSel.value);
+    els.finish.addEventListener('click', finish);
+    els.resume.addEventListener('click', function () {
+      override = null;
+      rebuild();
+      updateTransport();
+      paintForm(null);
     });
 
-    // like the metronome: keep playing across in-app tabs, stop when the APP hides
+    els.form.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-jsec]');
+      if (!b) return;
+      state.selSec = b.getAttribute('data-jsec');
+      renderForm();
+      renderEditor();
+    });
+
+    els.edChords.addEventListener('click', function (e) {
+      var rm = e.target.closest('[data-jrm]');
+      if (!rm) return;
+      var s = section(state.selSec);
+      s.chords.splice(parseInt(rm.getAttribute('data-jrm'), 10), 1);
+      saveState();
+      renderForm();
+      renderEditor();
+      rebuild();
+    });
+    els.edOn.addEventListener('change', function () {
+      var s = section(state.selSec);
+      if (s.id !== 'a') s.on = !!this.checked;
+      saveState();
+      renderForm();
+      rebuild();
+    });
+    els.edRep.addEventListener('change', function () {
+      section(state.selSec).repeats = Math.max(1, Math.min(4, parseInt(this.value, 10) || 1));
+      saveState();
+      renderForm();
+      rebuild();
+    });
+    els.edBars.addEventListener('change', function () {
+      section(state.selSec).barsPerChord = parseInt(this.value, 10) === 2 ? 2 : 1;
+      saveState();
+      rebuild();
+    });
+
+    els.palette.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-jpal]');
+      if (!b) return;
+      var d = parseInt(b.getAttribute('data-jpal'), 10);
+      if (playing) {
+        override = { tok: { d: d } };
+        updateTransport();
+        els.palette.querySelectorAll('.jam-pal').forEach(function (p) {
+          p.classList.toggle('jam-onair', p === b);
+        });
+      } else {
+        section(state.selSec).chords.push({ d: d });
+        saveState();
+        renderForm();
+        renderEditor();
+        rebuild();
+        // preview strum
+        try {
+          App.getAudio();
+          var ch = resolveToken({ d: d });
+          var v = chordVoicing(ch);
+          for (var i = 0; i < v.length; i++) App.pluck(v[i], i * 0.03, 1.4, 0.3);
+        } catch (err) { /* audio unavailable */ }
+      }
+    });
+
+    // MIDI re-harm: hold a chord (3+ notes) while playing → the band vamps it
+    App.on('midi:note', function (d) {
+      if (!d || !d.on || !playing || !App.midi) return;
+      var held = App.midi.held;
+      if (held.length < 3) return;
+      var pcs = {};
+      held.forEach(function (m) { pcs[Theory.mod12(m)] = true; });
+      var rootPc = Theory.mod12(Math.min.apply(null, held));
+      var QS = ['maj', 'min', '7', 'maj7', 'm7', 'dim', 'sus4', 'sus2'];
+      for (var qi = 0; qi < QS.length; qi++) {
+        var want = {};
+        Theory.QUALITIES[QS[qi]].intervals.forEach(function (iv) { want[Theory.mod12(rootPc + iv)] = true; });
+        var all = Object.keys(want).every(function (pc) { return pcs[pc]; }) &&
+                  Object.keys(pcs).every(function (pc) { return want[pc]; });
+        if (all) {
+          override = { tok: { abs: { rootPc: rootPc, quality: QS[qi] } } };
+          updateTransport();
+          return;
+        }
+      }
+    });
+
+    // mixer
+    ['drums', 'bass', 'comp'].forEach(function (chn) {
+      document.getElementById('jam-mute-' + chn).addEventListener('click', function () {
+        state.mix[chn].on = !state.mix[chn].on;
+        saveState();
+        syncControls();
+      });
+      document.getElementById('jam-vol-' + chn).addEventListener('input', function () {
+        var v = parseInt(this.value, 10);
+        state.mix[chn].vol = (v >= 0 && v <= 100) ? v : 80;
+        saveState();
+      });
+    });
+    els.compSel.addEventListener('change', function () {
+      if (COMP_IDS.indexOf(this.value) !== -1) state.comp = this.value;
+      saveState();
+    });
+
+    // shared key: re-render palette + editor names on key/scale changes —
+    // resolveToken reads the store live, so playback re-harmonizes by itself
+    App.on('fb:scale', function () { renderPalette(); renderEditor(); });
+    App.on('fb:set', function () { renderPalette(); renderEditor(); });
+
+    // the band stops when the APP goes hidden (not on in-app tab switches)
     document.addEventListener('visibilitychange', function () {
-      if (document.hidden && playing) stop();
+      if (document.hidden) stop();
     });
+
+    updateTransport();
   }
 
-  App.register('jam', {
-    init: init,
-    // deliberately no onHide stop — the backing track keeps playing while you
-    // practice on the fretboard; visibilitychange stops it when the app hides
-    onKey: function (e) {
-      if (e.code === 'Space' || e.key === ' ') {
-        e.preventDefault();
-        if (playing) stop(); else play();
-      }
-    }
-  });
+  App.register('jam', { init: init });
 })();

@@ -32,7 +32,12 @@ js/piano.js       │ (piano: keyboard twin of the fretboard — degree-colored
                   │  follows fb:set/fb:scale + jam:chord)
 js/songs.js       │ (songs: user-imported ASCII tab / MIDI parsed on-device,
                   │  bar-loop player at shared tempo, key detect → fb:set)
-js/jam.js         │
+js/jam.js         │ (jam: auto-band — genre presets write an intro/A/B/ending
+                  │  song of DEGREE tokens that re-harmonize live against the
+                  │  context-bar key; section editor, energy/swing, per-
+                  │  instrument mixer, palette/MIDI vamp override, Finish →
+                  │  ending; store jam2.*, old jam.track migrates once; the
+                  │  sample/voice layer is the only carried-over code)
 js/tuner.js       │
 js/trainer.js     │
 js/theorytab.js   │ (theory: circle of fifths + key guide + degree ear quiz)
