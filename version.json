@@ -1,5 +1,5 @@
 {
-  "version": "0.36.0",
+  "version": "0.36.1",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "Native iPad app groundwork: the iOS wrapper now has a full CoreMIDI bridge, so as a native app the ROLI connects over Bluetooth ON the iPad - same expressive input, LED guidance and LUMI sync as Chrome, plus a system Bluetooth pairing button right in Settings. A cloud build workflow produces the installable iPad app without needing a Mac (sideload with AltStore). Web app unchanged in the browser."
+  "notes": "Practice runs now finish where they should: mode-box (and pentatonic-box) exercises end on the root at the top of the box instead of stopping on whichever scale note happened to fit the position - so groups-of-3 and every other pattern resolve home on the final note."
 }
