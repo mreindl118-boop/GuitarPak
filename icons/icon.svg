@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="soundLAB">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffbe66"/>
+      <stop offset="1" stop-color="#e08a20"/>
+    </linearGradient>
+    <linearGradient id="key" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#41414a"/>
+      <stop offset="0.22" stop-color="#1c1c21"/>
+      <stop offset="1" stop-color="#0a0a0d"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <!-- three black keys, middle one longer (the wordmark's stem shape) -->
+  <path d="M118 96 H206 V308 A44 44 0 0 1 118 308 Z" fill="url(#key)"/>
+  <path d="M212 96 H300 V372 A44 44 0 0 1 212 372 Z" fill="url(#key)"/>
+  <path d="M306 96 H394 V308 A44 44 0 0 1 306 308 Z" fill="url(#key)"/>
+</svg>

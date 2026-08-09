@@ -31,7 +31,7 @@ window.App = (function () {
   // ---- auto-update ----
   // version.json on GitHub is the source of truth. Web builds refresh through
   // the service worker; the APK build (file://) links to the new APK download.
-  var APP_VERSION = '0.42.0';
+  var APP_VERSION = '0.43.0';
   var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
 
   function verNum(v) {
@@ -61,7 +61,7 @@ window.App = (function () {
     var bar = document.createElement('div');
     bar.id = 'app-update';
     var msg = document.createElement('span');
-    msg.textContent = 'GuitarLab v' + String(info.version) + ' is available.';
+    msg.textContent = 'soundLAB v' + String(info.version) + ' is available.';
     bar.appendChild(msg);
 
     var go = document.createElement('button');

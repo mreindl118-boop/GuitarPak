@@ -1,7 +1,15 @@
-# GuitarLab — agent guide
+# soundLAB — agent guide
 
-Guitar practice PWA (vanilla HTML/CSS/JS, no build step) + Android WebView
-wrapper. GitHub: https://github.com/mreindl118-boop/GuitarPak
+Guitar + keys practice PWA (vanilla HTML/CSS/JS, no build step) + Android
+WebView wrapper. GitHub: https://github.com/mreindl118-boop/GuitarPak
+Branded **soundLAB** (formerly GuitarLab) since v0.43.0 — the rename is
+user-facing ONLY: storage keys stay 'guitarlab.*', the Android package stays
+com.mreindl.guitarlab, the APK filename stays GuitarLab-alpha.apk (update
+URL compat), and internal ids/comments are untouched. The wordmark is a
+custom SVG letterform set (stems = piano black keys: flat top, rounded
+bottom): inline in index.html's header (theme-aware via currentColor +
+--accent), standalone in icons/logo.svg, app icon icons/icon.svg (three
+black keys on amber) rendered to icons/icon-192/512.png.
 
 ## Layout
 
