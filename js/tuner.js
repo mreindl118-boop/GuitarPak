@@ -1,4 +1,4 @@
-/* GuitarLab tuner module.
+/* soundLAB tuner module.
  *
  * Card 1 "Tuner": microphone pitch detection (autocorrelation / NSDF with
  * parabolic interpolation + median smoothing), big note readout, SVG cents
@@ -356,7 +356,7 @@
     }
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       showErr('This browser does not expose the microphone API on this page. ' +
-        'Chrome and Edge allow mic access even when GuitarLab is opened from file:// — ' +
+        'Chrome and Edge allow mic access even when soundLAB is opened from file:// — ' +
         'Firefox and Safari need the app served over http(s) or localhost.');
       return;
     }
@@ -377,10 +377,10 @@
       if (name === 'NotReadableError' || name === 'AbortError') {
         showErr('The microphone exists but could not be opened (' + name + '). Usually another app is ' +
           'holding the mic, or the system blocked the audio device — close recorder/voice apps, check ' +
-          'Settings › Apps › GuitarLab › Permissions › Microphone, then press Start again.');
+          'Settings › Apps › soundLAB › Permissions › Microphone, then press Start again.');
       } else if (name === 'NotAllowedError' || name === 'SecurityError') {
         showErr('Mic permission was denied (' + name + '). In the Android app: allow the microphone prompt, ' +
-          'or enable it under Settings › Apps › GuitarLab › Permissions. In a browser: click the ' +
+          'or enable it under Settings › Apps › soundLAB › Permissions. In a browser: click the ' +
           'mic icon in the address bar and choose Allow, then press Start again.');
       } else if (name === 'NotFoundError') {
         showErr('No microphone was found on this device.');

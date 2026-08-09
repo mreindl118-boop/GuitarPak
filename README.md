@@ -1,11 +1,13 @@
-# 🎸 GuitarLab — Practice Companion (alpha)
+# 🎹 soundLAB — Practice Companion (alpha)
+
+> Formerly **GuitarLab** — same app, new name and logo as the toolkit grew beyond the fretboard (piano, MIDI keyboards, songs, an auto-band).
 
 A guitar practice tool that runs entirely in your browser. No install, no accounts, no internet needed — open `index.html` and play.
 
 ## Get it
 
 - **Web (recommended):** https://mreindl118-boop.github.io/GuitarPak/ — installable as a PWA (browser menu → *Add to Home screen*), works offline after first visit, microphone tuner fully functional.
-- **Android APK (sideload):** [Download GuitarLab-alpha.apk](https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk) — allow "install unknown apps" when prompted. Rebuilt by `android/build.ps1`.
+- **Android APK (sideload):** [Download GuitarLab-alpha.apk](https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk) — installs as **soundLAB**; allow "install unknown apps" when prompted. Rebuilt by `android/build.ps1`. (The file keeps its original name so in-place updates from older installs still work.)
 - **iPad / iPhone:** open the web link in Safari → Share → *Add to Home Screen* — full-screen app with icon, offline, mic tuner works. (A native WKWebView wrapper lives in `ios/` for building with Xcode on a Mac — see `ios/README.md`.)
 - **Local:** double-click `index.html` (Chrome/Edge allow mic from local files), or `python -m http.server 8000` in this folder.
 

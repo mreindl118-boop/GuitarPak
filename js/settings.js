@@ -78,7 +78,7 @@
       '</div>' +
       '<div class="card">' +
         '<h2>About</h2>' +
-        '<div class="muted small">GuitarLab v' + App.version + ' &mdash; updates are checked automatically at startup.</div>' +
+        '<div class="muted small">soundLAB v' + App.version + ' &mdash; updates are checked automatically at startup.</div>' +
       '</div>';
 
     var seg = document.getElementById('set-theme');

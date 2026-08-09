@@ -1,5 +1,5 @@
 {
-  "version": "0.42.0",
+  "version": "0.43.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "Jam rebuilt from the ground up as an auto-band: pick a genre (Rock, Pop, Blues Shuffle, Funk, Ballad, Latin) and it writes a song — intro, verse, chorus, ending — that follows YOUR key from the context bar and re-harmonizes live when you change it. Shape the song with section editing (repeats, bars per chord, add/remove chords from the diatonic palette), an energy dial, a swing slider, and a per-instrument mixer. Tap a palette chord (or play one on MIDI) while the band plays to vamp on it, hit Finish for a real ending. Your old progressions migrate automatically."
+  "notes": "The app has a new name: soundLAB. New logo drawn in its own custom letterforms — every stem is shaped like a piano black key (flat top, rounded bottom) with the LAB in amber — plus a matching app icon of three glossy black keys. The name changes everywhere: browser tab, home-screen/PWA install, Android launcher, iPad app. Everything else — your settings, songs, jams, and all features — is exactly where you left it."
 }

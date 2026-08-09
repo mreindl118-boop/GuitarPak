@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.mreindl.guitarlab"
-    android:versionCode="60"
-    android:versionName="0.42.0">
+    android:versionCode="61"
+    android:versionName="0.43.0">
 
     <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="34" />
 
@@ -12,7 +12,7 @@
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
 
     <application
-        android:label="GuitarLab"
+        android:label="soundLAB"
         android:icon="@mipmap/ic_launcher"
         android:hardwareAccelerated="true"
         android:theme="@android:style/Theme.NoTitleBar"

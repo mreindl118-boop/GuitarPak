@@ -4,27 +4,34 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#131114">
-<title>GuitarLab — Practice Companion (alpha)</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#127928;</text></svg>">
+<title>soundLAB — Practice Companion (alpha)</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='96' fill='%23f0a441'/%3E%3Cpath d='M118 96 H206 V308 A44 44 0 0 1 118 308 Z M212 96 H300 V372 A44 44 0 0 1 212 372 Z M306 96 H394 V308 A44 44 0 0 1 306 308 Z' fill='%23131114'/%3E%3C/svg%3E">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="GuitarLab">
+<meta name="apple-mobile-web-app-title" content="soundLAB">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 <header class="topbar">
   <div class="brand">
-    <svg width="22" height="26" viewBox="0 0 22 26" aria-hidden="true">
-      <defs><linearGradient id="pick-g" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" stop-color="#ffc272"/><stop offset="1" stop-color="#e8912a"/>
-      </linearGradient></defs>
-      <path d="M11 25C6.5 21 1 15.5 1 9.5 1 4.5 5.5 1 11 1s10 3.5 10 8.5C21 15.5 15.5 21 11 25Z"
-            fill="url(#pick-g)" stroke="rgba(255,214,160,0.55)" stroke-width="1"/>
+    <svg class="wordmark" viewBox="0 0 367 106" role="img" aria-label="soundLAB">
+      <path d="M33 43 H18 Q11 43 11 50 V61 Q11 68 18 68 H26 Q33 68 33 75 V86 Q33 93 26 93 H11" fill="none" stroke="currentColor" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M62 36 H72 A13 13 0 0 1 85 49 V87 A13 13 0 0 1 72 100 H62 A13 13 0 0 1 49 87 V49 A13 13 0 0 1 62 36 Z M67 50 H67 A4 4 0 0 1 71 54 V82 A4 4 0 0 1 67 86 H67 A4 4 0 0 1 63 82 V54 A4 4 0 0 1 67 50 Z" fill="currentColor" fill-rule="evenodd"/>
+      <path d="M101 36 V82 A11 11 0 0 0 123 82 V36" fill="none" stroke="currentColor" stroke-width="14" stroke-linecap="butt" stroke-linejoin="round"/>
+      <path d="M146 93 V54 A11 11 0 0 1 168 54 V93" fill="none" stroke="currentColor" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M197 36 H207 A13 13 0 0 1 220 49 V87 A13 13 0 0 1 207 100 H197 A13 13 0 0 1 184 87 V49 A13 13 0 0 1 197 36 Z M202 50 H202 A4 4 0 0 1 206 54 V82 A4 4 0 0 1 202 86 H202 A4 4 0 0 1 198 82 V54 A4 4 0 0 1 202 50 Z" fill="currentColor" fill-rule="evenodd"/>
+      <path d="M206 12 H220 V93 A7 7 0 0 1 206 93 Z" fill="currentColor"/>
+      <g class="wm-lab">
+        <path d="M236 12 H250 V86 H260 A7 7 0 0 1 260 100 H243 A7 7 0 0 1 236 93 Z" fill="var(--accent,#ffab47)"/>
+        <path d="M283 93 V31 A12 12 0 0 1 307 31 V93" fill="none" stroke="var(--accent,#ffab47)" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M283 55 H307 V69 H283 Z" fill="var(--accent,#ffab47)"/>
+        <path d="M323 12 H341 A19 19 0 0 1 341 50 A22 25 0 0 1 341 100 H330 A7 7 0 0 1 323 93 Z M337 26 H341 A5 5 0 0 1 341 36 H337 Z M337 64 H341 A8 11 0 0 1 341 86 H337 Z" fill="var(--accent,#ffab47)" fill-rule="evenodd"/>
+      </g>
     </svg>
-    Guitar<em>Lab</em> <span class="tag">alpha</span>
+    <span class="tag">alpha</span>
   </div>
   <nav class="nav" id="tabs">
     <select id="nav-select" aria-label="Go to page">
@@ -66,7 +73,7 @@
   <section class="panel" id="panel-settings"></section>
 </main>
 <footer class="foot">
-  GuitarLab alpha &mdash; everything runs locally in your browser. Sound starts after your first click (browser autoplay policy). The Tuner needs microphone permission.
+  soundLAB alpha &mdash; everything runs locally in your browser. Sound starts after your first click (browser autoplay policy). The Tuner needs microphone permission.
 </footer>
 <script src="js/theory.js"></script>
 <script src="js/app.js"></script>
