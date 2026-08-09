@@ -1,5 +1,5 @@
 {
-  "version": "0.43.0",
+  "version": "0.43.1",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "The app has a new name: soundLAB. New logo drawn in its own custom letterforms — every stem is shaped like a piano black key (flat top, rounded bottom) with the LAB in amber — plus a matching app icon of three glossy black keys. The name changes everywhere: browser tab, home-screen/PWA install, Android launcher, iPad app. Everything else — your settings, songs, jams, and all features — is exactly where you left it."
+  "notes": "The soundLAB logo, take two: lighter weight, wide-open letters, smooth curves — instantly legible at any size — presented on the app's dark ground. Same idea underneath (every stem is a piano black key: flat top, rounded bottom; LAB in amber), now easy on the eyes."
 }
