@@ -471,8 +471,25 @@
     ensureChannels();
   }
 
+  // global click track (app.click — a Settings toggle, mirrored on the Pads
+  // page): a metronome blip on every beat of BOTH studio transports
+  function clickOn() { return App.store.get('app.click', false) === true; }
+
+  function clickBlip(ctx, t, strong) {
+    var o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = 'square';
+    o.frequency.value = strong ? 1568 : 1046;
+    g.gain.setValueAtTime(0.11, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+    o.connect(g); g.connect(ctx.destination);
+    o.start(t); o.stop(t + 0.06);
+  }
+
   function scheduleLoop(atT, ctx, chans) {
     var bd = beatDur();
+    if (clickOn() && !(typeof OfflineAudioContext !== 'undefined' && ctx instanceof OfflineAudioContext)) {
+      for (var cb = 0; cb < bars * 4; cb++) clickBlip(ctx, atT + cb * bd, cb % 4 === 0);
+    }
     tracks.forEach(function (t) {
       var c = chans[t.id];
       if (!c) return;
@@ -572,6 +589,12 @@
   }
 
   function scheduleClipWindow(from, to, chans, b2t) {
+    if (clickOn() && chans === channels) { // live only — never in WAV renders
+      var ctx = ctxNow();
+      for (var cb = Math.ceil(from - 1e-9); cb < to; cb++) {
+        if (cb >= from) clickBlip(ctx, b2t(cb), cb % 4 === 0);
+      }
+    }
     tracks.forEach(function (t) {
       var c = chans[t.id];
       if (!c) return;

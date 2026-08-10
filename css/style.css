@@ -102,12 +102,16 @@
 
 * { box-sizing: border-box; }
 
+/* no double-tap-to-zoom ANYWHERE. touch-action does NOT inherit, so the old
+   html,body rule left every other element zoomable — this hits them all.
+   Pinch-zoom and panning stay available (manipulation); surfaces that
+   restrict further (touch-action:none paint grids, pan-x boards) win via
+   their class rules' higher specificity. */
+* { touch-action: manipulation; }
+
 html, body {
   margin: 0;
   padding: 0;
-  /* no double-tap-to-zoom anywhere — taps on pads/keys/boards must never
-     zoom the page. Pinch-zoom and panning stay available (manipulation),
-     and elements that restrict further (pan-x boards) keep their own rules. */
   touch-action: manipulation;
   color: var(--text);
   font-family: var(--font-body);

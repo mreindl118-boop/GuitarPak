@@ -178,6 +178,8 @@
     els.recbtn.classList.toggle('active', rec);
     els.recbtn.innerHTML = (rec ? App.icon('stop', 14) : App.icon('play', 14)) + (rec ? ' Recording' : ' Record hits');
     els.play.innerHTML = DAW.engine.playing ? App.icon('stop', 15) + ' Stop' : App.icon('play', 15) + ' Play loop';
+    var ck = document.getElementById('pd-click');
+    if (ck) ck.classList.toggle('active', App.store.get('app.click', false) === true);
   }
 
   function init(rootEl) {
@@ -202,6 +204,8 @@
           '<span class="row tight">' +
             '<button type="button" class="btn big primary" id="pd-play"></button>' +
             '<button type="button" class="btn" id="pd-rec"></button>' +
+            '<button type="button" class="chip fb-chip" id="pd-click" title="Metronome click during the loop — a global setting, also in Settings › Sound">Click</button>' +
+            '<button type="button" class="btn sm" id="pd-clear" title="Wipe every hit from this drum track&rsquo;s pattern">Clear</button>' +
             '<span class="muted small" id="pd-recinfo"></span>' +
           '</span>' +
           '<span class="row tight">' +
@@ -250,10 +254,36 @@
       if (DAW.engine.playing) DAW.engine.stop(); else if (padTrack()) DAW.engine.play();
       paintControls();
     });
+    var forcedClick = false;
     els.recbtn.addEventListener('click', function () {
       rec = !rec;
-      if (rec && !DAW.engine.playing && padTrack()) DAW.engine.play();
+      if (rec) {
+        // recording NEEDS a time reference: force the click on for the take
+        // (restored after) unless it's already on
+        if (App.store.get('app.click', false) !== true) {
+          App.store.set('app.click', true);
+          forcedClick = true;
+        }
+        if (!DAW.engine.playing && padTrack()) DAW.engine.play();
+      } else if (forcedClick) {
+        App.store.set('app.click', false);
+        forcedClick = false;
+      }
       paintControls();
+    });
+    document.getElementById('pd-click').addEventListener('click', function () {
+      App.store.set('app.click', App.store.get('app.click', false) !== true);
+      forcedClick = false; // an explicit choice sticks
+      paintControls();
+    });
+    document.getElementById('pd-clear').addEventListener('click', function () {
+      var t = padTrack();
+      if (!t) return;
+      for (var l = 0; l < (t.steps || []).length; l++) {
+        for (var s = 0; s < t.steps[l].length; s++) t.steps[l][s] = 0;
+      }
+      App.store.set('st.tracks', DAW.engine.tracks);
+      paintRecCount(t);
     });
     els.mkbtn.addEventListener('click', function () {
       // a fresh, EMPTY kit — the pads are for playing your own beat in
