@@ -147,6 +147,11 @@
       hHeads += '<div class="ar-head" data-arh="' + t.id + '">' +
         '<div class="ar-hname">' + esc(t.name) + '</div>' +
         '<div class="row tight">' +
+          (t.kind !== 'drums'
+            ? '<button type="button" class="chip fb-chip ar-mini ar-arm' +
+              (App.store.get('st.armed', null) === t.id ? ' active' : '') +
+              '" data-ararm="' + t.id + '" title="Arm: your keyboard plays this track live and Record captures into it">&#9679;</button>'
+            : '') +
           '<button type="button" class="chip fb-chip ar-mini' + (t.mix.mute ? ' active' : '') + '" data-armute="' + t.id + '">M</button>' +
           '<button type="button" class="chip fb-chip ar-mini' + (t.mix.solo ? ' active' : '') + '" data-arsolo="' + t.id + '">S</button>' +
           '<input type="range" data-arvol="' + t.id + '" min="0" max="100" step="5" value="' + t.mix.vol + '" class="ar-vol">' +
@@ -178,10 +183,115 @@
     els.ph.style.height = (tracks().length * LANE_H + RULER_H) + 'px';
   }
 
+  // ---------------- record-to-clip (Studio phase 1) ----------------
+  // Arm a melodic track, hit Rec: the song transport rolls and everything
+  // you play (MIDI, on-screen piano, QWERTY) is captured with beat-accurate
+  // positions, then committed as a pattern clip. If the armed track's note
+  // space is already in use by clips, the take lands on a fresh "Take n"
+  // track with the same voice — nothing existing is overwritten.
+
+  var recOn = false, recNotes = [], recOpen = {};
+
+  function armedMelodic() {
+    var id = App.store.get('st.armed', null);
+    var t = trackById(id);
+    return t && t.kind !== 'drums' ? t : null;
+  }
+
+  function ensureArmed() {
+    var t = armedMelodic();
+    if (t) return t;
+    tracks().forEach(function (x) { if (!t && x.kind !== 'drums') t = x; });
+    if (!t) {
+      t = { id: 'tr' + Date.now().toString(36), name: 'Take 1', kind: 'synth', voice: 'keys',
+        synth: { cutoff: 0, attack: null, release: null, glide: null },
+        sampler: { rootNote: 60, loop: false, name: '' },
+        steps: null, notes: [], clips: [],
+        fx: { type: 'none', mix: 0.3 }, mix: { vol: 80, mute: false, solo: false } };
+      DAW.engine.tracks.push(t);
+    }
+    App.store.set('st.armed', t.id);
+    return t;
+  }
+
+  function recEvent(d) {
+    if (!recOn || !d || !DAW.engine.songPlaying) return;
+    var pos = DAW.engine.position();
+    if (d.on) {
+      recOpen[d.midi] = { m: d.midi, v: Math.max(1, Math.min(127, Math.round(d.vel || 90))), t: pos };
+    } else if (recOpen[d.midi]) {
+      var n = recOpen[d.midi];
+      n.d = Math.max(0.1, pos - n.t);
+      recNotes.push(n);
+      delete recOpen[d.midi];
+    }
+  }
+
+  function startRec() {
+    ensureArmed();
+    recOn = true;
+    recNotes = [];
+    recOpen = {};
+    DAW.engine.freeRun = true; // roll past the song's end while capturing
+    if (!DAW.engine.songPlaying) DAW.engine.songPlay();
+    renderLanes();
+    renderTransport();
+  }
+
+  function stopRec() {
+    recOn = false;
+    DAW.engine.freeRun = false;
+    var pos = DAW.engine.songPlaying ? DAW.engine.position() : 0;
+    Object.keys(recOpen).forEach(function (k) {
+      var n = recOpen[k];
+      n.d = Math.max(0.1, pos - n.t);
+      recNotes.push(n);
+    });
+    recOpen = {};
+    if (recNotes.length) commitTake();
+    renderTransport();
+  }
+
+  function commitTake() {
+    var src = armedMelodic() || ensureArmed();
+    var t0 = 0, t1 = 0;
+    recNotes.forEach(function (n, i) {
+      t0 = i === 0 ? Math.floor(n.t) : Math.min(t0, Math.floor(n.t));
+      t1 = Math.max(t1, n.t + n.d);
+    });
+    var len = Math.max(1, Math.ceil(t1) - t0);
+    var target = src;
+    if ((src.clips || []).length || (src.notes || []).length) {
+      var takes = tracks().filter(function (x) { return /^Take /.test(x.name); }).length + 1;
+      target = { id: 'tr' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+        name: 'Take ' + takes, kind: src.kind, voice: src.voice,
+        synth: JSON.parse(JSON.stringify(src.synth || {})),
+        sampler: JSON.parse(JSON.stringify(src.sampler || {})),
+        steps: null, notes: [], clips: [],
+        fx: JSON.parse(JSON.stringify(src.fx || { type: 'none', mix: 0.3 })),
+        mix: { vol: src.mix.vol, mute: false, solo: false } };
+      DAW.engine.tracks.push(target);
+    }
+    target.notes = recNotes.map(function (n) {
+      return { m: n.m, t: +(n.t - t0).toFixed(3), d: +n.d.toFixed(3), v: n.v };
+    });
+    target.clips = target.clips || [];
+    target.clips.push({ id: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+      start: t0, len: len, src: 'pattern' });
+    App.store.set('st.tracks', DAW.engine.tracks);
+    App.store.set('st.armed', target.id);
+    renderLanes();
+  }
+
   function renderTransport() {
     if (!els.play) return;
     els.play.innerHTML = DAW.engine.songPlaying
       ? App.icon('stop', 15) + ' Stop' : App.icon('play', 15) + ' Play song';
+    if (els.rec) {
+      els.rec.classList.toggle('active', recOn);
+      els.rec.innerHTML = recOn ? '&#9632; Stop rec' : '&#9679; Rec';
+      els.rec.style.color = recOn ? '#ff5a5a' : '';
+    }
     els.loopChip.classList.toggle('active', DAW.engine.loopRegion.on);
     els.followChip.classList.toggle('active', follow);
     els.snapSeg.querySelectorAll('button').forEach(function (b) {
@@ -379,6 +489,13 @@
 
     // headers: mute/solo/vol
     els.heads.addEventListener('click', function (e) {
+      var a = e.target.closest('[data-ararm]');
+      if (a) {
+        var aid = a.getAttribute('data-ararm');
+        App.store.set('st.armed', App.store.get('st.armed', null) === aid ? null : aid);
+        renderLanes();
+        return;
+      }
       var m = e.target.closest('[data-armute]');
       var s = e.target.closest('[data-arsolo]');
       if (m) {
@@ -453,6 +570,7 @@
         '<div class="row spread">' +
           '<span class="row tight">' +
             '<button type="button" class="btn big primary" id="ar-play"></button>' +
+            '<button type="button" class="btn sm" id="ar-rec" title="Record your keyboard playing into a clip on the armed track (arms one for you if needed)">&#9679; Rec</button>' +
             '<button type="button" class="btn sm" id="ar-rtz" title="Back to the top">' + App.icon('restart', 14) + '</button>' +
             '<span class="muted" id="ar-pos" style="min-width:44px;font-variant-numeric:tabular-nums">1.1</span>' +
             '<button type="button" class="chip fb-chip" id="ar-loop" title="Loop the region drawn on the ruler">Loop</button>' +
@@ -490,6 +608,7 @@
     els.lanes = document.getElementById('ar-lanes');
     els.ph = document.getElementById('ar-ph');
     els.play = document.getElementById('ar-play');
+    els.rec = document.getElementById('ar-rec');
     els.pos = document.getElementById('ar-pos');
     els.loopChip = document.getElementById('ar-loop');
     els.followChip = document.getElementById('ar-follow');
@@ -505,6 +624,9 @@
     els.play.addEventListener('click', function () {
       if (DAW.engine.songPlaying) DAW.engine.songStop(); else DAW.engine.songPlay();
     });
+    els.rec.addEventListener('click', function () { if (recOn) stopRec(); else startRec(); });
+    App.on('midi:note', recEvent);
+    App.on('note:input', recEvent);
     document.getElementById('ar-rtz').addEventListener('click', function () {
       DAW.engine.setPosition(DAW.engine.loopRegion.on ? DAW.engine.loopRegion.start : 0);
     });
@@ -552,7 +674,11 @@
     });
 
     wireInteractions();
-    App.on('st:tr', function () { renderTransport(); startAnims(); });
+    App.on('st:tr', function () {
+      if (recOn && !DAW.engine.songPlaying) stopRec(); // transport stopped -> take commits
+      renderTransport();
+      startAnims();
+    });
     App.on('st:state', function () { startAnims(); });
     renderAll();
   }

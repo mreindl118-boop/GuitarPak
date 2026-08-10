@@ -1,5 +1,5 @@
 {
-  "version": "0.60.0",
+  "version": "0.61.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/soundLAB-alpha.apk",
-  "notes": "YOUR KEYBOARD NOW DRIVES THE DRUM PADS properly: octave-agnostic mapping (shift the LUMI up or down — the eight pad keys still land), and the Pads page creates its drum track automatically the moment it opens, so a fresh install can finger-drum immediately. THE SYNTH IS NOW PLAYABLE: the Keys page (Instrument tab) grew a VOICE picker — the sampled grand or the Studio's MPE synth presets (Super saw, Warm pad, Soft keys, Round bass, plus any plugin voices), with full ROLI expression: per-note pitch bend and pressure route straight into the synth."
+  "notes": "STUDIO REBUILD, PHASE 1 — the Studio now opens on a real DAW screen. The Timeline is the home: transport, per-track ARM (●) / mute / solo / volume / meters on every lane, and a working RECORD button — arm a track (or let Rec arm one for you), hit ● Rec, play your keyboard, and the take lands on the timeline as a clip, beat-accurate, without overwriting anything (busy tracks get a fresh 'Take n' lane with the same voice). The Editor (step grid / piano roll / voices / FX) is the second pill of the same tab — double-tap any clip to open it, as before. Pads and Sketch (Song / Ideas) follow. Phases 2-3 (editor drawer on the timeline itself, undo, clip trim/split, pan) are next."
 }

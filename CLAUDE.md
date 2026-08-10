@@ -80,8 +80,12 @@ js/pads.js        drum-pad controller page ('pads', studio): 8 velocity pads
                   LUMI lights the 8 mapped keys, flashes on every hit incl.
                   loop playback. Drums-armed MIDI is handled HERE, not by
                   studio.js liveRoute (which skips kind==='drums').
-js/arrange.js     Arrange page ('arrange', studio): lane timeline over song
-                  mode — DOM clip divs, CSS-gradient grid, rAF-transform
+js/arrange.js     Arrange page ('arrange', studio) — the STUDIO HOME (v0.61.0):
+                  lane timeline over song mode with per-lane ARM chips +
+                  RECORD-TO-CLIP (rec captures midi:note/note:input at
+                  DAW.engine.position(), commits a pattern clip; busy armed
+                  tracks spawn 'Take n' lanes; engine.freeRun keeps the
+                  transport rolling past songEnd while recording) — DOM clip divs, CSS-gradient grid, rAF-transform
                   playhead + follow, per-channel analyser meters (only while
                   playing), waveform peaks cached per buffer, ruler tap=seek /
                   drag=loop region, snap/zoom stores st.zoomX/st.snap/st.loop/
@@ -133,8 +137,8 @@ version.json      auto-update feed (source of truth for latest version)
 - TAB GROUPS (app.js GROUPS, v0.54.0): the nav select lists GROUPS of pages,
   not pages — practice: Instrument (fretboard/tab/notation/piano), Theory
   (chords/theory), Play (songs/jam), Practice (trainer/shed), Tools
-  (metronome/tuner); studio: Sketch (song/ideas), Tracks (tracks/arrange),
-  Pads. Members show as a pill strip (#subnav, .subtab) under the context
+  (metronome/tuner); studio: Studio (arrange=Timeline HOME / tracks=Editor),
+  Pads, Sketch (song/ideas). Members show as a pill strip (#subnav, .subtab) under the context
   bar; single-page groups hide the strip; each group remembers its last
   member (app.gtab.<gid>). NAVIGATION ONLY — pages/modules/ids unchanged, so
   App.switchTo(pageId) and every bus cross-link still work (the owning group
