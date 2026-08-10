@@ -529,8 +529,9 @@
     var h = '<div class="row spread" style="margin-bottom:10px"><h3 style="margin:0">' + esc(t.name) + '</h3>' +
       '<span class="row tight">' +
       '<label class="row tight small muted" style="gap:5px">FX <select id="st-fx">' +
-        ['none', 'reverb', 'delay', 'drive'].map(function (f) {
-          return '<option value="' + f + '"' + (t.fx.type === f ? ' selected' : '') + '>' + f + '</option>';
+        ['none', 'reverb', 'delay', 'drive'].concat(Object.keys(DAW.fxPlugins || {})).map(function (f) {
+          var label = (DAW.fxPlugins && DAW.fxPlugins[f] && DAW.fxPlugins[f].name) || f;
+          return '<option value="' + f + '"' + (t.fx.type === f ? ' selected' : '') + '>' + esc(label) + '</option>';
         }).join('') + '</select></label>' +
       '<input type="range" id="st-fxmix" min="0" max="100" step="5" value="' + Math.round(t.fx.mix * 100) + '" style="width:90px" title="FX amount">' +
       '</span></div>';

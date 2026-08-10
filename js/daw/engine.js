@@ -276,9 +276,17 @@
     return curve;
   }
 
-  // fx: {type: 'none'|'reverb'|'delay'|'drive', mix: 0..1}
+  var fxPlugins = {};   // plugin FX types (SoundLab.registerFx): id -> {name, build}
+
+  // fx: {type: 'none'|'reverb'|'delay'|'drive'|<plugin id>, mix: 0..1}
   function buildFx(ctx, fx) {
     var mix = Math.max(0, Math.min(1, fx.mix == null ? 0.3 : fx.mix));
+    if (fxPlugins[fx.type]) {
+      try {
+        var built = fxPlugins[fx.type].build(ctx, { type: fx.type, mix: mix });
+        if (built && built.input && built.output) return built;
+      } catch (e) { console.error('plugin fx ' + fx.type, e); }
+    }
     if (fx.type === 'reverb') {
       var conv = ctx.createConvolver();
       conv.buffer = makeImpulse(ctx, 2.2, 2.5);
@@ -551,6 +559,7 @@
   DAW.createDrums = createDrums;
   DAW.createSampler = createSampler;
   DAW.buildFx = buildFx;
+  DAW.fxPlugins = fxPlugins;
   DAW.audioBufferToWav = audioBufferToWav;
   DAW.downloadBlob = downloadBlob;
   DAW.engine = {

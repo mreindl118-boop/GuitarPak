@@ -131,6 +131,17 @@
         '</label>' +
       '</div>' +
       '<div class="card">' +
+        '<h2>Plugins</h2>' +
+        '<div class="muted small">Extend soundLAB with your own JavaScript: plugins can add pages, Studio effects and synth voices ' +
+          '(see <b>PLUGINS.md</b> in the GitHub repo for the API and a sample). Plugins run with full access to the app — ' +
+          '<b>only load code you trust</b>. Stored on this device only.</div>' +
+        '<div class="row tight" style="margin-top:12px">' +
+          '<label class="btn sm">Add plugin (.js)<input type="file" id="set-plugin-file" accept=".js,text/javascript" style="display:none"></label>' +
+          '<span class="muted small" id="set-plugin-msg"></span>' +
+        '</div>' +
+        '<div id="set-plugin-list" style="margin-top:6px"></div>' +
+      '</div>' +
+      '<div class="card">' +
         '<h2>About</h2>' +
         '<div class="row tight">' +
           '<span class="muted small">soundLAB v' + App.version + ' &mdash; updates are checked automatically at startup.</span>' +
@@ -205,6 +216,51 @@
       App.store.set('app.keepAwake', !!this.checked);
       App.wake.reapply();
     });
+
+    // ---- plugins ----
+    var plugMsg = document.getElementById('set-plugin-msg');
+    var plugList = document.getElementById('set-plugin-list');
+
+    function paintPlugins() {
+      var l = (window.SoundLab && SoundLab.plugins.list) || [];
+      if (!l.length) { plugList.innerHTML = ''; return; }
+      plugList.innerHTML = l.map(function (p) {
+        return '<div class="row tight" style="margin-top:8px" data-plug="' + p.id + '">' +
+          '<label class="row tight small" style="gap:6px"><input type="checkbox" data-plugon="' + p.id + '"' +
+            (p.on !== false ? ' checked' : '') + '>' + p.name.replace(/</g, '&lt;') + '</label>' +
+          (p.error ? '<span class="small" style="color:var(--red,#d9484a)">error: ' + String(p.error).replace(/</g, '&lt;') + '</span>' : '') +
+          '<button type="button" class="btn sm" data-plugrm="' + p.id + '">Remove</button>' +
+          '</div>';
+      }).join('');
+    }
+
+    document.getElementById('set-plugin-file').addEventListener('change', function () {
+      var f = this.files && this.files[0];
+      this.value = '';
+      if (!f || !window.SoundLab) return;
+      var rd = new FileReader();
+      rd.onload = function () {
+        var res = SoundLab.plugins.add(f.name.replace(/\.js$/i, ''), String(rd.result));
+        plugMsg.textContent = res.ok ? 'loaded and running' : ('failed: ' + res.error);
+        paintPlugins();
+      };
+      rd.readAsText(f);
+    });
+    plugList.addEventListener('click', function (e) {
+      var rm = e.target.closest('[data-plugrm]');
+      if (rm) {
+        SoundLab.plugins.remove(rm.getAttribute('data-plugrm'));
+        plugMsg.textContent = 'removed — fully unloads on the next app start';
+        paintPlugins();
+      }
+    });
+    plugList.addEventListener('change', function (e) {
+      var chk = e.target.closest('[data-plugon]');
+      if (!chk) return;
+      SoundLab.plugins.toggle(chk.getAttribute('data-plugon'), chk.checked);
+      plugMsg.textContent = chk.checked ? 'enabled' : 'disabled — unloads on the next app start';
+    });
+    paintPlugins();
 
     // ---- update check ----
     document.getElementById('set-update').addEventListener('click', function () {

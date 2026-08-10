@@ -1,5 +1,5 @@
 {
-  "version": "0.47.0",
+  "version": "0.48.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "Finger drums! The Studio's new Pads page is a full drum-pad controller: eight velocity-sensitive pads playing your drum track's kit (through its FX and mixer), hit them by touch, with Z X C V / A S D F, or from your MIDI keys — ROLI octave mapping (eight keys from any base note) or the standard GM drum map for hardware pad controllers. Turn on Record while the loop plays and every hit quantizes onto the nearest 1/16 of your pattern. ROLI key lights: the eight pad keys stay lit on the LUMI and flash with every hit — including the loop's own beat, so your keyboard shows the groove."
+  "notes": "soundLAB learns to explain itself: a new ? button in the top bar walks you through WHICHEVER page you're on, step by step, in plain language — it spotlights the actual controls as it goes. First launch says hello with a quick orientation. Every page has a tour: the fretboard's colors, the Jam's song form, the Studio's loop, the pads, capture — all covered for beginners. And for advanced users going the other way: soundLAB is now PLUGIN-READY. Settings > Plugins loads plain .js files that can add whole pages, Studio effects, and synth voices through the new SoundLab API (docs in PLUGINS.md, working sample plugin in the repo: a Lo-fi effect + Glass bell voice)."
 }

@@ -48,7 +48,7 @@ window.App = (function () {
   // ---- auto-update ----
   // version.json on GitHub is the source of truth. Web builds refresh through
   // the service worker; the APK build (file://) links to the new APK download.
-  var APP_VERSION = '0.47.0';
+  var APP_VERSION = '0.48.0';
   var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
 
   function verNum(v) {
@@ -566,6 +566,31 @@ window.App = (function () {
     paintGear();
   }
 
+  // plugin surface: add a whole page at runtime (SoundLab.registerPage)
+  function addPage(id, label, sp, mod) {
+    if (!id || !/^[a-z][a-z0-9_-]*$/.test(id) || PANEL_ORDER.indexOf(id) !== -1) return false;
+    if (!mod || typeof mod.init !== 'function') return false;
+    sp = SPACES[sp] ? sp : 'practice';
+    var main = document.querySelector('main');
+    if (!main) return false;
+    var sec = document.createElement('section');
+    sec.className = 'panel';
+    sec.id = 'panel-' + id;
+    main.appendChild(sec);
+    SPACE_LABELS[id] = String(label || id).slice(0, 20);
+    SPACES[sp].push(id);
+    PANEL_ORDER.push(id);
+    modules[id] = mod;
+    try {
+      mod.init(sec);
+    } catch (e) {
+      console.error('plugin page ' + id, e);
+      sec.innerHTML = '<div class="error">Plugin page "' + id + '" crashed during init: ' + e.message + '</div>';
+    }
+    populateNav();
+    return true;
+  }
+
   function toggleSettings() {
     if (active === 'settings') {
       var back = (prevTab && prevTab !== 'settings' && SPACES[space].indexOf(prevTab) !== -1)
@@ -896,6 +921,7 @@ window.App = (function () {
     get space() { return space; },
     setSpace: setSpace,
     switchTo: switchTo,
+    addPage: addPage,
     setVolume: setVolume,
     get volume() { return volPref(); },
     setAccent: setAccent,
