@@ -879,7 +879,13 @@
       '.jam-pal{cursor:pointer;font-family:inherit;color:var(--text);gap:7px}' +
       '.jam-pal b{color:var(--accent)}' +
       '.jam-pal.jam-onair{border-color:var(--teal);color:var(--teal)}' +
-      '.jam-edch{gap:7px;padding-right:7px}' +
+      '.jam-edch{gap:7px;padding-right:7px;cursor:grab;touch-action:none}' +
+      '.jam-pal{touch-action:none}' +
+      '.jam-ghost{position:fixed;z-index:600;pointer-events:none;background:var(--card);' +
+        'border-color:var(--accent);box-shadow:0 6px 20px rgba(0,0,0,0.4)}' +
+      '.jam-dropsec{border-color:var(--accent) !important;box-shadow:0 0 10px var(--accent-glow)}' +
+      '.jam-chdragging{opacity:0.45}' +
+      '.jam-dropch{border-color:var(--accent) !important}' +
       '.jam-edx{background:transparent;border:none;color:var(--muted);cursor:pointer;padding:2px;display:inline-flex}' +
       '.jam-edx:hover{color:var(--red)}' +
       '.jam-mixrow{display:grid;grid-template-columns:86px auto 1fr;gap:12px;align-items:center;margin-top:10px}' +
@@ -1075,7 +1081,103 @@
       rebuild();
     });
 
+    // ---- drag & drop: palette chord -> a section chip (or the editor) ----
+    var palDrag = null;
+    var dragGhost = null;
+    var suppressPalClick = false;
+
+    function killGhost() {
+      if (dragGhost) { dragGhost.remove(); dragGhost = null; }
+      els.form.querySelectorAll('.jam-dropsec').forEach(function (c) { c.classList.remove('jam-dropsec'); });
+    }
+
+    els.palette.addEventListener('pointerdown', function (e) {
+      var b = e.target.closest('[data-jpal]');
+      if (!b) return;
+      palDrag = { d: parseInt(b.getAttribute('data-jpal'), 10), x: e.clientX, y: e.clientY, active: false, label: b.textContent };
+    });
+    document.addEventListener('pointermove', function (e) {
+      if (!palDrag) return;
+      if (!palDrag.active) {
+        if (Math.abs(e.clientX - palDrag.x) + Math.abs(e.clientY - palDrag.y) < 12) return;
+        palDrag.active = true;
+        suppressPalClick = true;
+        dragGhost = document.createElement('span');
+        dragGhost.className = 'chip jam-ghost';
+        dragGhost.textContent = palDrag.label;
+        document.body.appendChild(dragGhost);
+      }
+      dragGhost.style.left = (e.clientX + 10) + 'px';
+      dragGhost.style.top = (e.clientY - 14) + 'px';
+      var el = document.elementFromPoint(e.clientX, e.clientY);
+      var sec = el && el.closest ? el.closest('[data-jsec]') : null;
+      els.form.querySelectorAll('.jam-dropsec').forEach(function (c) { c.classList.remove('jam-dropsec'); });
+      if (sec) sec.classList.add('jam-dropsec');
+    });
+    document.addEventListener('pointerup', function (e) {
+      if (!palDrag) return;
+      var wasActive = palDrag.active;
+      var deg = palDrag.d;
+      palDrag = null;
+      killGhost();
+      if (!wasActive) { setTimeout(function () { suppressPalClick = false; }, 0); return; }
+      setTimeout(function () { suppressPalClick = false; }, 0);
+      var el = document.elementFromPoint(e.clientX, e.clientY);
+      var sec = el && el.closest ? el.closest('[data-jsec]') : null;
+      var inEditor = el && el.closest ? el.closest('.jam-editor') : null;
+      var target = sec ? section(sec.getAttribute('data-jsec')) : (inEditor ? section(state.selSec) : null);
+      if (!target) return;
+      target.chords.push({ d: deg });
+      if (sec) state.selSec = target.id;
+      saveState();
+      renderForm();
+      renderEditor();
+      rebuild();
+    });
+
+    // ---- drag & drop: reorder chords inside the section editor ----
+    var chDrag = null;
+    els.edChords.addEventListener('pointerdown', function (e) {
+      if (e.target.closest('.jam-edx')) return; // the remove button still removes
+      var chipEl = e.target.closest('.jam-edch');
+      if (!chipEl) return;
+      var chips = Array.prototype.slice.call(els.edChords.querySelectorAll('.jam-edch'));
+      chDrag = { from: chips.indexOf(chipEl), x: e.clientX, y: e.clientY, active: false, el: chipEl };
+    });
+    document.addEventListener('pointermove', function (e) {
+      if (!chDrag) return;
+      if (!chDrag.active) {
+        if (Math.abs(e.clientX - chDrag.x) + Math.abs(e.clientY - chDrag.y) < 10) return;
+        chDrag.active = true;
+        chDrag.el.classList.add('jam-chdragging');
+      }
+      var el = document.elementFromPoint(e.clientX, e.clientY);
+      var over = el && el.closest ? el.closest('.jam-edch') : null;
+      els.edChords.querySelectorAll('.jam-dropch').forEach(function (c) { c.classList.remove('jam-dropch'); });
+      if (over && over !== chDrag.el && els.edChords.contains(over)) over.classList.add('jam-dropch');
+    });
+    document.addEventListener('pointerup', function (e) {
+      if (!chDrag) return;
+      var drag = chDrag;
+      chDrag = null;
+      drag.el.classList.remove('jam-chdragging');
+      var el = document.elementFromPoint(e.clientX, e.clientY);
+      var over = el && el.closest ? el.closest('.jam-edch') : null;
+      els.edChords.querySelectorAll('.jam-dropch').forEach(function (c) { c.classList.remove('jam-dropch'); });
+      if (!drag.active || !over || !els.edChords.contains(over)) return;
+      var chips = Array.prototype.slice.call(els.edChords.querySelectorAll('.jam-edch'));
+      var to = chips.indexOf(over);
+      if (to === -1 || to === drag.from) return;
+      var s = section(state.selSec);
+      var moved = s.chords.splice(drag.from, 1)[0];
+      s.chords.splice(to, 0, moved);
+      saveState();
+      renderEditor();
+      rebuild();
+    });
+
     els.palette.addEventListener('click', function (e) {
+      if (suppressPalClick) return;
       var b = e.target.closest('[data-jpal]');
       if (!b) return;
       var d = parseInt(b.getAttribute('data-jpal'), 10);

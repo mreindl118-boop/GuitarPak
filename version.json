@@ -1,5 +1,5 @@
 {
-  "version": "0.48.0",
+  "version": "0.49.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "soundLAB learns to explain itself: a new ? button in the top bar walks you through WHICHEVER page you're on, step by step, in plain language — it spotlights the actual controls as it goes. First launch says hello with a quick orientation. Every page has a tour: the fretboard's colors, the Jam's song form, the Studio's loop, the pads, capture — all covered for beginners. And for advanced users going the other way: soundLAB is now PLUGIN-READY. Settings > Plugins loads plain .js files that can add whole pages, Studio effects, and synth voices through the new SoundLab API (docs in PLUGINS.md, working sample plugin in the repo: a Lo-fi effect + Glass bell voice)."
+  "notes": "FL-Studio-style hands-on editing everywhere it makes sense: the piano roll now DRAWS — press an empty spot to create a note and keep dragging to place it, drag notes to move them (snapping to the grid and semitones, auditioning as the pitch changes), drag a note's right edge to stretch it, right-click to erase (sweep to erase many). The step sequencer PAINTS — press and drag across cells. Drag tracks by their handle to reorder the mixer. Drop an audio file straight onto the Tracks page and it becomes a sampler (drop onto an existing sampler to swap its sound). And in the Jam: drag a chord from the palette onto any section chip to add it there, and drag chords within the section editor to reorder the progression."
 }
