@@ -1,5 +1,5 @@
 /* GuitarLab service worker — cache-first so the app works fully offline once visited. */
-var CACHE = 'guitarlab-v69';
+var CACHE = 'guitarlab-v70';
 var ASSETS = [
   '.',
   'index.html',
@@ -23,6 +23,7 @@ var ASSETS = [
   'js/theorytab.js',
   'js/settings.js',
   'js/daw/synth.js',
+  'js/daw/engine.js',
   'js/studio.js',
   'manifest.webmanifest',
   'icons/icon-192.png',

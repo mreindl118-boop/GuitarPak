@@ -1,5 +1,5 @@
 {
-  "version": "0.45.0",
+  "version": "0.46.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "Settings grew up: it's now the gear icon in the top bar — always there, on every page in Practice AND Studio, opening in place (no page shuffle) and toggling back to where you were. Inside, a proper control center with sections: Appearance (theme + NEW accent colors — amber, teal, violet, coral, recoloring the whole app including the logo), Sound (NEW master volume knob over everything + guitar/piano/bass voices), Studio (NEW retro-capture memory length 15/30/60s + idea playback voice: saw/pad/keys/bass), Screen & battery (NEW keep-awake toggle), and About with a check-for-updates button."
+  "notes": "The Studio gets its DAW heart: a new Tracks page — a groovebox-style loop where every track plays in sync at your tempo. Add Drums (synthesized 808/909 kit with a step sequencer), Synths (four voices with cutoff/attack/release/glide controls and a piano roll colored by YOUR key's scale degrees), or Samplers (load any audio file, set its root note, play it across the keys). Per-track mute/solo/volume and an FX slot (reverb, delay, drive). Arm a track LIVE and your ROLI or typing keys play its instrument — with slide and pressure. Ideas now have a 'To track' button, and Export WAV renders your loop to a real audio file. All ported from the OpenStudio engine."
 }

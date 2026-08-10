@@ -56,6 +56,17 @@ js/studio.js      STUDIO workspace (DAW phase one): registers 'song' (sketch-
                   Captures midi:note + note:input into ideas (notes tagged
                   key/bpm/date, store ideas.list, song.name); 30s retro buffer
                   ("keep what I just played"); playback via the studio synth.
+js/daw/engine.js  studio engine (OpenStudio ports): DrumKit (8-lane 808/909
+                  synth kit), Sampler (pitch-shifted one-sample instrument,
+                  buffers in DAW.samples — context-independent, raw bytes in
+                  IndexedDB 'guitarlab-daw'), FX (reverb/delay/drive wet-dry),
+                  WAV encode/download, and the LOOP ENGINE: DAW.engine —
+                  groovebox session loop (bars 1/2/4, st.tracks store), 25ms
+                  lookahead at met.bpm, st:step/st:state bus events, live-play
+                  channels (armed track st.armed), OfflineAudioContext render.
+                  The 'tracks' page in studio.js is its UI (step grid, piano
+                  roll degree-colored via fb.colors, mixer rows, FX slot,
+                  idea→track, Export WAV).
 js/daw/synth.js   MPE poly synth ported from the OpenStudio DAW repo
                   (Sampler-DAW src/audio/synth.ts): 2 osc + noise + filter/amp
                   envelopes, unison, glide, LFO, per-channel bend/pressure/
