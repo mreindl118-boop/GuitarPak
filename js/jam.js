@@ -293,6 +293,7 @@
     var g = ctx.createGain();
     attack = attack || 0.004;
     release = release || 0.07;
+    gain = gain * (App.sampleNorm ? App.sampleNorm(src.buffer) : 1); // level the banks
     g.gain.setValueAtTime(0.0001, t);
     g.gain.linearRampToValueAtTime(gain, t + attack);
     g.gain.setValueAtTime(gain, t + Math.max(attack, dur - release));

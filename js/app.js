@@ -80,7 +80,7 @@ window.App = (function () {
   // ---- auto-update ----
   // version.json on GitHub is the source of truth. Web builds refresh through
   // the service worker; the APK build (file://) links to the new APK download.
-  var APP_VERSION = '0.65.0';
+  var APP_VERSION = '0.65.1';
   var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
 
   function verNum(v) {
@@ -210,7 +210,16 @@ window.App = (function () {
       var speakers = audioCtx.destination;
       masterGain = audioCtx.createGain();
       masterGain.gain.value = volPref() / 100;
-      masterGain.connect(speakers);
+      // gentle app-wide limiter: chords, the jam band and the studio stack
+      // voices — without this the sum clips harshly at the DAC
+      var limiter = audioCtx.createDynamicsCompressor();
+      limiter.threshold.value = -9;
+      limiter.knee.value = 6;
+      limiter.ratio.value = 12;
+      limiter.attack.value = 0.002;
+      limiter.release.value = 0.12;
+      masterGain.connect(limiter);
+      limiter.connect(speakers);
       try {
         Object.defineProperty(audioCtx, 'destination', { value: masterGain, configurable: true });
       } catch (e) { /* locked down — app plays at full volume */ }
@@ -226,8 +235,8 @@ window.App = (function () {
   // note spoke LATE by that much. Compute each buffer's lead-in once (first
   // sample above 2% of peak, keeping 2ms of natural ramp) and start playback
   // past it. Cached straight on the AudioBuffer.
-  function sampleLead(buf) {
-    if (!buf || buf.__lead !== undefined) return buf ? buf.__lead : 0;
+  function analyzeSample(buf) {
+    if (buf.__lead !== undefined) return;
     var d = buf.getChannelData(0);
     var peak = 0, i;
     for (i = 0; i < d.length; i++) { var a = d[i] < 0 ? -d[i] : d[i]; if (a > peak) peak = a; }
@@ -235,7 +244,22 @@ window.App = (function () {
     for (i = 0; i < d.length; i++) { if ((d[i] < 0 ? -d[i] : d[i]) > th) break; }
     var lead = Math.max(0, i / buf.sampleRate - 0.002);
     buf.__lead = lead > 0.004 ? lead : 0; // ignore negligible lead-ins
+    // the banks are mastered at wildly different levels (peaks 0.07..0.7 —
+    // ~19dB apart!): normalize every buffer toward a 0.6 peak so switching
+    // voices doesn't swing the volume tenfold
+    buf.__norm = peak > 0.001 ? Math.min(4, 0.6 / peak) : 1;
+  }
+
+  function sampleLead(buf) {
+    if (!buf) return 0;
+    analyzeSample(buf);
     return buf.__lead;
+  }
+
+  function sampleNorm(buf) {
+    if (!buf) return 1;
+    analyzeSample(buf);
+    return buf.__norm;
   }
 
   // ---- sampled pluck voice (FluidR3 GM — samples/CREDITS.md) ----
@@ -355,6 +379,7 @@ window.App = (function () {
       var lv = gain * (PLUCK_SETS[tone] ? PLUCK_SETS[tone].trim : 1.4) * (0.92 + Math.random() * 0.16);
       var g = ctx.createGain();
       g.gain.setValueAtTime(0.0001, t);
+      lv = lv * sampleNorm(src.buffer);
       g.gain.linearRampToValueAtTime(lv, t + 0.003);
       // hold, then an exponential tail — a linear gate chops the string's
       // natural ring and is exactly what sounds robotic on scale runs
@@ -1038,6 +1063,7 @@ window.App = (function () {
     addPage: addPage,
     setVolume: setVolume,
     sampleLead: sampleLead,
+    sampleNorm: sampleNorm,
     get volume() { return volPref(); },
     setAccent: setAccent,
     get accent() { var a = store.get('app.accent', 'amber'); return ACCENTS[a] ? a : 'amber'; },
