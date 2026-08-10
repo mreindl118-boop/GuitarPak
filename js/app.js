@@ -29,8 +29,10 @@ window.App = (function () {
   // Two workspaces over one app: Practice (the original tool set) and Studio
   // (the DAW side). One clock, one key, one MIDI service — the context bar
   // stays put; only the page set changes, behind a screen-wipe transition.
+  // Settings is deliberately in NEITHER list: it's an overlay page opened by
+  // the ever-present gear in the header, from any page in either space.
   var SPACES = {
-    practice: ['metronome', 'fretboard', 'tab', 'notation', 'chords', 'piano', 'songs', 'jam', 'tuner', 'trainer', 'theory', 'settings'],
+    practice: ['metronome', 'fretboard', 'tab', 'notation', 'chords', 'piano', 'songs', 'jam', 'tuner', 'trainer', 'theory'],
     studio: ['song', 'ideas']
   };
   var SPACE_LABELS = {
@@ -39,13 +41,14 @@ window.App = (function () {
     trainer: 'Trainer', theory: 'Theory', settings: 'Settings',
     song: 'Song', ideas: 'Ideas'
   };
-  var PANEL_ORDER = SPACES.practice.concat(SPACES.studio);
+  var PANEL_ORDER = SPACES.practice.concat(SPACES.studio).concat(['settings']);
   var space = 'practice';
+  var prevTab = null; // where the gear came from, to toggle back to
 
   // ---- auto-update ----
   // version.json on GitHub is the source of truth. Web builds refresh through
   // the service worker; the APK build (file://) links to the new APK download.
-  var APP_VERSION = '0.44.0';
+  var APP_VERSION = '0.45.0';
   var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
 
   function verNum(v) {
@@ -134,7 +137,8 @@ window.App = (function () {
     plus: '<path d="M12 5v14M5 12h14"/>',
     minus: '<path d="M5 12h14"/>',
     pickdown: '<path d="M6 19.5v-9a6 6 0 0 1 12 0v9"/>',
-    pickup: '<path d="M5 5.5 12 19l7-13.5"/>'
+    pickup: '<path d="M5 5.5 12 19l7-13.5"/>',
+    gear: '<circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h.09a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.09a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1z"/>'
   };
 
   function icon(name, size) {
@@ -146,10 +150,35 @@ window.App = (function () {
       'aria-hidden="true" focusable="false">' + d + '</svg>';
   }
 
+  // ---- master volume ----
+  // One gain node between everything and the speakers. Modules connect to
+  // ctx.destination as always — the instance property is shadowed to point at
+  // the master gain, so every voice in the app obeys the Settings slider
+  // without any module knowing about it.
+  var masterGain = null;
+
+  function volPref() {
+    var v = parseInt(store.get('app.vol', 100), 10);
+    return (v >= 0 && v <= 100) ? v : 100;
+  }
+
+  function setVolume(v) {
+    v = Math.max(0, Math.min(100, Math.round(v)));
+    store.set('app.vol', v);
+    if (masterGain && audioCtx) masterGain.gain.setTargetAtTime(v / 100, audioCtx.currentTime, 0.02);
+  }
+
   function getAudio() {
     if (!audioCtx) {
       var Ctx = window.AudioContext || window.webkitAudioContext;
       audioCtx = new Ctx();
+      var speakers = audioCtx.destination;
+      masterGain = audioCtx.createGain();
+      masterGain.gain.value = volPref() / 100;
+      masterGain.connect(speakers);
+      try {
+        Object.defineProperty(audioCtx, 'destination', { value: masterGain, configurable: true });
+      } catch (e) { /* locked down — app plays at full volume */ }
     }
     if (audioCtx.state === 'suspended') audioCtx.resume();
     decodeGuitar(); // turn any prefetched sample bytes into playable buffers
@@ -360,12 +389,47 @@ window.App = (function () {
   // device via prefers-color-scheme, live — changed from the Settings tab.
   var darkMQ = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
 
+  // ---- accent color ----
+  // Amber is the stylesheet default; the others override the accent custom
+  // properties inline (per current theme, for contrast) so every accent-aware
+  // style — buttons, wordmark LAB, glows, active states — follows along.
+  var ACCENTS = {
+    amber:  { name: 'Amber',  dark: ['#ffab47', '#c97f26', 'rgba(255,171,71,0.35)'],  light: ['#d97e0f', '#b96a10', 'rgba(217,126,15,0.28)'] },
+    teal:   { name: 'Teal',   dark: ['#4cc9b0', '#31a38d', 'rgba(76,201,176,0.35)'],  light: ['#0e9b80', '#0b8069', 'rgba(14,155,128,0.28)'] },
+    violet: { name: 'Violet', dark: ['#b18cff', '#8b64d9', 'rgba(177,140,255,0.35)'], light: ['#7d54d4', '#6743b3', 'rgba(125,84,212,0.30)'] },
+    coral:  { name: 'Coral',  dark: ['#ff7a66', '#d95742', 'rgba(255,122,102,0.35)'], light: ['#d94f39', '#b53f2c', 'rgba(217,79,57,0.28)'] }
+  };
+
+  function applyAccent() {
+    var id = store.get('app.accent', 'amber');
+    if (!ACCENTS[id]) id = 'amber';
+    var st = document.documentElement.style;
+    if (id === 'amber') {
+      st.removeProperty('--accent');
+      st.removeProperty('--accent-dim');
+      st.removeProperty('--accent-glow');
+      return;
+    }
+    var theme = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+    var c = ACCENTS[id][theme];
+    st.setProperty('--accent', c[0]);
+    st.setProperty('--accent-dim', c[1]);
+    st.setProperty('--accent-glow', c[2]);
+  }
+
+  function setAccent(id) {
+    if (!ACCENTS[id]) id = 'amber';
+    store.set('app.accent', id);
+    applyAccent();
+  }
+
   function applyTheme(pref) {
     var t = pref === 'auto' ? (darkMQ && !darkMQ.matches ? 'light' : 'dark') : pref;
     if (t !== 'light') t = 'dark';
     document.documentElement.setAttribute('data-theme', t);
     var meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute('content', t === 'light' ? '#f3efe8' : '#131114');
+    applyAccent(); // accent shades are theme-specific
   }
 
   function setTheme(pref) {
@@ -396,17 +460,21 @@ window.App = (function () {
   var wakeCount = 0;
   var wakeSentinel = null;
 
+  function wakeWanted() {
+    return wakeCount > 0 && store.get('app.keepAwake', true) !== false;
+  }
+
   function applyWake() {
     var host = window.GuitarLabHost;
     if (host && typeof host.setKeepScreenOn === 'function') {
-      try { host.setKeepScreenOn(wakeCount > 0); } catch (e) { /* bridge gone */ }
+      try { host.setKeepScreenOn(wakeWanted()); } catch (e) { /* bridge gone */ }
     }
     if ('wakeLock' in navigator) {
-      var want = wakeCount > 0 && !document.hidden;
+      var want = wakeWanted() && !document.hidden;
       if (want && !wakeSentinel) {
         navigator.wakeLock.request('screen').then(function (s) {
           // request() is async — if we stopped wanting it meanwhile, drop it now
-          if (wakeCount > 0 && !document.hidden) {
+          if (wakeWanted() && !document.hidden) {
             wakeSentinel = s;
             s.addEventListener('release', function () { wakeSentinel = null; });
           } else {
@@ -454,8 +522,29 @@ window.App = (function () {
     if (active && SPACES[space].indexOf(active) !== -1) nav.value = active;
   }
 
+  function paintGear() {
+    var g = document.getElementById('settings-btn');
+    if (g) g.classList.toggle('active', active === 'settings');
+  }
+
   function switchTo(name) {
     if (name === active) return;
+    // settings is space-agnostic: overlay in place, no wipe, no nav entry
+    if (name === 'settings') {
+      prevTab = active;
+      if (active && modules[active] && modules[active].onHide) {
+        try { modules[active].onHide(); } catch (e) { console.error(active + '.onHide', e); }
+      }
+      active = 'settings';
+      document.querySelectorAll('.panel').forEach(function (p) {
+        p.classList.toggle('active', p.id === 'panel-settings');
+      });
+      if (modules.settings && modules.settings.onShow) {
+        try { modules.settings.onShow(); } catch (e) { console.error('settings.onShow', e); }
+      }
+      paintGear();
+      return;
+    }
     // crossing into the other workspace? go through the wipe
     if (spaceOf(name) !== space) { setSpace(spaceOf(name), name); return; }
     if (active && modules[active] && modules[active].onHide) {
@@ -474,6 +563,18 @@ window.App = (function () {
       try { modules[name].onShow(); } catch (e) { console.error(name + '.onShow', e); }
     }
     store.set(tabStoreKey(space), name);
+    paintGear();
+  }
+
+  function toggleSettings() {
+    if (active === 'settings') {
+      var back = (prevTab && prevTab !== 'settings' && SPACES[space].indexOf(prevTab) !== -1)
+        ? prevTab : store.get(tabStoreKey(space), SPACES[space][0]);
+      if (SPACES[space].indexOf(back) === -1) back = SPACES[space][0];
+      switchTo(back);
+    } else {
+      switchTo('settings');
+    }
   }
 
   // ---- workspace wipe ----
@@ -718,6 +819,14 @@ window.App = (function () {
         this.blur();
       });
     }
+    var gearBtn = document.getElementById('settings-btn');
+    if (gearBtn) {
+      gearBtn.innerHTML = icon('gear', 16);
+      gearBtn.addEventListener('click', function () {
+        toggleSettings();
+        this.blur();
+      });
+    }
 
     var startSpace = store.get('app.space', 'practice');
     if (!SPACES[startSpace]) startSpace = 'practice';
@@ -786,6 +895,11 @@ window.App = (function () {
     get active() { return active; },
     get space() { return space; },
     setSpace: setSpace,
-    switchTo: switchTo
+    switchTo: switchTo,
+    setVolume: setVolume,
+    get volume() { return volPref(); },
+    setAccent: setAccent,
+    get accent() { var a = store.get('app.accent', 'amber'); return ACCENTS[a] ? a : 'amber'; },
+    ACCENTS: ACCENTS
   };
 })();

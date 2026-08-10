@@ -1,5 +1,5 @@
 {
-  "version": "0.44.0",
+  "version": "0.45.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "soundLAB grows a second workspace: the Studio. Tap the Studio button in the header and a screen wipe slides you over to the songwriting side — same key, same tempo, same everything. First tools: a capture button (the red dot in the top bar, on EVERY page) records whatever you play — ROLI, typing keys, touch piano — into your song's Ideas, tagged with key and tempo; retro-capture keeps the take you played BEFORE you hit record (last 30 seconds, always remembered); ideas play back on a new expressive synth ported from the OpenStudio DAW (full ROLI slide/pressure support, more of it coming). This is phase one of the full DAW — sections, lyrics, tracks and mixing land next."
+  "notes": "Settings grew up: it's now the gear icon in the top bar — always there, on every page in Practice AND Studio, opening in place (no page shuffle) and toggling back to where you were. Inside, a proper control center with sections: Appearance (theme + NEW accent colors — amber, teal, violet, coral, recoloring the whole app including the logo), Sound (NEW master volume knob over everything + guitar/piano/bass voices), Studio (NEW retro-capture memory length 15/30/60s + idea playback voice: saw/pad/keys/bass), Screen & battery (NEW keep-awake toggle), and About with a check-for-updates button."
 }
