@@ -176,6 +176,14 @@ html, body {
   filter: drop-shadow(0 0 10px var(--accent-glow));
 }
 
+#settings-btn { padding: 6px 9px; }
+
+#settings-btn.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-glow);
+}
+
 /* workspace wipe — the curtain between Practice and Studio */
 #wipe {
   position: fixed;

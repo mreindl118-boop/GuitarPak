@@ -6,13 +6,27 @@
 
   function init(rootEl) {
     App.injectCSS('settings',
-      '.set-theme-note{margin-top:10px}'
+      '.set-theme-note{margin-top:10px}' +
+      '.set-sub{margin:16px 0 8px;font-size:12px;font-weight:600;letter-spacing:1.4px;' +
+        'text-transform:uppercase;color:var(--label,var(--muted))}' +
+      '.set-sub:first-of-type{margin-top:12px}' +
+      '.set-acc{width:22px;height:22px;border-radius:50%;border:2px solid transparent;cursor:pointer;padding:0}' +
+      '.set-acc.active{border-color:var(--text);box-shadow:0 0 0 2px var(--card)}' +
+      '#set-vol{width:200px;max-width:56vw;vertical-align:middle}'
     );
+
+    var accBtns = '';
+    Object.keys(App.ACCENTS).forEach(function (id) {
+      accBtns += '<button type="button" class="set-acc" data-accent="' + id + '" ' +
+        'style="background:' + App.ACCENTS[id].dark[0] + '" title="' + App.ACCENTS[id].name + '" ' +
+        'aria-label="Accent ' + App.ACCENTS[id].name + '"></button>';
+    });
 
     rootEl.innerHTML =
       '<div class="card">' +
         '<h2>Appearance</h2>' +
-        '<div class="fb-field">Theme' +
+        '<div class="set-sub">Theme</div>' +
+        '<div class="fb-field">' +
           '<div class="seg" id="set-theme">' +
             '<button type="button" data-theme-pref="dark">Dark</button>' +
             '<button type="button" data-theme-pref="light">Light</button>' +
@@ -20,10 +34,20 @@
           '</div>' +
         '</div>' +
         '<div class="muted small set-theme-note">Auto follows your device&rsquo;s light/dark setting and switches live when it changes.</div>' +
+        '<div class="set-sub">Accent color</div>' +
+        '<div class="row tight" id="set-accent">' + accBtns + '</div>' +
+        '<div class="muted small set-theme-note">Colors every highlight in the app &mdash; buttons, glows, the LAB in the logo.</div>' +
       '</div>' +
       '<div class="card">' +
         '<h2>Sound</h2>' +
-        '<div class="fb-field">Note sound' +
+        '<div class="set-sub">Master volume</div>' +
+        '<div class="row tight">' +
+          '<input type="range" id="set-vol" min="0" max="100" step="5">' +
+          '<span class="muted small" id="set-vol-val"></span>' +
+        '</div>' +
+        '<div class="muted small set-theme-note">One knob for everything &mdash; metronome, practice notes, the Jam band, the Studio.</div>' +
+        '<div class="set-sub">Guitar</div>' +
+        '<div class="fb-field">' +
           '<div class="seg" id="set-tone">' +
             '<button type="button" data-tone="steel">Steel</button>' +
             '<button type="button" data-tone="electric">Electric</button>' +
@@ -32,7 +56,8 @@
           '</div>' +
         '</div>' +
         '<div class="muted small set-theme-note">The voice for fretboard taps, scale practice, chord strums and trainer notes.</div>' +
-        '<div class="fb-field" style="margin-top:14px">Piano sound' +
+        '<div class="set-sub">Piano</div>' +
+        '<div class="fb-field">' +
           '<div class="seg" id="set-ptone">' +
             '<button type="button" data-ptone="grand">Grand</button>' +
             '<button type="button" data-ptone="bright">Bright</button>' +
@@ -42,13 +67,42 @@
         '</div>' +
         '<div class="muted small set-theme-note">The Piano tab, MIDI keyboard and chord piano voicings. All open source: ' +
           'Grand is a real recorded Salamander grand; Bright, Electric and Organ are FluidR3 / MusyngKite voices.</div>' +
-        '<div class="fb-field" style="margin-top:14px">Bass guitar' +
+        '<div class="set-sub">Bass</div>' +
+        '<div class="fb-field">' +
           '<div class="seg" id="set-bass">' +
             '<button type="button" data-bass-style="finger">Fingered</button>' +
             '<button type="button" data-bass-style="pick">Picked</button>' +
           '</div>' +
         '</div>' +
         '<div class="muted small set-theme-note">How the Jam backing-track bass plays &mdash; warm finger-plucked or bright picked. Takes effect on the next bass note.</div>' +
+      '</div>' +
+      '<div class="card">' +
+        '<h2>Studio</h2>' +
+        '<div class="set-sub">Retro-capture memory</div>' +
+        '<div class="fb-field">' +
+          '<div class="seg" id="set-retro">' +
+            '<button type="button" data-retro="15">15s</button>' +
+            '<button type="button" data-retro="30">30s</button>' +
+            '<button type="button" data-retro="60">60s</button>' +
+          '</div>' +
+        '</div>' +
+        '<div class="muted small set-theme-note">How far back &ldquo;Keep the last take&rdquo; reaches. Everything you play is remembered for this long.</div>' +
+        '<div class="set-sub">Idea playback voice</div>' +
+        '<div class="fb-field">' +
+          '<div class="seg" id="set-voice">' +
+            '<button type="button" data-voice="saw">Saw</button>' +
+            '<button type="button" data-voice="pad">Pad</button>' +
+            '<button type="button" data-voice="keys">Keys</button>' +
+            '<button type="button" data-voice="bass">Bass</button>' +
+          '</div>' +
+        '</div>' +
+        '<div class="muted small set-theme-note">The studio synth preset ideas play back on (full ROLI slide/pressure expression).</div>' +
+      '</div>' +
+      '<div class="card">' +
+        '<h2>Screen &amp; battery</h2>' +
+        '<label class="row tight small muted" style="gap:6px">' +
+          '<input type="checkbox" id="set-wake">Keep the screen awake while sound is playing or a practice runner is going' +
+        '</label>' +
       '</div>' +
       '<div class="card">' +
         '<h2>MIDI keyboard</h2>' +
@@ -78,8 +132,86 @@
       '</div>' +
       '<div class="card">' +
         '<h2>About</h2>' +
-        '<div class="muted small">soundLAB v' + App.version + ' &mdash; updates are checked automatically at startup.</div>' +
+        '<div class="row tight">' +
+          '<span class="muted small">soundLAB v' + App.version + ' &mdash; updates are checked automatically at startup.</span>' +
+          '<button type="button" class="btn sm" id="set-update">Check now</button>' +
+        '</div>' +
+        '<div class="muted small set-theme-note" id="set-update-msg"></div>' +
       '</div>';
+
+    // ---- accent ----
+    var accRow = document.getElementById('set-accent');
+    function paintAccent() {
+      accRow.querySelectorAll('.set-acc').forEach(function (b) {
+        b.classList.toggle('active', b.getAttribute('data-accent') === App.accent);
+      });
+    }
+    accRow.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-accent]');
+      if (!b) return;
+      App.setAccent(b.getAttribute('data-accent'));
+      paintAccent();
+    });
+    paintAccent();
+
+    // ---- master volume ----
+    var vol = document.getElementById('set-vol');
+    var volVal = document.getElementById('set-vol-val');
+    vol.value = String(App.volume);
+    volVal.textContent = App.volume + '%';
+    vol.addEventListener('input', function () {
+      App.setVolume(parseInt(this.value, 10));
+      volVal.textContent = App.volume + '%';
+    });
+
+    // ---- studio prefs ----
+    var retroSeg = document.getElementById('set-retro');
+    function paintRetro() {
+      var v = parseInt(App.store.get('sd.retroSecs', 30), 10);
+      if ([15, 30, 60].indexOf(v) === -1) v = 30;
+      retroSeg.querySelectorAll('button').forEach(function (b) {
+        b.classList.toggle('active', parseInt(b.getAttribute('data-retro'), 10) === v);
+      });
+    }
+    retroSeg.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-retro]');
+      if (!b) return;
+      App.store.set('sd.retroSecs', parseInt(b.getAttribute('data-retro'), 10));
+      App.emit('sd:prefs', {});
+      paintRetro();
+    });
+    paintRetro();
+
+    var voiceSeg = document.getElementById('set-voice');
+    function paintVoice() {
+      var v = App.store.get('sd.playVoice', 'keys');
+      voiceSeg.querySelectorAll('button').forEach(function (b) {
+        b.classList.toggle('active', b.getAttribute('data-voice') === v);
+      });
+    }
+    voiceSeg.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-voice]');
+      if (!b) return;
+      App.store.set('sd.playVoice', b.getAttribute('data-voice'));
+      App.emit('sd:prefs', {});
+      paintVoice();
+    });
+    paintVoice();
+
+    // ---- screen wake ----
+    var wakeChk = document.getElementById('set-wake');
+    wakeChk.checked = App.store.get('app.keepAwake', true) !== false;
+    wakeChk.addEventListener('change', function () {
+      App.store.set('app.keepAwake', !!this.checked);
+      App.wake.reapply();
+    });
+
+    // ---- update check ----
+    document.getElementById('set-update').addEventListener('click', function () {
+      document.getElementById('set-update-msg').textContent =
+        'Checking… if a newer version exists, a banner will appear.';
+      App.checkForUpdate(true);
+    });
 
     var seg = document.getElementById('set-theme');
 

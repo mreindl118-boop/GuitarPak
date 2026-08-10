@@ -84,6 +84,13 @@ version.json      auto-update feed (source of truth for latest version)
   shared stores (fb.root/fb.scale/fb.mode, met.bpm, met.sig) and pushes changes
   over the bus; pages must NOT grow their own duplicate selects for these.
   Also hosts #cx-met (transport) and #cx-rec (studio capture ●).
+- Settings is a SPACELESS overlay page: opened by #settings-btn (gear, header,
+  ever-present in both spaces), toggles back to the previous tab, never in the
+  nav select. App-level prefs live there: theme, accent (App.setAccent —
+  inline --accent vars, amber default), master volume (App.setVolume — a
+  master GainNode shadows ctx.destination so every module obeys), keep-awake
+  (app.keepAwake gates App.wake), studio prefs (sd.retroSecs, sd.playVoice —
+  'sd:prefs' bus event).
 - New bus events: `note:input` {on, midi, vel, src, dur?} — user played a note
   on an on-screen instrument (piano QWERTY/touch emit it; capture listens
   alongside midi:note), `space` {space} after a workspace switch.

@@ -18,7 +18,11 @@
 
   var MAX_IDEAS = 100;
   var MAX_NOTES = 2000;
-  var RETRO_SECS = 30;
+
+  function retroSecs() {
+    var v = parseInt(App.store.get('sd.retroSecs', 30), 10);
+    return [15, 30, 60].indexOf(v) !== -1 ? v : 30;
+  }
 
   var els = {};       // ideas page
   var sels = {};      // song page
@@ -55,7 +59,7 @@
     if (o) {
       delete retroOpen[k];
       retro.push({ m: o.m, v: o.v, t: o.t, d: Math.max(0.05, t - o.t) });
-      var cut = nowS() - RETRO_SECS;
+      var cut = nowS() - retroSecs();
       while (retro.length && retro[0].t + retro[0].d < cut) retro.shift();
       if (retro.length > MAX_NOTES) retro.shift();
     }
@@ -176,6 +180,7 @@
   // ---------------- idea playback ----------------
 
   var playSynth = null;
+  var playVoiceId = null;
   var playingId = null;
   var playTimers = [];
 
@@ -187,13 +192,27 @@
     renderIdeasTransport();
   }
 
+  function voicePreset() {
+    var id = App.store.get('sd.playVoice', 'keys');
+    for (var i = 0; i < DAW.SYNTH_PRESETS.length; i++) {
+      if (DAW.SYNTH_PRESETS[i].id === id) return DAW.SYNTH_PRESETS[i];
+    }
+    return DAW.SYNTH_PRESETS[2]; // soft keys
+  }
+
   function playIdea(idea) {
     var ctx;
     try { ctx = App.getAudio(); } catch (e) { return; }
     stopPlayback();
+    var preset = voicePreset();
+    if (playSynth && playVoiceId !== preset.id) {
+      playSynth.dispose();
+      playSynth = null;
+    }
     if (!playSynth) {
-      playSynth = DAW.createSynth(ctx, DAW.SYNTH_PRESETS[2].params); // soft keys
+      playSynth = DAW.createSynth(ctx, preset.params);
       playSynth.output.connect(ctx.destination);
+      playVoiceId = preset.id;
     }
     playingId = idea.id;
     var t0 = ctx.currentTime + 0.06;
@@ -281,9 +300,9 @@
         '<div class="row spread">' +
           '<h2 style="margin:0">Ideas</h2>' +
           '<button type="button" class="btn" id="sd-retro">' + App.icon('restart', 15) +
-            ' Keep the last 30s</button>' +
+            ' <span id="sd-retro-label">Keep the last ' + retroSecs() + 's</span></button>' +
         '</div>' +
-        '<div class="muted small" style="margin-top:8px">Everything you play is remembered for half a minute — ' +
+        '<div class="muted small" style="margin-top:8px">Everything you play is remembered (length in Settings) — ' +
           'grab it even if you never hit record. Each idea is tagged with the key and tempo it was played in.</div>' +
       '</div>' +
       '<div id="sd-list"></div>';
@@ -409,6 +428,12 @@
     App.on('fb:scale', renderSong);
     App.on('fb:set', renderSong);
     App.on('tempo', renderSong);
+
+    // settings changed the studio prefs (retro length / playback voice)
+    App.on('sd:prefs', function () {
+      var lbl = document.getElementById('sd-retro-label');
+      if (lbl) lbl.textContent = 'Keep the last ' + retroSecs() + 's';
+    });
 
     document.addEventListener('visibilitychange', function () {
       if (document.hidden) stopPlayback();
