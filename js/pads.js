@@ -74,14 +74,17 @@
       var l = GM_MAP[midi];
       return l == null ? null : l;
     }
-    // octave-agnostic: a keyboard shifted up/down (LUMI octave buttons)
-    // still lands on the pads — offsets 0-7 within ANY octave of the base
-    var d = ((midi - base()) % 12 + 12) % 12;
-    return d < 8 ? d : null;
+    // WHITE-KEY layout, octave-agnostic: drummers on a keyboard play the
+    // naturals — C D E F G A B carry the seven main lanes, ANY black key
+    // is the crash. (The old chromatic layout hid the snare on C#.)
+    var pc = ((midi - base()) % 12 + 12) % 12;
+    var W = { 0: 0, 2: 1, 4: 2, 5: 3, 7: 4, 9: 5, 11: 6 };
+    return W[pc] !== undefined ? W[pc] : 7;
   }
 
   function midiForLane(lane) {
-    return mode() === 'gm' ? [36, 38, 39, 42, 46, 45, 50, 49][lane] : base() + lane;
+    if (mode() === 'gm') return [36, 38, 39, 42, 46, 45, 50, 49][lane];
+    return lane < 7 ? base() + [0, 2, 4, 5, 7, 9, 11][lane] : base() + 1; // crash shows on C#
   }
 
   // ---------------- triggering ----------------
@@ -356,11 +359,13 @@
 
     // MIDI: pads page open, or the pad drum track armed Live (anywhere in Studio)
     App.on('midi:note', function (d) {
-      if (!d || !d.on || App.space !== 'studio') return;
+      if (!d || !d.on) return;
       var t = padTrack();
       if (!t) return;
+      // on the Pads page: always. Elsewhere: only in the Studio with the
+      // drum track armed (pads now lives on the practice Instrument tab)
       var armed = App.store.get('st.armed', null) === t.id;
-      if (App.active !== 'pads' && !armed) return;
+      if (App.active !== 'pads' && !(App.space === 'studio' && armed)) return;
       var lane = laneForMidi(d.midi);
       if (lane == null) return;
       hit(lane, Math.max(0.15, (d.vel || 90) / 127), false);

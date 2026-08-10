@@ -272,7 +272,7 @@
     g.gain.linearRampToValueAtTime(gain, t + 0.004);
     src.connect(g);
     g.connect(ctx.destination);
-    src.start(t);
+    src.start(t, App.sampleLead(src.buffer)); // skip the MP3 lead-in silence
     var key = chan + '-' + midi;
     if (heldVoices[key]) noteOffRaw(midi, chan); // retrigger
     heldVoices[key] = { src: src, g: g, base: base, gain: gain, chan: chan };
@@ -481,7 +481,7 @@
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.06);
     src.connect(g);
     g.connect(ctx.destination);
-    src.start(t);
+    src.start(t, App.sampleLead(src.buffer));
     src.stop(t + dur + 0.1);
   }
 

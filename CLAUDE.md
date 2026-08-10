@@ -73,9 +73,12 @@ js/plugins.js     window.SoundLab plugin API v1: registerPage (App.addPage),
                   cap, per-plugin enable/error) run right after boot; loaded
                   from Settings > Plugins. Docs PLUGINS.md; sample plugin
                   plugins/sample-lofi.js (Lo-fi fx + Glass bell voice).
-js/pads.js        drum-pad controller page ('pads', studio): 8 velocity pads
-                  on the pad drum track's live channel; touch + ZXCV/ASDF +
-                  MIDI (pads.mode 'roli' chromatic-from-base | 'gm' drum map);
+js/pads.js        drum-pad controller page ('pads', PRACTICE Instrument group
+                  since v0.64.0; still records to st.tracks + studio-armed
+                  MIDI works): 8 velocity pads on the pad drum track's live
+                  channel; touch + ZXCV/ASDF + MIDI (pads.mode 'roli' =
+                  WHITE-KEY layout C..B->7 lanes + black=crash, any octave |
+                  'gm' drum map); auto-creates its drum track on open;
                   Record quantizes hits to nearest 1/16 vs st:step heartbeat;
                   LUMI lights the 8 mapped keys, flashes on every hit incl.
                   loop playback. Drums-armed MIDI is handled HERE, not by
@@ -137,8 +140,8 @@ version.json      auto-update feed (source of truth for latest version)
 - TAB GROUPS (app.js GROUPS, v0.54.0): the nav select lists GROUPS of pages,
   not pages — practice: Instrument (fretboard/tab/notation/piano), Theory
   (chords/theory), Play (songs/jam), Practice (trainer/shed), Tools
-  (metronome/tuner); studio: Studio (arrange=Timeline HOME / tracks=Editor),
-  Pads, Sketch (song/ideas). Members show as a pill strip (#subnav, .subtab) under the context
+  (metronome/tuner) — Instrument also carries 'pads' (v0.64.0); studio:
+  Studio (arrange=Timeline HOME / tracks=Editor), Sketch (song/ideas). Members show as a pill strip (#subnav, .subtab) under the context
   bar; single-page groups hide the strip; each group remembers its last
   member (app.gtab.<gid>). NAVIGATION ONLY — pages/modules/ids unchanged, so
   App.switchTo(pageId) and every bus cross-link still work (the owning group
