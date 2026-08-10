@@ -299,7 +299,7 @@
     g.gain.linearRampToValueAtTime(0.0001, t + dur);
     src.connect(g);
     g.connect(ctx.destination);
-    src.start(t);
+    src.start(t, App.sampleLead ? App.sampleLead(src.buffer) : 0);
     src.stop(t + dur + 0.05);
     return true;
   }

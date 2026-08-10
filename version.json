@@ -1,5 +1,5 @@
 {
-  "version": "0.63.0",
+  "version": "0.64.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/soundLAB-alpha.apk",
-  "notes": "PLAYED vs NEXT, unmistakable. Practice guidance now clearly separates the CURRENT note from the UPCOMING one everywhere: on screen the target wears the solid accent ring while the next note gets a dashed, gently pulsing ring; on your MIDI keyboard the current key is lit solid and the NEXT key BLINKS — solid-vs-blinking reads on every keybed, including the LUMI (whose own lighting normalizes brightness, which is why the old bright/dim pair looked identical). Applies to both the auto practice runner and Guide mode on the Keys page."
+  "notes": "LATENCY, FIXED AT THE SOURCE: the sampled instruments had silence baked into the front of their MP3s (28ms grand piano, 46ms guitar, 71ms pad) — every sampled note spoke late no matter how fast the audio path was. Each sample's lead-in is now measured once and playback starts past it: the grand, guitars and the whole Jam band speak the instant you (or the beat) hit. DRUM MAPPING FIXED: keyboard drumming now uses the WHITE KEYS — C D E F G A B are kick/snare/clap/hat/open-hat/toms, any black key is the crash (the snare was hiding on C#). And PADS MOVED to the Instrument tab (Neck / Tab / Notation / Keys / Pads) — it's an instrument; the Studio keeps driving it when a drum track is armed."
 }

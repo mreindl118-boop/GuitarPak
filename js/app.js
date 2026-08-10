@@ -32,8 +32,8 @@ window.App = (function () {
   // Settings is deliberately in NEITHER list: it's an overlay page opened by
   // the ever-present gear in the header, from any page in either space.
   var SPACES = {
-    practice: ['metronome', 'fretboard', 'tab', 'notation', 'chords', 'piano', 'songs', 'jam', 'shed', 'tuner', 'trainer', 'theory'],
-    studio: ['arrange', 'tracks', 'pads', 'song', 'ideas']
+    practice: ['metronome', 'fretboard', 'tab', 'notation', 'chords', 'piano', 'pads', 'songs', 'jam', 'shed', 'tuner', 'trainer', 'theory'],
+    studio: ['arrange', 'tracks', 'song', 'ideas']
   };
   var SPACE_LABELS = {
     metronome: 'Metronome', fretboard: 'Fretboard', tab: 'Tab', notation: 'Notation',
@@ -48,7 +48,7 @@ window.App = (function () {
   // pages) keep addressing pages by id and the owning group follows along.
   var GROUPS = {
     practice: [
-      { id: 'ginst', label: 'Instrument', pages: ['fretboard', 'tab', 'notation', 'piano'] },
+      { id: 'ginst', label: 'Instrument', pages: ['fretboard', 'tab', 'notation', 'piano', 'pads'] },
       { id: 'gtheory', label: 'Theory', pages: ['chords', 'theory'] },
       { id: 'gplay', label: 'Play', pages: ['songs', 'jam'] },
       { id: 'gprac', label: 'Practice', pages: ['shed', 'trainer'] }, // the game first
@@ -56,7 +56,6 @@ window.App = (function () {
     ],
     studio: [
       { id: 'gstudio', label: 'Studio', pages: ['arrange', 'tracks'] }, // the DAW home
-      { id: 'gpads', label: 'Pads', pages: ['pads'] },
       { id: 'gsketch', label: 'Sketch', pages: ['song', 'ideas'] }
     ]
   };
@@ -81,7 +80,7 @@ window.App = (function () {
   // ---- auto-update ----
   // version.json on GitHub is the source of truth. Web builds refresh through
   // the service worker; the APK build (file://) links to the new APK download.
-  var APP_VERSION = '0.63.0';
+  var APP_VERSION = '0.64.0';
   var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
 
   function verNum(v) {
@@ -221,6 +220,24 @@ window.App = (function () {
     return audioCtx;
   }
 
+  // ---- sample lead-in trim ----
+  // MP3 renders carry encoder padding + un-trimmed silence at the front (the
+  // grand piano bank measures ~28ms, guitar ~46ms, pad ~71ms) — every sampled
+  // note spoke LATE by that much. Compute each buffer's lead-in once (first
+  // sample above 2% of peak, keeping 2ms of natural ramp) and start playback
+  // past it. Cached straight on the AudioBuffer.
+  function sampleLead(buf) {
+    if (!buf || buf.__lead !== undefined) return buf ? buf.__lead : 0;
+    var d = buf.getChannelData(0);
+    var peak = 0, i;
+    for (i = 0; i < d.length; i++) { var a = d[i] < 0 ? -d[i] : d[i]; if (a > peak) peak = a; }
+    var th = peak * 0.02;
+    for (i = 0; i < d.length; i++) { if ((d[i] < 0 ? -d[i] : d[i]) > th) break; }
+    var lead = Math.max(0, i / buf.sampleRate - 0.002);
+    buf.__lead = lead > 0.004 ? lead : 0; // ignore negligible lead-ins
+    return buf.__lead;
+  }
+
   // ---- sampled pluck voice (FluidR3 GM — samples/CREDITS.md) ----
   // The pluck instrument is an app-level setting (app.pluckTone: steel |
   // electric | nylon | synth, Settings tab). Anchor-note MP3s for the chosen
@@ -346,7 +363,7 @@ window.App = (function () {
       g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.05);
       src.connect(g);
       g.connect(ctx.destination);
-      src.start(t);
+      src.start(t, sampleLead(src.buffer));
       src.stop(t + dur + 0.1);
       return;
     }
@@ -996,6 +1013,7 @@ window.App = (function () {
     switchTo: switchTo,
     addPage: addPage,
     setVolume: setVolume,
+    sampleLead: sampleLead,
     get volume() { return volPref(); },
     setAccent: setAccent,
     get accent() { var a = store.get('app.accent', 'amber'); return ACCENTS[a] ? a : 'amber'; },
