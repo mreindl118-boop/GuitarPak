@@ -23,6 +23,7 @@ final class MIDIBridge: NSObject {
     private var inPort = MIDIPortRef()
     private var outPort = MIDIPortRef()
     private var currentOut: MIDIEndpointRef = 0
+    private var connected = Set<MIDIEndpointRef>()
     weak var webView: WKWebView?
 
     func start() {
@@ -45,12 +46,19 @@ final class MIDIBridge: NSObject {
 
     private func connectAllSources() {
         guard inPort != 0 else { return }
+        // track what's already wired: re-connecting a source on every setup
+        // notification would deliver every packet twice after a hot-plug
+        var alive = Set<MIDIEndpointRef>()
         for i in 0..<MIDIGetNumberOfSources() {
             let src = MIDIGetSource(i)
+            alive.insert(src)
+            guard !connected.contains(src) else { continue }
             // srcRef connRefCon carries the endpoint so receive() can name it
             MIDIPortConnectSource(inPort, src,
                 UnsafeMutableRawPointer(bitPattern: UInt(src)))
+            connected.insert(src)
         }
+        connected = connected.intersection(alive) // forget unplugged endpoints
     }
 
     private func uid(_ ep: MIDIEndpointRef) -> Int32 {

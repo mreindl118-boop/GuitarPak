@@ -33,7 +33,8 @@
     genre: 'rock',
     energy: 2,          // 1 chill · 2 groove · 3 push
     swing: 0,           // 0..1 (seeded from the genre default on genre change)
-    comp: 'guitar',     // guitar | eguitar | nylon | keys | pad
+    comp: 'guitar',     // any COMP_IDS entry
+    kit: 'studio',      // drum kit prebuilt (KITS)
     mix: {
       drums: { on: true, vol: 80 },
       bass: { on: true, vol: 80 },
@@ -45,7 +46,7 @@
   // chord token: {d: 1..7, q?: qualityOverride} (degree — re-harmonizes with
   // the key) or {abs: {rootPc, quality}} (fixed — migrated progressions)
 
-  var COMP_IDS = ['guitar', 'eguitar', 'nylon', 'keys', 'pad'];
+  var COMP_IDS = ['guitar', 'eguitar', 'nylon', 'keys', 'piano2', 'epiano', 'organ', 'pad'];
   var SEC_LABELS = { intro: 'Intro', a: 'A', b: 'B', ending: 'Ending' };
 
   // ---------------- genres ----------------
@@ -205,10 +206,15 @@
     eguitar: { dir: 'samples/eguitar/', notes: { 40: 'E2', 45: 'A2', 48: 'C3', 57: 'A3', 66: 'Fs4', 69: 'A4',
                                                  72: 'C5', 78: 'Fs5', 81: 'A5' } },
     nylon:   { dir: 'samples/nylon/',   notes: { 40: 'E2', 45: 'A2', 50: 'D3', 55: 'G3', 59: 'B3', 64: 'E4',
-                                                 69: 'A4', 74: 'D5', 76: 'E5', 81: 'A5' } }
+                                                 69: 'A4', 74: 'D5', 76: 'E5', 81: 'A5' } },
+    piano2:  { dir: 'samples/piano2/',  notes: { 48: 'C3', 52: 'E3', 57: 'A3', 60: 'C4', 64: 'E4', 69: 'A4', 72: 'C5' } },
+    epiano:  { dir: 'samples/epiano/',  notes: { 48: 'C3', 52: 'E3', 57: 'A3', 60: 'C4', 64: 'E4', 69: 'A4', 72: 'C5' } },
+    organ:   { dir: 'samples/organ/',   notes: { 48: 'C3', 52: 'E3', 57: 'A3', 60: 'C4', 64: 'E4', 69: 'A4', 72: 'C5' } }
   };
 
   var GUITAR_COMPS = { guitar: 1, eguitar: 1, nylon: 1 };
+  var KEYS_COMPS = { keys: 1, piano2: 1, epiano: 1 };   // struck: short comp stabs
+  var HELD_COMPS = { pad: 1, organ: 1 };                // sustained: hold the chord
 
   function hum(s) { return (Math.random() * 2 - 1) * s; }
   var sampleBuf = {};
@@ -309,7 +315,44 @@
     return noiseBuf;
   }
 
+  // ---- drum KITS: the Studio engine's 808/909 synth kit, jam-side ----
+  // DAW.createDrums (js/daw/engine.js) replaces the old fixed kick/snare/hat
+  // trio. Each prebuilt is a per-lane {tune (semis), decay 0..1, level} set;
+  // 'snare' picks the snare lane (1) or the clap lane (2, the 808 move).
+  var KITS = {
+    studio: { label: 'Studio', snare: 1,
+      k: { tune: 0, decay: 0.3, level: 0.95 }, s: { tune: 0, decay: 0.42, level: 0.85 }, h: { tune: 0, decay: 0.3, level: 0.5 } },
+    boom: { label: '808', snare: 2,
+      k: { tune: -3, decay: 0.75, level: 1 }, s: { tune: 0, decay: 0.5, level: 0.8 }, h: { tune: -2, decay: 0.2, level: 0.4 } },
+    club: { label: '909', snare: 1,
+      k: { tune: 2, decay: 0.22, level: 0.95 }, s: { tune: 3, decay: 0.55, level: 0.9 }, h: { tune: 2, decay: 0.5, level: 0.55 } },
+    dusty: { label: 'Lo-fi', snare: 1,
+      k: { tune: -1, decay: 0.45, level: 0.8 }, s: { tune: -3, decay: 0.28, level: 0.6 }, h: { tune: -4, decay: 0.12, level: 0.32 } }
+  };
+  var kitInst = null, kitBuilt = null; // {instance, for ctx + kit id}
+
+  function kitFor() {
+    if (!(window.DAW && DAW.createDrums)) return null;
+    var id = KITS[state.kit] ? state.kit : 'studio';
+    if (kitInst && kitBuilt === id + '@' + (ctx ? ctx.sampleRate : 0)) return kitInst;
+    var kd = KITS[id];
+    var lanes = [];
+    for (var i = 0; i < 8; i++) lanes.push({ name: '', tune: 0, decay: 0.5, level: 0.9 });
+    lanes[0] = { name: 'Kick', tune: kd.k.tune, decay: kd.k.decay, level: kd.k.level };
+    lanes[kd.snare] = { name: 'Snare', tune: kd.s.tune, decay: kd.s.decay, level: kd.s.level };
+    lanes[3] = { name: 'Hat', tune: kd.h.tune, decay: kd.h.decay, level: kd.h.level };
+    kitInst = DAW.createDrums(ctx, { gain: 1, lanes: lanes });
+    kitInst.output.connect(ctx.destination);
+    kitInst.snareLane = kd.snare;
+    kitBuilt = id + '@' + ctx.sampleRate;
+    return kitInst;
+  }
+
+  function kitChanged() { kitInst = null; kitBuilt = null; } // rebuild on next hit
+
   function kick(t, gain) {
+    var kit = kitFor();
+    if (kit) { kit.noteOn(0, gain, t); return; }
     var o = ctx.createOscillator(), g = ctx.createGain();
     o.type = 'sine';
     o.frequency.setValueAtTime(125, t);
@@ -321,6 +364,8 @@
   }
 
   function snare(t, gain) {
+    var kit = kitFor();
+    if (kit) { kit.noteOn(kit.snareLane, gain * 1.3, t); return; }
     var src = ctx.createBufferSource(), bp = ctx.createBiquadFilter(), g = ctx.createGain();
     src.buffer = getNoise();
     bp.type = 'bandpass'; bp.frequency.value = 1900; bp.Q.value = 0.8;
@@ -337,6 +382,8 @@
   }
 
   function hat(t, gain) {
+    var kit = kitFor();
+    if (kit) { kit.noteOn(3, gain * 1.5, t); return; }
     var src = ctx.createBufferSource(), hp = ctx.createBiquadFilter(), g = ctx.createGain();
     src.buffer = getNoise();
     hp.type = 'highpass'; hp.frequency.value = 6800;
@@ -366,10 +413,12 @@
     o.start(t); o.stop(t + dur + 0.05);
   }
 
-  function padChord(t, midis, dur, gain) {
-    if (setReady('pad')) {
+  function padChord(t, midis, dur, gain, setId) {
+    var set = setId && SAMPLE_SETS[setId] ? setId : 'pad';
+    if (setReady(set)) {
+      var atk = set === 'organ' ? 0.02 : 0.22; // organ speaks, pad swells
       for (var p = 0; p < midis.length; p++) {
-        playSample('pad', midis[p], t + p * 0.012, dur, (gain / midis.length) * 1.9, 0.22, 0.4);
+        playSample(set, midis[p], t + p * 0.012, dur, (gain / midis.length) * 1.9, atk, 0.4);
       }
       return;
     }
@@ -392,10 +441,11 @@
     }
   }
 
-  function keysChord(t, midis, gain) {
-    if (setReady('keys')) {
+  function keysChord(t, midis, gain, setId) {
+    var set = setId && SAMPLE_SETS[setId] ? setId : 'keys';
+    if (setReady(set)) {
       for (var k = 0; k < midis.length; k++) {
-        playSample('keys', midis[k], t + k * 0.004 + Math.random() * 0.006, 0.6,
+        playSample(set, midis[k], t + k * 0.004 + Math.random() * 0.006, 0.6,
           (gain / midis.length) * 1.7 * (0.88 + Math.random() * 0.24));
       }
       return;
@@ -572,15 +622,15 @@
     if (mixC.on && mixC.vol > 0) {
       var cv = mixC.vol / 80;
       var voicing = chordVoicing(chord);
-      if (state.comp === 'pad') {
-        if (isChordStart) padChord(barT, voicing.slice(-4), 4 * beatDur() * holdBars, 0.5 * cv);
+      if (HELD_COMPS[state.comp]) {
+        if (isChordStart) padChord(barT, voicing.slice(-4), 4 * beatDur() * holdBars, 0.5 * cv, state.comp);
       } else {
         var comp = compFor();
         for (i = 0; i < comp.length; i++) {
           t = barT + comp[i][0] * beatDur() + hum(0.008);
           var hitGain = comp[i][2] * (0.88 + Math.random() * 0.24) * cv;
-          if (state.comp === 'keys') {
-            keysChord(t, voicing.slice(-4), hitGain * 2.4);
+          if (KEYS_COMPS[state.comp]) {
+            keysChord(t, voicing.slice(-4), hitGain * 2.4, state.comp);
             continue;
           }
           var gap = 0.008 + Math.random() * 0.012;
@@ -718,6 +768,8 @@
     state.swing = (sw >= 0 && sw <= 1) ? sw : GENRES[state.genre].swing;
     var cp = g('jam2.comp', 'guitar');
     state.comp = COMP_IDS.indexOf(cp) !== -1 ? cp : 'guitar';
+    var kt = g('jam2.kit', 'studio');
+    state.kit = KITS[kt] ? kt : 'studio';
     var mx = g('jam2.mix', null);
     if (mx && mx.drums && mx.bass && mx.comp) {
       ['drums', 'bass', 'comp'].forEach(function (ch) {
@@ -763,6 +815,7 @@
     App.store.set('jam2.energy', state.energy);
     App.store.set('jam2.swing', state.swing);
     App.store.set('jam2.comp', state.comp);
+    App.store.set('jam2.kit', state.kit);
     App.store.set('jam2.mix', state.mix);
     App.store.set('jam2.sections', state.sections);
   }
@@ -856,11 +909,39 @@
     els.swing.value = String(Math.round(state.swing * 100));
     els.bpm.value = String(bpm);
     els.compSel.value = state.comp;
+    els.kitSel.value = KITS[state.kit] ? state.kit : 'studio';
+    els.bassSel.value = App.store.get('app.bassStyle', 'finger') === 'pick' ? 'pick' : 'finger';
     ['drums', 'bass', 'comp'].forEach(function (chn) {
       var m = state.mix[chn];
       document.getElementById('jam-mute-' + chn).classList.toggle('active', !m.on);
       document.getElementById('jam-vol-' + chn).value = String(m.vol);
     });
+    paintBands();
+  }
+
+  // ---- prebuilt bands: one tap sets kit + bass tone + comp voice ----
+  var BANDS = [
+    { id: 'unplugged', label: 'Unplugged', kit: 'studio', bass: 'finger', comp: 'guitar' },
+    { id: 'lounge', label: 'Lounge', kit: 'dusty', bass: 'finger', comp: 'epiano' },
+    { id: 'organtrio', label: 'Organ trio', kit: 'studio', bass: 'finger', comp: 'organ' },
+    { id: 'rockclub', label: 'Rock club', kit: 'club', bass: 'pick', comp: 'eguitar' },
+    { id: 'boombap', label: 'Boom bap', kit: 'boom', bass: 'finger', comp: 'piano2' },
+    { id: 'dream', label: 'Dream', kit: 'dusty', bass: 'finger', comp: 'pad' }
+  ];
+
+  function bandActive(b) {
+    return state.kit === b.kit && state.comp === b.comp &&
+      (App.store.get('app.bassStyle', 'finger') === 'pick' ? 'pick' : 'finger') === b.bass;
+  }
+
+  function paintBands() {
+    if (!els.bands) return;
+    var h = '';
+    BANDS.forEach(function (b) {
+      h += '<button type="button" class="chip fb-chip' + (bandActive(b) ? ' active' : '') +
+        '" data-jband="' + b.id + '">' + b.label + '</button>';
+    });
+    els.bands.innerHTML = h;
   }
 
   function rebuild() {
@@ -888,7 +969,8 @@
       '.jam-dropch{border-color:var(--accent) !important}' +
       '.jam-edx{background:transparent;border:none;color:var(--muted);cursor:pointer;padding:2px;display:inline-flex}' +
       '.jam-edx:hover{color:var(--red)}' +
-      '.jam-mixrow{display:grid;grid-template-columns:86px auto 1fr;gap:12px;align-items:center;margin-top:10px}' +
+      '.jam-mixrow{display:grid;grid-template-columns:86px auto 1fr auto;gap:12px;align-items:center;margin-top:10px}' +
+      '.jam-mixrow select{min-width:104px}' +
       '.jam-mixlabel{font-size:12px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:var(--label)}' +
       '.jam-editor{margin-top:12px;padding:12px 14px;background:var(--card2);border:1px solid var(--line);border-radius:12px}' +
       '.tab.jam-live::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;' +
@@ -946,25 +1028,36 @@
           'Playing: tapping a palette chord (or playing a chord on your MIDI keyboard) makes the band vamp on it — Resume returns to the song.</div>' +
       '</div>' +
       '<div class="card">' +
-        '<h2>Mixer</h2>' +
+        '<h2>The band</h2>' +
+        '<div class="row tight" id="jam-bands" style="margin-bottom:12px"></div>' +
         '<div class="jam-mixrow"><span class="jam-mixlabel">Drums</span>' +
           '<button type="button" class="chip fb-chip" id="jam-mute-drums">Mute</button>' +
-          '<input type="range" id="jam-vol-drums" min="0" max="100" step="5"></div>' +
+          '<input type="range" id="jam-vol-drums" min="0" max="100" step="5">' +
+          '<select id="jam-kit" aria-label="Drum kit">' +
+            '<option value="studio">Studio</option>' +
+            '<option value="boom">808</option>' +
+            '<option value="club">909</option>' +
+            '<option value="dusty">Lo-fi</option></select></div>' +
         '<div class="jam-mixrow"><span class="jam-mixlabel">Bass</span>' +
           '<button type="button" class="chip fb-chip" id="jam-mute-bass">Mute</button>' +
-          '<input type="range" id="jam-vol-bass" min="0" max="100" step="5"></div>' +
+          '<input type="range" id="jam-vol-bass" min="0" max="100" step="5">' +
+          '<select id="jam-bass" aria-label="Bass tone">' +
+            '<option value="finger">Fingered</option>' +
+            '<option value="pick">Picked</option></select></div>' +
         '<div class="jam-mixrow"><span class="jam-mixlabel">Comp</span>' +
           '<button type="button" class="chip fb-chip" id="jam-mute-comp">Mute</button>' +
-          '<input type="range" id="jam-vol-comp" min="0" max="100" step="5"></div>' +
-        '<div class="row" style="margin-top:12px">' +
-          '<label class="field">Comp instrument<select id="jam-comp">' +
+          '<input type="range" id="jam-vol-comp" min="0" max="100" step="5">' +
+          '<select id="jam-comp" aria-label="Comp instrument">' +
             '<option value="guitar">Acoustic guitar</option>' +
             '<option value="eguitar">Electric guitar</option>' +
             '<option value="nylon">Nylon guitar</option>' +
-            '<option value="keys">Keys</option>' +
-            '<option value="pad">Pad</option></select></label>' +
-          '<span class="muted small">Bass tone (fingered / picked) lives in Settings. Kill the comp to practice comping yourself.</span>' +
-        '</div>' +
+            '<option value="keys">Bright keys</option>' +
+            '<option value="piano2">Grand piano</option>' +
+            '<option value="epiano">E-piano</option>' +
+            '<option value="organ">Organ</option>' +
+            '<option value="pad">Pad</option></select></div>' +
+        '<div class="muted small" style="margin-top:10px">Prebuilt bands set the kit, bass and comp in one tap — then tweak any of them. ' +
+          'Kill the comp to practice comping yourself.</div>' +
       '</div>';
 
     els.genre = document.getElementById('jam-genre');
@@ -985,6 +1078,9 @@
     els.edBars = document.getElementById('jam-ed-bars');
     els.edTitle = document.getElementById('jam-edtitle');
     els.compSel = document.getElementById('jam-comp');
+    els.kitSel = document.getElementById('jam-kit');
+    els.bassSel = document.getElementById('jam-bass');
+    els.bands = document.getElementById('jam-bands');
 
     loadState();
     renderForm();
@@ -1241,6 +1337,29 @@
     els.compSel.addEventListener('change', function () {
       if (COMP_IDS.indexOf(this.value) !== -1) state.comp = this.value;
       saveState();
+      paintBands();
+    });
+    els.kitSel.addEventListener('change', function () {
+      if (KITS[this.value]) { state.kit = this.value; kitChanged(); }
+      saveState();
+      paintBands();
+    });
+    els.bassSel.addEventListener('change', function () {
+      App.store.set('app.bassStyle', this.value === 'pick' ? 'pick' : 'finger');
+      paintBands();
+    });
+    els.bands.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-jband]');
+      if (!btn) return;
+      var b = null;
+      BANDS.forEach(function (x) { if (x.id === btn.getAttribute('data-jband')) b = x; });
+      if (!b) return;
+      state.kit = b.kit;
+      state.comp = b.comp;
+      App.store.set('app.bassStyle', b.bass);
+      kitChanged();
+      saveState();
+      syncControls();
     });
 
     // shared key: re-render palette + editor names on key/scale changes —
@@ -1256,5 +1375,12 @@
     updateTransport();
   }
 
-  App.register('jam', { init: init });
+  App.register('jam', {
+    init: init,
+    onShow: function () {
+      // warm the sample bank so the FIRST Play already sounds like the band
+      try { if (!ctx) ctx = App.getAudio(); } catch (e) { return; }
+      loadSamples();
+    }
+  });
 })();

@@ -8,6 +8,7 @@ A guitar practice tool that runs entirely in your browser. No install, no accoun
 
 - **Web (recommended):** https://mreindl118-boop.github.io/GuitarPak/ — installable as a PWA (browser menu → *Add to Home screen*), works offline after first visit, microphone tuner fully functional.
 - **Android APK (sideload):** [Download GuitarLab-alpha.apk](https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk) — installs as **soundLAB**; allow "install unknown apps" when prompted. Rebuilt by `android/build.ps1`. (The file keeps its original name so in-place updates from older installs still work.)
+- **Windows desktop:** [Download soundLAB-windows.bat](https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/soundLAB-windows.bat) and double-click it — creates Desktop + Start Menu shortcuts that open soundLAB in its own app window (Edge/Chrome app mode). **MIDI keyboards work out of the box**: Chromium's native Web MIDI is the bridge — plug in (or Bluetooth-pair in Windows Settings) and allow the MIDI prompt. Offline after first visit, auto-updates, a few KB.
 - **iPad / iPhone:** open the web link in Safari → Share → *Add to Home Screen* — full-screen app with icon, offline, mic tuner works. (A native WKWebView wrapper lives in `ios/` for building with Xcode on a Mac — see `ios/README.md`.)
 - **Local:** double-click `index.html` (Chrome/Edge allow mic from local files), or `python -m http.server 8000` in this folder.
 

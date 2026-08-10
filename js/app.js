@@ -51,7 +51,7 @@ window.App = (function () {
       { id: 'ginst', label: 'Instrument', pages: ['fretboard', 'tab', 'notation', 'piano'] },
       { id: 'gtheory', label: 'Theory', pages: ['chords', 'theory'] },
       { id: 'gplay', label: 'Play', pages: ['songs', 'jam'] },
-      { id: 'gprac', label: 'Practice', pages: ['trainer', 'shed'] },
+      { id: 'gprac', label: 'Practice', pages: ['shed', 'trainer'] }, // the game first
       { id: 'gtools', label: 'Tools', pages: ['metronome', 'tuner'] }
     ],
     studio: [
@@ -81,7 +81,7 @@ window.App = (function () {
   // ---- auto-update ----
   // version.json on GitHub is the source of truth. Web builds refresh through
   // the service worker; the APK build (file://) links to the new APK download.
-  var APP_VERSION = '0.55.0';
+  var APP_VERSION = '0.56.0';
   var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
 
   function verNum(v) {

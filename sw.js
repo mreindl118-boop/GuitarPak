@@ -1,5 +1,5 @@
 /* GuitarLab service worker — cache-first so the app works fully offline once visited. */
-var CACHE = 'guitarlab-v80';
+var CACHE = 'guitarlab-v81';
 var ASSETS = [
   '.',
   'index.html',
@@ -42,6 +42,15 @@ var ASSETS = [
   'samples/keys/C3.mp3', 'samples/keys/E3.mp3', 'samples/keys/A3.mp3',
   'samples/keys/C4.mp3', 'samples/keys/E4.mp3', 'samples/keys/A4.mp3',
   'samples/keys/C5.mp3',
+  'samples/piano2/C3.mp3', 'samples/piano2/E3.mp3', 'samples/piano2/A3.mp3',
+  'samples/piano2/C4.mp3', 'samples/piano2/E4.mp3', 'samples/piano2/A4.mp3',
+  'samples/piano2/C5.mp3',
+  'samples/epiano/C3.mp3', 'samples/epiano/E3.mp3', 'samples/epiano/A3.mp3',
+  'samples/epiano/C4.mp3', 'samples/epiano/E4.mp3', 'samples/epiano/A4.mp3',
+  'samples/epiano/C5.mp3',
+  'samples/organ/C3.mp3', 'samples/organ/E3.mp3', 'samples/organ/A3.mp3',
+  'samples/organ/C4.mp3', 'samples/organ/E4.mp3', 'samples/organ/A4.mp3',
+  'samples/organ/C5.mp3',
   'samples/pad/C3.mp3', 'samples/pad/B3.mp3', 'samples/pad/E4.mp3',
   'samples/pad/G4.mp3', 'samples/pad/C5.mp3',
   'samples/guitar/E2.mp3', 'samples/guitar/A2.mp3', 'samples/guitar/C3.mp3',

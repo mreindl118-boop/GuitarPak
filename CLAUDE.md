@@ -45,7 +45,11 @@ js/jam.js         │ (jam: auto-band — genre presets write an intro/A/B/endin
                   │  context-bar key; section editor, energy/swing, per-
                   │  instrument mixer, palette/MIDI vamp override, Finish →
                   │  ending; store jam2.*, old jam.track migrates once; the
-                  │  sample/voice layer is the only carried-over code)
+                  │  sample/voice layer is the only carried-over code;
+                  │  v0.56.0: drum KITS via DAW.createDrums (Studio/808/909/
+                  │  Lo-fi), comp banks incl piano2/epiano/organ, prebuilt
+                  │  BANDS chips = kit+bass+comp combos, samples preload on
+                  │  page show)
 js/tuner.js       │
 js/trainer.js     │
 js/theorytab.js   │ (theory: circle of fifths + key guide + degree ear quiz)
