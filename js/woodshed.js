@@ -85,16 +85,52 @@
     return mkScore(name + ' pentatonic fours', 'guitar', 88, notes, true, 'generator');
   }
 
-  // 8 of the 40 PAS rudiments (the rest are data to add, not new machinery)
+  // The full 40 PAS rudiments. flam: one grace ~30ms before the marked
+  // strokes; drag: two. Sticking shown is standard PAS; a handful of compound
+  // drag orderings are simplified to their common practice-pad forms.
+  // 'buzz' = multiple-bounce textures we can't sense from single hits —
+  // display + timing only, accents unscored.
   var RUDIMENTS = [
-    { id: 'single', name: 'Single stroke roll', stick: 'RLRLRLRL', acc: [] },
-    { id: 'double', name: 'Double stroke roll', stick: 'RRLLRRLL', acc: [] },
-    { id: 'paradiddle', name: 'Single paradiddle', stick: 'RLRRLRLL', acc: [0, 4] },
-    { id: 'dparadiddle', name: 'Double paradiddle', stick: 'RLRLRRLRLRLL', acc: [0, 6] },
-    { id: 'flam', name: 'Flam', stick: 'RL', acc: [0, 1], flam: true },
-    { id: 'flamtap', name: 'Flam tap', stick: 'RRLL', acc: [0, 2], flam: true },
-    { id: 'five', name: 'Five stroke roll', stick: 'RRLLR LLRRL', acc: [4, 10] },
-    { id: 'nine', name: 'Nine stroke roll', stick: 'RRLLRRLLR', acc: [8] }
+    { id: 'r1', name: 'Single stroke roll', stick: 'RLRLRLRL', acc: [] },
+    { id: 'r2', name: 'Single stroke four', stick: 'RLRL', acc: [3] },
+    { id: 'r3', name: 'Single stroke seven', stick: 'RLRLRLR', acc: [6] },
+    { id: 'r4', name: 'Multiple bounce roll', stick: 'RLRL', acc: [], buzz: true },
+    { id: 'r5', name: 'Triple stroke roll', stick: 'RRRLLL', acc: [] },
+    { id: 'r6', name: 'Double stroke open roll', stick: 'RRLLRRLL', acc: [] },
+    { id: 'r7', name: 'Five stroke roll', stick: 'RRLLRLLRRL', acc: [4, 9] },
+    { id: 'r8', name: 'Six stroke roll', stick: 'RLLRRL', acc: [0, 5] },
+    { id: 'r9', name: 'Seven stroke roll', stick: 'RRLLRRL', acc: [6] },
+    { id: 'r10', name: 'Nine stroke roll', stick: 'RRLLRRLLR', acc: [8] },
+    { id: 'r11', name: 'Ten stroke roll', stick: 'RRLLRRLLRL', acc: [8, 9] },
+    { id: 'r12', name: 'Eleven stroke roll', stick: 'RRLLRRLLRRL', acc: [10] },
+    { id: 'r13', name: 'Thirteen stroke roll', stick: 'RRLLRRLLRRLLR', acc: [12] },
+    { id: 'r14', name: 'Fifteen stroke roll', stick: 'RRLLRRLLRRLLRRL', acc: [14] },
+    { id: 'r15', name: 'Seventeen stroke roll', stick: 'RRLLRRLLRRLLRRLLR', acc: [16] },
+    { id: 'r16', name: 'Single paradiddle', stick: 'RLRRLRLL', acc: [0, 4] },
+    { id: 'r17', name: 'Double paradiddle', stick: 'RLRLRRLRLRLL', acc: [0, 6] },
+    { id: 'r18', name: 'Triple paradiddle', stick: 'RLRLRLRRLRLRLRLL', acc: [0, 8] },
+    { id: 'r19', name: 'Paradiddle-diddle', stick: 'RLRRLLRLRRLL', acc: [0, 6] },
+    { id: 'r20', name: 'Flam', stick: 'RL', acc: [0, 1], flam: [0, 1] },
+    { id: 'r21', name: 'Flam accent', stick: 'RLRLRL', acc: [0, 3], flam: [0, 3] },
+    { id: 'r22', name: 'Flam tap', stick: 'RRLL', acc: [0, 2], flam: [0, 2] },
+    { id: 'r23', name: 'Flamacue', stick: 'RLRLR', acc: [1], flam: [0, 4] },
+    { id: 'r24', name: 'Flam paradiddle', stick: 'RLRRLRLL', acc: [0, 4], flam: [0, 4] },
+    { id: 'r25', name: 'Single flammed mill', stick: 'RRLRLLRL', acc: [0, 4], flam: [0, 4] },
+    { id: 'r26', name: 'Flam paradiddle-diddle', stick: 'RLRRLL', acc: [0], flam: [0] },
+    { id: 'r27', name: 'Pataflafla', stick: 'RLRLRLRL', acc: [0, 3, 4, 7], flam: [0, 3, 4, 7] },
+    { id: 'r28', name: 'Swiss army triplet', stick: 'RRLRRL', acc: [0, 3], flam: [0, 3] },
+    { id: 'r29', name: 'Inverted flam tap', stick: 'RLLR', acc: [0, 2], flam: [0, 2] },
+    { id: 'r30', name: 'Flam drag', stick: 'RLLR', acc: [0, 3], flam: [0], drag: [3] },
+    { id: 'r31', name: 'Drag (half drag)', stick: 'RL', acc: [0, 1], drag: [0, 1] },
+    { id: 'r32', name: 'Single drag tap', stick: 'RLRL', acc: [1, 3], drag: [0, 2] },
+    { id: 'r33', name: 'Double drag tap', stick: 'RRLLLR', acc: [2, 5], drag: [0, 1, 3, 4] },
+    { id: 'r34', name: 'Lesson 25', stick: 'RLRRLR', acc: [2, 5], drag: [0, 3] },
+    { id: 'r35', name: 'Single dragadiddle', stick: 'RLRRLRLL', acc: [0, 4], drag: [0, 4] },
+    { id: 'r36', name: 'Drag paradiddle #1', stick: 'RRLRRLLRLL', acc: [0, 5], drag: [1, 6] },
+    { id: 'r37', name: 'Drag paradiddle #2', stick: 'RRLRLRLLRLRL', acc: [0, 6], drag: [1, 2, 7, 8] },
+    { id: 'r38', name: 'Single ratamacue', stick: 'RLRL', acc: [3], drag: [0] },
+    { id: 'r39', name: 'Double ratamacue', stick: 'RRLRL', acc: [4], drag: [0, 1] },
+    { id: 'r40', name: 'Triple ratamacue', stick: 'RRRLRL', acc: [5], drag: [0, 1, 2] }
   ];
 
   function rudimentScore(r) {
@@ -104,13 +140,21 @@
     for (var rep = 0; rep < 4; rep++) {
       for (var i = 0; i < stick.length; i++) {
         var accented = r.acc.indexOf(i) !== -1;
-        notes.push({ m: 38, t: t, d: 0.2, v: accented ? 118 : 78, lane: stick[i] === 'R' ? 0 : 1, s: stick[i] });
+        var lane = stick[i] === 'R' ? 0 : 1;
+        // grace strokes: flam = one, drag = two, ~1/16 of a beat ahead, soft
+        var graces = (r.flam && r.flam.indexOf(i) !== -1) ? 1 : (r.drag && r.drag.indexOf(i) !== -1) ? 2 : 0;
+        for (var gi = graces; gi > 0; gi--) {
+          notes.push({ m: 38, t: Math.max(0, t - gi * 0.07), d: 0.08, v: 48, lane: 1 - lane, s: stick[i] === 'R' ? 'l' : 'r', grace: true });
+        }
+        notes.push({ m: 38, t: t, d: 0.2, v: accented ? 118 : 78, lane: lane, s: stick[i] });
         t += 0.5;
       }
     }
     var sc = mkScore(r.name, 'drums', 70, notes, true, 'rudiment');
     sc.rud = r.id;
     sc.stick = stick;
+    sc.hasGrace = !!(r.flam || r.drag);
+    sc.buzz = !!r.buzz;
     return sc;
   }
 
@@ -331,7 +375,9 @@
     var notes = S.mode === 'phrase' ? phraseNotes(S.sc, S.phrase) : S.sc.notes;
     var base = S.mode === 'phrase' ? S.phrase * PHRASE_BEATS : 0;
     S.targets = notes.map(function (n, i) {
-      return { i: i, n: n, at: (n.t - base) * spb(), judged: null, err: 0, sounded: false };
+      // grace strokes render + sound but are never judged (flam quality is
+      // measured from the played stream instead — see report)
+      return { i: i, n: n, at: (n.t - base) * spb(), judged: n.grace ? 'grace' : null, err: 0, sounded: false };
     });
   }
 
@@ -439,16 +485,18 @@
     S.played.push({ m: midi, at: now - S.startT, v: vel });
 
     if (S.mode === 'wait') {
+      while (S.targets[S.waitIdx] && S.targets[S.waitIdx].judged === 'grace') S.waitIdx++;
       var tg = S.targets[S.waitIdx];
       if (!tg) return;
       var wantPc = S.sc.instrument === 'drums' ? true : Theory.mod12(midi) === Theory.mod12(tg.n.m);
       if (wantPc) {
         tg.judged = 'perfect';
+        tg.pv = vel;
         S.counts.perfect++;
         S.combo++; S.maxCombo = Math.max(S.maxCombo, S.combo);
         soundNote(tg.n, ctx.currentTime);
         S.waitIdx++;
-        // advance past simultaneous chord tones already matched
+        while (S.targets[S.waitIdx] && S.targets[S.waitIdx].judged === 'grace') S.waitIdx++;
         if (S.waitIdx >= S.targets.length) endRun(true);
       } else {
         S.combo = 0;
@@ -473,6 +521,7 @@
       var j = Math.abs(ms) <= WIN.perfect ? 'perfect' : Math.abs(ms) <= WIN.great ? 'great' : 'good';
       best.tg.judged = j;
       best.tg.err = ms;
+      best.tg.pv = vel;
       S.judged.push({ t: best.tg.n.t, err: ms, j: j });
       S.counts[j]++;
       S.combo++;
@@ -486,7 +535,7 @@
   }
 
   function accuracy() {
-    var total = S.targets.length;
+    var total = S.targets.filter(function (tg) { return tg.judged !== 'grace'; }).length;
     if (!total) return 0;
     var pts = S.counts.perfect + S.counts.great * 0.8 + S.counts.good * 0.5;
     return Math.round((pts / total) * 100);
@@ -554,11 +603,106 @@
       id: uid('i'), name: 'Shed: ' + S.sc.title.slice(0, 20), ts: Date.now(), source: 'woodshed',
       bpm: Math.round(S.sc.bpm * S.tempoScale), root: App.store.get('fb.root', 0), scale: App.store.get('fb.scale', 'major'),
       dur: Math.round((S.played[S.played.length - 1].at + 0.5) * 10) / 10,
+      misses: S.targets.filter(function (tg) { return tg.judged === 'miss'; })
+        .map(function (tg) { return Math.round(tg.at * 100) / 100; }).slice(0, 60),
       notes: S.played.slice(0, 800).map(function (p) {
         return { m: p.m, v: p.v || 90, t: Math.max(0, Math.round(p.at * 1000) / 1000), d: 0.3 };
       })
     });
     App.store.set('ideas.list', list.slice(-100));
+  }
+
+  // ---------------- audio-in: mic/interface note reading ----------------
+  // Guitar: normalized autocorrelation pitch detection (60-1000 Hz) on the
+  // selected input device with echoCancellation/noiseSuppression/autoGain
+  // OFF (they destroy transients); frames below a clarity threshold are
+  // DISCARDED, never scored as misses. Drums: amplitude-jump onset
+  // detection, pitch-agnostic. Timing windows already absorb detection lag
+  // via the calibration wizard ('audio' source).
+
+  var mic = { on: false, stream: null, timer: null, lastMidi: -1, quiet: true, lastRms: 0, err: '' };
+
+  function micStart() {
+    var pref = App.store.get('audio.inId', null);
+    var cons = {
+      echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1
+    };
+    if (pref) cons.deviceId = { ideal: pref };
+    return navigator.mediaDevices.getUserMedia({ audio: cons }).then(function (stream) {
+      var ctx = App.getAudio();
+      mic.stream = stream;
+      var src = ctx.createMediaStreamSource(stream);
+      var an = ctx.createAnalyser();
+      an.fftSize = 2048;
+      src.connect(an);
+      var buf = new Float32Array(2048);
+      mic.on = true;
+      mic.err = '';
+      mic.timer = setInterval(function () {
+        an.getFloatTimeDomainData(buf);
+        var rms = 0;
+        for (var i = 0; i < buf.length; i++) rms += buf[i] * buf[i];
+        rms = Math.sqrt(rms / buf.length);
+        if (S && S.sc.instrument === 'drums') {
+          // onset: sharp jump over the previous frame
+          if (rms > 0.03 && rms > mic.lastRms * 2.6) {
+            inputNote(38, Math.min(127, Math.round(rms * 600)), 'audio');
+          }
+          mic.lastRms = rms;
+          return;
+        }
+        if (rms < 0.012) { mic.quiet = true; mic.lastMidi = -1; mic.lastRms = rms; return; }
+        var det = detectPitch(buf, ctx.sampleRate);
+        mic.lastRms = rms;
+        if (!det || det.clarity < 0.9) return; // low confidence — discard, don't punish
+        var midi = Math.round(69 + 12 * Math.log2(det.freq / 440));
+        if (midi < 28 || midi > 96) return;
+        if (midi !== mic.lastMidi || mic.quiet) {
+          inputNote(midi, Math.min(127, Math.round(rms * 500) + 40), 'audio');
+          mic.lastMidi = midi;
+          mic.quiet = false;
+        }
+      }, 30);
+      paintMicChip();
+    }).catch(function (e) {
+      mic.err = 'mic unavailable: ' + (e && e.name || e);
+      mic.on = false;
+      paintMicChip();
+    });
+  }
+
+  function micStop() {
+    if (mic.timer) { clearInterval(mic.timer); mic.timer = null; }
+    if (mic.stream) { mic.stream.getTracks().forEach(function (t) { t.stop(); }); mic.stream = null; }
+    mic.on = false;
+    mic.lastMidi = -1;
+    paintMicChip();
+  }
+
+  function detectPitch(buf, sr) {
+    // normalized autocorrelation over guitar-range lags
+    var minLag = Math.floor(sr / 1000), maxLag = Math.floor(sr / 60);
+    var bestLag = -1, bestR = 0;
+    var energy = 0;
+    for (var i = 0; i < buf.length; i++) energy += buf[i] * buf[i];
+    if (energy === 0) return null;
+    for (var lag = minLag; lag <= maxLag; lag++) {
+      var r = 0;
+      for (var j = 0; j + lag < buf.length; j += 2) r += buf[j] * buf[j + lag];
+      r = (2 * r * 2) / energy; // normalize (stride-2 compensation)
+      if (r > bestR) { bestR = r; bestLag = lag; }
+    }
+    if (bestLag < 0) return null;
+    return { freq: sr / bestLag, clarity: Math.min(1, bestR) };
+  }
+
+  function paintMicChip() {
+    var b = document.getElementById('ws-mic');
+    if (!b) return;
+    b.classList.toggle('active', mic.on);
+    b.textContent = mic.on ? '🎤 Listening' : '🎤 Mic';
+    var m = document.getElementById('ws-micmsg');
+    if (m) m.textContent = mic.err;
   }
 
   // ---------------- LUMI lights ----------------
@@ -600,7 +744,7 @@
 
   function noteColor(j) {
     return j === 'perfect' ? '#4cc9b0' : j === 'great' ? '#8bd450' : j === 'good' ? '#ffd166'
-      : j === 'miss' ? '#d9484a' : '#e8e2d6';
+      : j === 'miss' ? '#d9484a' : j === 'grace' ? 'rgba(180,175,165,0.5)' : '#e8e2d6';
   }
 
   function draw() {
@@ -621,6 +765,8 @@
 
     if (S.display === 'highway') drawHighway(g, W, H, now, lo, hi);
     else if (S.display === 'scroll') drawScroll(g, W, H, now, lo, hi);
+    else if (S.display === 'tab') drawTab(g, W, H, now, 0, H);
+    else if (S.display === 'both') { drawSheet(g, W, H * 0.55, now); drawTab(g, W, H, now, H * 0.58, H * 0.42); }
     else drawSheet(g, W, H, now);
 
     if (S.running || S.mode === 'wait') rafId = requestAnimationFrame(draw);
@@ -690,6 +836,45 @@
       g.roundRect(x, y - 6, w, 12, 4);
       g.fill();
       g.globalAlpha = 1;
+    });
+  }
+
+  function tabPos(n) {
+    if (n.str != null) return { s: n.str, f: n.fret };
+    for (var s = 0; s < 6; s++) {
+      var f = n.m - TAB_TUNING[s];
+      if (f >= 0 && f <= 15) return { s: s, f: f };
+    }
+    return { s: 0, f: Math.max(0, n.m - TAB_TUNING[0]) };
+  }
+
+  function drawTab(g, W, H, now, y0, hgt) {
+    var top = y0 + 18, gap = (hgt - 40) / 5;
+    g.strokeStyle = 'rgba(200,195,185,0.4)';
+    g.lineWidth = 1;
+    for (var s = 0; s < 6; s++) {
+      g.beginPath();
+      g.moveTo(20, top + s * gap);
+      g.lineTo(W - 20, top + s * gap);
+      g.stroke();
+    }
+    var hitX = 110, pxPerBeat = 46;
+    g.fillStyle = 'rgba(255,171,71,0.9)';
+    g.fillRect(hitX, top - 8, 2, 5 * gap + 16);
+    S.targets.forEach(function (tg) {
+      var dx = (tg.at - now) / spb() * pxPerBeat;
+      if (dx < -100 || dx > W - 100) return;
+      var p = tabPos(tg.n);
+      g.fillStyle = noteColor(tg.judged);
+      g.font = 'bold 12px sans-serif';
+      g.textAlign = 'center';
+      var y = top + p.s * gap;
+      g.beginPath();
+      g.arc(hitX + dx, y, 8.5, 0, Math.PI * 2);
+      g.fillStyle = 'rgba(19,17,20,0.9)';
+      g.fill();
+      g.fillStyle = noteColor(tg.judged);
+      g.fillText(String(p.f), hitX + dx, y + 4);
     });
   }
 
@@ -897,20 +1082,26 @@
           '</span>' +
           '<span class="row tight">' +
             '<div class="seg" id="ws-disp">' +
-              '<button type="button" data-wsd="highway">Highway</button>' +
-              '<button type="button" data-wsd="scroll">Scroll</button>' +
-              '<button type="button" data-wsd="sheet">Sheet</button></div>' +
+              [['highway', 'Highway'], ['scroll', 'Scroll'], ['sheet', 'Sheet']]
+                .concat(S.sc.instrument === 'guitar' ? [['tab', 'Tab'], ['both', 'Tab+Sheet']] : [])
+                .map(function (d) { return '<button type="button" data-wsd="' + d[0] + '">' + d[1] + '</button>'; }).join('') +
+            '</div>' +
+            (S.sc.instrument !== 'piano'
+              ? '<button type="button" class="chip fb-chip" id="ws-mic" title="Score from your instrument through the mic / audio interface (guitar: pitch detection · drums: onset detection)">🎤 Mic</button>'
+              : '') +
             '<button type="button" class="chip fb-chip' + (S.guide ? ' active' : '') + '" id="ws-guide" title="Play the target notes as a guide">Guide</button>' +
             '<button type="button" class="btn sm primary" id="ws-go">' + App.icon('restart', 14) + ' ' + (S.mode === 'wait' ? 'Start' : 'Count-in') + '</button>' +
           '</span>' +
         '</div>' +
         '<div id="ws-hud" class="row tight" style="margin-top:8px;min-height:26px"></div>' +
+        '<div class="muted small" id="ws-micmsg"></div>' +
         '<canvas id="ws-cv" width="1100" height="360" style="width:100%;background:var(--card2);border:1px solid var(--line);border-radius:10px;margin-top:6px"></canvas>' +
         '<div class="muted small" style="margin-top:8px">Play with your MIDI keys anywhere, the typing keys or touch keys on the Piano page' +
           (S.sc.instrument === 'drums' ? ', or the Pads' : '') + '. Switch the view live — same clock underneath.</div>' +
       '</div>';
     document.getElementById('ws-back').addEventListener('click', function () {
       endRun(false);
+      micStop();
       S = null;
       view = 'lib';
       render();
@@ -929,6 +1120,13 @@
       App.store.set('ws.guide', S.guide);
       this.classList.toggle('active', S.guide);
     });
+    var micBtn = document.getElementById('ws-mic');
+    if (micBtn) {
+      micBtn.addEventListener('click', function () {
+        if (mic.on) micStop(); else micStart();
+      });
+      paintMicChip();
+    }
     els.canvas = document.getElementById('ws-cv');
     paintDispSeg();
     paintHud();
@@ -968,6 +1166,33 @@
         '<div style="height:' + Math.max(6, pAcc * 0.6) + 'px;background:' + (pAcc >= 85 ? '#4cc9b0' : pAcc >= 60 ? '#ffd166' : '#d9484a') + '"></div>' +
         '<span>' + (p + 1) + '</span></div>';
     }
+    // deeper read-outs where the material carries targets
+    var extras = [];
+    var real = S.targets.filter(function (tg) { return tg.judged !== 'grace'; });
+    var withV = real.filter(function (tg) { return tg.pv != null; });
+    if (S.sc.instrument === 'drums' && !S.sc.buzz && withV.length >= 4) {
+      var okAcc = withV.filter(function (tg) { return (tg.n.v >= 110) === (tg.pv >= 105); }).length;
+      extras.push('accent pattern ' + Math.round((okAcc / withV.length) * 100) + '% match');
+    }
+    var distinctV = {};
+    real.forEach(function (tg) { distinctV[tg.n.v] = 1; });
+    if (S.sc.instrument !== 'drums' && Object.keys(distinctV).length > 2 && withV.length >= 4) {
+      var dv = withV.reduce(function (a, tg) { return a + Math.abs(tg.pv - tg.n.v); }, 0) / withV.length;
+      extras.push('dynamics ' + Math.max(0, Math.round(100 - dv)) + '% match to the score');
+    }
+    if (S.sc.hasGrace && S.played.length > 3) {
+      var groups = 0;
+      S.targets.forEach(function (tg, i) {
+        if (tg.judged === 'grace' && (!S.targets[i - 1] || S.targets[i - 1].judged !== 'grace')) groups++;
+      });
+      var pairs = 0;
+      for (var pi = 1; pi < S.played.length; pi++) {
+        var gap = (S.played[pi].at - S.played[pi - 1].at) * 1000;
+        if (gap >= 15 && gap <= 60) pairs++;
+      }
+      if (groups) extras.push('flam/drag grace spacing: ' + Math.min(100, Math.round((pairs / groups) * 100)) + '% landed in the 15–60ms pocket');
+    }
+
     var coach = S.counts.miss > S.targets.length / 3 ? 'Lots of misses — drop to Phrases or Wait mode and rebuild it slowly.'
       : Math.abs(bias) < 12 ? 'Your timing is centered — push the tempo.'
       : bias > 0 ? 'You drag by ~' + bias + 'ms on average — think ahead of the click.'
@@ -981,6 +1206,7 @@
           ' · combo ' + S.maxCombo + ' · strays ' + S.strays + (days > 1 ? ' · 🔥 ' + days + ' days' : '') + '</span>' +
         '</div>' +
         '<div class="muted" style="margin-top:10px">' + coach + '</div>' +
+        (extras.length ? '<div class="muted small" style="margin-top:6px">' + extras.join(' · ') + '</div>' : '') +
         '<div class="row tight" style="margin-top:12px;align-items:flex-end" id="ws-phrases">' + phrasesH + '</div>' +
         '<div class="row" style="margin-top:14px">' +
           '<button type="button" class="btn primary" id="ws-again">' + App.icon('restart', 14) + ' Again</button>' +
@@ -1122,6 +1348,7 @@
     get session() { return S; },
     get view() { return view; },
     get cal() { return cal; },
+    get mic() { return mic; },
     importMidi: importMidi,
     importAscii: importAscii
   };
@@ -1129,7 +1356,7 @@
   App.register('shed', {
     init: init,
     onShow: function () { if (view === 'lib') renderLib(); },
-    onHide: function () { if (S) endRun(false); lightsOff(); },
+    onHide: function () { if (S) endRun(false); micStop(); lightsOff(); },
     onKey: function (e) {
       if (view !== 'session' || !S) return;
       // QWERTY drumming/tapping: Z/X = L/R pads in the shed (drums), any-key tap for cal

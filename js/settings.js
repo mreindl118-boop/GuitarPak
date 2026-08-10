@@ -131,6 +131,17 @@
         '</label>' +
       '</div>' +
       '<div class="card">' +
+        '<h2>Audio devices</h2>' +
+        '<div class="muted small">Pick which interface soundLAB listens to (Woodshed mic scoring, future recording) and plays out of. ' +
+          'A Line&nbsp;6 Helix / Stadium is auto-detected by name. Devices are re-checked on plug/unplug.</div>' +
+        '<div class="row" style="margin-top:12px" id="set-audio-row">' +
+          '<button type="button" class="btn sm primary" id="set-audio-enable">List devices</button>' +
+          '<label class="field" style="display:none">Input<select id="set-audio-in"></select></label>' +
+          '<label class="field" style="display:none">Output<select id="set-audio-out"></select></label>' +
+          '<span class="muted small" id="set-audio-msg"></span>' +
+        '</div>' +
+      '</div>' +
+      '<div class="card">' +
         '<h2>Plugins</h2>' +
         '<div class="muted small">Extend soundLAB with your own JavaScript: plugins can add pages, Studio effects and synth voices ' +
           '(see <b>PLUGINS.md</b> in the GitHub repo for the API and a sample). Plugins run with full access to the app — ' +
@@ -216,6 +227,69 @@
       App.store.set('app.keepAwake', !!this.checked);
       App.wake.reapply();
     });
+
+    // ---- audio devices ----
+    var audMsg = document.getElementById('set-audio-msg');
+    var audIn = document.getElementById('set-audio-in');
+    var audOut = document.getElementById('set-audio-out');
+
+    function fillDevices(devs) {
+      var ins = devs.filter(function (d) { return d.kind === 'audioinput'; });
+      var outs = devs.filter(function (d) { return d.kind === 'audiooutput'; });
+      function fill(sel, list, storeKey) {
+        var cur = App.store.get(storeKey, '');
+        sel.innerHTML = '<option value="">System default</option>' + list.map(function (d) {
+          return '<option value="' + d.deviceId + '"' + (d.deviceId === cur ? ' selected' : '') + '>' +
+            (d.label || d.kind).replace(/</g, '&lt;').slice(0, 48) + '</option>';
+        }).join('');
+        sel.parentElement.style.display = '';
+        if (cur && !list.some(function (d) { return d.deviceId === cur; })) {
+          App.store.set(storeKey, '');
+          sel.value = '';
+          audMsg.textContent = 'a selected device went away — fell back to the system default';
+        }
+      }
+      fill(audIn, ins, 'audio.inId');
+      fill(audOut, outs, 'audio.outId');
+      var helix = devs.filter(function (d) { return /helix|stadium|line 6/i.test(d.label || ''); })[0];
+      if (helix && !App.store.get('audio.inId', '')) {
+        audMsg.textContent = 'Helix detected: “' + helix.label.slice(0, 40) + '” — selected as input.';
+        if (helix.kind === 'audioinput') { App.store.set('audio.inId', helix.deviceId); audIn.value = helix.deviceId; }
+      }
+      document.getElementById('set-audio-enable').style.display = 'none';
+    }
+
+    function listDevices(withPoke) {
+      var p = withPoke && navigator.mediaDevices.getUserMedia
+        ? navigator.mediaDevices.getUserMedia({ audio: true }).then(function (s) {
+            s.getTracks().forEach(function (t) { t.stop(); });
+          }).catch(function () { /* labels stay generic without permission */ })
+        : Promise.resolve();
+      p.then(function () { return navigator.mediaDevices.enumerateDevices(); })
+        .then(fillDevices)
+        .catch(function () { audMsg.textContent = 'device listing unavailable here'; });
+    }
+
+    document.getElementById('set-audio-enable').addEventListener('click', function () { listDevices(true); });
+    audIn.addEventListener('change', function () { App.store.set('audio.inId', this.value); });
+    audOut.addEventListener('change', function () {
+      App.store.set('audio.outId', this.value);
+      try {
+        var ctx = App.getAudio();
+        if (typeof ctx.setSinkId === 'function') {
+          ctx.setSinkId(this.value || '').then(function () { audMsg.textContent = 'output switched'; })
+            .catch(function () { audMsg.textContent = 'output switch refused — using default'; });
+        } else {
+          audMsg.textContent = 'this browser cannot route output per-app — using default';
+        }
+      } catch (e) { /* no audio yet */ }
+    });
+    if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
+      navigator.mediaDevices.addEventListener('devicechange', function () {
+        if (document.getElementById('set-audio-in') &&
+            document.getElementById('set-audio-enable').style.display === 'none') listDevices(false);
+      });
+    }
 
     // ---- plugins ----
     var plugMsg = document.getElementById('set-plugin-msg');

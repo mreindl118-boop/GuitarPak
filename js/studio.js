@@ -277,6 +277,7 @@
           esc(keyName(it.root, it.scale)) + ' · ' + it.bpm + ' BPM · ' +
           it.notes.length + ' notes · ' + it.dur + 's · ' + fmtWhen(it.ts) +
           (it.source === 'retro' ? ' · retro-captured' : '') +
+          (it.misses && it.misses.length ? ' · <span style="color:#d9484a">' + it.misses.length + ' misses marked</span>' : '') +
         '</div></div>';
     }
     els.list.innerHTML = h;
