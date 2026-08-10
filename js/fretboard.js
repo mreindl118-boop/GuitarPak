@@ -394,7 +394,8 @@
       var jy = rowY(r);
       for (f = 0; f <= N; f++) {
         s.push('<circle class="fb-jam-ring" data-pc="' + Theory.mod12(tun.midi[js] + f) +
-          '" cx="' + fx(colCX(f)) + '" cy="' + jy + '" r="15" fill="none" ' +
+          '" data-midi="' + (tun.midi[js] + f) + '" cx="' + fx(colCX(f)) + '" cy="' + jy +
+          '" r="15" fill="none" ' +
           'stroke="rgba(255,255,255,0.85)" stroke-width="2.5" pointer-events="none"/>');
       }
     }
@@ -423,6 +424,22 @@
     els.scroll.scrollLeft = keepX;
     els.scroll.scrollTop = keepY;
     if (jamLast) jamPaint(jamLast); // fresh svg — reapply the live chord overlay
+    midiPaint();                     // …and any held MIDI notes
+  }
+
+  // ---------------- MIDI note echo (played keys light the board) ----------------
+  // Every position matching a held MIDI note glows amber — the LUMI / any
+  // keyboard is visually reflected on the neck, exact pitch, all strings.
+
+  var midiHeld = {};
+
+  function midiPaint() {
+    var svg = document.getElementById('fb-svg');
+    if (!svg) return;
+    var rings = svg.querySelectorAll('.fb-jam-ring');
+    for (var i = 0; i < rings.length; i++) {
+      rings[i].classList.toggle('midi', !!midiHeld[rings[i].getAttribute('data-midi')]);
+    }
   }
 
   // ---------------- jam follow (scale-over-chord visualization) ----------------
@@ -1602,6 +1619,8 @@
       '.fb-jam-ring{opacity:0;transition:opacity 0.28s ease,stroke 0.28s ease}' +
       '.fb-jam-ring.on{opacity:0.92}' +
       '.fb-jam-ring.root{stroke:var(--accent);stroke-width:3.5}' +
+      '.fb-jam-ring.midi{opacity:0.95;stroke:var(--accent);stroke-width:4;' +
+        'filter:drop-shadow(0 0 5px var(--accent-glow,rgba(255,171,71,0.6)))}' +
       '.fb-settings{display:none;position:absolute;z-index:6;top:52px;left:10px;right:10px;max-width:760px;' +
         'margin:0 auto;background:var(--card);border:1px solid var(--line);' +
         'border-radius:12px;padding:16px 18px;box-shadow:0 18px 50px rgba(0,0,0,0.55);' +
@@ -1860,6 +1879,16 @@
       jamLast = ev;
       jamPaint(ev);
       if (autoMode) jamApplySuggestion(ev);
+    });
+    App.on('midi:note', function (d) {
+      if (!d) return;
+      if (d.on) midiHeld[d.midi] = true; else delete midiHeld[d.midi];
+      midiPaint();
+    });
+    App.on('note:input', function (d) { // on-screen piano / QWERTY too
+      if (!d) return;
+      if (d.on) midiHeld[d.midi] = true; else delete midiHeld[d.midi];
+      midiPaint();
     });
     App.on('jam:stopped', function () {
       jamLast = null;

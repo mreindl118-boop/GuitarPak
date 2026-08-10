@@ -1,5 +1,5 @@
 {
-  "version": "0.58.0",
+  "version": "0.59.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/soundLAB-alpha.apk",
-  "notes": "Branding catch-up on every install surface. The Android download is now soundLAB-alpha.apk (updates keep working — your installed app reads this feed; the old filename stays as a copy for one release). The Windows installer now stamps the real soundLAB icon on the Desktop and Start Menu shortcuts instead of the browser's logo (re-run the installer to pick it up). The iOS wrapper finally has its app icon — the three-keys-on-amber mark — wired into the Xcode project for the next Mac build."
+  "notes": "KEY COLORS, EVERYWHERE YOU LOOK. The Piano now paints the WHOLE KEY in its degree color (black keys shaded darker, root outlined white) instead of small dots, and pressed keys pop with a bright white-outlined flash — from touch, QWERTY and MIDI hardware alike. Playing your MIDI keyboard now lights the matching positions on the FRETBOARD too (amber glow rings, exact pitch, every string). LUMI color sync got diagnostics: a 'Push to LUMI now' button plus a SysEx status line — if the browser's SysEx permission was declined the colors silently never reached the keyboard; the status now tells you and how to fix it. LATENCY: the audio engine explicitly requests low-latency mode and Settings > Sound shows a live breakdown (engine + output device) — if you see 150-500 ms, it's almost always Bluetooth audio OUT; use wired sound for live playing (Bluetooth MIDI IN is fine)."
 }

@@ -65,6 +65,16 @@
   // a palette customized in the fretboard settings recolors this page too
   var DEG_DEFAULTS = ['#ffab47', '#e8d44d', '#7ad97a', '#4cc9b0', '#6ea8fe', '#b48ef0', '#ff85b3'];
 
+  function mixHex(a, b, t) { // blend a toward b by t (0..1)
+    var pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
+    var c = 0;
+    for (var sh = 16; sh >= 0; sh -= 8) {
+      var v = Math.round(((pa >> sh) & 0xff) * (1 - t) + ((pb >> sh) & 0xff) * t);
+      c |= v << sh;
+    }
+    return '#' + ('00000' + c.toString(16)).slice(-6);
+  }
+
   function degColors() {
     var cols = App.store.get('fb.colors', null);
     return (Array.isArray(cols) && cols.length === 7 &&
@@ -331,12 +341,27 @@
       var step = info.pcToStep.get(pc);
       var inScale = step !== undefined;
       var isRoot = pc === Theory.mod12(root);
+      var outWin = mwin && (midi < mwin[0] || midi > mwin[1]);
+      // FULL-KEY degree color: in-scale keys are painted with their degree
+      // color edge to edge (white keys bright, black keys shaded darker so
+      // the two key heights still read); out-of-scale stays ivory/ebony.
+      // Inline style beats the class fill; the pressed state uses filter +
+      // stroke (with !important) so it stays visible over any color.
+      var keyStyle = '';
+      if (inScale) {
+        var kc = cols[step % 7];
+        var fillC = isWhite
+          ? (outWin ? mixHex(kc, '#f7f3ea', 0.55) : kc)
+          : (outWin ? mixHex(kc, '#221d20', 0.72) : mixHex(kc, '#221d20', 0.35));
+        keyStyle = ' style="fill:' + fillC +
+          (isRoot ? ';stroke:#ffffff;stroke-width:2.5' : '') + '"';
+      }
       var x, cx, cy;
       if (isWhite) {
         x = whiteIndex(midi) * W;
         totalW = Math.max(totalW, x + W);
         whites += '<rect class="pn-key pn-w" data-midi="' + midi + '" data-pc="' + pc + '" x="' + x +
-          '" y="0" width="' + W + '" height="' + H + '" rx="4"/>';
+          '" y="0" width="' + W + '" height="' + H + '" rx="4"' + keyStyle + '/>';
         cx = x + W / 2; cy = H - 26;
         if (pc === 0) { // octave marker under every C
           labels += '<text class="pn-oct" x="' + cx + '" y="' + (H + 16) + '" text-anchor="middle">C' +
@@ -345,7 +370,7 @@
       } else {
         x = whiteIndex(midi) * W - BW / 2;
         blacks += '<rect class="pn-key pn-b" data-midi="' + midi + '" data-pc="' + pc + '" x="' + x +
-          '" y="0" width="' + BW + '" height="' + BH + '" rx="3"/>';
+          '" y="0" width="' + BW + '" height="' + BH + '" rx="3"' + keyStyle + '/>';
         cx = x + BW / 2; cy = BH - 18;
       }
       // QWERTY hints: the computer key that plays this piano key right now
@@ -367,15 +392,12 @@
           '" y="' + (cy - 17) + '" text-anchor="middle">' + fingerMap[midi] + '</text>';
       }
       if (inScale) {
-        var col = cols[step % 7];
-        // mode dimming hits the dot + label only — jam rings stay full so a
-        // sounding chord reads clearly across the whole keyboard
-        var dim = mwin && (midi < mwin[0] || midi > mwin[1]) ? ' opacity="0.5"' : '';
+        // the KEY is the color now — the old degree dot is gone; the label
+        // sits straight on the painted key, contrast-picked per key type
         dots += '<g class="pn-dotg" data-midi="' + midi + '" data-pc="' + pc + '" data-cx="' + cx + '" data-cy="' + cy + '">' +
           '<circle class="pn-jamring" data-pc="' + pc + '" cx="' + cx + '" cy="' + cy + '" r="15.5" fill="none"/>' +
-          '<circle cx="' + cx + '" cy="' + cy + '" r="11.5" fill="' + col + '"' +
-          (isRoot ? ' stroke="#ffffff" stroke-width="2"' : '') + dim + '/>' +
-          '<text class="pn-dott" x="' + cx + '" y="' + (cy + 3.5) + '" text-anchor="middle"' + dim + '>' +
+          '<text class="pn-dott" x="' + cx + '" y="' + (cy + 3.5) + '" text-anchor="middle"' +
+          (isWhite ? '' : ' fill="#f2ede4"') + '>' +
           keyLabel(midi, info, pf) + '</text></g>';
       }
     }
@@ -828,10 +850,13 @@
       // ivory + ebony in both themes — this is the instrument, not chrome
       '.pn-w{fill:#f7f3ea;stroke:#b9b0a2;stroke-width:1}' +
       '.pn-b{fill:#221d20;stroke:#000;stroke-width:1}' +
-      // pressed keys light AMBER, unmistakably — held for the length of the
-      // press, from screen taps, QWERTY and MIDI alike
+      // pressed keys are UNMISTAKABLE — white outline + brightness pop works
+      // over any fill (degree-colored keys use inline styles, so the effect
+      // must not rely on fill alone); plain keys also flash amber
       '.pn-w.pn-down{fill:#ffce7d;stroke:#e8912a}' +
       '.pn-b.pn-down{fill:#b9791f;stroke:#e8912a}' +
+      '.pn-key.pn-down{filter:brightness(1.45) saturate(1.15) drop-shadow(0 0 6px rgba(255,255,255,0.7));' +
+        'stroke:#ffffff !important;stroke-width:3 !important}' +
       '.pn-dotg{pointer-events:none}' +
       '.pn-dott{font:700 11px var(--font-body);fill:#1c1206}' +
       '.pn-oct{font:600 11px var(--font-body);fill:var(--muted)}' +
