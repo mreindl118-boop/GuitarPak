@@ -464,6 +464,26 @@
     });
   }
 
+  function loadSampleFile(t, f) {
+    var rd = new FileReader();
+    rd.onload = function () {
+      var bytes = rd.result;
+      idbPut(t.id, bytes.slice(0)).catch(function () { /* idb unavailable — session-only */ });
+      App.getAudio().decodeAudioData(bytes, function (buf) {
+        DAW.samples[t.id] = buf;
+        t.sampler.name = f.name.replace(/\.[^.]+$/, '').slice(0, 24);
+        saveTracks();
+        DAW.engine.rebuildChannel(t.id);
+        renderTracks();
+        renderEditor2();
+      }, function () {
+        var el = document.getElementById('st-sinfo');
+        if (el) el.textContent = 'could not decode that file — try a WAV/MP3/OGG';
+      });
+    };
+    rd.readAsArrayBuffer(f);
+  }
+
   function loadSampleBuffers() {
     tracksList().forEach(function (t) {
       if (t.kind !== 'sampler' || DAW.samples[t.id]) return;
@@ -502,6 +522,7 @@
         : t.kind === 'sampler' ? (t.sampler.name || 'no sample')
         : ({ saw: 'Super saw', pad: 'Warm pad', keys: 'Soft keys', bass: 'Round bass' }[t.voice] || t.voice);
       h += '<div class="st-row' + (t.id === trk.sel ? ' st-sel' : '') + '" data-st="' + t.id + '">' +
+        '<span class="st-drag" data-stdrag="' + t.id + '" title="Drag to reorder">' + App.icon('updown', 13) + '</span>' +
         '<button type="button" class="chip fb-chip st-arm' + (armed === t.id ? ' active' : '') + '" data-starm="' + t.id + '" ' +
           'title="Arm: your MIDI/typing keys play this track&rsquo;s instrument">Live</button>' +
         '<input class="sd-name" data-stname="' + t.id + '" value="' + esc(t.name) + '" aria-label="Track name">' +
@@ -647,15 +668,40 @@
     });
 
     if (t.kind === 'drums') {
-      document.getElementById('st-steps').addEventListener('click', function (e) {
-        var b = e.target.closest('.st-cell');
-        if (!b) return;
+      // FL-style painting: press a cell to toggle it, keep dragging to paint
+      // the same state across cells (works with touch, mouse and pen)
+      var grid = document.getElementById('st-steps');
+      var paint = null;
+
+      function applyCell(b) {
         var lane = parseInt(b.getAttribute('data-lane'), 10);
         var s = parseInt(b.getAttribute('data-step'), 10);
-        t.steps[lane][s] = t.steps[lane][s] ? 0 : 1;
-        b.classList.toggle('on', !!t.steps[lane][s]);
-        saveTracks();
+        if (t.steps[lane][s] === paint) return;
+        t.steps[lane][s] = paint;
+        b.classList.toggle('on', !!paint);
+      }
+
+      grid.addEventListener('pointerdown', function (e) {
+        var b = e.target.closest('.st-cell');
+        if (!b) return;
+        e.preventDefault();
+        paint = t.steps[parseInt(b.getAttribute('data-lane'), 10)][parseInt(b.getAttribute('data-step'), 10)] ? 0 : 1;
+        applyCell(b);
+        try { grid.setPointerCapture(e.pointerId); } catch (err) { /* synthetic */ }
       });
+      grid.addEventListener('pointermove', function (e) {
+        if (paint === null) return;
+        var el = document.elementFromPoint(e.clientX, e.clientY);
+        var b = el && el.closest ? el.closest('.st-cell') : null;
+        if (b && grid.contains(b)) applyCell(b);
+      });
+      function endPaint() {
+        if (paint === null) return;
+        paint = null;
+        saveTracks();
+      }
+      grid.addEventListener('pointerup', endPaint);
+      grid.addEventListener('pointercancel', endPaint);
       return;
     }
 
@@ -680,23 +726,7 @@
       document.getElementById('st-file').addEventListener('change', function () {
         var f = this.files && this.files[0];
         if (!f) return;
-        var rd = new FileReader();
-        rd.onload = function () {
-          var bytes = rd.result;
-          idbPut(t.id, bytes.slice(0)).catch(function () { /* idb unavailable — session-only */ });
-          App.getAudio().decodeAudioData(bytes, function (buf) {
-            DAW.samples[t.id] = buf;
-            t.sampler.name = f.name.replace(/\.[^.]+$/, '').slice(0, 24);
-            saveTracks();
-            DAW.engine.rebuildChannel(t.id);
-            renderTracks();
-            renderEditor2();
-          }, function () {
-            var el = document.getElementById('st-sinfo');
-            if (el) el.textContent = 'could not decode that file — try a WAV/MP3/OGG';
-          });
-        };
-        rd.readAsArrayBuffer(f);
+        loadSampleFile(t, f);
       });
       document.getElementById('st-root').addEventListener('change', function () {
         t.sampler.rootNote = parseInt(this.value, 10);
@@ -723,25 +753,20 @@
       saveTracks();
       drawRoll(t);
     });
-    document.getElementById('st-roll').addEventListener('click', function (e) {
-      var note = e.target.closest('.st-note');
-      if (note) {
-        t.notes.splice(parseInt(note.getAttribute('data-ni'), 10), 1);
-        saveTracks();
-        drawRoll(t);
-        return;
-      }
-      var rect = this.getBoundingClientRect();
-      var x = e.clientX - rect.left - 46;
-      var y = e.clientY - rect.top;
-      if (x < 0) return;
-      var col = Math.floor(x / 22);
-      var m = ROLL_HI - Math.floor(y / 14);
-      if (col < 0 || col >= stepCols() || m < ROLL_LO || m > ROLL_HI) return;
-      t.notes.push({ m: m, v: 100, t: col * 0.25, d: trk.noteLen * 0.25 });
-      saveTracks();
-      drawRoll(t);
-      // audition
+
+    // FL-style piano roll: press empty = draw a note and keep dragging it;
+    // drag a note = move (snaps to 1/16 and semitones); drag its right edge =
+    // resize; plain tap on a note = delete; RIGHT button erases (drag to
+    // sweep-erase). Pointer events so mouse, pen and touch all behave.
+    var svg = document.getElementById('st-roll');
+    var rollDrag = null;
+
+    function rollPos(e) {
+      var r = svg.getBoundingClientRect();
+      return { x: e.clientX - r.left, y: e.clientY - r.top };
+    }
+
+    function audition(m) {
       try {
         var c = DAW.engine.liveChannel(t.id);
         if (c) {
@@ -750,7 +775,92 @@
           c.instrument.noteOff(m, ctx.currentTime + 0.3, 0);
         }
       } catch (err) { /* audio unavailable */ }
+    }
+
+    svg.parentElement.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+    svg.addEventListener('pointerdown', function (e) {
+      var pt = rollPos(e);
+      var noteEl = e.target.closest ? e.target.closest('.st-note') : null;
+      try { svg.setPointerCapture(e.pointerId); } catch (err) { /* synthetic */ }
+      e.preventDefault();
+      if (e.button === 2) { // right button: erase (and sweep)
+        if (noteEl) {
+          t.notes.splice(parseInt(noteEl.getAttribute('data-ni'), 10), 1);
+          saveTracks();
+          drawRoll(t);
+        }
+        rollDrag = { mode: 'erase' };
+        return;
+      }
+      if (noteEl) {
+        var i = parseInt(noteEl.getAttribute('data-ni'), 10);
+        var n = t.notes[i];
+        var rightEdge = 46 + (n.t + n.d) * 4 * 22;
+        rollDrag = {
+          mode: pt.x > rightEdge - 9 ? 'resize' : 'move',
+          i: i, x: pt.x, y: pt.y,
+          o: { m: n.m, t: n.t, d: n.d },
+          moved: false, created: false
+        };
+        return;
+      }
+      var x = pt.x - 46;
+      if (x < 0) return;
+      var col = Math.floor(x / 22);
+      var m = ROLL_HI - Math.floor(pt.y / 14);
+      if (col < 0 || col >= stepCols() || m < ROLL_LO || m > ROLL_HI) return;
+      var note = { m: m, v: 100, t: col * 0.25, d: trk.noteLen * 0.25 };
+      t.notes.push(note);
+      rollDrag = {
+        mode: 'move', i: t.notes.length - 1, x: pt.x, y: pt.y,
+        o: { m: note.m, t: note.t, d: note.d },
+        moved: false, created: true
+      };
+      drawRoll(t);
+      audition(m);
     });
+    svg.addEventListener('pointermove', function (e) {
+      if (!rollDrag) return;
+      if (rollDrag.mode === 'erase') {
+        var el = document.elementFromPoint(e.clientX, e.clientY);
+        var ne = el && el.closest ? el.closest('.st-note') : null;
+        if (ne && ne.ownerSVGElement === svg) {
+          t.notes.splice(parseInt(ne.getAttribute('data-ni'), 10), 1);
+          drawRoll(t);
+        }
+        return;
+      }
+      var n = t.notes[rollDrag.i];
+      if (!n) return;
+      var pt = rollPos(e);
+      var dcol = Math.round((pt.x - rollDrag.x) / 22);
+      var drow = Math.round((pt.y - rollDrag.y) / 14);
+      if (dcol || drow) rollDrag.moved = true;
+      if (rollDrag.mode === 'resize') {
+        var nd = Math.max(0.25, Math.min(stepCols() * 0.25 - rollDrag.o.t, rollDrag.o.d + dcol * 0.25));
+        if (nd !== n.d) { n.d = nd; drawRoll(t); }
+      } else {
+        var nt = Math.max(0, Math.min(stepCols() * 0.25 - n.d, rollDrag.o.t + dcol * 0.25));
+        var nm = Math.max(ROLL_LO, Math.min(ROLL_HI, rollDrag.o.m - drow));
+        if (nt !== n.t || nm !== n.m) {
+          var pitchChanged = nm !== n.m;
+          n.t = nt; n.m = nm;
+          drawRoll(t);
+          if (pitchChanged) audition(nm);
+        }
+      }
+    });
+    function rollUp() {
+      if (!rollDrag) return;
+      if (rollDrag.mode !== 'erase' && !rollDrag.moved && !rollDrag.created) {
+        t.notes.splice(rollDrag.i, 1); // plain tap on a note = delete
+        drawRoll(t);
+      }
+      saveTracks();
+      rollDrag = null;
+    }
+    svg.addEventListener('pointerup', rollUp);
+    svg.addEventListener('pointercancel', rollUp);
   }
 
   function ideaToTrack(idea) {
@@ -877,6 +987,74 @@
       if (trk.sel === t.id) renderEditor2();
     });
 
+    // drag the ⇅ handle to reorder tracks
+    var rowDrag = null;
+    tels.list.addEventListener('pointerdown', function (e) {
+      var hd = e.target.closest('[data-stdrag]');
+      if (!hd) return;
+      e.preventDefault();
+      var row = hd.closest('.st-row');
+      rowDrag = { id: hd.getAttribute('data-stdrag'), row: row, target: null };
+      row.classList.add('st-dragging');
+      try { tels.list.setPointerCapture(e.pointerId); } catch (err) { /* synthetic */ }
+    });
+    tels.list.addEventListener('pointermove', function (e) {
+      if (!rowDrag) return;
+      var el = document.elementFromPoint(e.clientX, e.clientY);
+      var over = el && el.closest ? el.closest('.st-row') : null;
+      tels.list.querySelectorAll('.st-dropmark').forEach(function (r) { r.classList.remove('st-dropmark'); });
+      if (over && over !== rowDrag.row && tels.list.contains(over)) {
+        over.classList.add('st-dropmark');
+        rowDrag.target = over.getAttribute('data-st');
+      } else {
+        rowDrag.target = null;
+      }
+    });
+    function endRowDrag() {
+      if (!rowDrag) return;
+      var fromId = rowDrag.id, toId = rowDrag.target;
+      rowDrag.row.classList.remove('st-dragging');
+      tels.list.querySelectorAll('.st-dropmark').forEach(function (r) { r.classList.remove('st-dropmark'); });
+      rowDrag = null;
+      if (toId && toId !== fromId) {
+        var arr = tracksList();
+        var fi = arr.findIndex(function (x) { return x.id === fromId; });
+        var moved = arr.splice(fi, 1)[0];
+        var ti = arr.findIndex(function (x) { return x.id === toId; });
+        arr.splice(ti, 0, moved);
+        saveTracks();
+        renderTracks();
+      }
+    }
+    tels.list.addEventListener('pointerup', endRowDrag);
+    tels.list.addEventListener('pointercancel', endRowDrag);
+
+    // FL-style: drop an audio file anywhere on the page -> a sampler plays it
+    // (drop onto an existing sampler row to swap ITS sample instead)
+    var panel = document.getElementById('panel-tracks');
+    panel.addEventListener('dragover', function (e) {
+      if (e.dataTransfer && Array.prototype.some.call(e.dataTransfer.items || [], function (i) { return i.kind === 'file'; })) {
+        e.preventDefault();
+        panel.classList.add('st-dropzone');
+      }
+    });
+    panel.addEventListener('dragleave', function (e) {
+      if (e.target === panel) panel.classList.remove('st-dropzone');
+    });
+    panel.addEventListener('drop', function (e) {
+      panel.classList.remove('st-dropzone');
+      var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if (!f) return;
+      e.preventDefault();
+      var overRow = e.target.closest ? e.target.closest('.st-row') : null;
+      var target = overRow && trackById(overRow.getAttribute('data-st'));
+      var t = (target && target.kind === 'sampler') ? target : newTrack('sampler');
+      trk.sel = t.id;
+      loadSampleFile(t, f);
+      renderTracks();
+      renderEditor2();
+    });
+
     App.on('st:state', renderTransport);
     App.on('st:step', function (d) {
       // playhead over the roll + step grid
@@ -989,7 +1167,13 @@
       '.st-cell.on{background:var(--accent);border-color:var(--accent)}' +
       '.st-cell.st-now{outline:2px solid rgba(255,255,255,0.5);outline-offset:-2px}' +
       '.st-rollwrap{overflow-x:auto;background:var(--card2);border:1px solid var(--line);border-radius:10px}' +
-      '.st-note{cursor:pointer}'
+      '.st-note{cursor:grab}' +
+      '#st-roll{touch-action:none}' +
+      '.st-cell{touch-action:none}' +
+      '.st-drag{cursor:grab;color:var(--muted);display:inline-flex;padding:4px 2px;touch-action:none}' +
+      '.st-row.st-dragging{opacity:0.45}' +
+      '.st-row.st-dropmark{box-shadow:0 -2px 0 var(--accent)}' +
+      '#panel-tracks.st-dropzone .card:first-child{outline:2px dashed var(--accent);outline-offset:-2px}'
     );
 
     // capture inputs: hardware MIDI (anywhere) + on-screen/QWERTY piano notes.

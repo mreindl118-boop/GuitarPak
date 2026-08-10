@@ -134,6 +134,13 @@ version.json      auto-update feed (source of truth for latest version)
   exercise engine (path/sequence math) lives in theory.js as
   Theory.exercisePath / Theory.exerciseSeq / Theory.pickDirs (pick strokes:
   alt | eco | down | up), shared by fretboard and tab.
+- Drag interactions are POINTER-EVENT based (no HTML5 dnd except the file
+  drop): piano roll draw/move/resize/right-erase, step-grid painting, track
+  row reorder (.st-drag handle), jam palette->section + chord reorder (ghost
+  chip, click suppressed after a real drag). Synthetic-event friendly: every
+  setPointerCapture is try/caught; hit-testing via elementFromPoint. Audio
+  file drop on #panel-tracks -> sampler (loadSampleFile shared with the
+  file input).
 - Audio schedulers (metronome/practice/jam): 25 ms setInterval + lookahead on
   the AudioContext clock, with a catch-up guard (`if nextT < currentTime →
   jump forward`) so stalls never schedule past-dated (silent) notes. Keep this
