@@ -244,12 +244,12 @@
     if (sel.value !== pnVoice) { sel.value = 'piano'; pnVoice = 'piano'; } // preset gone
   }
 
-  function noteOn(midi, vel, chan) {
+  function noteOnRaw(midi, vel, chan, when) {
     var ctx;
     try { ctx = App.getAudio(); } catch (e) { return; }
     var syn = synthVoice();
     if (syn) {
-      syn.noteOn(midi, vel || 100, ctx.currentTime, chan || 0);
+      syn.noteOn(midi, vel || 100, when || ctx.currentTime, chan || 0);
       heldSynth[(chan || 0) + '-' + midi] = true;
       return;
     }
@@ -261,8 +261,8 @@
       var d = Math.abs(midi - m);
       if (d < bd) { bd = d; best = Number(m); }
     }
-    if (best === null) { App.pluckSynth(midi, 0, 1.2, gain * 0.8); return; }
-    var t = ctx.currentTime;
+    if (best === null) { App.pluckSynth(midi, when ? Math.max(0, when - ctx.currentTime) : 0, 1.2, gain * 0.8); return; }
+    var t = when || ctx.currentTime;
     var src = ctx.createBufferSource();
     src.buffer = pb.bank[best];
     var base = Math.pow(2, (midi - best) / 12);
@@ -274,15 +274,15 @@
     g.connect(ctx.destination);
     src.start(t);
     var key = chan + '-' + midi;
-    if (heldVoices[key]) noteOff(midi, chan); // retrigger
+    if (heldVoices[key]) noteOffRaw(midi, chan); // retrigger
     heldVoices[key] = { src: src, g: g, base: base, gain: gain, chan: chan };
   }
 
-  function noteOff(midi, chan) {
+  function noteOffRaw(midi, chan, when) {
     var key = (chan || 0) + '-' + midi;
     if (heldSynth[key]) {
       delete heldSynth[key];
-      if (pnSyn) { try { pnSyn.noteOff(midi, App.getAudio().currentTime, chan || 0); } catch (e) { /* ok */ } }
+      if (pnSyn) { try { pnSyn.noteOff(midi, when || App.getAudio().currentTime, chan || 0); } catch (e) { /* ok */ } }
       return;
     }
     key = chan + '-' + midi;
@@ -290,13 +290,149 @@
     if (!v) return;
     delete heldVoices[key];
     try {
-      var t = App.getAudio().currentTime;
+      var t = when || App.getAudio().currentTime;
       v.g.gain.cancelScheduledValues(t);
       v.g.gain.setValueAtTime(Math.max(0.0001, v.g.gain.value), t);
       v.g.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
       v.src.stop(t + 0.35);
     } catch (e) { /* context gone */ }
   }
+
+  // ---------------- PERFORM: smart chords + arpeggiator ----------------
+  // ROLI-Studio-Player-style performance layer over ANY voice (grand or the
+  // MPE synth): in-scale keys can trigger full diatonic chords (stacked in
+  // scale steps, so it works in every 5/6/7-note scale) with strum + bass,
+  // and held notes can run through a clocked arpeggiator (shared met.bpm).
+  // noteOn/noteOff below are the ROUTER — every input path (touch, QWERTY,
+  // MIDI) already calls them.
+
+  var perf = { chords: 'off', bass: false, strum: 0, arp: false, rate: 4, dir: 'up', oct: 1, hold: false };
+  var perfHeld = {};
+
+  function chordFor(midi) {
+    if (perf.chords === 'off') return [midi];
+    var info = Theory.scaleInfo(curRoot(), curScale());
+    var n = info.pcs.length;
+    var step = info.pcToStep.get(Theory.mod12(midi));
+    if (step === undefined) return [midi]; // out of scale: plain note
+    var rootPc = Theory.mod12(curRoot());
+    var sr = info.pcs.map(function (pc) { return Theory.mod12(pc - rootPc); });
+    var picks = perf.chords === '7th' ? [0, 2, 4, 6] : [0, 2, 4];
+    var notes = picks.map(function (k) {
+      var st = step + k;
+      return midi + (sr[st % n] + 12 * Math.floor(st / n)) - sr[step];
+    });
+    if (perf.bass) notes.unshift(midi - 12);
+    return notes;
+  }
+
+  // ---- arp engine: 25ms interval + audio-clock lookahead + stall guard ----
+  var arp = { held: [], timer: null, nextT: 0, idx: 0 };
+
+  function arpPool() {
+    var out = [], seen = {};
+    arp.held.forEach(function (h) {
+      h.notes.forEach(function (m) {
+        if (!seen[m]) { seen[m] = 1; out.push({ m: m, vel: h.vel, chan: h.chan }); }
+        if (perf.oct === 2 && !seen[m + 12]) { seen[m + 12] = 1; out.push({ m: m + 12, vel: h.vel, chan: h.chan }); }
+      });
+    });
+    out.sort(function (a, b) { return a.m - b.m; });
+    return out;
+  }
+
+  function arpTick() {
+    var pool = arpPool();
+    if (!pool.length) { arpStop(); return; }
+    var ctx;
+    try { ctx = App.getAudio(); } catch (e) { return; }
+    var bpm = parseInt(App.store.get('met.bpm', 100), 10) || 100;
+    var dur = 60 / bpm / perf.rate;
+    if (arp.nextT < ctx.currentTime - 0.02) arp.nextT = ctx.currentTime + 0.02;
+    while (arp.nextT < ctx.currentTime + 0.12) {
+      var n = pool.length, i;
+      if (perf.dir === 'up') i = arp.idx % n;
+      else if (perf.dir === 'down') i = n - 1 - (arp.idx % n);
+      else { var span = Math.max(1, 2 * n - 2); var k = arp.idx % span; i = k < n ? k : span - k; }
+      var x = pool[i];
+      noteOnRaw(x.m, x.vel, x.chan, arp.nextT);
+      noteOffRaw(x.m, x.chan, arp.nextT + dur * 0.85);
+      arp.idx++;
+      arp.nextT += dur;
+    }
+  }
+
+  function arpStart() {
+    if (arp.timer) return;
+    var ctx;
+    try { ctx = App.getAudio(); } catch (e) { return; }
+    arp.nextT = ctx.currentTime + 0.03;
+    arp.idx = 0;
+    arp.timer = setInterval(arpTick, 25);
+    arpTick();
+  }
+
+  function arpStop() {
+    if (arp.timer) { clearInterval(arp.timer); arp.timer = null; }
+    arp.held = [];
+  }
+
+  function noteOn(midi, vel, chan) {
+    var key = chan + '-' + midi;
+    var notes = chordFor(midi);
+    if (perf.arp) {
+      arp.held.push({ src: key, notes: notes, vel: vel, chan: chan });
+      perfHeld[key] = { arp: true };
+      arpStart();
+      return;
+    }
+    var strumS = perf.strum * 0.045; // up to 45ms between chord notes
+    var ctx = null;
+    try { ctx = App.getAudio(); } catch (e) { return; }
+    notes.forEach(function (m, i) {
+      noteOnRaw(m, vel, chan, i ? ctx.currentTime + i * strumS : 0);
+    });
+    perfHeld[key] = { notes: notes };
+  }
+
+  function noteOff(midi, chan) {
+    var key = chan + '-' + midi;
+    var h = perfHeld[key];
+    if (h) {
+      delete perfHeld[key];
+      if (h.arp) {
+        if (!perf.hold) {
+          arp.held = arp.held.filter(function (x) { return x.src !== key; });
+          if (!arp.held.length) arpStop();
+        }
+        return;
+      }
+      (h.notes || []).forEach(function (m) { noteOffRaw(m, chan); });
+      return;
+    }
+    noteOffRaw(midi, chan);
+  }
+
+  function paintPerf() {
+    var seg = function (id, attr, val) {
+      var el = document.getElementById(id);
+      if (el) el.querySelectorAll('button').forEach(function (b) {
+        b.classList.toggle('active', b.getAttribute(attr) === String(val));
+      });
+    };
+    seg('pn-chseg', 'data-pnch', perf.chords);
+    seg('pn-arprate', 'data-pnar', perf.rate);
+    seg('pn-arpdir', 'data-pnad', perf.dir);
+    seg('pn-arpoct', 'data-pnao', perf.oct);
+    var c = function (id, on) { var el = document.getElementById(id); if (el) el.classList.toggle('active', !!on); };
+    c('pn-bass', perf.bass);
+    c('pn-arp', perf.arp);
+    c('pn-hold', perf.hold);
+    var st = document.getElementById('pn-strum');
+    if (st) st.value = String(Math.round(perf.strum * 100));
+  }
+
+  function savePerf() { App.store.set('pn.perf', perf); }
 
   function bendChan(chan, semis) {
     if (pnSyn && pnVoice !== 'piano') { try { pnSyn.pitchBend(semis, chan); } catch (e) { /* ok */ } }
@@ -954,6 +1090,23 @@
             '<button type="button" class="btn sm" id="pn-rotate" title="Rotate the keyboard (portrait / landscape)" aria-label="Rotate the keyboard">' + App.icon('rotate', 14) + '</button>' +
           '</span>' +
         '</div>' +
+        '<div class="row tight" id="pn-perf" style="margin-top:10px">' +
+          '<span class="muted small" style="letter-spacing:1.2px">PERFORM</span>' +
+          '<div class="seg" id="pn-chseg" title="Smart chords: in-scale keys play full diatonic chords">' +
+            '<button type="button" data-pnch="off">Notes</button>' +
+            '<button type="button" data-pnch="triad">Triads</button>' +
+            '<button type="button" data-pnch="7th">7ths</button></div>' +
+          '<button type="button" class="chip fb-chip" id="pn-bass" title="Add the bass note an octave down">+Bass</button>' +
+          '<label class="field">Strum<input type="range" id="pn-strum" min="0" max="100" step="10" style="width:76px"></label>' +
+          '<button type="button" class="chip fb-chip" id="pn-arp" title="Arpeggiate held notes at the shared tempo">Arp</button>' +
+          '<div class="seg" id="pn-arprate"><button type="button" data-pnar="2">1/8</button>' +
+            '<button type="button" data-pnar="3">Trip</button><button type="button" data-pnar="4">1/16</button></div>' +
+          '<div class="seg" id="pn-arpdir"><button type="button" data-pnad="up">Up</button>' +
+            '<button type="button" data-pnad="down">Down</button><button type="button" data-pnad="updown">UD</button></div>' +
+          '<div class="seg" id="pn-arpoct"><button type="button" data-pnao="1">1 oct</button>' +
+            '<button type="button" data-pnao="2">2 oct</button></div>' +
+          '<button type="button" class="chip fb-chip" id="pn-hold" title="Latch: arpeggio keeps running after you lift">Hold</button>' +
+        '</div>' +
         '<div class="pn-qwpanel" id="pn-qwpanel">' +
           '<div class="row tight" id="pn-qwslots"></div>' +
           '<div class="row tight" style="margin-top:10px">' +
@@ -1058,6 +1211,59 @@
       });
     }
     paintVoiceSel(); // presets may land later (daw/synth.js loads after us)
+
+    var pf = App.store.get('pn.perf', null);
+    if (pf && typeof pf === 'object') {
+      perf.chords = ['off', 'triad', '7th'].indexOf(pf.chords) !== -1 ? pf.chords : 'off';
+      perf.bass = !!pf.bass;
+      perf.strum = (pf.strum >= 0 && pf.strum <= 1) ? pf.strum : 0;
+      perf.rate = [2, 3, 4].indexOf(pf.rate) !== -1 ? pf.rate : 4;
+      perf.dir = ['up', 'down', 'updown'].indexOf(pf.dir) !== -1 ? pf.dir : 'up';
+      perf.oct = pf.oct === 2 ? 2 : 1;
+      perf.hold = !!pf.hold;
+    }
+    document.getElementById('pn-chseg').addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-pnch]');
+      if (!b) return;
+      perf.chords = b.getAttribute('data-pnch');
+      savePerf(); paintPerf();
+    });
+    document.getElementById('pn-bass').addEventListener('click', function () {
+      perf.bass = !perf.bass; savePerf(); paintPerf();
+    });
+    document.getElementById('pn-strum').addEventListener('input', function () {
+      perf.strum = Math.max(0, Math.min(1, parseInt(this.value, 10) / 100));
+      savePerf();
+    });
+    document.getElementById('pn-arp').addEventListener('click', function () {
+      perf.arp = !perf.arp;
+      if (!perf.arp) arpStop();
+      savePerf(); paintPerf();
+    });
+    document.getElementById('pn-arprate').addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-pnar]');
+      if (!b) return;
+      perf.rate = parseInt(b.getAttribute('data-pnar'), 10);
+      savePerf(); paintPerf();
+    });
+    document.getElementById('pn-arpdir').addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-pnad]');
+      if (!b) return;
+      perf.dir = b.getAttribute('data-pnad');
+      savePerf(); paintPerf();
+    });
+    document.getElementById('pn-arpoct').addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-pnao]');
+      if (!b) return;
+      perf.oct = parseInt(b.getAttribute('data-pnao'), 10);
+      savePerf(); paintPerf();
+    });
+    document.getElementById('pn-hold').addEventListener('click', function () {
+      perf.hold = !perf.hold;
+      if (!perf.hold) arpStop();
+      savePerf(); paintPerf();
+    });
+    paintPerf();
 
     var qwChip = document.getElementById('pn-qw');
     qwChip.classList.toggle('active', qw.on);
@@ -1263,7 +1469,8 @@
       if (!k) return;
       var midi = parseInt(k.getAttribute('data-midi'), 10);
       if (isNaN(midi)) return;
-      play(midi, 0, 1.6, 0.55);
+      noteOn(midi, 90, 98);
+      setTimeout(function () { noteOff(midi, 98); }, 450);
       pressKey(midi);
       guideCheck(midi);
       // tap = a short note for the capture service (no key-up to wait for)

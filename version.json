@@ -1,5 +1,5 @@
 {
-  "version": "0.61.0",
+  "version": "0.62.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/soundLAB-alpha.apk",
-  "notes": "STUDIO REBUILD, PHASE 1 — the Studio now opens on a real DAW screen. The Timeline is the home: transport, per-track ARM (●) / mute / solo / volume / meters on every lane, and a working RECORD button — arm a track (or let Rec arm one for you), hit ● Rec, play your keyboard, and the take lands on the timeline as a clip, beat-accurate, without overwriting anything (busy tracks get a fresh 'Take n' lane with the same voice). The Editor (step grid / piano roll / voices / FX) is the second pill of the same tab — double-tap any clip to open it, as before. Pads and Sketch (Song / Ideas) follow. Phases 2-3 (editor drawer on the timeline itself, undo, clip trim/split, pan) are next."
+  "notes": "PERFORM like ROLI Studio Player: the Keys page grew SMART CHORDS (in-scale keys play full diatonic triads/7ths — works in every scale — with +Bass and a strum slider) and an ARPEGGIATOR (1/8, triplet or 1/16 at the shared tempo; up/down/up-down; 1-2 octaves; Hold latch) — both layered over ANY voice, grand or the MPE synth presets. Studio phase 2 starters: + Synth / + Drums / + Sampler buttons right on the Timeline and FL-style CLIP RESIZE (drag a clip's right edge, snap-aware). LUMI fix: when LUMI sync is on, the app no longer fights the keyboard's own display — the note-light modes auto-stand-down, so the SysEx scale colors (root + in-scale, the hardware's two custom slots) show clean."
 }

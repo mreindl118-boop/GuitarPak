@@ -165,6 +165,7 @@
           'px;--arc:' + col + '">' +
           (c.src === 'audio' ? '<canvas class="ar-wave" width="' + Math.min(220, Math.max(20, Math.floor(c.len * zoomX))) + '" height="40"></canvas>'
             : '<span class="ar-cl">' + esc(t.name) + '</span>') +
+          '<span class="ar-rsz" title="Drag to resize"></span>' +
           '</div>';
       });
       hLanes += '<div class="ar-lane" data-arlane="' + t.id + '" style="width:' + (tb * zoomX) + 'px;background-image:' + gridCss() + '">' + clipsH + '</div>';
@@ -423,6 +424,10 @@
           sel = [id];
         }
         paintSelection();
+        if (e.target.closest && e.target.closest('.ar-rsz')) { // FL-style edge resize
+          var fr = clipById(id);
+          if (fr) { drag = { resize: id, len0: fr.clip.len, b0: beatAt(e.clientX), moved: false }; return; }
+        }
         drag = { ids: sel.slice(), b0: beatAt(e.clientX), l0: laneIndexAt(e.clientY), moved: false, orig: {} };
         drag.ids.forEach(function (cid) {
           var f = clipById(cid);
@@ -453,6 +458,17 @@
     });
     els.lanes.addEventListener('pointermove', function (e) {
       if (!drag) return;
+      if (drag.resize) {
+        var f2 = clipById(drag.resize);
+        if (!f2) return;
+        var nl = drag.len0 + (beatAt(e.clientX) - drag.b0);
+        nl = snapV > 0 ? Math.max(snapV, Math.round(nl / snapV) * snapV) : Math.max(0.25, Math.round(nl * 100) / 100);
+        if (nl !== f2.clip.len) drag.moved = true;
+        f2.clip.len = nl;
+        var el2 = els.lanes.querySelector('[data-arclip="' + drag.resize + '"]');
+        if (el2) el2.style.width = (nl * zoomX - 2) + 'px';
+        return;
+      }
       var db = snap(beatAt(e.clientX) - drag.b0 + 1e-9);
       if (snapV === 0) db = beatAt(e.clientX) - drag.b0;
       var dl = laneIndexAt(e.clientY) - drag.l0;
@@ -542,6 +558,7 @@
 
   function init(rootEl) {
     App.injectCSS('arrange',
+      '.ar-rsz{position:absolute;right:0;top:0;bottom:0;width:10px;cursor:ew-resize;touch-action:none}' +
       '.ar-wrap{display:flex;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--card2)}' +
       '.ar-headcol{flex:0 0 150px;border-right:1px solid var(--line);z-index:2;background:var(--card)}' +
       '.ar-headspacer{height:' + RULER_H + 'px;border-bottom:1px solid var(--line)}' +
@@ -584,6 +601,9 @@
               '<button type="button" data-arsnap="0">Off</button></div>' +
             '<button type="button" class="btn sm" id="ar-zo">' + App.icon('minus', 13) + '</button>' +
             '<button type="button" class="btn sm" id="ar-zi">' + App.icon('plus', 13) + '</button>' +
+            '<button type="button" class="btn sm" id="ar-addsyn" title="Add a synth track">+ Synth</button>' +
+            '<button type="button" class="btn sm" id="ar-adddrm" title="Add a drum track (starter beat included)">+ Drums</button>' +
+            '<button type="button" class="btn sm" id="ar-addsmp" title="Add a sampler track (drop an audio file on the Editor)">+ Sampler</button>' +
             '<button type="button" class="btn sm" id="ar-export" title="Render the whole arrangement to a WAV file">Export song</button>' +
           '</span>' +
         '</div>' +
@@ -625,6 +645,30 @@
       if (DAW.engine.songPlaying) DAW.engine.songStop(); else DAW.engine.songPlay();
     });
     els.rec.addEventListener('click', function () { if (recOn) stopRec(); else startRec(); });
+    function addTrack(kind) {
+      var names = { drums: 'Drums', synth: 'Synth', sampler: 'Sampler' };
+      var count = tracks().filter(function (t) { return t.kind === kind; }).length;
+      var t = { id: 'tr' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+        name: names[kind] + (count ? ' ' + (count + 1) : ''), kind: kind, voice: 'keys',
+        synth: { cutoff: 0, attack: null, release: null, glide: null },
+        sampler: { rootNote: 60, loop: false, name: '' },
+        steps: null, notes: kind === 'drums' ? null : [], clips: [],
+        fx: { type: 'none', mix: 0.3 }, mix: { vol: 80, mute: false, solo: false } };
+      if (kind === 'drums') {
+        var st = [];
+        for (var l = 0; l < 8; l++) { var r = []; for (var i = 0; i < 64; i++) r.push(0); st.push(r); }
+        st[0][0] = st[0][8] = st[0][16] = st[0][24] = 1;
+        st[1][8] = st[1][24] = 1;
+        for (var h2 = 0; h2 < 32; h2 += 4) st[3][h2] = 1;
+        t.steps = st;
+      }
+      DAW.engine.tracks.push(t);
+      save();
+      renderLanes();
+    }
+    document.getElementById('ar-addsyn').addEventListener('click', function () { addTrack('synth'); });
+    document.getElementById('ar-adddrm').addEventListener('click', function () { addTrack('drums'); });
+    document.getElementById('ar-addsmp').addEventListener('click', function () { addTrack('sampler'); });
     App.on('midi:note', recEvent);
     App.on('note:input', recEvent);
     document.getElementById('ar-rtz').addEventListener('click', function () {

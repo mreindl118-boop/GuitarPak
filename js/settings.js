@@ -136,7 +136,7 @@
             '<option value="off">Off</option>' +
             '<option value="echo">Played notes</option>' +
             '<option value="scale">Whole scale layout</option></select></label>' +
-          '<span class="muted small">Lights the LED output&rsquo;s keys with the app&rsquo;s scale &mdash; the root brightest, chord tones next. ' +
+          '<span class="muted small">Lights the LED output&rsquo;s keys with the app&rsquo;s scale &mdash; the root brightest, chord tones next. FOR NON-LUMI keyboards: with LUMI sync on, these auto-disable &mdash; the LUMI paints its own keybed (root + in-scale colors over SysEx, pressed keys natively; two colors is the hardware&rsquo;s limit). ' +
             'For LED controllers (they light silently); a sound module on that output would play the notes.</span>' +
         '</div>' +
         '<label class="row tight small muted" style="gap:6px;margin-top:12px">' +
