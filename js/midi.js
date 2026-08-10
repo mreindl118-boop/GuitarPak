@@ -266,7 +266,12 @@
   function lumiCmd(cmd) {
     if (!hasOutput()) return;
     while (cmd.length < 8) cmd.push(0);
-    sendBytes([0xf0, 0x00, 0x21, 0x10, 0x77, 0x37].concat(cmd, [lumiChecksum(cmd), 0xf7]));
+    // device id is topology-dependent (0x37 on the documented unit, 0x00 =
+    // broadcast per the same doc's own uncertainty) — send BOTH; the config
+    // frames are idempotent, so whichever id this LUMI answers to wins
+    var tail = cmd.concat([lumiChecksum(cmd), 0xf7]);
+    sendBytes([0xf0, 0x00, 0x21, 0x10, 0x77, 0x37].concat(tail));
+    sendBytes([0xf0, 0x00, 0x21, 0x10, 0x77, 0x00].concat(tail));
   }
 
   function lumiVal(type, v) { // <5-bit type><value> from byte 3 of the command

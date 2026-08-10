@@ -1,5 +1,5 @@
 {
-  "version": "0.67.0",
-  "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/soundLAB-alpha.apk",
-  "notes": "PADS REMAP + AUTO-CONNECT + the last hairs of latency. Every drum pad is now REMAPPABLE: tap Remap on the Pads page, tap a pad, press any key — done (Reset map restores the standard layout; crash defaults to any black key). Your MIDI keyboard now AUTO-CONNECTS on every launch and after every update — enable it once and the LUMI is just there, colors synced. Latency shaved further: the audio engine now requests the tightest buffer the hardware allows, sample lead-trim cuts closer, and note attacks are snappier. SETTINGS: updates never clear them (they live on this device) — new Backup card in Settings exports/imports everything (preferences, palettes, jam songs, studio tracks) so you can move between installs; if settings ever 'reset', you were likely in a different browser profile."
+ "version": "0.67.1",
+ "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/soundLAB-alpha.apk",
+ "notes": "Fix: the DRIVE effect was hard-wired 100% wet \u2014 deafeningly loud on drums, and the FX amount slider barely did anything; it's now a true wet/dry blend with compensated level (measured). LUMI COLORS: every SysEx frame is now sent under BOTH device ids (0x37 and broadcast 0x00) \u2014 the community protocol doc is uncertain which id a given unit answers to, and if yours wanted the other one, every color/scale frame was being silently ignored. If the keybed still doesn't take colors after this, tap 'Push to LUMI now' in Settings > MIDI and tell me what happens \u2014 the next stop would be a firmware-version difference."
 }
