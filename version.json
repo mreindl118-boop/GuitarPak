@@ -1,5 +1,5 @@
 {
-  "version": "0.57.0",
-  "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "LED KEYBOARDS light up with the app's colors. New in Settings > MIDI: Key lights — 'Played notes' lights every key you play on the LED output, 'Whole scale layout' keeps the full in-scale layout lit (root brightest, chord tones next; works on any keyboard that lights incoming notes). ROLI LUMI (USB or Bluetooth): the sync was rebuilt against the community SysEx documentation — the old key/scale encoding was actually wrong — and now also pushes the app's DEGREE COLORS (root = degree-1 color, in-scale keys = degree-5 color) plus a light-mode picker (Scale colors / Rainbow / Piano / Night). Editing the fretboard palette re-colors the LUMI live. Also fixes a v0.56 service-worker install bug that could keep web installs from updating."
+  "version": "0.58.0",
+  "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/soundLAB-alpha.apk",
+  "notes": "Branding catch-up on every install surface. The Android download is now soundLAB-alpha.apk (updates keep working — your installed app reads this feed; the old filename stays as a copy for one release). The Windows installer now stamps the real soundLAB icon on the Desktop and Start Menu shortcuts instead of the browser's logo (re-run the installer to pick it up). The iOS wrapper finally has its app icon — the three-keys-on-amber mark — wired into the Xcode project for the next Mac build."
 }

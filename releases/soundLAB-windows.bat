@@ -29,10 +29,16 @@ if not defined BROWSER (
 
 echo Using browser: %BROWSER%
 
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$ws=New-Object -ComObject WScript.Shell; $l=$ws.CreateShortcut([Environment]::GetFolderPath('Desktop')+'\soundLAB.lnk'); $l.TargetPath='%BROWSER%'; $l.Arguments='--app=%URL%'; $l.Description='soundLAB - guitar + keys practice and studio'; $l.Save()"
+rem fetch the soundLAB icon so the shortcuts carry the real app icon
+set "ICODIR=%LocalAppData%\soundLAB"
+set "ICO=%ICODIR%\soundLAB.ico"
+if not exist "%ICODIR%" mkdir "%ICODIR%"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "try { Invoke-WebRequest -UseBasicParsing 'https://github.com/mreindl118-boop/GuitarPak/raw/main/icons/soundlab.ico' -OutFile '%ICO%' } catch { }"
+
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$ws=New-Object -ComObject WScript.Shell; $l=$ws.CreateShortcut([Environment]::GetFolderPath('Desktop')+'\soundLAB.lnk'); $l.TargetPath='%BROWSER%'; $l.Arguments='--app=%URL%'; $l.Description='soundLAB - guitar + keys practice and studio'; if (Test-Path '%ICO%') { $l.IconLocation='%ICO%,0' }; $l.Save()"
 if errorlevel 1 goto :fail
 
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$ws=New-Object -ComObject WScript.Shell; $d=Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'; $l=$ws.CreateShortcut((Join-Path $d 'soundLAB.lnk')); $l.TargetPath='%BROWSER%'; $l.Arguments='--app=%URL%'; $l.Description='soundLAB - guitar + keys practice and studio'; $l.Save()"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$ws=New-Object -ComObject WScript.Shell; $d=Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'; $l=$ws.CreateShortcut((Join-Path $d 'soundLAB.lnk')); $l.TargetPath='%BROWSER%'; $l.Arguments='--app=%URL%'; $l.Description='soundLAB - guitar + keys practice and studio'; if (Test-Path '%ICO%') { $l.IconLocation='%ICO%,0' }; $l.Save()"
 if errorlevel 1 goto :fail
 
 echo.
