@@ -1187,8 +1187,11 @@
     // is held — same visual language as QWERTY input. ----
     App.on('midi:note', function (d) {
       if (!d) return;
+      // in the Studio with a track armed, the TRACK's instrument sounds the
+      // note (studio.js routes it) — the piano voice would double it
+      var studioArmed = App.space === 'studio' && App.store.get('st.armed', null);
       if (d.on) {
-        noteOn(d.midi, d.vel, d.chan);
+        if (!studioArmed) noteOn(d.midi, d.vel, d.chan);
         pressKeyHold(d.midi, true);
         guideCheck(d.midi);
       } else {
