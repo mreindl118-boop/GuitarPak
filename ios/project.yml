@@ -18,8 +18,8 @@ targets:
       path: Info.plist
       properties:
         CFBundleDisplayName: soundLAB
-        CFBundleShortVersionString: "0.62.0"
-        CFBundleVersion: "82"
+        CFBundleShortVersionString: "0.63.0"
+        CFBundleVersion: "83"
         NSMicrophoneUsageDescription: >-
           GuitarLab listens to your guitar to run the tuner and the
           note-finder game. Audio never leaves the device.
