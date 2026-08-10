@@ -50,6 +50,17 @@ js/tuner.js       │
 js/trainer.js     │
 js/theorytab.js   │ (theory: circle of fifths + key guide + degree ear quiz)
 js/settings.js    ┘ (settings: app-level prefs — theme dark/light/auto)
+js/studio.js      STUDIO workspace (DAW phase one): registers 'song' (sketch-
+                  book home) + 'ideas' (capture inbox) pages and the app-wide
+                  capture service behind #cx-rec (header ● on every page).
+                  Captures midi:note + note:input into ideas (notes tagged
+                  key/bpm/date, store ideas.list, song.name); 30s retro buffer
+                  ("keep what I just played"); playback via the studio synth.
+js/daw/synth.js   MPE poly synth ported from the OpenStudio DAW repo
+                  (Sampler-DAW src/audio/synth.ts): 2 osc + noise + filter/amp
+                  envelopes, unison, glide, LFO, per-channel bend/pressure/
+                  timbre. window.DAW.createSynth/defaultSynth/SYNTH_PRESETS.
+                  More of that engine lands here as the studio grows.
 samples/          MIT FluidR3 instrument MP3s (see samples/CREDITS.md)
 android/          APK project — build.ps1 (no Gradle: javac→d8→aapt→zipalign→
                   apksigner); keystore is gitignored, do NOT commit it
@@ -62,10 +73,20 @@ version.json      auto-update feed (source of truth for latest version)
 
 ## Cross-module conventions
 
+- WORKSPACES (app.js): two page sets over one app — SPACES.practice (the 12
+  original tabs) and SPACES.studio ('song', 'ideas' — the DAW side). #space-btn
+  in the header switches via a screen-wipe (#wipe overlay); App.setSpace/
+  App.switchTo cross spaces automatically; per-space last tab in app.tab /
+  app.tabStudio, current space in app.space, <html data-space>. The context
+  bar, clock, key and MIDI service are shared across both — that's the point.
 - Context bar (index.html #ctxbar, wired in app.js): the single home for key/
   scale/mode/BPM/time signature, always visible under the tabs. It reads the
   shared stores (fb.root/fb.scale/fb.mode, met.bpm, met.sig) and pushes changes
   over the bus; pages must NOT grow their own duplicate selects for these.
+  Also hosts #cx-met (transport) and #cx-rec (studio capture ●).
+- New bus events: `note:input` {on, midi, vel, src, dur?} — user played a note
+  on an on-screen instrument (piano QWERTY/touch emit it; capture listens
+  alongside midi:note), `space` {space} after a workspace switch.
 - Event bus: `App.on/emit`. New: `sig` {sig, source} (time signature changed —
   metronome and the bar mirror each other), `met:toggle` (request start/stop
   from anywhere), `met:state` {running}, `met:beat` {beat} (context-bar

@@ -26,12 +26,26 @@ window.App = (function () {
   var modules = {};
   var active = null;
   var audioCtx = null;
-  var PANEL_ORDER = ['metronome', 'fretboard', 'tab', 'notation', 'chords', 'piano', 'songs', 'jam', 'tuner', 'trainer', 'theory', 'settings'];
+  // Two workspaces over one app: Practice (the original tool set) and Studio
+  // (the DAW side). One clock, one key, one MIDI service — the context bar
+  // stays put; only the page set changes, behind a screen-wipe transition.
+  var SPACES = {
+    practice: ['metronome', 'fretboard', 'tab', 'notation', 'chords', 'piano', 'songs', 'jam', 'tuner', 'trainer', 'theory', 'settings'],
+    studio: ['song', 'ideas']
+  };
+  var SPACE_LABELS = {
+    metronome: 'Metronome', fretboard: 'Fretboard', tab: 'Tab', notation: 'Notation',
+    chords: 'Chords', piano: 'Piano', songs: 'Songs', jam: 'Jam', tuner: 'Tuner',
+    trainer: 'Trainer', theory: 'Theory', settings: 'Settings',
+    song: 'Song', ideas: 'Ideas'
+  };
+  var PANEL_ORDER = SPACES.practice.concat(SPACES.studio);
+  var space = 'practice';
 
   // ---- auto-update ----
   // version.json on GitHub is the source of truth. Web builds refresh through
   // the service worker; the APK build (file://) links to the new APK download.
-  var APP_VERSION = '0.43.1';
+  var APP_VERSION = '0.44.0';
   var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
 
   function verNum(v) {
@@ -423,8 +437,27 @@ window.App = (function () {
     get active() { return wakeCount > 0; }
   };
 
+  function spaceOf(name) {
+    return SPACES.studio.indexOf(name) !== -1 ? 'studio' : 'practice';
+  }
+
+  function tabStoreKey(sp) { return sp === 'studio' ? 'app.tabStudio' : 'app.tab'; }
+
+  function populateNav() {
+    var nav = document.getElementById('nav-select');
+    if (!nav) return;
+    var h = '';
+    SPACES[space].forEach(function (name) {
+      h += '<option value="' + name + '">' + SPACE_LABELS[name] + '</option>';
+    });
+    nav.innerHTML = h;
+    if (active && SPACES[space].indexOf(active) !== -1) nav.value = active;
+  }
+
   function switchTo(name) {
     if (name === active) return;
+    // crossing into the other workspace? go through the wipe
+    if (spaceOf(name) !== space) { setSpace(spaceOf(name), name); return; }
     if (active && modules[active] && modules[active].onHide) {
       try { modules[active].onHide(); } catch (e) { console.error(active + '.onHide', e); }
     }
@@ -440,7 +473,65 @@ window.App = (function () {
     if (modules[name] && modules[name].onShow) {
       try { modules[name].onShow(); } catch (e) { console.error(name + '.onShow', e); }
     }
-    store.set('app.tab', name);
+    store.set(tabStoreKey(space), name);
+  }
+
+  // ---- workspace wipe ----
+  var wiping = false;
+
+  function applySpace(sp, tab) {
+    space = sp;
+    store.set('app.space', sp);
+    document.documentElement.setAttribute('data-space', sp);
+    var btn = document.getElementById('space-btn');
+    if (btn) {
+      btn.innerHTML = sp === 'studio'
+        ? icon('left', 14) + ' Practice'
+        : icon('right', 14) + ' Studio';
+      btn.setAttribute('aria-label', sp === 'studio' ? 'Back to the practice tools' : 'Over to the studio');
+    }
+    populateNav();
+    var next = tab || store.get(tabStoreKey(sp), SPACES[sp][0]);
+    if (SPACES[sp].indexOf(next) === -1) next = SPACES[sp][0];
+    switchTo(next);
+    emit('space', { space: sp });
+  }
+
+  function setSpace(sp, tab) {
+    if (sp === space || !SPACES[sp] || wiping) return;
+    var wipe = document.getElementById('wipe');
+    if (!wipe) { applySpace(sp, tab); return; }
+    wiping = true;
+    var toStudio = sp === 'studio';
+    // sweep in from the side we're heading toward, swap under cover, sweep on
+    wipe.style.transition = 'none';
+    wipe.style.transform = 'translateX(' + (toStudio ? '102%' : '-102%') + ')';
+    wipe.style.display = 'block';
+    // force layout so the jump is committed before animating
+    void wipe.offsetWidth;
+    wipe.style.transition = 'transform 0.26s ease-in';
+    wipe.style.transform = 'translateX(0)';
+    var swapped = false;
+    function onEnd() {
+      if (!swapped) {
+        swapped = true;
+        applySpace(sp, tab);
+        wipe.style.transition = 'transform 0.26s ease-out';
+        wipe.style.transform = 'translateX(' + (toStudio ? '-102%' : '102%') + ')';
+        return;
+      }
+      wipe.removeEventListener('transitionend', onEnd);
+      wipe.style.display = 'none';
+      wiping = false;
+    }
+    wipe.addEventListener('transitionend', onEnd);
+    // safety: never leave the curtain stuck if transitionend is swallowed
+    setTimeout(function () {
+      if (wiping && !swapped) onEnd();
+      setTimeout(function () {
+        if (wiping) { wipe.removeEventListener('transitionend', onEnd); wipe.style.display = 'none'; wiping = false; }
+      }, 400);
+    }, 400);
   }
 
   // ---- persistent context bar: key / scale / mode / bpm / time ----
@@ -620,8 +711,26 @@ window.App = (function () {
     applyTheme(store.get('app.theme', 'dark'));
     wireContextBar();
 
-    var startTab = store.get('app.tab', 'metronome');
-    if (PANEL_ORDER.indexOf(startTab) === -1) startTab = 'metronome';
+    var spaceBtn = document.getElementById('space-btn');
+    if (spaceBtn) {
+      spaceBtn.addEventListener('click', function () {
+        setSpace(space === 'studio' ? 'practice' : 'studio');
+        this.blur();
+      });
+    }
+
+    var startSpace = store.get('app.space', 'practice');
+    if (!SPACES[startSpace]) startSpace = 'practice';
+    space = startSpace;
+    document.documentElement.setAttribute('data-space', space);
+    if (spaceBtn) {
+      spaceBtn.innerHTML = space === 'studio'
+        ? icon('left', 14) + ' Practice'
+        : icon('right', 14) + ' Studio';
+    }
+    populateNav();
+    var startTab = store.get(tabStoreKey(space), SPACES[space][0]);
+    if (SPACES[space].indexOf(startTab) === -1) startTab = SPACES[space][0];
     switchTo(startTab);
 
     var foot = document.querySelector('.foot');
@@ -674,6 +783,9 @@ window.App = (function () {
     boot: boot,
     version: APP_VERSION,
     checkForUpdate: checkForUpdate,
-    get active() { return active; }
+    get active() { return active; },
+    get space() { return space; },
+    setSpace: setSpace,
+    switchTo: switchTo
   };
 })();

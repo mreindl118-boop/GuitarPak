@@ -764,6 +764,7 @@
     noteOn(midi, 100, 99); // pseudo-channel for computer-keyboard voices
     pressKeyHold(midi, true);
     guideCheck(midi);
+    App.emit('note:input', { on: true, midi: midi, vel: 100, src: 'qwerty' });
   }
 
   function qwUp(e) {
@@ -772,6 +773,7 @@
     delete qw.held[e.code];
     noteOff(midi, 99);
     pressKeyHold(midi, false);
+    App.emit('note:input', { on: false, midi: midi, src: 'qwerty' });
   }
 
   // held visual (press for as long as the computer key is down)
@@ -1176,6 +1178,8 @@
       play(midi, 0, 1.6, 0.55);
       pressKey(midi);
       guideCheck(midi);
+      // tap = a short note for the capture service (no key-up to wait for)
+      App.emit('note:input', { on: true, midi: midi, vel: 90, src: 'touch', dur: 0.5 });
     });
 
     // ---- MIDI keyboard: expressive input + guide answers, on every tab.

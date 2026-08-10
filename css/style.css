@@ -176,6 +176,19 @@ html, body {
   filter: drop-shadow(0 0 10px var(--accent-glow));
 }
 
+/* workspace wipe — the curtain between Practice and Studio */
+#wipe {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: #0d0b0e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  will-change: transform;
+}
+
 .brand .tag {
   font-family: var(--font-body);
   font-size: 10px;

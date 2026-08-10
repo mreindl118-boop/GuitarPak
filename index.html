@@ -34,20 +34,8 @@
     <span class="tag">alpha</span>
   </div>
   <nav class="nav" id="tabs">
-    <select id="nav-select" aria-label="Go to page">
-      <option value="metronome">Metronome</option>
-      <option value="fretboard">Fretboard</option>
-      <option value="tab">Tab</option>
-      <option value="notation">Notation</option>
-      <option value="chords">Chords</option>
-      <option value="piano">Piano</option>
-      <option value="songs">Songs</option>
-      <option value="jam">Jam</option>
-      <option value="tuner">Tuner</option>
-      <option value="trainer">Trainer</option>
-      <option value="theory">Theory</option>
-      <option value="settings">Settings</option>
-    </select>
+    <select id="nav-select" aria-label="Go to page"></select>
+    <button type="button" class="btn sm" id="space-btn" aria-label="Switch workspace"></button>
   </nav>
   <div class="ctxbar" id="ctxbar">
     <label class="cx-field">Key<select id="cx-root"></select></label>
@@ -56,8 +44,15 @@
     <label class="cx-field">BPM<input id="cx-bpm" type="number" min="30" max="280" step="1"></label>
     <label class="cx-field">Time<select id="cx-sig"></select></label>
     <button type="button" class="btn sm" id="cx-met" title="Start / stop the metronome (works on every tab)" aria-label="Start or stop the metronome"></button>
+    <button type="button" class="btn sm" id="cx-rec" aria-label="Capture what you play into the current song"></button>
+    <span id="cx-rec-msg" style="display:none" role="status"></span>
   </div>
 </header>
+<div id="wipe" aria-hidden="true" style="display:none">
+  <svg viewBox="0 0 512 512" width="120" height="120">
+    <path d="M118 96 H206 V308 A44 44 0 0 1 118 308 Z M212 96 H300 V372 A44 44 0 0 1 212 372 Z M306 96 H394 V308 A44 44 0 0 1 306 308 Z" fill="#ffab47" opacity="0.9"/>
+  </svg>
+</div>
 <main>
   <section class="panel" id="panel-metronome"></section>
   <section class="panel" id="panel-fretboard"></section>
@@ -71,6 +66,8 @@
   <section class="panel" id="panel-trainer"></section>
   <section class="panel" id="panel-theory"></section>
   <section class="panel" id="panel-settings"></section>
+  <section class="panel" id="panel-song"></section>
+  <section class="panel" id="panel-ideas"></section>
 </main>
 <footer class="foot">
   soundLAB alpha &mdash; everything runs locally in your browser. Sound starts after your first click (browser autoplay policy). The Tuner needs microphone permission.
@@ -87,6 +84,8 @@
 <script src="js/tuner.js"></script>
 <script src="js/trainer.js"></script>
 <script src="js/theorytab.js"></script>
+<script src="js/daw/synth.js"></script>
+<script src="js/studio.js"></script>
 <script src="js/settings.js"></script>
 <script>
 App.boot();
