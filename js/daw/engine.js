@@ -599,6 +599,7 @@
   // one engine, two ways to drive it (session loop / arrangement).
 
   var song = { loop: { on: false, start: 0, end: 16 } };
+  var freeRun = false; // true while recording: no auto-stop at songEnd
   var songPlaying = false;
   var songTimer = null;
   var origin = { time: 0, beat: 0 };
@@ -693,7 +694,8 @@
         break;
       }
     }
-    if (!song.loop.on && schedBeat > songEnd() + 1) songStop();
+    // freeRun (recording): keep rolling past the arrangement's end
+    if (!freeRun && !song.loop.on && schedBeat > songEnd() + 1) songStop();
   }
 
   function songPlay(fromBeat) {
@@ -802,6 +804,8 @@
     set loopRegion(l) { if (l && typeof l.start === 'number') song.loop = { on: !!l.on, start: Math.max(0, l.start), end: Math.max(l.start + 0.25, l.end) }; },
     songPlay: songPlay,
     songStop: songStop,
+    get freeRun() { return freeRun; },
+    set freeRun(v) { freeRun = !!v; },
     setPosition: setPosition,
     position: position,
     songEnd: songEnd,

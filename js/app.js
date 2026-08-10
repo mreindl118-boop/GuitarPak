@@ -33,7 +33,7 @@ window.App = (function () {
   // the ever-present gear in the header, from any page in either space.
   var SPACES = {
     practice: ['metronome', 'fretboard', 'tab', 'notation', 'chords', 'piano', 'songs', 'jam', 'shed', 'tuner', 'trainer', 'theory'],
-    studio: ['song', 'arrange', 'tracks', 'pads', 'ideas']
+    studio: ['arrange', 'tracks', 'pads', 'song', 'ideas']
   };
   var SPACE_LABELS = {
     metronome: 'Metronome', fretboard: 'Fretboard', tab: 'Tab', notation: 'Notation',
@@ -55,9 +55,9 @@ window.App = (function () {
       { id: 'gtools', label: 'Tools', pages: ['metronome', 'tuner'] }
     ],
     studio: [
-      { id: 'gsketch', label: 'Sketch', pages: ['song', 'ideas'] },
-      { id: 'gtrk', label: 'Tracks', pages: ['tracks', 'arrange'] },
-      { id: 'gpads', label: 'Pads', pages: ['pads'] }
+      { id: 'gstudio', label: 'Studio', pages: ['arrange', 'tracks'] }, // the DAW home
+      { id: 'gpads', label: 'Pads', pages: ['pads'] },
+      { id: 'gsketch', label: 'Sketch', pages: ['song', 'ideas'] }
     ]
   };
   // short member names for the strip (fall back to SPACE_LABELS)
@@ -65,7 +65,7 @@ window.App = (function () {
     fretboard: 'Neck', tab: 'Tab', notation: 'Notation', piano: 'Keys',
     chords: 'Chords', theory: 'Circle', songs: 'Songs', jam: 'Jam',
     trainer: 'Trainer', shed: 'Woodshed', metronome: 'Metronome', tuner: 'Tuner',
-    song: 'Song', ideas: 'Ideas', tracks: 'Loop', arrange: 'Arrange', pads: 'Pads'
+    song: 'Song', ideas: 'Ideas', tracks: 'Editor', arrange: 'Timeline', pads: 'Pads'
   };
 
   function groupOf(name) {
@@ -81,7 +81,7 @@ window.App = (function () {
   // ---- auto-update ----
   // version.json on GitHub is the source of truth. Web builds refresh through
   // the service worker; the APK build (file://) links to the new APK download.
-  var APP_VERSION = '0.60.0';
+  var APP_VERSION = '0.61.0';
   var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
 
   function verNum(v) {
