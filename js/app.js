@@ -80,7 +80,7 @@ window.App = (function () {
   // ---- auto-update ----
   // version.json on GitHub is the source of truth. Web builds refresh through
   // the service worker; the APK build (file://) links to the new APK download.
-  var APP_VERSION = '0.64.0';
+  var APP_VERSION = '0.65.0';
   var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
 
   function verNum(v) {
@@ -839,23 +839,47 @@ window.App = (function () {
       emit('sig', { sig: this.value, source: 'bar' });
     });
 
-    // metronome transport: one button, live on every tab
+    // THE transport button: one button, live on every tab, driving whichever
+    // clock the current space owns — the metronome in Practice, the loop or
+    // the song (on the Timeline) in the Studio. All transports are mutually
+    // exclusive via the transport:claim bus event.
     var met = document.getElementById('cx-met');
     if (met) {
+      var metRuns = false;
       met.innerHTML = icon('play', 14);
-      met.addEventListener('click', function () { emit('met:toggle', {}); });
-      on('met:state', function (d) {
-        var runs = !!(d && d.running);
+      function anyRunning() {
+        var eng = window.DAW && DAW.engine;
+        return metRuns || !!(eng && (eng.playing || eng.songPlaying));
+      }
+      function paintCx() {
+        var runs = anyRunning();
         met.classList.toggle('on', runs);
         met.innerHTML = runs ? icon('stop', 14) : icon('play', 14);
         if (!runs) met.classList.remove('tick');
+      }
+      met.addEventListener('click', function () {
+        var eng = window.DAW && DAW.engine;
+        if (space === 'studio' && eng) {
+          if (eng.songPlaying) { eng.songStop(); return; }
+          if (eng.playing) { eng.stop(); return; }
+          if (active === 'arrange') eng.songPlay();
+          else if (eng.tracks.length) eng.play();
+          else emit('met:toggle', {});
+          return;
+        }
+        emit('met:toggle', {});
       });
+      on('met:state', function (d) { metRuns = !!(d && d.running); paintCx(); });
+      on('st:state', paintCx);
+      on('st:tr', paintCx);
       var tickTimer = null;
-      on('met:beat', function () {
+      function cxTick() {
         met.classList.add('tick');
         if (tickTimer) clearTimeout(tickTimer);
         tickTimer = setTimeout(function () { met.classList.remove('tick'); }, 110);
-      });
+      }
+      on('met:beat', cxTick);
+      on('st:step', function (d) { if (d && d.step % 4 === 0) cxTick(); }); // studio beats pulse too
     }
 
     // mirror changes made anywhere else

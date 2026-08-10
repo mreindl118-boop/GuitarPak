@@ -92,6 +92,7 @@
           '</div>' +
         '</div>' +
         '<div class="muted small set-theme-note">How far back &ldquo;Keep the last take&rdquo; reaches. Everything you play is remembered for this long.</div>' +
+        '<div class="muted small set-theme-note">Time signature: the context-bar signature drives the metronome; the Studio loop and the Jam band currently play 4/4 (odd meters there are on the roadmap).</div>' +
         '<div class="set-sub">Idea playback voice</div>' +
         '<div class="fb-field">' +
           '<div class="seg" id="set-voice">' +
@@ -142,6 +143,12 @@
         '<label class="row tight small muted" style="gap:6px;margin-top:12px">' +
           '<input type="checkbox" id="set-midi-lumi">ROLI LUMI sync (experimental) &mdash; pushes the app&rsquo;s key, scale and degree colors to the LUMI&rsquo;s own lights (USB or Bluetooth)' +
         '</label>' +
+        '<div class="row tight" style="margin-top:8px">' +
+          '<label class="field">Root key color<input type="color" id="set-lumi-root"></label>' +
+          '<label class="field">In-scale color<input type="color" id="set-lumi-scale"></label>' +
+          '<button type="button" class="btn sm" id="set-lumi-reset" title="Back to the app palette (degree 1 + degree 5)">Match palette</button>' +
+          '<span class="muted small">LED colors render differently than the screen &mdash; dial these until the keybed looks right; every change pushes live.</span>' +
+        '</div>' +
         '<div class="row tight" style="margin-top:8px">' +
           '<button type="button" class="btn sm" id="set-midi-lumipush" title="Re-send key, scale, mode and colors to the LUMI right now">Push to LUMI now</button>' +
           '<span class="muted small" id="set-midi-sysex"></span>' +
@@ -546,6 +553,29 @@
       App.store.set('midi.lumiMode', this.value);
       if (App.midi) App.midi.lumiSync(); // re-push with the new mode
     });
+
+    var lumiRootIn = document.getElementById('set-lumi-root');
+    var lumiScaleIn = document.getElementById('set-lumi-scale');
+    function paintLumiCols() {
+      var cols = App.store.get('fb.colors', null) || [];
+      lumiRootIn.value = App.store.get('midi.lumiRoot', '') || cols[0] || '#ffab47';
+      lumiScaleIn.value = App.store.get('midi.lumiScale', '') || cols[4] || '#6ea8fe';
+    }
+    lumiRootIn.addEventListener('input', function () {
+      App.store.set('midi.lumiRoot', this.value);
+      if (App.midi) App.midi.lumiSync();
+    });
+    lumiScaleIn.addEventListener('input', function () {
+      App.store.set('midi.lumiScale', this.value);
+      if (App.midi) App.midi.lumiSync();
+    });
+    document.getElementById('set-lumi-reset').addEventListener('click', function () {
+      App.store.set('midi.lumiRoot', '');
+      App.store.set('midi.lumiScale', '');
+      paintLumiCols();
+      if (App.midi) App.midi.lumiSync();
+    });
+    paintLumiCols();
 
     function paintSysex() {
       var el = document.getElementById('set-midi-sysex');

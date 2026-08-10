@@ -564,6 +564,7 @@
 
   function play() {
     if (playing || !tracks.length) return;
+    App.emit('transport:claim', { owner: 'loop' }); // stops met/jam/song app-wide
     if (songPlaying) songStop(); // one transport at a time
     var ctx = ctxNow();
     ensureChannels();
@@ -700,6 +701,7 @@
 
   function songPlay(fromBeat) {
     if (songPlaying) return;
+    App.emit('transport:claim', { owner: 'song' });
     if (playing) stop(); // one transport at a time — session loop yields
     var ctx = ctxNow();
     ensureChannels();
@@ -786,6 +788,12 @@
   DAW.fxPlugins = fxPlugins;
   DAW.audioBufferToWav = audioBufferToWav;
   DAW.downloadBlob = downloadBlob;
+  App.on('transport:claim', function (d) {
+    if (!d) return;
+    if (d.owner !== 'loop' && playing) stop();
+    if (d.owner !== 'song' && songPlaying) songStop();
+  });
+
   DAW.engine = {
     get tracks() { return tracks; },
     set tracks(t) { tracks = t; if (playing) ensureChannels(); },

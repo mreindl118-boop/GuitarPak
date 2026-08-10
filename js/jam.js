@@ -724,6 +724,7 @@
     finishing = false;
     override = null;
     nextBarT = ctx.currentTime + 0.1;
+    App.emit('transport:claim', { owner: 'jam' });
     playing = true;
     App.wake.acquire('jam-run');
     timer = setInterval(tick, 25);
@@ -1364,6 +1365,7 @@
 
     // shared key: re-render palette + editor names on key/scale changes —
     // resolveToken reads the store live, so playback re-harmonizes by itself
+    App.on('transport:claim', function (d) { if (d && d.owner !== 'jam' && playing) stop(); });
     App.on('fb:scale', function () { renderPalette(); renderEditor(); });
     App.on('fb:set', function () { renderPalette(); renderEditor(); });
 

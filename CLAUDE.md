@@ -162,6 +162,11 @@ version.json      auto-update feed (source of truth for latest version)
 - New bus events: `note:input` {on, midi, vel, src, dur?} — user played a note
   on an on-screen instrument (piano QWERTY/touch emit it; capture listens
   alongside midi:note), `space` {space} after a workspace switch.
+- TRANSPORT EXCLUSIVITY (v0.65.0): `transport:claim` {owner: 'met'|'jam'|
+  'loop'|'song'} — every transport emits it before starting and stops itself
+  on any foreign claim; #cx-met drives the space's transport (met in
+  practice; loop, or the song on arrange, in studio) and pulses on met:beat
+  + st:step. Studio/jam are 4/4-hardcoded (noted in Settings).
 - Event bus: `App.on/emit`. New: `sig` {sig, source} (time signature changed —
   metronome and the bar mirror each other), `met:toggle` (request start/stop
   from anywhere), `met:state` {running}, `met:beat` {beat} (context-bar
