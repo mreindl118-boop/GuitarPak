@@ -63,14 +63,14 @@
     arrange: [
       { t: 'Arrange', x: 'The song timeline: every track is a lane, and clips of its pattern (or its audio) sit on a bars-and-beats ruler. Everything you see plays, in sync, through the mixer.' },
       { sel: '#ar-ruler', t: 'The ruler', x: 'Tap anywhere to jump the playhead there. DRAG along the ruler to draw a loop region — the Loop chip turns it on and off.' },
-      { sel: '#ar-lanes', t: 'Clips', x: 'Tap an empty spot on a lane to place a clip. Drag clips to move them (up/down hops between lanes of the same kind), Shift-tap to multi-select, right-click or Delete to remove.' },
+      { sel: '#ar-lanes', t: 'Clips', x: 'Tap an empty spot on a lane to place a clip; DOUBLE-TAP a clip to open its notes or drum steps in the editor. Drag clips to move them (up/down hops between lanes of the same kind), Shift-tap to multi-select, right-click or Delete to remove.' },
       { sel: '#ar-snap', t: 'Snap & zoom', x: 'Snap decides what dragging locks onto — whole bars down to free. Zoom with + and −, and Follow keeps the view chasing the playhead. Space plays and stops.' }
     ],
     tracks: [
       { t: 'Tracks', x: 'A loop workstation: every track loops in sync at the shared tempo. Drums get a step grid, synths and samplers get a piano roll colored by your key’s scale degrees.' },
       { sel: '#st-play', t: 'The loop', x: 'Play starts everything together — 1, 2 or 4 bars around. Export WAV renders your loop to a real audio file.' },
       { sel: '#st-list', t: 'Your tracks', x: 'Each row: arm Live (your MIDI/typing keys play its instrument), rename, Mute / Solo, volume, Edit to open its editor, × to delete.' },
-      { sel: '#st-editor', t: 'The editor', x: 'Whatever’s selected opens here — drum steps, the piano roll (tap to add notes, tap a note to remove), synth voice knobs, or the sampler’s file + root note. Every track also has an FX slot.' }
+      { sel: '#st-editor', t: 'The editor', x: 'Whatever’s selected opens here — drum steps (press and drag to paint), the piano roll (press empty space and DRAG to draw a note; drag notes to move, drag their right edge to stretch, tap to remove), synth voice knobs, or the sampler’s file + root note. Every track also has an FX slot.' }
     ],
     pads: [
       { t: 'Drum pads', x: 'Finger drums. Eight pads play your drum track’s kit — tap them, use Z X C V / A S D F, or hit them from MIDI keys with real velocity.' },

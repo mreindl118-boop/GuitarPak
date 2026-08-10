@@ -1,5 +1,5 @@
 {
-  "version": "0.50.0",
+  "version": "0.50.1",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "The Studio gets its ARRANGE view — a real song timeline, powered by OpenStudio's beat-domain transport (now fully merged into the soundLAB engine, one engine for everything). Every track is a lane: tap to place clips of its pattern, sampler lanes place the actual AUDIO with its waveform drawn on the clip. Drag clips along the timeline and between lanes, shift-tap to multi-select, right-click or Delete to remove. Tap the ruler to jump the playhead, drag it to draw a LOOP region. Lane headers carry mute/solo/volume and LIVE METERS. Snap (bar/beat/quarter/off), zoom, follow-playhead auto-scroll, Space to play/stop, and Export song renders the whole arrangement to WAV. Built for smoothness: the playhead is a single transform on the compositor, waveforms draw once, and 20 tracks scroll at full frame rate mid-playback."
+  "notes": "Piano-roll drawing is now impossible to miss: an empty roll says exactly what to do (press an empty spot and drag — that draws a note), the cursor shows a crosshair over the grid, and the caption spells out the whole gesture set (draw, drag to move, stretch the right edge, tap to remove, right-click to sweep-erase). And the FL move you were reaching for: DOUBLE-TAP any clip in the Arrange view and it opens that track's piano roll or drum steps in the editor."
 }
