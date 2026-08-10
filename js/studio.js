@@ -606,7 +606,8 @@
               (l === 1 ? '1/16' : l === 2 ? '1/8' : '1/4') + '</button>';
           }).join('') + '</div>' +
         '<button type="button" class="btn sm" id="st-clear">Clear notes</button>' +
-        '<span class="muted small">Tap to add · tap a note to remove · colors = scale degrees in your key</span>' +
+        '<span class="muted small"><b>Draw:</b> press empty space and drag · drag a note to move it · ' +
+          'drag its right edge to stretch · tap a note to remove · right-click sweeps away · colors = your key&rsquo;s degrees</span>' +
         '</div>' +
         '<div class="st-rollwrap"><svg id="st-roll" width="' + (46 + stepCols() * 22) + '" height="364"></svg></div>';
     }
@@ -650,6 +651,11 @@
         '" width="' + Math.max(8, n.d * 4 * colW - 2) + '" height="' + (rowH - 3) + '" rx="3" fill="' + fill + '"/>';
     });
     h += '<rect id="st-ph" x="' + x0 + '" y="0" width="' + colW + '" height="' + ((ROLL_HI - ROLL_LO + 1) * rowH) + '" fill="rgba(255,255,255,0.07)" style="display:none"/>';
+    if (!(t.notes || []).length) {
+      h += '<text x="' + (x0 + (cols * colW) / 2) + '" y="' + (((ROLL_HI - ROLL_LO + 1) * rowH) / 2) +
+        '" text-anchor="middle" font-size="13" fill="rgba(128,128,128,0.85)" pointer-events="none">' +
+        '✏ press an empty spot and drag — that draws a note</text>';
+    }
     svg.innerHTML = h;
   }
 
@@ -1168,7 +1174,7 @@
       '.st-cell.st-now{outline:2px solid rgba(255,255,255,0.5);outline-offset:-2px}' +
       '.st-rollwrap{overflow-x:auto;background:var(--card2);border:1px solid var(--line);border-radius:10px}' +
       '.st-note{cursor:grab}' +
-      '#st-roll{touch-action:none}' +
+      '#st-roll{touch-action:none;cursor:crosshair}' +
       '.st-cell{touch-action:none}' +
       '.st-drag{cursor:grab;color:var(--muted);display:inline-flex;padding:4px 2px;touch-action:none}' +
       '.st-row.st-dragging{opacity:0.45}' +
@@ -1212,6 +1218,13 @@
     App.on('fb:scale', renderSong);
     App.on('fb:set', renderSong);
     App.on('tempo', renderSong);
+
+    // another page asks to open a track's editor (Arrange double-tap)
+    App.on('st:edit', function (d) {
+      if (!d || !trackById(d.trackId)) return;
+      trk.sel = d.trackId;
+      if (App.active === 'tracks') { renderTracks(); renderEditor2(); }
+    });
 
     // settings changed the studio prefs (retro length / playback voice)
     App.on('sd:prefs', function () {

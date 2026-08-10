@@ -282,8 +282,10 @@
     els.ruler.addEventListener('pointerup', rulerUp);
     els.ruler.addEventListener('pointercancel', rulerUp);
 
-    // lanes: tap empty = add clip; drag clips = move (multi-select aware)
+    // lanes: tap empty = add clip; drag clips = move (multi-select aware);
+    // double-tap a clip = open its track's editor (the FL clip -> roll flow)
     var drag = null;
+    var lastTap = { id: null, t: 0 };
     els.lanes.addEventListener('pointerdown', function (e) {
       var clipEl = e.target.closest ? e.target.closest('.ar-clip') : null;
       e.preventDefault();
@@ -294,6 +296,17 @@
           deleteClips([id]);
           return;
         }
+        var now = performance.now();
+        if (lastTap.id === id && now - lastTap.t < 350) {
+          lastTap = { id: null, t: 0 };
+          var f0 = clipById(id);
+          if (f0) {
+            App.emit('st:edit', { trackId: f0.track.id });
+            App.switchTo('tracks');
+          }
+          return;
+        }
+        lastTap = { id: id, t: now };
         if (e.shiftKey) {
           if (sel.indexOf(id) === -1) sel.push(id); else sel = sel.filter(function (x) { return x !== id; });
         } else if (sel.indexOf(id) === -1) {
@@ -465,8 +478,9 @@
           '</div>' +
         '</div>' +
         '<div class="muted small" style="margin-top:10px">Tap a lane to place a clip of that track&rsquo;s pattern (sampler lanes with a ' +
-          'sample place the AUDIO with its waveform). Drag clips to move them — up/down hops lanes of the same kind. Shift-tap ' +
-          'multi-selects; right-click or Delete removes. Tap the ruler to jump the playhead, drag it to draw a loop. Space plays/stops.</div>' +
+          'sample place the AUDIO with its waveform). <b>Double-tap a clip to open its notes/steps in the editor.</b> Drag clips to ' +
+          'move them — up/down hops lanes of the same kind. Shift-tap multi-selects; right-click or Delete removes. Tap the ruler ' +
+          'to jump the playhead, drag it to draw a loop. Space plays/stops.</div>' +
       '</div>';
 
     els.wrap = rootEl.querySelector('.ar-wrap');
