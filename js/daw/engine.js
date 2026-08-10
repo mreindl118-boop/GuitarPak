@@ -302,16 +302,18 @@
       return wetDry(ctx, { input: inNode, output: delay }, mix);
     }
     if (fx.type === 'drive') {
-      var drive = 0.25 + mix * 0.6;
+      // mix is a TRUE wet/dry here (it was hard-wired 100% wet — deafening,
+      // and the slider seemed dead); it also scales the saturation amount
+      var drive = 0.2 + mix * 0.5;
       var pre = ctx.createGain();
-      pre.gain.value = 1 + drive * 2;
+      pre.gain.value = 1 + drive * 1.5;
       var shaper = ctx.createWaveShaper();
       shaper.curve = distortionCurve(drive);
       shaper.oversample = '4x';
       var post = ctx.createGain();
-      post.gain.value = 1 / (1 + drive);
+      post.gain.value = 0.8 / (1 + drive);
       pre.connect(shaper); shaper.connect(post);
-      return wetDry(ctx, { input: pre, output: post }, 1);
+      return wetDry(ctx, { input: pre, output: post }, mix);
     }
     var pass = ctx.createGain();
     return { input: pass, output: pass, dispose: function () { try { pass.disconnect(); } catch (e) { /* ok */ } } };
