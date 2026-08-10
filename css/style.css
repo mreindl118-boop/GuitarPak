@@ -234,6 +234,36 @@ html, body {
 
 /* ---------- persistent context bar (key / scale / mode / bpm / time) ---------- */
 
+/* sub-tab strip: members of the active tab group (nav shows the group) */
+.subnav {
+  flex-basis: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 6px 2px 2px;
+}
+
+.subnav[hidden] { display: none; }
+
+.subtab {
+  background: var(--card2);
+  border: 1px solid var(--ctl-border);
+  border-radius: 999px;
+  padding: 5px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 1.1px;
+  text-transform: uppercase;
+  color: var(--label);
+  transition: border-color 120ms ease, color 120ms ease;
+}
+
+.subtab.active {
+  border-color: rgba(255, 171, 71, 0.7);
+  color: var(--accent);
+}
+
 .ctxbar {
   flex-basis: 100%;
   display: flex;

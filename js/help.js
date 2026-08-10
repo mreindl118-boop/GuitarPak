@@ -195,6 +195,7 @@
     openTour(null, [
       { t: 'Welcome to soundLAB', x: 'Two workspaces in one app: Practice (fretboard, piano, jam band, tuner…) and the Studio (record ideas, build loops, finger-drum). The button next to the page menu slides between them.' },
       { t: 'One musical brain', x: 'The bar at the top — key, scale, tempo — is shared by EVERYTHING. Change it once and the fretboard re-colors, the jam re-harmonizes, and the Studio follows.' },
+      { t: 'Grouped pages', x: 'Each entry in the page menu is a small group of related views — the pill strip under the top bar flips between them (Neck / Tab / Notation / Keys, Songs / Jam, Loop / Arrange…).' },
       { t: 'Whenever you’re lost', x: 'Tap the ? in the top bar — it explains whichever page you’re on, step by step. Try it on every page once.' }
     ]);
   }

@@ -42,13 +42,46 @@ window.App = (function () {
     song: 'Song', arrange: 'Arrange', tracks: 'Tracks', pads: 'Pads', ideas: 'Ideas'
   };
   var PANEL_ORDER = SPACES.practice.concat(SPACES.studio).concat(['settings']);
+  // Tab GROUPS: related pages share one entry in the page menu; the members
+  // show as a sub-tab strip under the context bar. Pages/modules are untouched
+  // — this is navigation only, so cross-links (fb:practice, st:edit, plugin
+  // pages) keep addressing pages by id and the owning group follows along.
+  var GROUPS = {
+    practice: [
+      { id: 'ginst', label: 'Instrument', pages: ['fretboard', 'tab', 'notation', 'piano'] },
+      { id: 'gtheory', label: 'Theory', pages: ['chords', 'theory'] },
+      { id: 'gplay', label: 'Play', pages: ['songs', 'jam'] },
+      { id: 'gprac', label: 'Practice', pages: ['trainer', 'shed'] },
+      { id: 'gtools', label: 'Tools', pages: ['metronome', 'tuner'] }
+    ],
+    studio: [
+      { id: 'gsketch', label: 'Sketch', pages: ['song', 'ideas'] },
+      { id: 'gtrk', label: 'Tracks', pages: ['tracks', 'arrange'] },
+      { id: 'gpads', label: 'Pads', pages: ['pads'] }
+    ]
+  };
+  // short member names for the strip (fall back to SPACE_LABELS)
+  var SUB_LABELS = {
+    fretboard: 'Neck', tab: 'Tab', notation: 'Notation', piano: 'Keys',
+    chords: 'Chords', theory: 'Circle', songs: 'Songs', jam: 'Jam',
+    trainer: 'Trainer', shed: 'Woodshed', metronome: 'Metronome', tuner: 'Tuner',
+    song: 'Song', ideas: 'Ideas', tracks: 'Loop', arrange: 'Arrange', pads: 'Pads'
+  };
+
+  function groupOf(name) {
+    var gs = GROUPS.practice.concat(GROUPS.studio);
+    for (var i = 0; i < gs.length; i++) {
+      if (gs[i].pages.indexOf(name) !== -1) return gs[i];
+    }
+    return null;
+  }
   var space = 'practice';
   var prevTab = null; // where the gear came from, to toggle back to
 
   // ---- auto-update ----
   // version.json on GitHub is the source of truth. Web builds refresh through
   // the service worker; the APK build (file://) links to the new APK download.
-  var APP_VERSION = '0.53.0';
+  var APP_VERSION = '0.54.0';
   var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
 
   function verNum(v) {
@@ -515,11 +548,26 @@ window.App = (function () {
     var nav = document.getElementById('nav-select');
     if (!nav) return;
     var h = '';
-    SPACES[space].forEach(function (name) {
-      h += '<option value="' + name + '">' + SPACE_LABELS[name] + '</option>';
+    GROUPS[space].forEach(function (g) {
+      h += '<option value="' + g.id + '">' + g.label + '</option>';
     });
     nav.innerHTML = h;
-    if (active && SPACES[space].indexOf(active) !== -1) nav.value = active;
+    var g = active && groupOf(active);
+    if (g && GROUPS[space].indexOf(g) !== -1) nav.value = g.id;
+  }
+
+  function paintSubnav(name) {
+    var el = document.getElementById('subnav');
+    if (!el) return;
+    var g = groupOf(name);
+    if (!g || g.pages.length < 2) { el.hidden = true; el.innerHTML = ''; return; }
+    var h = '';
+    g.pages.forEach(function (p) {
+      h += '<button type="button" class="subtab' + (p === name ? ' active' : '')
+        + '" data-page="' + p + '">' + (SUB_LABELS[p] || SPACE_LABELS[p] || p) + '</button>';
+    });
+    el.innerHTML = h;
+    el.hidden = false;
   }
 
   function paintGear() {
@@ -542,6 +590,8 @@ window.App = (function () {
       if (modules.settings && modules.settings.onShow) {
         try { modules.settings.onShow(); } catch (e) { console.error('settings.onShow', e); }
       }
+      var sn = document.getElementById('subnav');
+      if (sn) sn.hidden = true; // strip belongs to the page under the overlay
       paintGear();
       return;
     }
@@ -551,8 +601,11 @@ window.App = (function () {
       try { modules[active].onHide(); } catch (e) { console.error(active + '.onHide', e); }
     }
     active = name;
+    var g = groupOf(name);
     var nav = document.getElementById('nav-select');
-    if (nav && nav.value !== name) nav.value = name;
+    if (nav && g && nav.value !== g.id) nav.value = g.id;
+    if (g) store.set('app.gtab.' + g.id, name); // remember the member per group
+    paintSubnav(name);
     document.querySelectorAll('.tab').forEach(function (b) {
       b.classList.toggle('active', b.dataset.panel === name);
     });
@@ -580,6 +633,8 @@ window.App = (function () {
     SPACE_LABELS[id] = String(label || id).slice(0, 20);
     SPACES[sp].push(id);
     PANEL_ORDER.push(id);
+    GROUPS[sp].push({ id: 'gpl-' + id, label: SPACE_LABELS[id], pages: [id] });
+    SUB_LABELS[id] = SPACE_LABELS[id];
     modules[id] = mod;
     try {
       mod.init(sec);
@@ -815,8 +870,23 @@ window.App = (function () {
     var navSel = document.getElementById('nav-select');
     if (navSel) {
       navSel.addEventListener('change', function () {
-        if (PANEL_ORDER.indexOf(this.value) !== -1) switchTo(this.value);
+        var gid = this.value, gs = GROUPS[space];
+        for (var i = 0; i < gs.length; i++) {
+          if (gs[i].id === gid) {
+            var pg = store.get('app.gtab.' + gid, gs[i].pages[0]);
+            if (gs[i].pages.indexOf(pg) === -1) pg = gs[i].pages[0];
+            switchTo(pg);
+            break;
+          }
+        }
         this.blur(); // keep focus off the menu so keyboard input reaches the page
+      });
+    }
+    var subEl = document.getElementById('subnav');
+    if (subEl) {
+      subEl.addEventListener('click', function (e) {
+        var b = e.target.closest('.subtab');
+        if (b) { switchTo(b.dataset.page); b.blur(); }
       });
     }
     var tabsEl = document.getElementById('tabs');

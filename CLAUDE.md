@@ -119,6 +119,16 @@ version.json      auto-update feed (source of truth for latest version)
   App.switchTo cross spaces automatically; per-space last tab in app.tab /
   app.tabStudio, current space in app.space, <html data-space>. The context
   bar, clock, key and MIDI service are shared across both — that's the point.
+- TAB GROUPS (app.js GROUPS, v0.54.0): the nav select lists GROUPS of pages,
+  not pages — practice: Instrument (fretboard/tab/notation/piano), Theory
+  (chords/theory), Play (songs/jam), Practice (trainer/shed), Tools
+  (metronome/tuner); studio: Sketch (song/ideas), Tracks (tracks/arrange),
+  Pads. Members show as a pill strip (#subnav, .subtab) under the context
+  bar; single-page groups hide the strip; each group remembers its last
+  member (app.gtab.<gid>). NAVIGATION ONLY — pages/modules/ids unchanged, so
+  App.switchTo(pageId) and every bus cross-link still work (the owning group
+  follows), and App.addPage wraps plugin pages in their own gpl-<id> group.
+  The settings overlay hides the strip; leaving settings repaints it.
 - Context bar (index.html #ctxbar, wired in app.js): the single home for key/
   scale/mode/BPM/time signature, always visible under the tabs. It reads the
   shared stores (fb.root/fb.scale/fb.mode, met.bpm, met.sig) and pushes changes
