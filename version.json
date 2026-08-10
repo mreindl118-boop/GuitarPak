@@ -1,5 +1,5 @@
 {
-  "version": "0.43.1",
+  "version": "0.44.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "The soundLAB logo, take two: lighter weight, wide-open letters, smooth curves — instantly legible at any size — presented on the app's dark ground. Same idea underneath (every stem is a piano black key: flat top, rounded bottom; LAB in amber), now easy on the eyes."
+  "notes": "soundLAB grows a second workspace: the Studio. Tap the Studio button in the header and a screen wipe slides you over to the songwriting side — same key, same tempo, same everything. First tools: a capture button (the red dot in the top bar, on EVERY page) records whatever you play — ROLI, typing keys, touch piano — into your song's Ideas, tagged with key and tempo; retro-capture keeps the take you played BEFORE you hit record (last 30 seconds, always remembered); ideas play back on a new expressive synth ported from the OpenStudio DAW (full ROLI slide/pressure support, more of it coming). This is phase one of the full DAW — sections, lyrics, tracks and mixing land next."
 }
