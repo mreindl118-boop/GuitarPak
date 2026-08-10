@@ -328,6 +328,9 @@
 
   function paintScaleLights() {
     allDark();
+    // a LUMI paints its own keybed (scale colors via SysEx + native pressed
+    // lights) — note-on lighting on top just fights it and looks broken
+    if (App.store.get('midi.lumi', false) === true) return;
     if (lightsMode() !== 'scale' || !hasOutput()) return;
     for (var m = 24; m <= 108; m++) {
       var v = degVel(m);
@@ -342,6 +345,7 @@
   }
 
   function echoNote(d) {
+    if (App.store.get('midi.lumi', false) === true) return; // LUMI lights itself
     if (!d || lightsMode() !== 'echo') return;
     if (d.on) light(d.midi, degVel(d.midi) || 60); else dark(d.midi);
   }
