@@ -1,5 +1,5 @@
 /* GuitarLab service worker — cache-first so the app works fully offline once visited. */
-var CACHE = 'guitarlab-v81';
+var CACHE = 'guitarlab-v82';
 var ASSETS = [
   '.',
   'index.html',
@@ -63,16 +63,7 @@ var ASSETS = [
   'samples/nylon/E2.mp3', 'samples/nylon/A2.mp3', 'samples/nylon/D3.mp3',
   'samples/nylon/G3.mp3', 'samples/nylon/B3.mp3', 'samples/nylon/E4.mp3',
   'samples/nylon/A4.mp3', 'samples/nylon/D5.mp3', 'samples/nylon/E5.mp3',
-  'samples/nylon/A5.mp3',
-  'samples/piano2/C3.mp3', 'samples/piano2/E3.mp3', 'samples/piano2/A3.mp3',
-  'samples/piano2/C4.mp3', 'samples/piano2/E4.mp3', 'samples/piano2/A4.mp3',
-  'samples/piano2/C5.mp3',
-  'samples/epiano/C3.mp3', 'samples/epiano/E3.mp3', 'samples/epiano/A3.mp3',
-  'samples/epiano/C4.mp3', 'samples/epiano/E4.mp3', 'samples/epiano/A4.mp3',
-  'samples/epiano/C5.mp3',
-  'samples/organ/C3.mp3', 'samples/organ/E3.mp3', 'samples/organ/A3.mp3',
-  'samples/organ/C4.mp3', 'samples/organ/E4.mp3', 'samples/organ/A4.mp3',
-  'samples/organ/C5.mp3'
+  'samples/nylon/A5.mp3'
 ];
 
 self.addEventListener('install', function (e) {
