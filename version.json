@@ -1,5 +1,5 @@
 {
-  "version": "0.55.0",
+  "version": "0.56.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "DYNAMIC LOOPING: editing tracks while the Studio loop plays now takes effect almost instantly (~150 ms) instead of waiting for the loop to come back around. Under the hood the live loop is scheduled step-by-step in a short rolling window, so painted drum steps, drawn piano-roll notes, pad hits and kit/voice preset swaps all land mid-cycle — and changing a preset no longer silences the rest of the loop. WAV export still renders the full loop bit-perfect."
+  "notes": "The jam band got a SOUND OVERHAUL. Prebuilt bands — Unplugged, Lounge, Organ trio, Rock club, Boom bap, Dream — set the whole rhythm section in one tap, then every piece is tweakable right in the mixer: 4 drum kits (Studio / 808 / 909 / Lo-fi, powered by the Studio engine's synth kit), bass tone (fingered / picked) moved into the mixer, and three NEW sampled comp instruments — grand piano, e-piano and organ — joining the guitars, keys and pad. Samples now pre-load when you open the Jam page so the first Play already sounds like the band. Also: Woodshed (the practice game) is now the FIRST pill in the Practice tab, and there's a new Windows desktop download (README) — a tiny installer that gives soundLAB its own desktop window with working MIDI."
 }
