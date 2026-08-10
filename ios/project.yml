@@ -13,12 +13,13 @@ targets:
     resources:
       - path: WebAssets
         type: folder
+      - Assets.xcassets
     info:
       path: Info.plist
       properties:
         CFBundleDisplayName: soundLAB
-        CFBundleShortVersionString: "0.57.0"
-        CFBundleVersion: "77"
+        CFBundleShortVersionString: "0.58.0"
+        CFBundleVersion: "78"
         NSMicrophoneUsageDescription: >-
           GuitarLab listens to your guitar to run the tuner and the
           note-finder game. Audio never leaves the device.
@@ -39,4 +40,5 @@ targets:
     settings:
       base:
         TARGETED_DEVICE_FAMILY: "1,2"   # iPhone + iPad
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         SWIFT_VERSION: "5.9"
