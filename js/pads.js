@@ -54,13 +54,30 @@
     return list[0] || null;
   }
 
+  // no drum track yet? make one — pads must work the moment the page opens
+  function ensureTrack() {
+    if (padTrack() || !(window.DAW && DAW.engine)) return;
+    var s = [];
+    for (var l = 0; l < 8; l++) { var r = []; for (var i = 0; i < 64; i++) r.push(0); s.push(r); }
+    DAW.engine.tracks.push({
+      id: 'tp' + Date.now().toString(36), name: 'Drums', kind: 'drums', voice: 'keys',
+      synth: { cutoff: 0, attack: null, release: null, glide: null },
+      sampler: { rootNote: 60, loop: false, name: '' },
+      steps: s, notes: null, fx: { type: 'none', mix: 0.3 },
+      mix: { vol: 80, mute: false, solo: false }
+    });
+    App.store.set('st.tracks', DAW.engine.tracks);
+  }
+
   function laneForMidi(midi) {
     if (mode() === 'gm') {
       var l = GM_MAP[midi];
       return l == null ? null : l;
     }
-    var d = midi - base();
-    return (d >= 0 && d < 8) ? d : null;
+    // octave-agnostic: a keyboard shifted up/down (LUMI octave buttons)
+    // still lands on the pads — offsets 0-7 within ANY octave of the base
+    var d = ((midi - base()) % 12 + 12) % 12;
+    return d < 8 ? d : null;
   }
 
   function midiForLane(lane) {
@@ -364,7 +381,7 @@
 
   App.register('pads', {
     init: init,
-    onShow: function () { render(); paintControls(); lightBase(); },
+    onShow: function () { ensureTrack(); render(); paintControls(); lightBase(); },
     onHide: function () { rec = false; darkBase(); paintControls(); },
     onKey: function (e) {
       if (e.repeat || e.type !== 'keydown') return;
