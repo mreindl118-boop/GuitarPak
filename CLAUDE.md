@@ -56,6 +56,15 @@ js/studio.js      STUDIO workspace (DAW phase one): registers 'song' (sketch-
                   Captures midi:note + note:input into ideas (notes tagged
                   key/bpm/date, store ideas.list, song.name); 30s retro buffer
                   ("keep what I just played"); playback via the studio synth.
+js/help.js        (?) button + guided page tours (TOURS per page id, spotlight
+                  ring + card overlay, first-run welcome; help.seen/help.done)
+js/plugins.js     window.SoundLab plugin API v1: registerPage (App.addPage),
+                  registerFx (DAW.fxPlugins, checked first by buildFx — must
+                  work on OfflineAudioContext too), registerSynthPreset, bus +
+                  app/daw/theory access. Stored plugins (plugins.list, 100KB
+                  cap, per-plugin enable/error) run right after boot; loaded
+                  from Settings > Plugins. Docs PLUGINS.md; sample plugin
+                  plugins/sample-lofi.js (Lo-fi fx + Glass bell voice).
 js/pads.js        drum-pad controller page ('pads', studio): 8 velocity pads
                   on the pad drum track's live channel; touch + ZXCV/ASDF +
                   MIDI (pads.mode 'roli' chromatic-from-base | 'gm' drum map);
