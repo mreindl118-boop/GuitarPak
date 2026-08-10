@@ -81,7 +81,7 @@ window.App = (function () {
   // ---- auto-update ----
   // version.json on GitHub is the source of truth. Web builds refresh through
   // the service worker; the APK build (file://) links to the new APK download.
-  var APP_VERSION = '0.58.0';
+  var APP_VERSION = '0.59.0';
   var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
 
   function verNum(v) {
@@ -204,7 +204,10 @@ window.App = (function () {
   function getAudio() {
     if (!audioCtx) {
       var Ctx = window.AudioContext || window.webkitAudioContext;
-      audioCtx = new Ctx();
+      // explicit low-latency request — some WebViews default higher; the
+      // real number lands in baseLatency/outputLatency (shown in Settings)
+      try { audioCtx = new Ctx({ latencyHint: 'interactive' }); }
+      catch (e) { audioCtx = new Ctx(); }
       var speakers = audioCtx.destination;
       masterGain = audioCtx.createGain();
       masterGain.gain.value = volPref() / 100;

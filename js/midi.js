@@ -378,6 +378,9 @@
     allDark: allDark,
     lumiSync: lumiSync,
     setLights: setLights,
-    get lights() { return lightsMode(); }
+    get lights() { return lightsMode(); },
+    // colors/scale need SysEx: the browser permission can be silently
+    // declined, which made LUMI sync fail with no visible error
+    get sysexOk() { return native ? true : !!(access && access.sysexEnabled); }
   };
 })();

@@ -49,6 +49,8 @@
         '<label class="row tight small muted" style="gap:6px;margin-top:12px">' +
           '<input type="checkbox" id="set-click">Metronome click during Studio playback (the loop, the Arrange song, and pad recording) &mdash; a global setting, also toggleable on the Pads page' +
         '</label>' +
+        '<div class="set-sub">Latency</div>' +
+        '<div class="muted small" id="set-latency">&mdash;</div>' +
         '<div class="set-sub">Guitar</div>' +
         '<div class="fb-field">' +
           '<div class="seg" id="set-tone">' +
@@ -140,6 +142,10 @@
         '<label class="row tight small muted" style="gap:6px;margin-top:12px">' +
           '<input type="checkbox" id="set-midi-lumi">ROLI LUMI sync (experimental) &mdash; pushes the app&rsquo;s key, scale and degree colors to the LUMI&rsquo;s own lights (USB or Bluetooth)' +
         '</label>' +
+        '<div class="row tight" style="margin-top:8px">' +
+          '<button type="button" class="btn sm" id="set-midi-lumipush" title="Re-send key, scale, mode and colors to the LUMI right now">Push to LUMI now</button>' +
+          '<span class="muted small" id="set-midi-sysex"></span>' +
+        '</div>' +
         '<div class="row" style="margin-top:8px">' +
           '<label class="field">LUMI light mode<select id="set-midi-lumimode">' +
             '<option value="scale">Scale colors (app palette)</option>' +
@@ -541,6 +547,24 @@
       if (App.midi) App.midi.lumiSync(); // re-push with the new mode
     });
 
+    function paintSysex() {
+      var el = document.getElementById('set-midi-sysex');
+      if (!el || !App.midi) return;
+      if (!App.midi.ready) { el.textContent = ''; return; }
+      el.textContent = App.midi.sysexOk
+        ? 'SysEx OK — colors can reach the LUMI.'
+        : 'SysEx BLOCKED: the browser permission was declined, so key/scale/COLORS cannot reach the LUMI. Reload and allow the MIDI prompt that mentions SysEx.';
+    }
+    document.getElementById('set-midi-lumipush').addEventListener('click', function () {
+      if (App.midi) {
+        if (!App.store.get('midi.lumi', false)) { App.store.set('midi.lumi', true); lumiChk.checked = true; }
+        App.midi.lumiSync();
+      }
+      paintSysex();
+    });
+    App.on('midi:state', paintSysex);
+    paintSysex();
+
     paintMidi();
   }
 
@@ -555,6 +579,26 @@
       if (w) w.checked = App.store.get('app.keepAwake', true) !== false;
       var v = document.getElementById('set-vol');
       if (v) { v.value = String(App.volume); var vv = document.getElementById('set-vol-val'); if (vv) vv.textContent = App.volume + '%'; }
+      // live audio-latency readout: shows WHERE delay comes from. The app
+      // schedules interactive notes at currentTime with a 4ms attack — big
+      // numbers here are the output chain (Bluetooth audio ~150-300ms).
+      var lat = document.getElementById('set-latency');
+      if (lat) {
+        try {
+          var ctx = App.getAudio();
+          var base = Math.round((ctx.baseLatency || 0) * 1000);
+          var out = Math.round((ctx.outputLatency || 0) * 1000);
+          var total = base + out;
+          var msg = 'Audio engine ' + base + ' ms + output device ' + out + ' ms = ~' + total + ' ms to your ears.';
+          if (total > 100) {
+            msg += ' That is HIGH — almost always Bluetooth headphones/speakers (they add 150-500 ms). ' +
+              'For live playing use a wired output or the device speaker; Bluetooth MIDI IN is fine (~15 ms), it is Bluetooth audio OUT that lags.';
+          } else {
+            msg += ' Good for live playing.';
+          }
+          lat.textContent = msg;
+        } catch (e) { lat.textContent = 'Audio not started yet — tap anywhere first, then reopen Settings.'; }
+      }
     }
   });
 })();
