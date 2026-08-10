@@ -1,5 +1,5 @@
 {
-  "version": "0.62.0",
+  "version": "0.63.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/soundLAB-alpha.apk",
-  "notes": "PERFORM like ROLI Studio Player: the Keys page grew SMART CHORDS (in-scale keys play full diatonic triads/7ths — works in every scale — with +Bass and a strum slider) and an ARPEGGIATOR (1/8, triplet or 1/16 at the shared tempo; up/down/up-down; 1-2 octaves; Hold latch) — both layered over ANY voice, grand or the MPE synth presets. Studio phase 2 starters: + Synth / + Drums / + Sampler buttons right on the Timeline and FL-style CLIP RESIZE (drag a clip's right edge, snap-aware). LUMI fix: when LUMI sync is on, the app no longer fights the keyboard's own display — the note-light modes auto-stand-down, so the SysEx scale colors (root + in-scale, the hardware's two custom slots) show clean."
+  "notes": "PLAYED vs NEXT, unmistakable. Practice guidance now clearly separates the CURRENT note from the UPCOMING one everywhere: on screen the target wears the solid accent ring while the next note gets a dashed, gently pulsing ring; on your MIDI keyboard the current key is lit solid and the NEXT key BLINKS — solid-vs-blinking reads on every keybed, including the LUMI (whose own lighting normalizes brightness, which is why the old bright/dim pair looked identical). Applies to both the auto practice runner and Guide mode on the Keys page."
 }

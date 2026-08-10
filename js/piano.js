@@ -647,18 +647,30 @@
 
   // LED guidance on a connected MIDI keyboard: the sounding note bright, the
   // upcoming note dim — "play this, this is next". Cleared on stop.
-  var led = { cur: -1, next: -1 };
+  var led = { cur: -1, next: -1, blink: null, on: false };
 
   function ledGuide(cur, next) {
     if (!App.midi || !App.midi.hasOutput) return;
     if (led.cur !== -1 && led.cur !== cur && led.cur !== next) App.midi.dark(led.cur);
     if (led.next !== -1 && led.next !== next && led.next !== cur) App.midi.dark(led.next);
     if (cur !== -1) App.midi.light(cur, 120);
-    if (next !== -1 && next !== cur) App.midi.light(next, 25);
     led.cur = cur; led.next = next;
+    // the NEXT note blinks — solid vs blinking reads on every keybed, even
+    // ones (LUMI) that normalize incoming-note brightness
+    if (led.blink) { clearInterval(led.blink); led.blink = null; }
+    if (next !== -1 && next !== cur) {
+      led.on = true;
+      App.midi.light(next, 45);
+      led.blink = setInterval(function () {
+        if (led.next === -1) { clearInterval(led.blink); led.blink = null; return; }
+        led.on = !led.on;
+        if (led.on) App.midi.light(led.next, 45); else App.midi.dark(led.next);
+      }, 320);
+    }
   }
 
   function ledClear() {
+    if (led.blink) { clearInterval(led.blink); led.blink = null; }
     if (App.midi && App.midi.hasOutput) App.midi.allDark();
     led.cur = led.next = -1;
   }
@@ -741,26 +753,47 @@
     }
   }
 
-  function ppRing(midi) {
+  function ppRing(midi, nextMidi) {
     var svg = document.getElementById('pn-svg');
     if (!svg) return;
     var rot = document.getElementById('pn-rot');
-    var ring = document.getElementById('pn-now');
+    var mk = function (id, cls) {
+      var r = document.getElementById(id);
+      if (!r) {
+        r = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        r.setAttribute('id', id);
+        r.setAttribute('r', '15.5');
+        r.setAttribute('fill', 'none');
+        r.setAttribute('pointer-events', 'none');
+        if (cls) r.setAttribute('class', cls);
+        rot.appendChild(r);
+      }
+      return r;
+    };
+    // NOW: solid accent ring. NEXT: dashed, dimmer, gently pulsing — "you
+    // are here" vs "this one's coming" at a glance.
+    var ring = mk('pn-now');
+    ring.setAttribute('stroke', 'var(--accent)');
+    ring.setAttribute('stroke-width', '3.5');
     var g = svg.querySelector('.pn-dotg[data-midi="' + midi + '"]');
-    if (!g) { if (ring) ring.setAttribute('opacity', '0'); return; }
-    if (!ring) {
-      ring = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-      ring.setAttribute('id', 'pn-now');
-      ring.setAttribute('r', '15.5');
-      ring.setAttribute('fill', 'none');
-      ring.setAttribute('stroke', 'var(--accent)');
-      ring.setAttribute('stroke-width', '3.5');
-      ring.setAttribute('pointer-events', 'none');
-      rot.appendChild(ring);
+    if (!g) ring.setAttribute('opacity', '0');
+    else {
+      ring.setAttribute('opacity', '1');
+      ring.setAttribute('cx', g.getAttribute('data-cx'));
+      ring.setAttribute('cy', g.getAttribute('data-cy'));
     }
-    ring.setAttribute('opacity', '1');
-    ring.setAttribute('cx', g.getAttribute('data-cx'));
-    ring.setAttribute('cy', g.getAttribute('data-cy'));
+    var nring = mk('pn-nxt', 'pn-nxtring');
+    nring.setAttribute('stroke', 'var(--accent)');
+    nring.setAttribute('stroke-width', '2.5');
+    nring.setAttribute('stroke-dasharray', '5 4');
+    var g2 = nextMidi != null && nextMidi !== midi
+      ? svg.querySelector('.pn-dotg[data-midi="' + nextMidi + '"]') : null;
+    if (!g2) { nring.style.display = 'none'; } // display, not opacity — the pulse animation owns opacity
+    else {
+      nring.style.display = '';
+      nring.setAttribute('cx', g2.getAttribute('data-cx'));
+      nring.setAttribute('cy', g2.getAttribute('data-cy'));
+    }
   }
 
   function ppDraw() {
@@ -771,7 +804,7 @@
     if (hit) {
       var spn = 60 / pp.bpm / pp.rate;
       pressKey(hit.midi, Math.max(120, spn * 700));
-      ppRing(hit.midi);
+      ppRing(hit.midi, hit.next !== -1 ? hit.next : null);
       ledGuide(hit.midi, hit.next);
       showFinger(pp.seq[hit.step % pp.seq.length]);
       ppStatus((hit.step % pp.seq.length) + 1 + ' / ' + pp.seq.length);
@@ -794,7 +827,7 @@
     var node = pp.path[pathIdx];
     var nxt = pp.path[pp.seq[(pp.idx + 1) % pp.seq.length]];
     pp.target = node.midi;
-    ppRing(node.midi);
+    ppRing(node.midi, nxt ? nxt.midi : null);
     ledGuide(node.midi, nxt ? nxt.midi : -1);
     showFinger(pathIdx);
     var pf = preferFlat();
@@ -1032,6 +1065,8 @@
       '.pn-stage.pn-v{overflow-x:visible;touch-action:manipulation;display:flex;justify-content:center}' +
       '.pn-stage.pn-v svg{width:min(360px,94%);height:auto}' +
       '.pn-key{cursor:pointer;transition:fill 60ms ease}' +
+      '.pn-nxtring{animation:pn-nx 1.1s ease-in-out infinite}' +
+      '@keyframes pn-nx{0%,100%{opacity:0.6}50%{opacity:0.25}}' +
       // ivory + ebony in both themes — this is the instrument, not chrome
       '.pn-w{fill:#f7f3ea;stroke:#b9b0a2;stroke-width:1}' +
       '.pn-b{fill:#221d20;stroke:#000;stroke-width:1}' +
