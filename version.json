@@ -1,5 +1,5 @@
 {
-  "version": "0.65.1",
+  "version": "0.66.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/soundLAB-alpha.apk",
-  "notes": "SOUND QUALITY PASS. Fixed: on the Pads page your keyboard fired BOTH drums and piano (leftover from the pads move) — pads own the keys there now. Chords through the synth presets sounded harsh because 3-5 full-velocity multi-oscillator voices stacked into clipping: chord notes now share the energy, the live synth voice is trimmed, and a gentle app-wide LIMITER protects everything (jam and studio included). Inconsistent volumes had a measurable cause — the sample banks are mastered ~19dB apart (some peak at 0.07, others at 0.7): every sample is now loudness-NORMALIZED at decode, so switching voices or comp instruments keeps a consistent level."
+  "notes": "SCREEN MEETS LUMI. Since the LUMI hardware shows exactly two colors (root + in-scale), the app can now meet it halfway: turn on TWO-COLOR MODE (Settings > MIDI, under the LUMI color pickers) and the on-screen keyboard paints its keys with the SAME two colors being pushed to the keybed — root keys in your root color, every other in-scale key in your scale color. Dial the two pickers until the physical keys look right, flip the toggle, and screen and LUMI finally agree."
 }
