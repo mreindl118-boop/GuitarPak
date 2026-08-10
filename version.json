@@ -1,5 +1,5 @@
 {
-  "version": "0.53.0",
+  "version": "0.54.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "Double-tap-to-zoom is gone EVERYWHERE, properly this time — the old fix only covered the page body, and zoom rules don't inherit, so newer surfaces could still zoom; now every element blocks it (pinch-zoom and scrolling untouched). Drum recording is now actually usable: hitting Record on the Pads page automatically brings in a METRONOME CLICK so you have a beat to play against (it steps back out when you stop, unless you pin it), and a new Clear button wipes the pattern to start the take over. The click is a global setting — toggle it on the Pads page or in Settings > Sound and it plays through Studio loop AND Arrange song playback, never in WAV exports."
+  "notes": "A much simpler view: related pages are now COMBINED into single tabs. Practice went from 12 tabs to 5 — Instrument (Neck / Tab / Notation / Keys), Theory (Chords / Circle), Play (Songs / Jam), Practice (Trainer / Woodshed), Tools (Metronome / Tuner) — and the Studio from 5 to 3 — Sketch (Song / Ideas), Tracks (Loop / Arrange), Pads. Pick a tab from the menu, then flip between its views with the pill strip under the top bar; every group remembers which view you used last. Nothing was removed — every page, shortcut and cross-link works exactly as before, just with far less menu noise."
 }
