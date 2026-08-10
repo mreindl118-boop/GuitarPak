@@ -105,6 +105,17 @@
         '<div class="muted small set-theme-note">The studio synth preset ideas play back on (full ROLI slide/pressure expression).</div>' +
       '</div>' +
       '<div class="card">' +
+        '<h2>Backup</h2>' +
+        '<div class="muted small">Updates NEVER clear your settings &mdash; they live on this device and survive every version. ' +
+          'If things ever look reset, you are probably in a different install (a Chrome tab vs the desktop app, or another browser profile). ' +
+          'Export moves everything &mdash; preferences, palettes, jam songs, studio tracks &mdash; between installs.</div>' +
+        '<div class="row tight" style="margin-top:12px">' +
+          '<button type="button" class="btn sm" id="set-backup-out">Export settings</button>' +
+          '<label class="btn sm" style="cursor:pointer">Import settings<input type="file" id="set-backup-in" accept=".json" style="display:none"></label>' +
+          '<span class="muted small" id="set-backup-msg"></span>' +
+        '</div>' +
+      '</div>' +
+      '<div class="card">' +
         '<h2>Screen &amp; battery</h2>' +
         '<label class="row tight small muted" style="gap:6px">' +
           '<input type="checkbox" id="set-wake">Keep the screen awake while sound is playing or a practice runner is going' +
@@ -601,6 +612,41 @@
     });
     App.on('midi:state', paintSysex);
     paintSysex();
+
+    document.getElementById('set-backup-out').addEventListener('click', function () {
+      var out = {};
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (k && k.indexOf('guitarlab.') === 0) out[k] = localStorage.getItem(k);
+      }
+      var blob = new Blob([JSON.stringify({ app: 'soundLAB', keys: out }, null, 1)], { type: 'application/json' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'soundlab-settings.json';
+      a.click();
+      setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
+    });
+    document.getElementById('set-backup-in').addEventListener('change', function () {
+      var f = this.files && this.files[0];
+      var msg = document.getElementById('set-backup-msg');
+      if (!f) return;
+      var rd = new FileReader();
+      rd.onload = function () {
+        try {
+          var d = JSON.parse(rd.result);
+          if (!d || d.app !== 'soundLAB' || !d.keys) throw new Error('not a soundLAB backup');
+          var n = 0;
+          Object.keys(d.keys).forEach(function (k) {
+            if (k.indexOf('guitarlab.') === 0) { localStorage.setItem(k, d.keys[k]); n++; }
+          });
+          msg.textContent = n + ' settings restored — reloading…';
+          setTimeout(function () { location.reload(); }, 900);
+        } catch (e) {
+          msg.textContent = 'Import failed: ' + e.message;
+        }
+      };
+      rd.readAsText(f);
+    });
 
     paintMidi();
   }

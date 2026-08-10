@@ -69,7 +69,14 @@
     App.store.set('st.tracks', DAW.engine.tracks);
   }
 
+  function customMap() {
+    var m = App.store.get('pads.map', null);
+    return (m && typeof m === 'object') ? m : {};
+  }
+
   function laneForMidi(midi) {
+    var cm = customMap();
+    for (var l in cm) { if (cm[l] === midi) return parseInt(l, 10); }
     if (mode() === 'gm') {
       var l = GM_MAP[midi];
       return l == null ? null : l;
@@ -83,8 +90,10 @@
   }
 
   function midiForLane(lane) {
+    var cm = customMap();
+    if (cm[lane] != null) return cm[lane];
     if (mode() === 'gm') return [36, 38, 39, 42, 46, 45, 50, 49][lane];
-    return lane < 7 ? base() + [0, 2, 4, 5, 7, 9, 11][lane] : base() + 1; // crash shows on C#
+    return lane < 7 ? base() + [0, 2, 4, 5, 7, 9, 11][lane] : base() + 1; // crash: any black key
   }
 
   // ---------------- triggering ----------------
@@ -204,6 +213,7 @@
 
   function init(rootEl) {
     App.injectCSS('pads',
+      '.pd-pad.pd-learn{outline:3px dashed var(--accent);outline-offset:2px}' +
       '.pd-grid{display:grid;grid-template-columns:repeat(4,minmax(84px,1fr));gap:12px;max-width:640px}' +
       '.pd-pad{position:relative;aspect-ratio:1.15;border-radius:16px;border:1px solid var(--line);cursor:pointer;' +
         'background:linear-gradient(180deg,rgba(255,255,255,0.05),rgba(0,0,0,0.18)),var(--card2);' +
@@ -224,6 +234,9 @@
           '<span class="row tight">' +
             '<button type="button" class="btn big primary" id="pd-play"></button>' +
             '<button type="button" class="btn" id="pd-rec"></button>' +
+            '<button type="button" class="chip fb-chip" id="pd-remap" title="Remap: tap a pad, then press the key that should trigger it">Remap</button>' +
+            '<button type="button" class="btn sm" id="pd-mapreset" title="Back to the standard mapping" style="display:none">Reset map</button>' +
+            '<span class="muted small" id="pd-maphint" style="display:none"></span>' +
             '<button type="button" class="chip fb-chip" id="pd-click" title="Metronome click during the loop — a global setting, also in Settings › Sound">Click</button>' +
             '<button type="button" class="btn sm" id="pd-clear" title="Wipe every hit from this drum track&rsquo;s pattern">Clear</button>' +
             '<span class="muted small" id="pd-recinfo"></span>' +
@@ -291,6 +304,33 @@
       }
       paintControls();
     });
+    var learn = { on: false, lane: null };
+    function paintLearn() {
+      var chip = document.getElementById('pd-remap');
+      var hint = document.getElementById('pd-maphint');
+      var rst = document.getElementById('pd-mapreset');
+      chip.classList.toggle('active', learn.on);
+      rst.style.display = learn.on ? '' : 'none';
+      hint.style.display = learn.on ? '' : 'none';
+      hint.textContent = !learn.on ? ''
+        : learn.lane == null ? 'tap a pad to remap it'
+        : 'press the key for ' + DAW.DRUM_LANES[learn.lane] + '…';
+      if (els.grid) els.grid.querySelectorAll('.pd-pad').forEach(function (p) {
+        p.classList.toggle('pd-learn', learn.on && parseInt(p.getAttribute('data-lane'), 10) === learn.lane);
+      });
+    }
+    document.getElementById('pd-remap').addEventListener('click', function () {
+      learn.on = !learn.on;
+      learn.lane = null;
+      paintLearn();
+    });
+    document.getElementById('pd-mapreset').addEventListener('click', function () {
+      App.store.set('pads.map', null);
+      learn.lane = null;
+      render();
+      paintLearn();
+    });
+
     document.getElementById('pd-click').addEventListener('click', function () {
       App.store.set('app.click', App.store.get('app.click', false) !== true);
       forcedClick = false; // an explicit choice sticks
@@ -331,6 +371,12 @@
     });
 
     els.grid.addEventListener('pointerdown', function (e) {
+      var padl = e.target.closest ? e.target.closest('.pd-pad') : null;
+      if (learn.on && padl) {
+        learn.lane = parseInt(padl.getAttribute('data-lane'), 10);
+        paintLearn();
+        return;
+      }
       var pad = e.target.closest('.pd-pad');
       if (!pad) return;
       e.preventDefault();
@@ -360,6 +406,17 @@
     // MIDI: pads page open, or the pad drum track armed Live (anywhere in Studio)
     App.on('midi:note', function (d) {
       if (!d || !d.on) return;
+      if (learn.on && App.active === 'pads') {
+        if (learn.lane != null) {
+          var cm = customMap();
+          cm[learn.lane] = d.midi;
+          App.store.set('pads.map', cm);
+          learn.lane = null;
+          render();
+          paintLearn();
+        }
+        return; // learning: keys assign, they don't play
+      }
       var t = padTrack();
       if (!t) return;
       // on the Pads page: always. Elsewhere: only in the Studio with the

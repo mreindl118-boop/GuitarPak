@@ -80,7 +80,7 @@ window.App = (function () {
   // ---- auto-update ----
   // version.json on GitHub is the source of truth. Web builds refresh through
   // the service worker; the APK build (file://) links to the new APK download.
-  var APP_VERSION = '0.66.0';
+  var APP_VERSION = '0.67.0';
   var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
 
   function verNum(v) {
@@ -205,8 +205,8 @@ window.App = (function () {
       var Ctx = window.AudioContext || window.webkitAudioContext;
       // explicit low-latency request — some WebViews default higher; the
       // real number lands in baseLatency/outputLatency (shown in Settings)
-      try { audioCtx = new Ctx({ latencyHint: 'interactive' }); }
-      catch (e) { audioCtx = new Ctx(); }
+      try { audioCtx = new Ctx({ latencyHint: 0.005 }); } // as tight as the hardware allows
+      catch (e) { try { audioCtx = new Ctx({ latencyHint: 'interactive' }); } catch (e2) { audioCtx = new Ctx(); } }
       var speakers = audioCtx.destination;
       masterGain = audioCtx.createGain();
       masterGain.gain.value = volPref() / 100;
@@ -242,7 +242,7 @@ window.App = (function () {
     for (i = 0; i < d.length; i++) { var a = d[i] < 0 ? -d[i] : d[i]; if (a > peak) peak = a; }
     var th = peak * 0.02;
     for (i = 0; i < d.length; i++) { if ((d[i] < 0 ? -d[i] : d[i]) > th) break; }
-    var lead = Math.max(0, i / buf.sampleRate - 0.002);
+    var lead = Math.max(0, i / buf.sampleRate - 0.001);
     buf.__lead = lead > 0.004 ? lead : 0; // ignore negligible lead-ins
     // the banks are mastered at wildly different levels (peaks 0.07..0.7 —
     // ~19dB apart!): normalize every buffer toward a 0.6 peak so switching
