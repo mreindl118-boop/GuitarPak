@@ -227,7 +227,10 @@
     (DAW.SYNTH_PRESETS || []).forEach(function (p) { if (p.id === pnVoice) preset = p; });
     if (!preset) { pnSyn = null; return null; }
     pnSyn = DAW.createSynth(ctx, preset.params);
-    pnSyn.output.connect(ctx.destination);
+    var trim = ctx.createGain();
+    trim.gain.value = 0.55; // presets are mixed hot for the studio chain
+    pnSyn.output.connect(trim);
+    trim.connect(ctx.destination);
     pnSynFor = pnVoice;
     return pnSyn;
   }
@@ -265,6 +268,7 @@
     var t = when || ctx.currentTime;
     var src = ctx.createBufferSource();
     src.buffer = pb.bank[best];
+    gain = gain * App.sampleNorm(src.buffer); // level the mismatched banks
     var base = Math.pow(2, (midi - best) / 12);
     src.playbackRate.value = base;
     var g = ctx.createGain();
@@ -381,7 +385,7 @@
     var key = chan + '-' + midi;
     var notes = chordFor(midi);
     if (perf.arp) {
-      arp.held.push({ src: key, notes: notes, vel: vel, chan: chan });
+      arp.held.push({ src: key, notes: notes, vel: vel, chan: chan }); // arp = one note at a time, no scaling needed
       perfHeld[key] = { arp: true };
       arpStart();
       return;
@@ -389,8 +393,10 @@
     var strumS = perf.strum * 0.045; // up to 45ms between chord notes
     var ctx = null;
     try { ctx = App.getAudio(); } catch (e) { return; }
+    // chords share the energy — full velocity per note stacks into clipping
+    var cv = notes.length > 1 ? Math.max(24, Math.round((vel || 100) / Math.pow(notes.length, 0.55))) : (vel || 100);
     notes.forEach(function (m, i) {
-      noteOnRaw(m, vel, chan, i ? ctx.currentTime + i * strumS : 0);
+      noteOnRaw(m, cv, chan, i ? ctx.currentTime + i * strumS : 0);
     });
     perfHeld[key] = { notes: notes };
   }
@@ -1520,12 +1526,13 @@
       // in the Studio with a track armed, the TRACK's instrument sounds the
       // note (studio.js routes it) — the piano voice would double it
       var studioArmed = App.space === 'studio' && App.store.get('st.armed', null);
+      var padsOwn = App.active === 'pads'; // the pads page owns the keys there
       if (d.on) {
-        if (!studioArmed) noteOn(d.midi, d.vel, d.chan);
+        if (!studioArmed && !padsOwn) noteOn(d.midi, d.vel, d.chan);
         pressKeyHold(d.midi, true);
         guideCheck(d.midi);
       } else {
-        noteOff(d.midi, d.chan);
+        if (!padsOwn) noteOff(d.midi, d.chan);
         pressKeyHold(d.midi, false);
       }
     });
