@@ -281,7 +281,7 @@
     src.playbackRate.value = base;
     var g = ctx.createGain();
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.linearRampToValueAtTime(gain, t + 0.004);
+    g.gain.linearRampToValueAtTime(gain, t + 0.0025);
     src.connect(g);
     g.connect(ctx.destination);
     src.start(t, App.sampleLead(src.buffer)); // skip the MP3 lead-in silence
@@ -489,7 +489,7 @@
     src.playbackRate.value = Math.pow(2, (midi - best) / 12);
     var g = ctx.createGain();
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.linearRampToValueAtTime(gain, t + 0.004);
+    g.gain.linearRampToValueAtTime(gain, t + 0.0025);
     var rel = Math.min(0.4, Math.max(0.15, dur * 0.3));
     g.gain.setValueAtTime(gain, t + Math.max(0.02, dur - rel));
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.06);

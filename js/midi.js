@@ -363,6 +363,12 @@
   App.on('fb:scale', function () { lumiSync(); paintScaleLights(); });
   App.on('midi:state', function () { lumiSync(); paintScaleLights(); });
 
+  // auto-reconnect: once MIDI was enabled and the permission granted, later
+  // sessions (and app updates) reconnect silently — the LUMI is just there
+  if (App.store.get('midi.wanted', false) === true) {
+    setTimeout(function () { enable().catch(function () { /* prompt needed again */ }); }, 50);
+  }
+
   App.midi = {
     get supported() { return supported(); },
     get native() { return native; },
@@ -378,7 +384,7 @@
       bendRange = [2, 12, 48].indexOf(r) !== -1 ? r : 2;
       App.store.set('midi.bendRange', bendRange);
     },
-    enable: enable,
+    enable: function () { App.store.set('midi.wanted', true); return enable(); },
     setInput: setInput,
     setOutput: setOutput,
     bluetooth: function () { if (native) post({ cmd: 'bluetooth' }); },
