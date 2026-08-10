@@ -209,9 +209,50 @@
   // per-channel bend (ROLI key wiggle) and pressure shape the live note.
   var heldVoices = {};
 
+  // ---- synth voice (the Studio's MPE synth, playable right here) ----
+  // pn.voice: 'piano' (sampled grand) or a DAW.SYNTH_PRESETS id. The synth
+  // gets true MPE: per-channel bend and pressure route straight into it.
+
+  var pnVoice = 'piano';
+  var pnSyn = null, pnSynFor = null;
+  var heldSynth = {};
+
+  function synthVoice() {
+    if (pnVoice === 'piano' || !(window.DAW && DAW.createSynth)) return null;
+    var ctx;
+    try { ctx = App.getAudio(); } catch (e) { return null; }
+    if (pnSyn && pnSynFor === pnVoice) return pnSyn;
+    if (pnSyn) { try { pnSyn.allNotesOff(); pnSyn.output.disconnect(); } catch (e) { /* ok */ } }
+    var preset = null;
+    (DAW.SYNTH_PRESETS || []).forEach(function (p) { if (p.id === pnVoice) preset = p; });
+    if (!preset) { pnSyn = null; return null; }
+    pnSyn = DAW.createSynth(ctx, preset.params);
+    pnSyn.output.connect(ctx.destination);
+    pnSynFor = pnVoice;
+    return pnSyn;
+  }
+
+  function paintVoiceSel() {
+    var sel = document.getElementById('pn-voice');
+    if (!sel || !(window.DAW && DAW.SYNTH_PRESETS)) return;
+    var h = '<option value="piano">Grand piano</option>';
+    DAW.SYNTH_PRESETS.forEach(function (p) {
+      h += '<option value="' + p.id + '">' + String(p.name).replace(/</g, '&lt;') + '</option>';
+    });
+    sel.innerHTML = h;
+    sel.value = pnVoice;
+    if (sel.value !== pnVoice) { sel.value = 'piano'; pnVoice = 'piano'; } // preset gone
+  }
+
   function noteOn(midi, vel, chan) {
     var ctx;
     try { ctx = App.getAudio(); } catch (e) { return; }
+    var syn = synthVoice();
+    if (syn) {
+      syn.noteOn(midi, vel || 100, ctx.currentTime, chan || 0);
+      heldSynth[(chan || 0) + '-' + midi] = true;
+      return;
+    }
     decodeAll(ctx);
     var pb = pianoBank();
     var gain = (0.12 + Math.pow((vel || 100) / 127, 1.4) * 0.62) * pb.trim; // hard/soft
@@ -238,7 +279,13 @@
   }
 
   function noteOff(midi, chan) {
-    var key = chan + '-' + midi;
+    var key = (chan || 0) + '-' + midi;
+    if (heldSynth[key]) {
+      delete heldSynth[key];
+      if (pnSyn) { try { pnSyn.noteOff(midi, App.getAudio().currentTime, chan || 0); } catch (e) { /* ok */ } }
+      return;
+    }
+    key = chan + '-' + midi;
     var v = heldVoices[key];
     if (!v) return;
     delete heldVoices[key];
@@ -252,6 +299,7 @@
   }
 
   function bendChan(chan, semis) {
+    if (pnSyn && pnVoice !== 'piano') { try { pnSyn.pitchBend(semis, chan); } catch (e) { /* ok */ } }
     for (var k in heldVoices) {
       var v = heldVoices[k];
       if (v.chan === chan) v.src.playbackRate.value = v.base * Math.pow(2, semis / 12);
@@ -259,6 +307,7 @@
   }
 
   function pressChan(chan, val) {
+    if (pnSyn && pnVoice !== 'piano') { try { pnSyn.pressure(val / 127, chan); } catch (e) { /* ok */ } }
     var ctx;
     try { ctx = App.getAudio(); } catch (e) { return; }
     for (var k in heldVoices) {
@@ -899,6 +948,8 @@
               '<span class="chip" id="pn-octlabel"></span>' +
               '<button type="button" class="btn sm" id="pn-octup" aria-label="Keys octave up">' + App.icon('plus', 13) + '</button>' +
             '</span>' +
+            '<label class="field" title="What this keyboard sounds like — the sampled grand, or the Studio&rsquo;s MPE synth presets (full pitch-bend / pressure expression from a ROLI)">Voice' +
+              '<select id="pn-voice"><option value="piano">Grand piano</option></select></label>' +
             '<button type="button" class="btn sm" id="pn-qwmap" title="Remap which computer key plays which note">Remap</button>' +
             '<button type="button" class="btn sm" id="pn-rotate" title="Rotate the keyboard (portrait / landscape)" aria-label="Rotate the keyboard">' + App.icon('rotate', 14) + '</button>' +
           '</span>' +
@@ -996,6 +1047,18 @@
     }
     els.qwPanel = document.getElementById('pn-qwpanel');
     els.qwSlots = document.getElementById('pn-qwslots');
+    pnVoice = App.store.get('pn.voice', 'piano');
+    var vsel = document.getElementById('pn-voice');
+    if (vsel) {
+      vsel.addEventListener('change', function () {
+        pnVoice = this.value;
+        App.store.set('pn.voice', pnVoice);
+        if (pnVoice === 'piano' && pnSyn) { try { pnSyn.allNotesOff(); } catch (e) { /* ok */ } }
+        heldSynth = {};
+      });
+    }
+    paintVoiceSel(); // presets may land later (daw/synth.js loads after us)
+
     var qwChip = document.getElementById('pn-qw');
     qwChip.classList.toggle('active', qw.on);
     qwChip.addEventListener('click', function () {
@@ -1244,6 +1307,7 @@
 
   function onShow() {
     render();       // palette may have been customized in the fretboard settings
+    paintVoiceSel(); // synth presets (incl. plugins) are loaded by now
     scrollToWindow();
   }
 
