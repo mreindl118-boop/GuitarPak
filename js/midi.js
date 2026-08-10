@@ -300,9 +300,14 @@
     if (sc !== undefined) lumiCmd([0x10, 0x60].concat(lumiVal(0x02, sc)));
     var mode = LUMI_MODES[App.store.get('midi.lumiMode', 'scale')];
     if (mode !== undefined) lumiCmd([0x10, 0x40].concat(lumiVal(0x02, mode)));
+    lumiCmd([0x10, 0x40].concat(lumiVal(0x04, 100))); // full LED brightness
     var cols = App.store.get('fb.colors', null) || [];
-    lumiColor(0x30, cols[0] || '#ffab47'); // root key <- degree 1 color
-    lumiColor(0x20, cols[4] || '#6ea8fe'); // in-scale keys <- degree 5 color
+    // overridable in Settings — LED color rendering differs from screens, so
+    // the two hardware slots can be dialed by eye; defaults follow the palette
+    var rootC = App.store.get('midi.lumiRoot', '') || cols[0] || '#ffab47';
+    var scaleC = App.store.get('midi.lumiScale', '') || cols[4] || '#6ea8fe';
+    lumiColor(0x30, rootC);  // root key slot
+    lumiColor(0x20, scaleC); // in-scale key slot
   }
 
   // ---- key lights: degree-aware LED echo for ANY keyboard that lights

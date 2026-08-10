@@ -448,6 +448,7 @@
     visQueue.length = 0;
     litIndex = -1;
     nextTime = ctx.currentTime + 0.08;
+    App.emit('transport:claim', { owner: 'met' }); // one beat authority at a time
     running = true;
     App.wake.acquire('met');
     timer = setInterval(tick, TICK_MS);
@@ -487,6 +488,7 @@
   // the emit happens synchronously inside the user's click, so getAudio is
   // still within the gesture
   App.on('met:toggle', function () { toggle(); });
+  App.on('transport:claim', function (d) { if (d && d.owner !== 'met' && running) stop(); });
 
   // ---- tempo trainer UI ----
 
