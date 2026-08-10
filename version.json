@@ -1,5 +1,5 @@
 {
-  "version": "0.50.1",
+  "version": "0.51.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "Piano-roll drawing is now impossible to miss: an empty roll says exactly what to do (press an empty spot and drag — that draws a note), the cursor shows a crosshair over the grid, and the caption spells out the whole gesture set (draw, drag to move, stretch the right edge, tap to remove, right-click to sweep-erase). And the FL move you were reaching for: DOUBLE-TAP any clip in the Arrange view and it opens that track's piano roll or drum steps in the editor."
+  "notes": "Welcome to the WOODSHED — soundLAB's gamified practice room, new in the Practice space. Pick an exercise or song and play it for score: Perfect/Great/Good/Miss timing windows (calibrated per input by a tap-along wizard), combos, accuracy, star grades, XP and levels, daily streaks, achievements, and a weak-phrase queue that resurfaces what needs work. Four modes: RUN (straight through), PHRASES (2-bar loops until two clean passes), WAIT (freezes until you play the right note — Synthesia style), and LADDER (tempo climbs as you pass). Three live-switchable views: falling highway, horizontal scroll, and staff sheet. Feed it music: built-in generators (scales in your key, Hanon, pentatonic fours, 8 PAS drum rudiments with sticking and accents), MIDI file import with tempo maps, ASCII tab paste, or any Studio track. Plays with your ROLI (with key lights), typing keys, or touch — and every run lands as a take in your Studio Ideas."
 }

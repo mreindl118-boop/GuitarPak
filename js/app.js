@@ -32,13 +32,13 @@ window.App = (function () {
   // Settings is deliberately in NEITHER list: it's an overlay page opened by
   // the ever-present gear in the header, from any page in either space.
   var SPACES = {
-    practice: ['metronome', 'fretboard', 'tab', 'notation', 'chords', 'piano', 'songs', 'jam', 'tuner', 'trainer', 'theory'],
+    practice: ['metronome', 'fretboard', 'tab', 'notation', 'chords', 'piano', 'songs', 'jam', 'shed', 'tuner', 'trainer', 'theory'],
     studio: ['song', 'arrange', 'tracks', 'pads', 'ideas']
   };
   var SPACE_LABELS = {
     metronome: 'Metronome', fretboard: 'Fretboard', tab: 'Tab', notation: 'Notation',
     chords: 'Chords', piano: 'Piano', songs: 'Songs', jam: 'Jam', tuner: 'Tuner',
-    trainer: 'Trainer', theory: 'Theory', settings: 'Settings',
+    trainer: 'Trainer', theory: 'Theory', settings: 'Settings', shed: 'Shed',
     song: 'Song', arrange: 'Arrange', tracks: 'Tracks', pads: 'Pads', ideas: 'Ideas'
   };
   var PANEL_ORDER = SPACES.practice.concat(SPACES.studio).concat(['settings']);
@@ -48,7 +48,7 @@ window.App = (function () {
   // ---- auto-update ----
   // version.json on GitHub is the source of truth. Web builds refresh through
   // the service worker; the APK build (file://) links to the new APK download.
-  var APP_VERSION = '0.50.1';
+  var APP_VERSION = '0.51.0';
   var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
 
   function verNum(v) {
