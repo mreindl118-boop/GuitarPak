@@ -421,8 +421,14 @@
     gain.gain.value = chanGain(track);
     inst.output.connect(chain.input);
     chain.output.connect(gain);
+    var analyser = null;
+    if (ctx.createAnalyser && !(typeof OfflineAudioContext !== 'undefined' && ctx instanceof OfflineAudioContext)) {
+      analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      gain.connect(analyser);
+    }
     gain.connect(dest);
-    return { instrument: inst, chain: chain, gain: gain, track: track };
+    return { instrument: inst, chain: chain, gain: gain, analyser: analyser, track: track };
   }
 
   function teardown() {
@@ -508,6 +514,7 @@
 
   function play() {
     if (playing || !tracks.length) return;
+    if (songPlaying) songStop(); // one transport at a time
     var ctx = ctxNow();
     ensureChannels();
     vis.length = 0;
@@ -528,6 +535,164 @@
     });
     App.wake.release('st-run');
     App.emit('st:state', { playing: false });
+  }
+
+  // ---------------- SONG MODE: the arrangement transport ----------------
+  // OpenStudio's Transport, ported ("A Tale of Two Clocks"): positions live
+  // in the BEAT domain; origin(time,beat) maps beats to the audio clock; the
+  // scheduler emits sample-accurate windows and loop-wraps by rebasing the
+  // origin. Clips live on tracks: t.clips = [{id, start, len (beats),
+  // src: 'pattern' | 'audio'}]. Pattern clips play the track's own steps or
+  // notes from the clip start (truncated to len); audio clips fire the
+  // sampler's buffer at natural pitch. Same channels, same mixer, same FX —
+  // one engine, two ways to drive it (session loop / arrangement).
+
+  var song = { loop: { on: false, start: 0, end: 16 } };
+  var songPlaying = false;
+  var songTimer = null;
+  var origin = { time: 0, beat: 0 };
+  var schedBeat = 0;
+  var stoppedAt = 0;
+  var stats = { stalls: 0 };
+
+  function beatToTime(b) { return origin.time + (b - origin.beat) * beatDur(); }
+
+  function position() {
+    if (!songPlaying) return stoppedAt;
+    var ctx = ctxNow();
+    return origin.beat + (ctx.currentTime - origin.time) / beatDur();
+  }
+
+  function songEnd() {
+    var end = 0;
+    tracks.forEach(function (t) {
+      (t.clips || []).forEach(function (c) { end = Math.max(end, c.start + c.len); });
+    });
+    return end;
+  }
+
+  function scheduleClipWindow(from, to, chans, b2t) {
+    tracks.forEach(function (t) {
+      var c = chans[t.id];
+      if (!c) return;
+      (t.clips || []).forEach(function (clip) {
+        if (clip.start + clip.len <= from || clip.start >= to) return;
+        if (clip.src === 'audio') {
+          if (clip.start >= from && clip.start < to) {
+            var root = (t.sampler && t.sampler.rootNote) || 60;
+            c.instrument.noteOn(root, 0.9, b2t(clip.start), 0);
+            c.instrument.noteOff(root, b2t(clip.start + clip.len), 0);
+          }
+          return;
+        }
+        if (t.kind === 'drums') {
+          var steps = t.steps || [];
+          var firstStep = Math.max(0, Math.ceil((from - clip.start) * 4));
+          var lastStep = Math.min(clip.len * 4, (to - clip.start) * 4);
+          for (var lane = 0; lane < steps.length; lane++) {
+            var row = steps[lane] || [];
+            for (var s = firstStep; s < lastStep; s++) {
+              var b = clip.start + s / 4;
+              if (b < from || b >= to) continue;
+              if (row[s % row.length]) c.instrument.noteOn(lane, 0.9, b2t(b));
+            }
+          }
+        } else {
+          (t.notes || []).forEach(function (n) {
+            var b = clip.start + n.t;
+            if (n.t >= clip.len || b < from || b >= to) return;
+            var t0 = b2t(b);
+            c.instrument.noteOn(n.m, (n.v / 127) * 0.85, t0, 0);
+            c.instrument.noteOff(n.m, t0 + Math.max(0.05, Math.min(n.d, clip.len - n.t) * beatDur()), 0);
+          });
+        }
+      });
+    });
+  }
+
+  function songTick() {
+    if (!songPlaying) return;
+    var ctx = ctxNow();
+    if (beatToTime(schedBeat) < ctx.currentTime - 0.02) {
+      stats.stalls++;
+      origin.time = ctx.currentTime + 0.05;
+      origin.beat = schedBeat;
+    }
+    var horizon = ctx.currentTime + 0.12;
+    var guard = 0;
+    while (beatToTime(schedBeat) < horizon && guard++ < 32) {
+      var horizonBeat = origin.beat + (horizon - origin.time) / beatDur();
+      var lp = song.loop;
+      var loopValid = lp.on && lp.end > lp.start + 0.01;
+      if (loopValid && schedBeat < lp.end && horizonBeat >= lp.end) {
+        if (lp.end > schedBeat) scheduleClipWindow(schedBeat, lp.end, channels, beatToTime);
+        var wrapTime = beatToTime(lp.end);
+        origin.time = wrapTime;
+        origin.beat = lp.start;
+        schedBeat = lp.start;
+      } else {
+        scheduleClipWindow(schedBeat, horizonBeat, channels, beatToTime);
+        schedBeat = horizonBeat;
+        break;
+      }
+    }
+    if (!song.loop.on && schedBeat > songEnd() + 1) songStop();
+  }
+
+  function songPlay(fromBeat) {
+    if (songPlaying) return;
+    if (playing) stop(); // one transport at a time — session loop yields
+    var ctx = ctxNow();
+    ensureChannels();
+    var start = (fromBeat != null) ? fromBeat : stoppedAt;
+    if (song.loop.on && song.loop.end > song.loop.start && start >= song.loop.end) start = song.loop.start;
+    songPlaying = true;
+    origin.time = ctx.currentTime + 0.06;
+    origin.beat = start;
+    schedBeat = start;
+    App.wake.acquire('st-song');
+    songTimer = setInterval(songTick, 25);
+    songTick();
+    App.emit('st:tr', { playing: true });
+  }
+
+  function songStop() {
+    if (!songPlaying) return;
+    stoppedAt = Math.max(0, position());
+    songPlaying = false;
+    if (songTimer) { clearInterval(songTimer); songTimer = null; }
+    Object.keys(channels).forEach(function (id) {
+      try { channels[id].instrument.allNotesOff(); } catch (e) { /* ok */ }
+    });
+    App.wake.release('st-song');
+    App.emit('st:tr', { playing: false });
+  }
+
+  function setPosition(beat) {
+    stoppedAt = Math.max(0, beat);
+    if (songPlaying) {
+      var ctx = ctxNow();
+      Object.keys(channels).forEach(function (id) {
+        try { channels[id].instrument.allNotesOff(); } catch (e) { /* ok */ }
+      });
+      origin.time = ctx.currentTime + 0.05;
+      origin.beat = stoppedAt;
+      schedBeat = stoppedAt;
+    }
+  }
+
+  // offline render of the arrangement -> WAV blob
+  function renderSong() {
+    var bd = beatDur();
+    var end = songEnd();
+    if (end <= 0) return Promise.reject(new Error('empty song'));
+    var len = end * bd + 1.5;
+    var sr = 44100;
+    var off = new OfflineAudioContext(2, Math.ceil(len * sr), sr);
+    var chans = {};
+    tracks.forEach(function (t) { chans[t.id] = buildChannel(off, t, off.destination); });
+    scheduleClipWindow(0, end, chans, function (b) { return 0.05 + b * bd; });
+    return off.startRendering().then(audioBufferToWav);
   }
 
   // live play: route an armed track's input through its real channel
@@ -573,6 +738,18 @@
     applyMix: applyMix,
     rebuildChannel: rebuildChannel,
     liveChannel: liveChannel,
-    render: render
+    render: render,
+    // song mode (arrangement)
+    get songPlaying() { return songPlaying; },
+    get loopRegion() { return song.loop; },
+    set loopRegion(l) { if (l && typeof l.start === 'number') song.loop = { on: !!l.on, start: Math.max(0, l.start), end: Math.max(l.start + 0.25, l.end) }; },
+    songPlay: songPlay,
+    songStop: songStop,
+    setPosition: setPosition,
+    position: position,
+    songEnd: songEnd,
+    renderSong: renderSong,
+    channelAnalyser: function (id) { return channels[id] ? channels[id].analyser : null; },
+    stats: stats
   };
 })();
