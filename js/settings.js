@@ -46,6 +46,9 @@
           '<span class="muted small" id="set-vol-val"></span>' +
         '</div>' +
         '<div class="muted small set-theme-note">One knob for everything &mdash; metronome, practice notes, the Jam band, the Studio.</div>' +
+        '<label class="row tight small muted" style="gap:6px;margin-top:12px">' +
+          '<input type="checkbox" id="set-click">Metronome click during Studio playback (the loop, the Arrange song, and pad recording) &mdash; a global setting, also toggleable on the Pads page' +
+        '</label>' +
         '<div class="set-sub">Guitar</div>' +
         '<div class="fb-field">' +
           '<div class="seg" id="set-tone">' +
@@ -184,6 +187,13 @@
     vol.addEventListener('input', function () {
       App.setVolume(parseInt(this.value, 10));
       volVal.textContent = App.volume + '%';
+    });
+
+    // ---- global studio click ----
+    var clickChk = document.getElementById('set-click');
+    clickChk.checked = App.store.get('app.click', false) === true;
+    clickChk.addEventListener('change', function () {
+      App.store.set('app.click', !!this.checked);
     });
 
     // ---- studio prefs ----
@@ -504,5 +514,17 @@
     paintMidi();
   }
 
-  App.register('settings', { init: init });
+  App.register('settings', {
+    init: init,
+    onShow: function () {
+      // dynamic prefs may have changed elsewhere (pads click chip, wake from
+      // code, volume) — re-read them when the page opens
+      var c = document.getElementById('set-click');
+      if (c) c.checked = App.store.get('app.click', false) === true;
+      var w = document.getElementById('set-wake');
+      if (w) w.checked = App.store.get('app.keepAwake', true) !== false;
+      var v = document.getElementById('set-vol');
+      if (v) { v.value = String(App.volume); var vv = document.getElementById('set-vol-val'); if (vv) vv.textContent = App.volume + '%'; }
+    }
+  });
 })();
