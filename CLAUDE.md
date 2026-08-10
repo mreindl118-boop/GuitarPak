@@ -56,6 +56,13 @@ js/studio.js      STUDIO workspace (DAW phase one): registers 'song' (sketch-
                   Captures midi:note + note:input into ideas (notes tagged
                   key/bpm/date, store ideas.list, song.name); 30s retro buffer
                   ("keep what I just played"); playback via the studio synth.
+js/pads.js        drum-pad controller page ('pads', studio): 8 velocity pads
+                  on the pad drum track's live channel; touch + ZXCV/ASDF +
+                  MIDI (pads.mode 'roli' chromatic-from-base | 'gm' drum map);
+                  Record quantizes hits to nearest 1/16 vs st:step heartbeat;
+                  LUMI lights the 8 mapped keys, flashes on every hit incl.
+                  loop playback. Drums-armed MIDI is handled HERE, not by
+                  studio.js liveRoute (which skips kind==='drums').
 js/daw/engine.js  studio engine (OpenStudio ports): DrumKit (8-lane 808/909
                   synth kit), Sampler (pitch-shifted one-sample instrument,
                   buffers in DAW.samples — context-independent, raw bytes in
