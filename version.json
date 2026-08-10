@@ -1,5 +1,5 @@
 {
-  "version": "0.46.0",
+  "version": "0.47.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "The Studio gets its DAW heart: a new Tracks page — a groovebox-style loop where every track plays in sync at your tempo. Add Drums (synthesized 808/909 kit with a step sequencer), Synths (four voices with cutoff/attack/release/glide controls and a piano roll colored by YOUR key's scale degrees), or Samplers (load any audio file, set its root note, play it across the keys). Per-track mute/solo/volume and an FX slot (reverb, delay, drive). Arm a track LIVE and your ROLI or typing keys play its instrument — with slide and pressure. Ideas now have a 'To track' button, and Export WAV renders your loop to a real audio file. All ported from the OpenStudio engine."
+  "notes": "Finger drums! The Studio's new Pads page is a full drum-pad controller: eight velocity-sensitive pads playing your drum track's kit (through its FX and mixer), hit them by touch, with Z X C V / A S D F, or from your MIDI keys — ROLI octave mapping (eight keys from any base note) or the standard GM drum map for hardware pad controllers. Turn on Record while the loop plays and every hit quantizes onto the nearest 1/16 of your pattern. ROLI key lights: the eight pad keys stay lit on the LUMI and flash with every hit — including the loop's own beat, so your keyboard shows the groove."
 }

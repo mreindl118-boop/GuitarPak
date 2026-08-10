@@ -898,7 +898,9 @@
   function liveRoute(d, isOn, chan) {
     if (App.space !== 'studio') return;
     var id = App.store.get('st.armed', null);
-    if (!id || !trackById(id)) return;
+    var t = id && trackById(id);
+    if (!t) return;
+    if (t.kind === 'drums') return; // pads.js owns note->lane drum mapping
     var c = DAW.engine.liveChannel(id);
     if (!c) return;
     var ctx = App.getAudio();
@@ -1039,5 +1041,15 @@
 
   App.register('song', { init: function (el) { init(); initSong(el); } });
   App.register('ideas', { init: initIdeas, onHide: stopPlayback });
-  App.register('tracks', { init: initTracks, onShow: loadSampleBuffers });
+  App.register('tracks', {
+    init: initTracks,
+    onShow: function () {
+      loadSampleBuffers();
+      // tracks may have been created elsewhere (pads page) — adopt + repaint
+      if (!trackById(trk.sel) && tracksList().length) trk.sel = tracksList()[0].id;
+      renderTracks();
+      renderEditor2();
+      renderTransport();
+    }
+  });
 })();
