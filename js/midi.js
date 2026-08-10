@@ -243,14 +243,19 @@
     Object.keys(lit).forEach(function (m) { dark(Number(m)); });
   }
 
-  // ---- ROLI LUMI scale sync (EXPERIMENTAL, community-documented SysEx) ----
-  // Pushes root key + scale so the LUMI's own per-key lights follow the app.
-  // Wrong bytes are simply ignored by non-LUMI devices.
+  // ---- ROLI LUMI sync (community-documented SysEx: benob/LUMI-lights) ----
+  // Pushes root key, scale, light mode and the app's degree COLORS to a LUMI
+  // (USB or Bluetooth — same bytes either way). The hardware supports exactly
+  // TWO colors: the root color and the in-scale color; we map degree 1 and
+  // degree 5 of the app's palette (fb.colors). Values pack as a 5-bit type +
+  // value spread over 7-bit bytes; frame device id 0x37 = LUMI. Wrong bytes
+  // are simply ignored by non-LUMI devices.
 
-  var LUMI_SCALES = { // app scale id -> LUMI scale index (best documented set)
+  var LUMI_SCALES = { // app scale id -> LUMI scale index (documented set)
     major: 0, aeolian: 1, harmonicMinor: 2, majorPent: 4, minorPent: 5,
     blues: 6, dorian: 7, phrygian: 8, lydian: 9, mixolydian: 10, locrian: 11
   };
+  var LUMI_MODES = { rainbow: 0, scale: 1, piano: 2, night: 3 };
 
   function lumiChecksum(bytes) {
     var c = bytes.length;
@@ -261,23 +266,93 @@
   function lumiCmd(cmd) {
     if (!hasOutput()) return;
     while (cmd.length < 8) cmd.push(0);
-    sendBytes([0xf0, 0x00, 0x21, 0x10, 0x77, 0x00].concat(cmd, [lumiChecksum(cmd), 0xf7]));
+    sendBytes([0xf0, 0x00, 0x21, 0x10, 0x77, 0x37].concat(cmd, [lumiChecksum(cmd), 0xf7]));
+  }
+
+  function lumiVal(type, v) { // <5-bit type><value> from byte 3 of the command
+    return [(type | ((v & 3) << 5)) & 0x7f, (v >> 2) & 0x7f];
+  }
+
+  function hexRgb(hex) {
+    var m = /^#?([0-9a-f]{6})$/i.exec(String(hex || ''));
+    var n = m ? parseInt(m[1], 16) : 0xffab47;
+    return { r: (n >> 16) & 0xff, g: (n >> 8) & 0xff, b: n & 0xff };
+  }
+
+  function lumiColor(reg, hex) { // reg 0x20 = in-scale color, 0x30 = root color
+    var c = hexRgb(hex);
+    lumiCmd([0x10, reg,
+      ((c.b & 0x03) << 5) | 0x04,
+      ((c.b >> 2) & 0x3f) | ((c.g & 1) << 6),
+      (c.g >> 1) & 0x7f,
+      c.r & 0x7f,
+      ((c.r >> 7) & 1) | 0x7e,
+      0x03]);
   }
 
   function lumiSync() {
-    if (!App.store.get('midi.lumi', false)) return;
+    if (!App.store.get('midi.lumi', false) || !hasOutput()) return;
     var root = App.store.get('fb.root', 9);
     var scaleId = App.store.get('fb.scale', 'minorPent');
     var key = Theory.mod12(typeof root === 'number' ? root : 9);
-    // LUMI keys are C-based 0..11
-    lumiCmd([0x10, 0x30, 0x03, key * 2, 0x00]);
+    lumiCmd([0x10, 0x30].concat(lumiVal(0x03, key)));
     var sc = LUMI_SCALES[scaleId];
-    if (sc !== undefined) lumiCmd([0x10, 0x60, 0x02, sc * 2, 0x00]);
+    if (sc !== undefined) lumiCmd([0x10, 0x60].concat(lumiVal(0x02, sc)));
+    var mode = LUMI_MODES[App.store.get('midi.lumiMode', 'scale')];
+    if (mode !== undefined) lumiCmd([0x10, 0x40].concat(lumiVal(0x02, mode)));
+    var cols = App.store.get('fb.colors', null) || [];
+    lumiColor(0x30, cols[0] || '#ffab47'); // root key <- degree 1 color
+    lumiColor(0x20, cols[4] || '#6ea8fe'); // in-scale keys <- degree 5 color
   }
 
-  // follow the app's key/scale live
-  App.on('fb:set', function () { lumiSync(); });
-  App.on('fb:scale', function () { lumiSync(); });
+  // ---- key lights: degree-aware LED echo for ANY keyboard that lights
+  // incoming notes (LUMI, Launchkey, most LED keybeds). midi.lights:
+  //   'off'   nothing
+  //   'echo'  light the keys you play, brightness graded by scale degree
+  //   'scale' hold the whole in-scale layout lit (root brightest)
+  // Opt-in only: these are note-on messages — aimed at controllers, which
+  // light silently; a sound module on the output would play them.
+
+  function lightsMode() { return App.store.get('midi.lights', 'off'); }
+
+  function degVel(midi) {
+    var root = App.store.get('fb.root', 9);
+    var rootPc = Theory.mod12(typeof root === 'number' ? root : 9);
+    var info = Theory.scaleInfo(rootPc, App.store.get('fb.scale', 'minorPent'));
+    if (info.pcToStep.get(Theory.mod12(midi)) === undefined) return 0; // out of scale
+    var semi = Theory.mod12(midi - rootPc);
+    if (semi === 0) return 127;                          // the root, brightest
+    return (semi === 3 || semi === 4 || semi === 7)      // 3rd (either) + 5th:
+      ? 100 : 72;                                        // chord tones, any scale
+  }
+
+  function paintScaleLights() {
+    allDark();
+    if (lightsMode() !== 'scale' || !hasOutput()) return;
+    for (var m = 24; m <= 108; m++) {
+      var v = degVel(m);
+      if (v) light(m, v);
+    }
+  }
+
+  function setLights(mode) {
+    mode = ['off', 'echo', 'scale'].indexOf(mode) !== -1 ? mode : 'off';
+    App.store.set('midi.lights', mode);
+    paintScaleLights(); // paints for 'scale', clears for the others
+  }
+
+  function echoNote(d) {
+    if (!d || lightsMode() !== 'echo') return;
+    if (d.on) light(d.midi, degVel(d.midi) || 60); else dark(d.midi);
+  }
+
+  App.on('note:input', echoNote); // on-screen piano / QWERTY
+  App.on('midi:note', echoNote);  // hardware keys, echoed back to the LEDs
+
+  // follow the app's key/scale/colors live
+  App.on('fb:set', function () { lumiSync(); paintScaleLights(); });
+  App.on('fb:scale', function () { lumiSync(); paintScaleLights(); });
+  App.on('midi:state', function () { lumiSync(); paintScaleLights(); });
 
   App.midi = {
     get supported() { return supported(); },
@@ -301,6 +376,8 @@
     light: light,
     dark: dark,
     allDark: allDark,
-    lumiSync: lumiSync
+    lumiSync: lumiSync,
+    setLights: setLights,
+    get lights() { return lightsMode(); }
   };
 })();

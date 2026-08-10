@@ -24,8 +24,12 @@ js/app.js         shell: module registry, tab switching, shared AudioContext +
                   App.pluck, App.store (localStorage 'guitarlab.*'), App.on/emit
                   event bus, APP_VERSION + auto-update checker
 js/midi.js        Web MIDI service (App.midi: in/out ports, note/bend/pressure
-                  events on the bus, LED note lighting, experimental LUMI
-                  SysEx key sync) — loaded right after app.js
+                  events on the bus; KEY LIGHTS midi.lights off|echo|scale —
+                  degree-graded note-echo LEDs for any lighting keybed; LUMI
+                  SysEx sync per benob/LUMI-lights doc: key/scale/light-mode +
+                  fb.colors degree colors, frame dev-id 0x37, values packed
+                  <5-bit type><value> — lumiSync repushes on fb:set/fb:scale/
+                  midi:state and palette edits) — loaded right after app.js
 js/metronome.js   ┐ feature modules; each registers
 js/fretboard.js   │ App.register(name, {init, onShow, onHide, onKey})
 js/chords.js      │ DOM ids/CSS prefixed met-/fb-/ch-/jam-/tun-/tr-

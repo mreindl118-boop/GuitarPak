@@ -129,9 +129,25 @@
             '<button type="button" data-bend="48">&plusmn;48 (ROLI)</button>' +
           '</div>' +
         '</div>' +
+        '<div class="row" style="margin-top:14px">' +
+          '<label class="field">Key lights<select id="set-midi-lights">' +
+            '<option value="off">Off</option>' +
+            '<option value="echo">Played notes</option>' +
+            '<option value="scale">Whole scale layout</option></select></label>' +
+          '<span class="muted small">Lights the LED output&rsquo;s keys with the app&rsquo;s scale &mdash; the root brightest, chord tones next. ' +
+            'For LED controllers (they light silently); a sound module on that output would play the notes.</span>' +
+        '</div>' +
         '<label class="row tight small muted" style="gap:6px;margin-top:12px">' +
-          '<input type="checkbox" id="set-midi-lumi">ROLI LUMI key/scale sync (experimental) &mdash; pushes the app&rsquo;s key and scale to the LUMI&rsquo;s own key lights' +
+          '<input type="checkbox" id="set-midi-lumi">ROLI LUMI sync (experimental) &mdash; pushes the app&rsquo;s key, scale and degree colors to the LUMI&rsquo;s own lights (USB or Bluetooth)' +
         '</label>' +
+        '<div class="row" style="margin-top:8px">' +
+          '<label class="field">LUMI light mode<select id="set-midi-lumimode">' +
+            '<option value="scale">Scale colors (app palette)</option>' +
+            '<option value="rainbow">Rainbow</option>' +
+            '<option value="piano">Piano</option>' +
+            '<option value="night">Night</option></select></label>' +
+          '<span class="muted small">Scale colors uses the fretboard palette: root = degree&nbsp;1 color, other in-scale keys = degree&nbsp;5 color (the LUMI hardware supports two).</span>' +
+        '</div>' +
       '</div>' +
       '<div class="card">' +
         '<h2>Audio devices</h2>' +
@@ -509,6 +525,20 @@
     lumiChk.addEventListener('change', function () {
       App.store.set('midi.lumi', !!this.checked);
       if (this.checked && App.midi) App.midi.lumiSync();
+    });
+
+    var lightsSel = document.getElementById('set-midi-lights');
+    lightsSel.value = App.store.get('midi.lights', 'off');
+    lightsSel.addEventListener('change', function () {
+      if (App.midi) App.midi.setLights(this.value);
+      else App.store.set('midi.lights', this.value);
+    });
+
+    var lumiModeSel = document.getElementById('set-midi-lumimode');
+    lumiModeSel.value = App.store.get('midi.lumiMode', 'scale');
+    lumiModeSel.addEventListener('change', function () {
+      App.store.set('midi.lumiMode', this.value);
+      if (App.midi) App.midi.lumiSync(); // re-push with the new mode
     });
 
     paintMidi();

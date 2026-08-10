@@ -1812,6 +1812,7 @@
       DEG_COLORS[ci] = inp.value;
       App.store.set('fb.colors', DEG_COLORS);
       renderBoard(); renderInfo(); renderLegend();
+      if (App.midi) App.midi.lumiSync(); // LUMI shows these colors live
     });
     els.colors.addEventListener('click', function (e) {
       if (!e.target.closest('#fb-col-reset')) return;
@@ -1819,6 +1820,7 @@
       App.store.set('fb.colors', null);
       renderColorInputs();
       renderBoard(); renderInfo(); renderLegend();
+      if (App.midi) App.midi.lumiSync();
     });
 
     window.addEventListener('resize', function () {
