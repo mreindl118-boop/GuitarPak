@@ -1,5 +1,5 @@
 {
-  "version": "0.54.0",
+  "version": "0.55.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/GuitarLab-alpha.apk",
-  "notes": "A much simpler view: related pages are now COMBINED into single tabs. Practice went from 12 tabs to 5 — Instrument (Neck / Tab / Notation / Keys), Theory (Chords / Circle), Play (Songs / Jam), Practice (Trainer / Woodshed), Tools (Metronome / Tuner) — and the Studio from 5 to 3 — Sketch (Song / Ideas), Tracks (Loop / Arrange), Pads. Pick a tab from the menu, then flip between its views with the pill strip under the top bar; every group remembers which view you used last. Nothing was removed — every page, shortcut and cross-link works exactly as before, just with far less menu noise."
+  "notes": "DYNAMIC LOOPING: editing tracks while the Studio loop plays now takes effect almost instantly (~150 ms) instead of waiting for the loop to come back around. Under the hood the live loop is scheduled step-by-step in a short rolling window, so painted drum steps, drawn piano-roll notes, pad hits and kit/voice preset swaps all land mid-cycle — and changing a preset no longer silences the rest of the loop. WAV export still renders the full loop bit-perfect."
 }

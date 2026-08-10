@@ -84,8 +84,11 @@ js/daw/engine.js  studio engine (OpenStudio ports): DrumKit (8-lane 808/909
                   buffers in DAW.samples — context-independent, raw bytes in
                   IndexedDB 'guitarlab-daw'), FX (reverb/delay/drive wet-dry),
                   WAV encode/download, and the LOOP ENGINE: DAW.engine —
-                  groovebox session loop (bars 1/2/4, st.tracks store), 25ms
-                  lookahead at met.bpm, st:step/st:state bus events, live-play
+                  groovebox session loop (bars 1/2/4, st.tracks store) —
+                  scheduled per-16th in a ~150ms rolling window reading live
+                  track data, so edits/preset swaps land mid-cycle (v0.55.0;
+                  scheduleLoop whole-loop path kept for the offline render),
+                  st:step/st:state bus events, live-play
                   channels (armed track st.armed), OfflineAudioContext render.
                   SONG MODE (OpenStudio transport port): beat-domain origin
                   rebase scheduler, t.clips [{start,len,src}] pattern/audio,
