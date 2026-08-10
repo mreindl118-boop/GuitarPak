@@ -147,6 +147,7 @@
           '<label class="field">Root key color<input type="color" id="set-lumi-root"></label>' +
           '<label class="field">In-scale color<input type="color" id="set-lumi-scale"></label>' +
           '<button type="button" class="btn sm" id="set-lumi-reset" title="Back to the app palette (degree 1 + degree 5)">Match palette</button>' +
+          '<label class="row tight small muted" style="gap:6px"><input type="checkbox" id="set-lumi-match">Two-color mode: paint the on-screen keyboard with just these two colors so screen and LUMI agree</label>' +
           '<span class="muted small">LED colors render differently than the screen &mdash; dial these until the keybed looks right; every change pushes live.</span>' +
         '</div>' +
         '<div class="row tight" style="margin-top:8px">' +
@@ -576,6 +577,12 @@
       if (App.midi) App.midi.lumiSync();
     });
     paintLumiCols();
+
+    var lumiMatch = document.getElementById('set-lumi-match');
+    lumiMatch.checked = App.store.get('midi.lumiMatch', false) === true;
+    lumiMatch.addEventListener('change', function () {
+      App.store.set('midi.lumiMatch', !!this.checked);
+    });
 
     function paintSysex() {
       var el = document.getElementById('set-midi-sysex');
