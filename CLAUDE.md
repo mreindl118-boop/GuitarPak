@@ -72,6 +72,13 @@ js/pads.js        drum-pad controller page ('pads', studio): 8 velocity pads
                   LUMI lights the 8 mapped keys, flashes on every hit incl.
                   loop playback. Drums-armed MIDI is handled HERE, not by
                   studio.js liveRoute (which skips kind==='drums').
+js/arrange.js     Arrange page ('arrange', studio): lane timeline over song
+                  mode — DOM clip divs, CSS-gradient grid, rAF-transform
+                  playhead + follow, per-channel analyser meters (only while
+                  playing), waveform peaks cached per buffer, ruler tap=seek /
+                  drag=loop region, snap/zoom stores st.zoomX/st.snap/st.loop/
+                  st.follow, Space/Delete via onKey. Perf pattern: never
+                  rebuild DOM per frame; drags mutate style only, commit on up.
 js/daw/engine.js  studio engine (OpenStudio ports): DrumKit (8-lane 808/909
                   synth kit), Sampler (pitch-shifted one-sample instrument,
                   buffers in DAW.samples — context-independent, raw bytes in
@@ -80,6 +87,12 @@ js/daw/engine.js  studio engine (OpenStudio ports): DrumKit (8-lane 808/909
                   groovebox session loop (bars 1/2/4, st.tracks store), 25ms
                   lookahead at met.bpm, st:step/st:state bus events, live-play
                   channels (armed track st.armed), OfflineAudioContext render.
+                  SONG MODE (OpenStudio transport port): beat-domain origin
+                  rebase scheduler, t.clips [{start,len,src}] pattern/audio,
+                  loop region, position()/setPosition, songPlay/songStop
+                  ('st:tr' event), renderSong; stats.stalls counts scheduler
+                  catch-ups; per-channel analyser for meters. ONE engine —
+                  session loop + song share channels/mixer/FX.
                   The 'tracks' page in studio.js is its UI (step grid, piano
                   roll degree-colored via fb.colors, mixer rows, FX slot,
                   idea→track, Export WAV).

@@ -33,13 +33,13 @@ window.App = (function () {
   // the ever-present gear in the header, from any page in either space.
   var SPACES = {
     practice: ['metronome', 'fretboard', 'tab', 'notation', 'chords', 'piano', 'songs', 'jam', 'tuner', 'trainer', 'theory'],
-    studio: ['song', 'tracks', 'pads', 'ideas']
+    studio: ['song', 'arrange', 'tracks', 'pads', 'ideas']
   };
   var SPACE_LABELS = {
     metronome: 'Metronome', fretboard: 'Fretboard', tab: 'Tab', notation: 'Notation',
     chords: 'Chords', piano: 'Piano', songs: 'Songs', jam: 'Jam', tuner: 'Tuner',
     trainer: 'Trainer', theory: 'Theory', settings: 'Settings',
-    song: 'Song', tracks: 'Tracks', pads: 'Pads', ideas: 'Ideas'
+    song: 'Song', arrange: 'Arrange', tracks: 'Tracks', pads: 'Pads', ideas: 'Ideas'
   };
   var PANEL_ORDER = SPACES.practice.concat(SPACES.studio).concat(['settings']);
   var space = 'practice';
@@ -48,7 +48,7 @@ window.App = (function () {
   // ---- auto-update ----
   // version.json on GitHub is the source of truth. Web builds refresh through
   // the service worker; the APK build (file://) links to the new APK download.
-  var APP_VERSION = '0.49.0';
+  var APP_VERSION = '0.50.0';
   var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
 
   function verNum(v) {
