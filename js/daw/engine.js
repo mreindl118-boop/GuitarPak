@@ -368,7 +368,6 @@
   var bars = 2;
   var playing = false;
   var timer = null;
-  var nextLoopT = 0;
   var vis = [];
   var channels = {};    // trackId -> {instrument, chain, gain, track}
 
@@ -512,17 +511,51 @@
     });
   }
 
+  // Live loop scheduling is per-STEP in a short rolling window (not whole
+  // loops at a time) so every edit — painted steps, drawn notes, kit/voice
+  // swaps via rebuildChannel — is audible within ~150 ms, mid-cycle, without
+  // resetting the loop. scheduleLoop() above stays for the offline render.
+  function scheduleStep(s, atT, ctx, chans) {
+    if (s % 4 === 0 && clickOn()) clickBlip(ctx, atT, s % 16 === 0);
+    var bd = beatDur(), sd = bd / 4;
+    tracks.forEach(function (t) {
+      var c = chans[t.id];
+      if (!c) return;
+      if (t.kind === 'drums') {
+        var steps = t.steps || [];
+        for (var lane = 0; lane < steps.length; lane++) {
+          if ((steps[lane] || [])[s]) c.instrument.noteOn(lane, 0.9, atT);
+        }
+      } else {
+        (t.notes || []).forEach(function (n) {
+          if (Math.floor(n.t * 4 + 1e-6) !== s) return; // starts in this step?
+          var t0 = atT + (n.t * 4 - s) * sd;
+          c.instrument.noteOn(n.m, (n.v / 127) * 0.85, t0, 0);
+          c.instrument.noteOff(n.m, t0 + Math.max(0.05, n.d * bd), 0);
+        });
+      }
+    });
+  }
+
+  var nextStepI = 0; // continuous step counter; step index = nextStepI % (bars*16)
+  var stepT = 0;     // audio-clock time of nextStepI
+
   function tick() {
     var ctx = ctxNow();
-    var loopLen = bars * 4 * beatDur();
-    if (nextLoopT < ctx.currentTime - 0.02) nextLoopT = ctx.currentTime + 0.05;
-    while (nextLoopT < ctx.currentTime + 0.3) {
-      scheduleLoop(nextLoopT, ctx, channels);
-      for (var s = 0; s < bars * 16; s++) {
-        vis.push({ t: nextLoopT + s * beatDur() / 4, step: s });
-      }
+    var sd = beatDur() / 4;
+    var total = bars * 16;
+    if (stepT < ctx.currentTime - 0.02) { // stall: jump forward, never schedule the past
+      var behind = Math.ceil((ctx.currentTime + 0.05 - stepT) / sd);
+      nextStepI += behind;
+      stepT += behind * sd;
+    }
+    while (stepT < ctx.currentTime + 0.15) {
+      var s = nextStepI % total;
+      scheduleStep(s, stepT, ctx, channels);
+      vis.push({ t: stepT, step: s });
       if (vis.length > 400) vis.splice(0, vis.length - 400);
-      nextLoopT += loopLen;
+      nextStepI++;
+      stepT += sd;
     }
     var hit = null;
     while (vis.length && vis[0].t <= ctx.currentTime) hit = vis.shift();
@@ -535,7 +568,8 @@
     var ctx = ctxNow();
     ensureChannels();
     vis.length = 0;
-    nextLoopT = ctx.currentTime + 0.08;
+    nextStepI = 0;
+    stepT = ctx.currentTime + 0.08;
     playing = true;
     App.wake.acquire('st-run');
     timer = setInterval(tick, 25);
