@@ -32,13 +32,13 @@ window.App = (function () {
   // Settings is deliberately in NEITHER list: it's an overlay page opened by
   // the ever-present gear in the header, from any page in either space.
   var SPACES = {
-    practice: ['metronome', 'fretboard', 'tab', 'notation', 'chords', 'piano', 'pads', 'songs', 'jam', 'shed', 'tuner', 'trainer', 'theory'],
+    practice: ['metronome', 'fretboard', 'tab', 'notation', 'chords', 'piano', 'synth', 'pads', 'songs', 'jam', 'shed', 'tuner', 'trainer', 'theory'],
     studio: ['arrange', 'tracks', 'song', 'ideas']
   };
   var SPACE_LABELS = {
     metronome: 'Metronome', fretboard: 'Fretboard', tab: 'Tab', notation: 'Notation',
     chords: 'Chords', piano: 'Piano', songs: 'Songs', jam: 'Jam', tuner: 'Tuner',
-    trainer: 'Trainer', theory: 'Theory', settings: 'Settings', shed: 'Shed',
+    trainer: 'Trainer', theory: 'Theory', settings: 'Settings', shed: 'Shed', synth: 'Synth',
     song: 'Song', arrange: 'Arrange', tracks: 'Tracks', pads: 'Pads', ideas: 'Ideas'
   };
   var PANEL_ORDER = SPACES.practice.concat(SPACES.studio).concat(['settings']);
@@ -48,7 +48,7 @@ window.App = (function () {
   // pages) keep addressing pages by id and the owning group follows along.
   var GROUPS = {
     practice: [
-      { id: 'ginst', label: 'Instrument', pages: ['fretboard', 'tab', 'notation', 'piano', 'pads'] },
+      { id: 'ginst', label: 'Instrument', pages: ['fretboard', 'tab', 'notation', 'piano', 'synth', 'pads'] },
       { id: 'gtheory', label: 'Theory', pages: ['chords', 'theory'] },
       { id: 'gplay', label: 'Play', pages: ['songs', 'jam'] },
       { id: 'gprac', label: 'Practice', pages: ['shed', 'trainer'] }, // the game first
@@ -64,7 +64,7 @@ window.App = (function () {
     fretboard: 'Neck', tab: 'Tab', notation: 'Notation', piano: 'Keys',
     chords: 'Chords', theory: 'Circle', songs: 'Songs', jam: 'Jam',
     trainer: 'Trainer', shed: 'Woodshed', metronome: 'Metronome', tuner: 'Tuner',
-    song: 'Song', ideas: 'Ideas', tracks: 'Editor', arrange: 'Timeline', pads: 'Pads'
+    song: 'Song', ideas: 'Ideas', tracks: 'Editor', arrange: 'Timeline', pads: 'Pads', synth: 'Synth'
   };
 
   function groupOf(name) {
@@ -80,7 +80,7 @@ window.App = (function () {
   // ---- auto-update ----
   // version.json on GitHub is the source of truth. Web builds refresh through
   // the service worker; the APK build (file://) links to the new APK download.
-  var APP_VERSION = '0.67.1';
+  var APP_VERSION = '0.68.0';
   var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
 
   function verNum(v) {
@@ -992,8 +992,9 @@ window.App = (function () {
       });
     }
 
-    var startSpace = store.get('app.space', 'practice');
-    if (!SPACES[startSpace]) startSpace = 'practice';
+    // theory-first: the app ALWAYS opens in Practice — the Studio is one
+    // button away but never the front door (v0.68.0 back-to-basics)
+    var startSpace = 'practice';
     space = startSpace;
     document.documentElement.setAttribute('data-space', space);
     if (spaceBtn) {

@@ -178,6 +178,9 @@
         '<h2>Audio devices</h2>' +
         '<div class="muted small">Pick which interface soundLAB listens to (Woodshed mic scoring, future recording) and plays out of. ' +
           'A Line&nbsp;6 Helix / Stadium is auto-detected by name. Devices are re-checked on plug/unplug.</div>' +
+        '<label class="row tight small muted" style="gap:6px;margin-top:10px">' +
+          '<input type="checkbox" id="set-tonein">&frac14;&Prime; / guitar TONE-IN &mdash; detect the notes you play on the audio input and light them on every instrument page (fretboard positions, keys, guide mode), exactly like a MIDI keyboard. Detection only &mdash; nothing is re-sounded.' +
+        '</label>' +
         '<div class="row" style="margin-top:12px" id="set-audio-row">' +
           '<button type="button" class="btn sm primary" id="set-audio-enable">List devices</button>' +
           '<label class="field" style="display:none">Input<select id="set-audio-in"></select></label>' +
@@ -612,6 +615,13 @@
     });
     App.on('midi:state', paintSysex);
     paintSysex();
+
+    var toneChk = document.getElementById('set-tonein');
+    toneChk.checked = App.store.get('audio.tonein', false) === true;
+    toneChk.addEventListener('change', function () {
+      App.store.set('audio.tonein', !!this.checked);
+      if (App.tonein) { if (this.checked) App.tonein.start(); else App.tonein.stop(); }
+    });
 
     document.getElementById('set-backup-out').addEventListener('click', function () {
       var out = {};
