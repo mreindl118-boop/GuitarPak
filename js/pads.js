@@ -405,7 +405,7 @@
 
     // MIDI: pads page open, or the pad drum track armed Live (anywhere in Studio)
     App.on('midi:note', function (d) {
-      if (!d || !d.on) return;
+      if (!d || !d.on || d.silent) return; // tone-in notes never drum
       if (learn.on && App.active === 'pads') {
         if (learn.lane != null) {
           var cm = customMap();

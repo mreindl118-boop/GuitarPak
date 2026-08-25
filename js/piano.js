@@ -1069,7 +1069,10 @@
 
   // ---------------- init ----------------
 
+  var pianoRoot = null, synthRoot = null;
+
   function init(rootEl) {
+    pianoRoot = rootEl;
     App.injectCSS('piano',
       '.pn-title{font-family:var(--font-display);font-size:19px;font-weight:600;letter-spacing:1px;text-transform:uppercase}' +
       '.pn-stage{overflow-x:auto;-webkit-overflow-scrolling:touch;padding:6px 2px 2px;touch-action:pan-x}' +
@@ -1255,6 +1258,7 @@
       vsel.addEventListener('change', function () {
         pnVoice = this.value;
         App.store.set('pn.voice', pnVoice);
+        if (pnVoice !== 'piano') App.store.set('pn.synthPreset', pnVoice);
         if (pnVoice === 'piano' && pnSyn) { try { pnSyn.allNotesOff(); } catch (e) { /* ok */ } }
         heldSynth = {};
       });
@@ -1536,11 +1540,11 @@
       var studioArmed = App.space === 'studio' && App.store.get('st.armed', null);
       var padsOwn = App.active === 'pads'; // the pads page owns the keys there
       if (d.on) {
-        if (!studioArmed && !padsOwn) noteOn(d.midi, d.vel, d.chan);
+        if (!studioArmed && !padsOwn && !d.silent) noteOn(d.midi, d.vel, d.chan);
         pressKeyHold(d.midi, true);
         guideCheck(d.midi);
       } else {
-        if (!padsOwn) noteOff(d.midi, d.chan);
+        if (!padsOwn && !d.silent) noteOff(d.midi, d.chan);
         pressKeyHold(d.midi, false);
       }
     });
@@ -1582,6 +1586,43 @@
     onShow: onShow,
     onHide: onHide
   });
+
+  // ---- the SYNTH page: the same playable keyboard, voice forced to the
+  // Studio synth presets. One DOM, borrowed while the page is open — every
+  // input path (touch, QWERTY, MIDI, tone-in) and the Perform layer come
+  // along for free.
+  App.register('synth', {
+    init: function (rootEl) {
+      synthRoot = rootEl;
+    },
+    onShow: function () {
+      if (pianoRoot && synthRoot) {
+        while (pianoRoot.firstChild) synthRoot.appendChild(pianoRoot.firstChild);
+      }
+      paintVoiceSel();
+      var sel = document.getElementById('pn-voice');
+      var last = App.store.get('pn.synthPreset', 'saw');
+      if (sel) {
+        sel.value = last;
+        if (sel.value !== last) sel.value = 'saw';
+        pnVoice = sel.value === 'piano' ? 'saw' : sel.value;
+        sel.value = pnVoice;
+        App.store.set('pn.voice', pnVoice);
+      }
+      render();
+      paintPerf();
+      scrollToWindow();
+    },
+    onHide: function () {
+      onHide();
+      if (pianoRoot && synthRoot) {
+        while (synthRoot.firstChild) pianoRoot.appendChild(synthRoot.firstChild);
+      }
+    },
+    onKey: modules_onKey_passthrough
+  });
+
+  function modules_onKey_passthrough(e) { /* QWERTY handled by document-level qw listeners */ }
 
   // the sampled piano voice, shared with other modules (chords' piano
   // voicings), plus the tone-library setting surface for the Settings tab

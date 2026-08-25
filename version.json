@@ -1,5 +1,5 @@
 {
- "version": "0.67.1",
- "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/soundLAB-alpha.apk",
- "notes": "Fix: the DRIVE effect was hard-wired 100% wet \u2014 deafeningly loud on drums, and the FX amount slider barely did anything; it's now a true wet/dry blend with compensated level (measured). LUMI COLORS: every SysEx frame is now sent under BOTH device ids (0x37 and broadcast 0x00) \u2014 the community protocol doc is uncertain which id a given unit answers to, and if yours wanted the other one, every color/scale frame was being silently ignored. If the keybed still doesn't take colors after this, tap 'Push to LUMI now' in Settings > MIDI and tell me what happens \u2014 the next stop would be a firmware-version difference."
+  "version": "0.68.0",
+  "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/soundLAB-alpha.apk",
+  "notes": "BACK TO BASICS. soundLAB now ALWAYS opens as the practice/theory app — clean tabs, no studio clutter (the capture dot and studio controls live only behind the Studio button; everything DAW is still one tap away, untouched). THE SYNTH IS AN INSTRUMENT NOW: a Synth pill sits right in the Instrument tab — the full playable keyboard locked to the Studio's MPE presets, with chords/arp and all input methods. And NEW: 1/4-INCH TONE-IN (Settings > Audio devices) — plug your guitar into the selected audio input and the notes you play light up every instrument page (fretboard positions, keys, guide mode) exactly like a MIDI keyboard; detection-only, low-confidence frames discarded. Keyboard, MIDI and guitar-in now all feed the same pipeline. NOTE: this update is live on web/desktop/PWA immediately; the Android APK build lags one release."
 }

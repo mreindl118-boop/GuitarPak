@@ -1146,6 +1146,7 @@
 
   function init() {
     App.injectCSS('studio',
+      '[data-space="practice"] #cx-rec{display:none}' +
       '#cx-rec{position:relative}' +
       '#cx-rec::before{content:"";display:inline-block;width:9px;height:9px;border-radius:50%;' +
         'background:#d9484a;vertical-align:0}' +

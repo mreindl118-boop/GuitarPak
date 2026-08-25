@@ -30,6 +30,11 @@ js/midi.js        Web MIDI service (App.midi: in/out ports, note/bend/pressure
                   fb.colors degree colors, frame dev-id 0x37, values packed
                   <5-bit type><value> — lumiSync repushes on fb:set/fb:scale/
                   midi:state and palette edits) — loaded right after app.js
+js/tonein.js      1/4"/audio-in TONE-IN: pitch-detects the selected audio
+                  input (audio.inId; toggle audio.tonein in Settings) and
+                  emits midi:note {silent:true} — instrument pages show the
+                  visuals (rings/presses/guide) but never re-sound; pauses on
+                  'shed' (its own mic) — loaded right after midi.js
 js/metronome.js   ┐ feature modules; each registers
 js/fretboard.js   │ App.register(name, {init, onShow, onHide, onKey})
 js/chords.js      │ DOM ids/CSS prefixed met-/fb-/ch-/jam-/tun-/tr-
@@ -131,6 +136,11 @@ version.json      auto-update feed (source of truth for latest version)
 
 ## Cross-module conventions
 
+- BACK TO BASICS (v0.68.0): the app ALWAYS boots into the practice space
+  (stored app.space is ignored at launch); the capture dot #cx-rec is CSS-
+  hidden outside the studio. 'synth' is a page registered by piano.js: it
+  BORROWS the Keys page's DOM (children reparented on show/hide) with the
+  voice forced to a synth preset (pn.synthPreset) — one keyboard, two pills.
 - WORKSPACES (app.js): two page sets over one app — SPACES.practice (the 12
   original tabs) and SPACES.studio ('song', 'ideas' — the DAW side). #space-btn
   in the header switches via a screen-wipe (#wipe overlay); App.setSpace/
@@ -225,6 +235,12 @@ republish the artifact via `python tools/bundle.py <out.html>` if that session
 owns the artifact URL.
 
 ## Cloud / mobile sessions (claude.ai/code, PC off)
+
+APK NOTE (2026-08-25): the in-cloud APK toolchain (scratchpad) was lost to
+container reclamation INCLUDING the cloud-generated signing keystore. New
+cloud APKs would carry a NEW cert = one uninstall/reinstall for users.
+Until re-keyed (owner's call) or rebuilt on the PC, ship releases web-only
+and say so in version.json notes.
 
 All web work is possible (js/css/html, sw.js, version.json, README). NOT
 possible: building/signing the APK (the keystore and Android toolchain exist
