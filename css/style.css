@@ -40,6 +40,7 @@
 }
 
 :root {
+  color-scheme: dark;
   --bg: #131114;
   --panel: #191518;
   --card: #1e191c;
@@ -71,6 +72,7 @@
    the translucent top bar need explicit light rules. */
 
 :root[data-theme="light"] {
+  color-scheme: light;
   --bg: #f3efe8;
   --panel: #efe9df;
   --card: #fffdf9;

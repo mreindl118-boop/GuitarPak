@@ -91,6 +91,7 @@ window.App = (function () {
   var lastUpdateCheck = 0;
 
   function checkForUpdate(force) {
+    if (window.SL_ARTIFACT) return; // the artifact is republished, not updated
     if (typeof fetch !== 'function') return;
     var now = Date.now();
     if (!force && now - lastUpdateCheck < 15 * 60 * 1000) return; // throttle re-checks

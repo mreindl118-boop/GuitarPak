@@ -130,7 +130,7 @@ android/          APK project — build.ps1 (no Gradle: javac→d8→aapt→zipa
 ios/              WKWebView wrapper (XcodeGen project.yml + Swift; needs a Mac
                   to build — the PWA is the primary iPad install)
 releases/         built signed APK (committed; raw URL = download link)
-tools/bundle.py   builds the single-file bundle for the claude.ai artifact
+tools/artifact_build.py  stages the multi-file claude.ai artifact (see below)
 version.json      auto-update feed (source of truth for latest version)
 ```
 
@@ -230,9 +230,28 @@ version.json      auto-update feed (source of truth for latest version)
 5. Build APK: `android\build.ps1` (outputs to releases/; sets JAVA_HOME itself;
    toolchain lives in C:\Users\mrein\AndroidBuildTools)
 
-Then: verify in preview, commit + push (credential is stored), and rebuild/
-republish the artifact via `python tools/bundle.py <out.html>` if that session
-owns the artifact URL.
+Then: verify in preview, commit + push (credential is stored), and republish
+the artifact (below).
+
+## claude.ai Artifact (the app, hosted in claude.ai)
+
+URL: https://claude.ai/artifact/R2c52cb7YA8xur86NNqpHs (owner's account; private
+until shared from its Share menu). Multi-file: the page plus every js/css/
+font/icon/sample file at its real path. Build + publish from any session:
+
+1. `python3 tools/artifact_build.py <scratchpad>/artifact` — stages the page
+   (viewer-adapted: no doctype/head/body tags, title "soundLAB", no service
+   worker or manifest, `window.SL_ARTIFACT=true` turns off the GitHub update
+   checker) and prints the asset list.
+2. Artifact tool publish with `url` = the URL above, `file_path` =
+   `<staged>/index.html`, `root` = `<staged>`, `files` = ONLY the assets that
+   changed (the artifact keeps the rest; samples never need resending).
+   A session that didn't create it must `action: "read"` the URL first.
+
+Inside the viewer: mic (tuner, tone-in, Woodshed audio), Web MIDI, file
+downloads (backup export, WAV export), offline/service worker and confirm()
+dialogs are refused by the frame — everything else runs. `tools/bundle.py`
+(old single-file build) is superseded.
 
 ## Cloud / mobile sessions (claude.ai/code, PC off)
 
@@ -242,10 +261,10 @@ cloud APKs would carry a NEW cert = one uninstall/reinstall for users.
 Until re-keyed (owner's call) or rebuilt on the PC, ship releases web-only
 and say so in version.json notes.
 
-All web work is possible (js/css/html, sw.js, version.json, README). NOT
-possible: building/signing the APK (the keystore and Android toolchain exist
-only on the owner's PC) and republishing the claude.ai artifact (owned by a
-PC session). For a release from the cloud: do checklist steps 1–4 only, note
+All web work is possible (js/css/html, sw.js, version.json, README), and so
+is republishing the claude.ai artifact (see that section). NOT possible:
+building/signing the APK (the keystore and Android toolchain exist only on
+the owner's PC). For a release from the cloud: do checklist steps 1–4 only, note
 in the commit that releases/GuitarLab-alpha.apk is stale until the next PC
 session runs android\build.ps1, and open a pull request instead of pushing
 to main so the owner can review from their phone.
