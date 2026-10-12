@@ -407,8 +407,7 @@
       for (f = 0; f <= N; f++) {
         var x0 = f === 0 ? LABEL_W : nutX + (f - 1) * FRET_W;
         var w0 = f === 0 ? OPEN_W : FRET_W;
-        var rx = lefty ? W - (x0 + w0) : x0;
-        s.push('<rect class="fb-hit" x="' + rx + '" y="' + (hy - GAP / 2) + '" width="' + w0 +
+        s.push('<rect class="fb-hit" x="' + x0 + '" y="' + (hy - GAP / 2) + '" width="' + w0 +
           '" height="' + GAP + '" fill="transparent" data-fb-s="' + hs + '" data-fb-f="' + f +
           '" data-fb-cx="' + fx(colCX(f)) + '" data-fb-cy="' + hy + '"/>');
       }

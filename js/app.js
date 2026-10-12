@@ -89,7 +89,7 @@ window.App = (function () {
   //            when an APK is actually built. Older APKs read nothing else, so
   //            this must never run ahead of the real file: when it did, the
   //            Android app kept downloading the same old APK in a loop.
-  var APP_VERSION = '0.71.0';
+  var APP_VERSION = '0.72.0';
   var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
 
   function verNum(v) {
@@ -635,6 +635,7 @@ window.App = (function () {
       applyWake();
     },
     reapply: applyWake, // the browser auto-drops the lock on tab-hide; re-request on return
+    held: function () { return Object.keys(wakeHolders); }, // xp.js times practice by tag
     get active() { return wakeCount > 0; }
   };
 
@@ -722,7 +723,13 @@ window.App = (function () {
     if (active && modules[active] && modules[active].onHide) {
       try { modules[active].onHide(); } catch (e) { console.error(active + '.onHide', e); }
     }
+    if (!backNav && active && active !== 'settings' && visited[visited.length - 1] !== active) {
+      visited.push(active);
+      if (visited.length > 30) visited.shift();
+    }
+    guardUp();
     active = name;
+    if (name === SPACES[space][0]) visited.length = 0; // home: Back from here leaves
     var g = groupOf(name);
     if (g) store.set('app.gtab.' + g.id, name); // remember the member per group
     populateNav();
@@ -857,6 +864,54 @@ window.App = (function () {
   }
 
   function toggleSheet(name) { if (sheet === name) closeSheet(); else openSheet(name); }
+
+  // ---- Back: Android's back gesture (and the browser's) walks back through
+  // the app instead of leaving it: help tour, sheet, settings, the page's own
+  // back (module.onBack() -> true when it handled it, e.g. a quiz run -> the
+  // path), the previous page, the space's home. One guard entry sits on top
+  // of the history; each Back pops it, we unwind one step and put it back.
+  // With nothing left to unwind the guard stays down, a hint says the next
+  // Back leaves, and any tap re-arms it.
+  var visited = [], backNav = false, guarded = false, backHint = null;
+  function guardUp() {
+    if (guarded || !backWired) return;
+    try { history.pushState({ sl: 'top' }, ''); guarded = true; } catch (e) { /* sandboxed frame */ }
+  }
+  var backWired = false;
+  function goBackTo(p) { backNav = true; try { switchTo(p); } finally { backNav = false; } }
+  function backStep() {
+    if (window.Help && Help.isOpen && Help.isOpen()) { Help.close(); return true; }
+    if (sheet) { closeSheet(); return true; }
+    if (active === 'settings') { toggleSettings(); return true; }
+    var m = modules[active];
+    if (m && m.onBack) { try { if (m.onBack()) return true; } catch (e) { console.error(active + '.onBack', e); } }
+    while (visited.length) {
+      var p = visited.pop();
+      if (p !== active && modules[p] && SPACES[spaceOf(p)] && !SHEETS[p]) { goBackTo(p); return true; }
+    }
+    if (space !== 'practice') { backNav = true; setSpace('practice'); setTimeout(function () { backNav = false; visited.length = 0; }, 700); return true; }
+    if (active !== SPACES.practice[0]) { goBackTo(SPACES.practice[0]); return true; }
+    return false;
+  }
+  function dropBackHint() { if (backHint) { backHint.remove(); backHint = null; } }
+  function wireBack() {
+    try { history.replaceState({ sl: 'base' }, ''); } catch (e) { return; }
+    backWired = true;
+    guardUp();
+    window.addEventListener('popstate', function () {
+      guarded = false;
+      dropBackHint();
+      if (backStep()) { guardUp(); return; }
+      backHint = document.createElement('div');
+      backHint.id = 'back-hint';
+      backHint.setAttribute('role', 'status');
+      backHint.textContent = 'Press Back again to leave soundLAB.';
+      document.body.appendChild(backHint);
+      setTimeout(dropBackHint, 2500);
+    });
+    // any tap after that re-arms the guard, so Back works again in-app
+    document.addEventListener('pointerdown', function () { if (!guarded) { dropBackHint(); guardUp(); } }, true);
+  }
 
   function wireSheets() {
     Object.keys(SHEETS).forEach(function (name) {
@@ -1222,6 +1277,7 @@ window.App = (function () {
     wireAudioWarmup();
     wireAutoHideBar();
     wireSheets();
+    wireBack();
 
     var spaceBtn = document.getElementById('space-btn');
     if (spaceBtn) {

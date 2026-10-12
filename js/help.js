@@ -61,7 +61,7 @@
     ],
     quiz: [
       { t: 'Exercises', x: 'A course in short levels of 10 questions: Notes, Intervals, Chords, Scales and Key signatures. Every right answer earns XP; quick answers and runs of 5 earn more.' },
-      { sel: '.qz-strip', t: 'Your day', x: 'Your streak grows each day you finish a level, the ring fills toward your daily XP goal, and XP raises your level. Seven days in a row earns a streak freeze that covers a missed day.' },
+      { sel: '.qz-strip', t: 'Your day', x: 'Your streak grows each day you finish a level or play for 5 minutes on any page. The ring fills toward your daily XP goal, and XP raises your level. Seven days in a row earns a streak freeze that covers a missed day.' },
       { sel: '.qz-hometabs', t: 'Path, Topics, Progress', x: 'The Path walks you through the course step by step, and each step opens the next. Topics lets you practice anything. Progress shows your XP, practice time and how your answer speed improves.' },
       { t: 'Sprints and jumps', x: 'Tap a step on the path for its levels and a 60-second sprint: as many right answers as you can, against your own record. Already know it? Tap a locked step and Jump here: 9 out of 10 opens the path up to there.' }
     ],
@@ -246,5 +246,5 @@
   // the shell boots synchronously after all scripts — run right after
   setTimeout(init, 0);
 
-  window.Help = { open: openTour, welcome: welcome, TOURS: TOURS };
+  window.Help = { open: openTour, welcome: welcome, TOURS: TOURS, close: close, isOpen: function () { return !!ov; } };
 })();

@@ -125,12 +125,59 @@
     return path;
   }
 
-  // standard scale fingering per ascending path position (1 = thumb …
-  // 5 = pinky). Right hand ascends 1-2-3, 1-2-3-4, 5 on the top; the left
-  // hand's ascending fingering is exactly the right hand's mirrored — which
-  // also makes descents come out right, since a note keeps its finger
-  // whichever direction the pattern moves through it.
-  function fingerFor(pathIdx, n) {
+  // Scale fingering per ascending path position (1 = thumb … 5 = pinky),
+  // key-aware for 7-note scales: the octave splits into a 3-finger and a
+  // 4-finger group, each started by the thumb on a WHITE key — on the tonic
+  // when it's white (C/G/D… 123 1234 5, F 1234 1234, B LH 4321 4321),
+  // otherwise on the white keys right after black ones (B♭ 4 123 1234, E♭
+  // 3 1234 123, F♯ 234 123 12). The left hand is the same rule run
+  // downward. A note keeps its finger whichever way the pattern moves.
+  var BLACK_PC = [0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0];
+  function cycleFingers(pcs) { // 7 pitch classes in playing order -> fingers
+    var best = null, bs = -1, a, len;
+    for (a = 0; a < 7; a++) {
+      for (len = 3; len <= 4; len++) {
+        var b = (a + len) % 7;
+        if (BLACK_PC[pcs[a]] || BLACK_PC[pcs[b]]) continue;
+        var sc = (a === 0 || b === 0 ? 100 : 0) + (BLACK_PC[pcs[(a + 6) % 7]] ? 10 : 0) + (BLACK_PC[pcs[(b + 6) % 7]] ? 10 : 0) +
+          ((a === 0 && len === 3) || (b === 0 && len === 4) ? 1 : 0);
+        if (sc > bs) { bs = sc; best = [a, len]; }
+      }
+    }
+    if (!best) return null;
+    var f = [];
+    for (var i = 0; i < 7; i++) { var k = (i - best[0] + 7) % 7; f.push(k < best[1] ? k + 1 : k - best[1] + 1); }
+    return f;
+  }
+  function fingering(path) {
+    var n = path.length, j;
+    if (n === 8) {
+      var pcs = [];
+      if (hand === 'left') {
+        for (j = 0; j < 7; j++) pcs.push(Theory.mod12(path[7 - j].midi));
+        var g = cycleFingers(pcs);
+        if (g) {
+          var out = [];
+          for (j = 0; j < 7; j++) out[7 - j] = g[j];
+          out[0] = g[0] === 1 ? g[6] + 1 : g[0];
+          return out;
+        }
+      } else {
+        for (j = 0; j < 7; j++) pcs.push(Theory.mod12(path[j].midi));
+        var f = cycleFingers(pcs);
+        if (f) return f.concat([f[0] === 1 ? f[6] + 1 : f[0]]);
+      }
+    }
+    var gen = [];
+    for (j = 0; j < n; j++) gen.push(fingerGeneric(j, n));
+    return gen;
+  }
+  function fingerFor(pathIdx, path) {
+    if (!path || pathIdx < 0 || pathIdx >= path.length) return 0;
+    return fingering(path)[pathIdx];
+  }
+  // other scale sizes: right hand 1-2-3, 1-2-3-4 … 5 on top; left mirrored
+  function fingerGeneric(pathIdx, n) {
     var rh;
     if (n === 8) rh = [1, 2, 3, 1, 2, 3, 4, 5];        // 7-note scales
     else if (n === 6) rh = [1, 2, 3, 1, 2, 5];          // pentatonics
@@ -535,7 +582,8 @@
     // shows which finger plays it (for the chosen hand)
     var ppath = practicePath();
     var fingerMap = {};
-    ppath.forEach(function (n, i) { fingerMap[n.midi] = fingerFor(i, ppath.length); });
+    var fset = fingering(ppath);
+    ppath.forEach(function (n, i) { fingerMap[n.midi] = fset[i]; });
 
     els.title.textContent = Theory.pcName(root, pf) + ' ' + Theory.SCALES[scaleId].name;
     updateOctLabel();
@@ -853,7 +901,7 @@
     ledGuide(node.midi, nxt ? nxt.midi : -1);
     showFinger(pathIdx);
     var pf = preferFlat();
-    var fing = fingerFor(pathIdx, pp.path.length);
+    var fing = fingerFor(pathIdx, pp.path);
     ppStatus('play ' + Theory.midiName(node.midi, pf) +
       (fing ? ' · finger ' + fing : '') + ' · ' +
       ((pp.idx % pp.seq.length) + 1) + ' / ' + pp.seq.length);
@@ -863,7 +911,7 @@
   function showFinger(pathIdx) {
     var el = document.getElementById('pn-finger');
     if (!el) return;
-    var f = pp.path && pp.path.length ? fingerFor(pathIdx, pp.path.length) : 0;
+    var f = pp.path && pp.path.length ? fingerFor(pathIdx, pp.path) : 0;
     if (!f) { el.style.display = 'none'; return; }
     el.style.display = '';
     el.textContent = f;

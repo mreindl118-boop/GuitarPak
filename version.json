@@ -1,6 +1,6 @@
 {
   "version": "0.70.2",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/soundLAB-alpha.apk",
-  "web": "0.71.0",
-  "notes": "EXERCISES IS NOW A GAME. Every right answer earns XP (more for quick answers and for runs of 5 in a row), and XP raises your player level. Pick a daily goal (Casual to Intense); the Learn tab shows a dot until you reach it. Finish a level each day to build a streak: every 7 days in a row earns a streak freeze that covers a missed day. The course is now a path: each step opens when you pass a level in the one before it, or skip ahead with a jump test (9 of 10). New 60-second sprints test your speed and keep your record for each step. The new Progress tab charts your XP per day, practice minutes and answer speed by week, with your speed and accuracy for each topic. The Topics tab still lets you practice anything freely."
+  "web": "0.72.0",
+  "notes": "PLAYING COUNTS NOW. Time you spend playing anywhere in soundLAB (fretboard and keys drills, Chords, Songs, Jam, Woodshed, the Trainer, or just playing your keyboard or guitar into it) earns 2 XP a minute, and 5 minutes keeps your streak alive, just like finishing a level. Progress shows where your time went. Android Back now steps back through the app (closes the metronome or Settings, leaves a level, returns to the last page) instead of closing it. Exercises: each step opens with its lesson, a wrong answer tells you what you picked, Drill these replays just the questions you missed, and lessons link to the Fretboard, Chords or the Circle to try them for real. Fixed: Keys scale fingering is now correct in every key (no more thumb on black keys in F, B♭, E♭ and the rest), and left-handed taps on the fretboard land on the right fret."
 }
