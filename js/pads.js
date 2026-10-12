@@ -426,7 +426,7 @@
       var lane = laneForMidi(d.midi);
       if (lane == null) return;
       hit(lane, Math.max(0.15, (d.vel || 90) / 127), false);
-    });
+    }, true); // sound first
 
     // loop heartbeat: quantize reference + light the beat on the keys/pads
     App.on('st:step', function (d) {

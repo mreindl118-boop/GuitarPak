@@ -69,6 +69,19 @@ js/studio.js      STUDIO workspace (DAW phase one): registers 'song' (sketch-
                   Captures midi:note + note:input into ideas (notes tagged
                   key/bpm/date, store ideas.list, song.name); 30s retro buffer
                   ("keep what I just played"); playback via the studio synth.
+js/quiz.js        EXERCISES ('quiz', the practice HOME since v0.69.0): Musicca-
+                  style course — COURSE topic > unit > mode (treble/bass/staff,
+                  piano, neck, ear, theory) > levels of 10 questions, 8 = pass,
+                  9/10 = more stars. Generators (GEN.*) work on SPELLED notes
+                  {L, acc, oct} so intervals/chords/scales/key signatures are
+                  written correctly (never double accidentals on the staff).
+                  Answers: tap, 1-9, or PLAY — midi:note (MIDI or tone-in
+                  silent:true) and on-screen keys/neck feed inputNote. Staff
+                  engraved with fonts/slmusic.woff2 (SLMusic = a Bravura subset,
+                  renamed per its OFL Reserved Font Name; fonts/OFL-Bravura.txt).
+                  Stores qz.prog / qz.items (weak items picked more) /
+                  qz.sound / qz.landed (one-time landing). window.SLQuiz =
+                  test hook (levels, gen, start, pick, q, view, theory).
 js/help.js        (?) button + guided page tours (TOURS per page id, spotlight
                   ring + card overlay, first-run welcome; help.seen/help.done)
 js/plugins.js     window.SoundLab plugin API v1: registerPage (App.addPage),
@@ -148,8 +161,9 @@ version.json      auto-update feed (source of truth for latest version)
   app.tabStudio, current space in app.space, <html data-space>. The context
   bar, clock, key and MIDI service are shared across both — that's the point.
 - TAB GROUPS (app.js GROUPS, v0.54.0): the nav select lists GROUPS of pages,
-  not pages — practice: Instrument (fretboard/tab/notation/piano), Theory
-  (chords/theory), Play (songs/jam), Practice (trainer/shed), Tools
+  not pages — practice: Theory (quiz=Exercises HOME/chords/theory — first
+  since v0.69.0), Instrument (fretboard/tab/notation/piano), Play
+  (songs/jam), Practice (trainer/shed), Tools
   (metronome/tuner) — Instrument also carries 'pads' (v0.64.0); studio:
   Studio (arrange=Timeline HOME / tracks=Editor), Sketch (song/ideas). Members show as a pill strip (#subnav, .subtab) under the context
   bar; single-page groups hide the strip; each group remembers its last
@@ -169,6 +183,15 @@ version.json      auto-update feed (source of truth for latest version)
   master GainNode shadows ctx.destination so every module obeys), keep-awake
   (app.keepAwake gates App.wake), studio prefs (sd.retroSecs, sd.playVoice —
   'sd:prefs' bus event).
+- LATENCY RULES (v0.69.0): the master chain is masterGain -> 0.5 pre-gain ->
+  WaveShaper soft clipper (oversample 'none' = zero delay) -> speakers; do NOT
+  put a DynamicsCompressor on the master path (fixed ~6ms lookahead). Sample
+  lead-in/peak analysis (App.sampleLead/sampleNorm) runs at DECODE time, never
+  on the first hit. wireAudioWarmup starts the device on the first pointer/key
+  gesture and shows #snd-hint if MIDI plays into a locked context. Bus
+  listeners that make SOUND register with App.on(evt, fn, true) — the third
+  arg puts them first, ahead of visual listeners. App.keys.play(midi, when,
+  dur, gain) = the Keys page's sampled piano for other modules (quiz).
 - New bus events: `note:input` {on, midi, vel, src, dur?} — user played a note
   on an on-screen instrument (piano QWERTY/touch emit it; capture listens
   alongside midi:note), `space` {space} after a workspace switch.

@@ -57,6 +57,12 @@
     trainer: [
       { t: 'Trainer', x: 'Practice prompts: it deals you a key, scale and tempo to work on. Hit Go and it sets up the Fretboard for that exact drill — a fresh challenge every time.' }
     ],
+    quiz: [
+      { t: 'Exercises', x: 'A step-by-step course like a music-theory textbook with a teacher built in: Notes, Intervals, Chords, Scales and Key signatures. Each level is 10 questions — get 8 right to pass, 9 or 10 for more stars.' },
+      { sel: '.qz-topics', t: 'Pick a topic', x: 'Each topic splits into units, and each unit into ways to practice: read it on the staff, find it on the piano or the neck, or hear it (ear training). Tap Learn on any unit for a short explanation first.' },
+      { sel: '#qz-cont', t: 'Or just continue', x: 'This button always starts the next level you haven’t passed, in course order.' },
+      { t: 'Answer by playing', x: 'Tap an answer (or press 1–9) — or PLAY it: your MIDI keyboard, the on-screen keys, or your guitar through Tone-in (Settings) all count. Space replays the sound.' }
+    ],
     theory: [
       { t: 'Theory', x: 'The circle of fifths, a guide to what chords live in every key, and an ear quiz for scale degrees. Tap around the circle — the app’s key follows.' }
     ],
@@ -193,7 +199,7 @@
 
   function welcome() {
     openTour(null, [
-      { t: 'Welcome to soundLAB', x: 'Two workspaces in one app: Practice (fretboard, piano, jam band, tuner…) and the Studio (record ideas, build loops, finger-drum). The button next to the page menu slides between them.' },
+      { t: 'Welcome to soundLAB', x: 'Start with Exercises: a short theory and ear-training course you answer by playing. Beyond it are two workspaces: Practice (fretboard, piano, jam band, tuner…) and the Studio (record ideas, build loops, finger-drum). The button next to the page menu switches between them.' },
       { t: 'One musical brain', x: 'The bar at the top — key, scale, tempo — is shared by EVERYTHING. Change it once and the fretboard re-colors, the jam re-harmonizes, and the Studio follows.' },
       { t: 'Grouped pages', x: 'Each entry in the page menu is a small group of related views — the pill strip under the top bar flips between them (Neck / Tab / Notation / Keys, Songs / Jam, Loop / Arrange…).' },
       { t: 'Whenever you’re lost', x: 'Tap the ? in the top bar — it explains whichever page you’re on, step by step. Try it on every page once.' }

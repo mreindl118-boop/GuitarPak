@@ -237,6 +237,7 @@
           if ((xhr.status !== 200 && xhr.status !== 0) || !xhr.response) return;
           ctx.decodeAudioData(xhr.response, function (buf) {
             sampleBuf[setId + '/' + m] = jamCondense(buf, 2.8);
+            if (App.sampleLead) App.sampleLead(sampleBuf[setId + '/' + m]); // scan at decode
             samplesLoaded++;
             sampleInfo();
           }, function () { /* undecodable — synth fallback */ });

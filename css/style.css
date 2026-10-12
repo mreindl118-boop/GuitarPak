@@ -659,6 +659,23 @@ button .ic, .chip .ic { display: inline-block; }
 ::-webkit-scrollbar-thumb:hover { background: var(--ctl-border); }
 
 /* update banner */
+#snd-hint {
+  position: fixed;
+  left: 50%;
+  bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 400;
+  width: min(460px, calc(100vw - 32px));
+  box-sizing: border-box;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--accent);
+  background: var(--card);
+  color: var(--text);
+  font-size: 14px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
 #app-update {
   position: fixed;
   left: 50%;

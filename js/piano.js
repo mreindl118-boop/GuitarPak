@@ -194,6 +194,7 @@
         delete raw[tone][m]; // decodeAudioData detaches the buffer
         ctx.decodeAudioData(bytes, function (b) {
           buf[tone][m] = b;
+          App.sampleLead(b); // lead/level scan now, not on first note
           readyN[tone]++;
         }, function () { /* fallback */ });
       });
@@ -378,7 +379,7 @@
     if (arp.timer) return;
     var ctx;
     try { ctx = App.getAudio(); } catch (e) { return; }
-    arp.nextT = ctx.currentTime + 0.03;
+    arp.nextT = ctx.currentTime + 0.005; // first arp note speaks immediately
     arp.idx = 0;
     arp.timer = setInterval(arpTick, 25);
     arpTick();
@@ -486,6 +487,7 @@
     if (best === null) { App.pluckSynth(midi, when, dur, gain * 0.8); return; }
     var src = ctx.createBufferSource();
     src.buffer = pb.bank[best];
+    gain *= App.sampleNorm(src.buffer); // same level as live-played notes
     src.playbackRate.value = Math.pow(2, (midi - best) / 12);
     var g = ctx.createGain();
     g.gain.setValueAtTime(0.0001, t);
@@ -1547,9 +1549,9 @@
         if (!padsOwn && !d.silent) noteOff(d.midi, d.chan);
         pressKeyHold(d.midi, false);
       }
-    });
-    App.on('midi:bend', function (d) { if (d) bendChan(d.chan, d.semis); });
-    App.on('midi:pressure', function (d) { if (d) pressChan(d.chan, d.val); });
+    }, true); // sound first, visuals after
+    App.on('midi:bend', function (d) { if (d) bendChan(d.chan, d.semis); }, true);
+    App.on('midi:pressure', function (d) { if (d) pressChan(d.chan, d.val); }, true);
 
     // shared context: follow key/scale/mode changes from the bar, theory page…
     App.on('fb:set', function () { render(); ppRebuild(); });
@@ -1580,6 +1582,15 @@
       delete qw.held[c];
     });
   }
+
+  // the sampled piano voice for other modules (Exercises ear training):
+  // App.keys.play(midi, whenSecondsFromNow, durSeconds, gain); warm() decodes
+  // the prefetched bank now; ready() = a sampled bank can play
+  App.keys = {
+    play: play,
+    warm: function () { try { decodeAll(App.getAudio()); } catch (e) { /* no audio */ } },
+    ready: function () { var b = pianoBank().bank; for (var k in b) return true; return false; }
+  };
 
   App.register('piano', {
     init: init,

@@ -1187,13 +1187,13 @@
     // capture inputs: hardware MIDI (anywhere) + on-screen/QWERTY piano notes.
     // The same events drive live play on the armed studio track (MPE).
     App.on('midi:note', function (d) {
+      if (d) liveRoute(d, !!d.on, d.chan); // sound before bookkeeping
       inputEvent(d, 'midi');
-      if (d) liveRoute(d, !!d.on, d.chan);
-    });
+    }, true);
     App.on('note:input', function (d) {
-      inputEvent(d, d && d.src === 'touch' ? 'touch' : 'qwerty');
       if (d) liveRoute(d, !!d.on, 0);
-    });
+      inputEvent(d, d && d.src === 'touch' ? 'touch' : 'qwerty');
+    }, true);
     App.on('midi:bend', function (d) {
       if (App.space !== 'studio' || !d) return;
       var id = App.store.get('st.armed', null);
