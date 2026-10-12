@@ -445,6 +445,12 @@
     c('pn-hold', perf.hold);
     var st = document.getElementById('pn-strum');
     if (st) st.value = String(Math.round(perf.strum * 100));
+    // show a control only when it does something: +Bass / Strum shape
+    // chords, the arp's rate / direction / range / Hold need Arp on
+    var vis = function (id, on) { var el = document.getElementById(id); if (el) el.hidden = !on; };
+    vis('pn-bass', perf.chords !== 'off');
+    vis('pn-strumf', perf.chords !== 'off');
+    ['pn-arprate', 'pn-arpdir', 'pn-arpoct', 'pn-hold'].forEach(function (id) { vis(id, perf.arp); });
   }
 
   function savePerf() { App.store.set('pn.perf', perf); }
@@ -1098,6 +1104,7 @@
         'stroke:#ffffff !important;stroke-width:3 !important}' +
       '.pn-dotg{pointer-events:none}' +
       '.pn-dott{font:700 11px var(--font-body);fill:#1c1206}' +
+      '#pn-perf [hidden]{display:none!important}' +
       '.pn-oct{font:600 11px var(--font-body);fill:var(--muted)}' +
       '.pn-jamring{opacity:0;stroke:rgba(0,0,0,0.65);stroke-width:2.5;transition:opacity 0.25s ease}' +
       '.pn-jamring.on{opacity:0.95}' +
@@ -1151,7 +1158,7 @@
             '<button type="button" data-pnch="triad">Triads</button>' +
             '<button type="button" data-pnch="7th">7ths</button></div>' +
           '<button type="button" class="chip fb-chip" id="pn-bass" title="Add the bass note an octave down">+Bass</button>' +
-          '<label class="field">Strum<input type="range" id="pn-strum" min="0" max="100" step="10" style="width:76px"></label>' +
+          '<label class="field" id="pn-strumf">Strum<input type="range" id="pn-strum" min="0" max="100" step="10" style="width:76px"></label>' +
           '<button type="button" class="chip fb-chip" id="pn-arp" title="Arpeggiate held notes at the shared tempo">Arp</button>' +
           '<div class="seg" id="pn-arprate"><button type="button" data-pnar="2">1/8</button>' +
             '<button type="button" data-pnar="3">Trip</button><button type="button" data-pnar="4">1/16</button></div>' +
@@ -1221,10 +1228,7 @@
         '</div>' +
         '<div class="pn-stage" id="pn-stage"></div>' +
         '<div class="row tight pn-legend" id="pn-legend"></div>' +
-        '<div class="muted small" style="margin-top:10px">Tap a key to hear it &mdash; or play with a MIDI keyboard, or any typing keyboard ' +
-          '(iPad Magic Keyboard included): home row = white keys, top row = black keys, Z / X shift octaves, Remap to customize. ' +
-          'Colors, key, scale and tempo are shared with the rest of the app; the practice runner plays the highlighted octave ' +
-          'with the same patterns, direction and loop pauses as the fretboard, and the Jam tab&#39;s chords light up here live.</div>' +
+        '<div class="muted small" style="margin-top:10px">Tap, type (home row = white keys, Z / X = octave) or play a MIDI keyboard.</div>' +
       '</div>';
 
     els.title = document.getElementById('pn-title');

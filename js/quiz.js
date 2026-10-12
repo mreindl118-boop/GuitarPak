@@ -379,7 +379,7 @@
         item: 'iv:' + id, miss: iv.w, sig: nm(lo) + id,
         audio: harm ? [{ m: [midiOf(lo), midiOf(hi)], at: 0, d: 1.5 }]
           : [{ m: [midiOf(lo)], at: 0, d: 0.8 }, { m: [midiOf(hi)], at: 0.85, d: 1.2 }],
-        explain: nm(lo) + ' to ' + nm(hi) + ': ' + iv.n + ' letter names, ' + iv.s + ' half steps — a ' + iv.w + '.'
+        explain: nm(lo) + ' to ' + nm(hi) + ': ' + iv.n + ' letter names, ' + iv.s + ' half step' + (iv.s === 1 ? '' : 's') + ' — a ' + iv.w + '.'
       };
       if (o.play) {
         q.kind = 'single'; q.pc = mod(midiOf(hi), 12); q.board = 'keys';
@@ -398,7 +398,7 @@
       q = {
         item: 'ik:' + id, miss: iv.w, sig: r + id, board: 'keys',
         audio: [{ m: [r], at: 0, d: 0.8 }, { m: [t], at: 0.85, d: 1.2 }],
-        explain: 'From ' + PC_LABEL[mod(r, 12)] + ' up ' + iv.s + ' half steps to ' + PC_LABEL[mod(t, 12)] + ' — a ' + iv.w + '.',
+        explain: 'From ' + PC_LABEL[mod(r, 12)] + ' up ' + iv.s + ' half step' + (iv.s === 1 ? '' : 's') + ' to ' + PC_LABEL[mod(t, 12)] + ' — a ' + iv.w + '.',
         show: { type: 'keys', marks: {} }
       };
       q.show.marks[r] = 'a';
@@ -421,7 +421,7 @@
     return {
       kind: 'choice', ear: 1, auto: 1, item: 'ie' + (o.dir || 'up') + ':' + id, miss: iv.w, sig: root + id,
       prompt: 'Which interval do you hear?', audio: ev, choices: choices, correct: id,
-      explain: 'A ' + iv.w + ' — ' + iv.s + ' half steps.' + (IV_SONG[id] && o.dir !== 'down' && o.dir !== 'harm' ? ' Going up it sounds like “' + IV_SONG[id] + '”.' : '')
+      explain: 'A ' + iv.w + ' — ' + iv.s + ' half step' + (iv.s === 1 ? '' : 's') + '.' + (IV_SONG[id] && o.dir !== 'down' && o.dir !== 'harm' ? ' Going up it sounds like “' + IV_SONG[id] + '”.' : '')
     };
   };
 
@@ -526,7 +526,8 @@
     if (o.task === 'play') {
       q.kind = 'set'; q.board = 'keys'; q.pcs = {};
       midis.forEach(function (m) { q.pcs[mod(m, 12)] = true; });
-      q.prompt = 'Play ' + label + ' — any inversion, any octave';
+      q.prompt = 'Play ' + label;
+      q.hint = 'Any inversion, any octave.';
       q.reveal = { keys: midis.map(fold) };
       return q;
     }
@@ -609,7 +610,8 @@
     if (o.task === 'play') {
       q.kind = 'set'; q.board = 'keys'; q.pcs = {};
       midis.forEach(function (m) { q.pcs[mod(m, 12)] = true; });
-      q.prompt = 'Play the ' + label + ' scale — any order, any octave';
+      q.prompt = 'Play the ' + label + ' scale';
+      q.hint = 'Any order, any octave.';
       q.reveal = { keys: midis.map(fold) };
       return q;
     }
@@ -1118,6 +1120,10 @@
 
   // ================= views =================
 
+  var CHEV = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" ' +
+    'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><polyline points="6 9 12 15 18 9"/></svg>';
+  var openUnits = {}; // topicId -> { unitId: true } — expanded unit cards
+
   function render() {
     if (!root) return;
     clearTimeout(advT);
@@ -1127,41 +1133,60 @@
     else renderDone();
   }
 
+  // keep the start of a view (or a unit) in sight, just below the top bar
+  function reveal(elm) {
+    if (!elm || !elm.getBoundingClientRect) return;
+    var bar = document.querySelector('.topbar');
+    var hb = bar ? bar.offsetHeight : 0;
+    var r = elm.getBoundingClientRect();
+    if (r.top >= hb && r.top < window.innerHeight * 0.45) return; // already in view
+    window.scrollTo(0, Math.max(0, window.pageYOffset + r.top - hb - 10));
+  }
+
   function renderHome() {
     var p = prog(), allPass = 0, h = '';
     COURSE.forEach(function (t) {
-      var pass = 0, tot = 0, st = 0;
+      var pass = 0, tot = 0;
       LEVELS.forEach(function (l) {
         if (l.topic !== t) return;
         tot++;
-        if (passed(p, l)) { pass++; st += p[l.id].s; }
+        if (passed(p, l)) pass++;
       });
       allPass += pass;
       h += '<button type="button" class="qz-topic" data-qzt="' + t.id + '">' +
         '<span class="qz-tname">' + esc(t.name) + '</span>' +
         '<span class="qz-tblurb">' + esc(t.blurb) + '</span>' +
-        '<span class="qz-bar"><i style="width:' + Math.round(100 * pass / tot) + '%"></i></span>' +
-        '<span class="qz-tmeta">' + pass + ' of ' + tot + ' levels' + (st ? ' · ' + st + ' ★' : '') + '</span></button>';
+        '<span class="qz-tfoot"><span class="qz-bar"><i style="width:' + Math.round(100 * pass / tot) + '%"></i></span>' +
+        '<span class="qz-tmeta">' + pass + '/' + tot + '</span></span></button>';
     });
     var nx = nextLevel();
     root.innerHTML =
-      '<div class="card qz-hero">' +
-        '<div class="qz-herotop"><div class="qz-herotext"><h2>Exercises</h2>' +
-          '<div class="muted small">Short levels of 10 questions: get 8 right to pass. Answer by tapping, or play the answer on your MIDI keyboard, the on-screen keys, or your guitar (Tone-in, in Settings).</div></div>' +
-          (nx ? '<button type="button" class="btn primary" id="qz-cont">' + App.icon('play', 13) + ' ' + (allPass ? 'Continue' : 'Start') + ': ' + esc(lvlTitle(nx)) + '</button>' : '') +
+      '<div class="qz-view">' +
+        '<div class="card qz-hero">' +
+          '<div class="qz-herotext"><h2>Exercises</h2>' +
+            '<p class="qz-sub">Theory and ear training, ten questions at a time. Tap the answer, or play it.</p></div>' +
+          '<div class="qz-heroact">' +
+            (nx ? '<button type="button" class="btn primary qz-go" id="qz-cont">' + App.icon('play', 13) + ' ' + (allPass ? 'Continue' : 'Start') + '</button>' +
+              '<span class="qz-nextup">' + esc(nx.topic.name + ' · ' + nx.unit.name + ' · ' + MODE_NAME[nx.mode] + ' ' + nx.n) + '</span>'
+              : '<span class="qz-nextup">Every level passed. Replay any level for more stars.</span>') +
+          '</div>' +
+          '<div class="qz-herofoot"><span class="qz-total">' + allPass + ' of ' + LEVELS.length + ' levels passed</span>' +
+            '<div class="seg qz-sound" role="group" aria-label="Exercise sound">' +
+              '<button type="button" data-qzs="piano">Piano</button><button type="button" data-qzs="guitar">Guitar</button></div></div>' +
         '</div>' +
-        '<div class="row tight qz-opts"><span class="muted small">Sound</span>' +
-          '<div class="seg" id="qz-sound"><button type="button" data-qzs="piano">Piano</button><button type="button" data-qzs="guitar">Guitar</button></div>' +
-          '<span class="muted small qz-total">' + allPass + ' of ' + LEVELS.length + ' levels passed</span></div>' +
-      '</div>' +
-      '<div class="qz-topics">' + h + '</div>';
+        '<div class="qz-topics">' + h + '</div>' +
+      '</div>';
     paintSound();
   }
 
   function paintSound() {
     var s = App.store.get('qz.sound', 'piano');
     if (!root) return;
-    root.querySelectorAll('[data-qzs]').forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-qzs') === s); });
+    root.querySelectorAll('[data-qzs]').forEach(function (b) {
+      var on = b.getAttribute('data-qzs') === s;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-pressed', String(on));
+    });
   }
 
   function firstOpenMode(u, p) {
@@ -1171,53 +1196,116 @@
     return u.modes[0].key;
   }
 
-  function renderTopic() {
-    var t = TOPIC[topicId], p = prog(), h = '';
-    t.units.forEach(function (u) {
-      var uPass = 0, uTot = 0, chips = '', mode = openMode[u.id] || firstOpenMode(u, p), md = null;
-      u.modes.forEach(function (m) {
-        var mp = 0;
-        m.levels.forEach(function (l) { if (passed(p, l)) mp++; });
-        uPass += mp;
-        uTot += m.levels.length;
-        if (m.key === mode) md = m;
-        chips += '<button type="button" class="chip fb-chip qz-mchip' + (m.key === mode ? ' active' : '') + '" data-qzm="' + u.id + '|' + m.key + '">' +
-          esc(MODE_NAME[m.key]) + '<b>' + mp + '/' + m.levels.length + '</b></button>';
-      });
-      md = md || u.modes[0];
-      var rows = md.levels.map(function (l) {
-        var s = p[l.id];
-        return '<button type="button" class="qz-lvl' + (s && s.s ? ' pass' : '') + '" data-qzl="' + l.id + '">' +
-          '<span class="n">' + l.n + '</span><span class="t">' + esc(l.text) + '</span>' +
-          '<span class="st">' + (s ? starStr(s.s) + '<small>' + s.b + '/10</small>' : '<small>Start</small>') + '</span></button>';
-      }).join('');
-      h += '<div class="card qz-unit"><div class="qz-uhead"><h3>' + esc(u.name) + '</h3><span class="muted small">' + uPass + '/' + uTot + '</span>' +
-        (u.learn ? '<button type="button" class="btn sm" data-qzlearn="' + u.id + '" aria-expanded="false">Learn</button>' : '') + '</div>' +
-        (u.learn ? '<div class="qz-learn" id="qz-learn-' + u.id + '" hidden>' + u.learn + '</div>' : '') +
-        '<div class="qz-mchips">' + chips + '</div><div class="qz-lvls">' + rows + '</div></div>';
-    });
-    root.innerHTML = '<div class="qz-tophead"><button type="button" class="btn sm" id="qz-home">' + App.icon('left', 14) + ' Exercises</button>' +
-      '<h2>' + esc(t.name) + '</h2></div><div class="qz-units">' + h + '</div>';
+  function firstOpenUnit(t, p) {
+    for (var i = 0; i < t.units.length; i++) {
+      var u = t.units[i];
+      for (var j = 0; j < u.modes.length; j++) {
+        if (u.modes[j].levels.some(function (l) { return !passed(p, l); })) return u.id;
+      }
+    }
+    return t.units[0].id;
   }
 
+  function renderTopic() {
+    var t = TOPIC[topicId], p = prog(), h = '';
+    if (!openUnits[t.id]) { openUnits[t.id] = {}; openUnits[t.id][firstOpenUnit(t, p)] = true; }
+    t.units.forEach(function (u) {
+      var uPass = 0, uTot = 0, open = !!openUnits[t.id][u.id];
+      u.modes.forEach(function (m) { m.levels.forEach(function (l) { uTot++; if (passed(p, l)) uPass++; }); });
+      h += '<section class="card qz-unit' + (open ? ' open' : '') + '" id="qz-unit-' + u.id + '">' +
+        '<button type="button" class="qz-uhead" data-qzu="' + u.id + '" aria-expanded="' + open + '">' +
+          '<span class="qz-uname">' + esc(u.name) + '</span>' +
+          '<span class="qz-bar qz-ubar"><i style="width:' + Math.round(100 * uPass / uTot) + '%"></i></span>' +
+          '<span class="qz-ucount">' + uPass + '/' + uTot + '</span>' +
+          '<span class="qz-chev">' + CHEV + '</span></button>' +
+        (open ? unitBody(u, p) : '') + '</section>';
+    });
+    root.innerHTML = '<div class="qz-view">' +
+      '<div class="qz-tophead"><button type="button" class="qz-backlink" id="qz-home">' + App.icon('left', 14) + ' Exercises</button>' +
+        '<h2 class="qz-ttl">' + esc(t.name) + '</h2></div>' +
+      '<div class="qz-units">' + h + '</div></div>';
+  }
+
+  function unitBody(u, p) {
+    var mode = openMode[u.id] || firstOpenMode(u, p), md = null, chips = '';
+    u.modes.forEach(function (m) {
+      if (m.key === mode) md = m;
+      var done = m.levels.every(function (l) { return passed(p, l); });
+      chips += '<button type="button" class="chip qz-mchip' + (m.key === mode ? ' active' : '') + '" data-qzm="' + u.id + '|' + m.key + '"' +
+        ' aria-pressed="' + (m.key === mode) + '">' + esc(MODE_NAME[m.key]) +
+        (done ? '<span class="qz-tick" aria-label="all passed">✓</span>' : '') + '</button>';
+    });
+    md = md || u.modes[0];
+    var rows = md.levels.map(function (l) {
+      var s = p[l.id];
+      var right = !s ? '' : s.s ? '<span class="st" aria-label="' + s.s + ' of 3 stars">' + starStr(s.s) + '</span>'
+        : '<span class="sc">' + s.b + '/10</span>';
+      return '<button type="button" class="qz-lvl' + (s && s.s ? ' pass' : '') + '" data-qzl="' + l.id + '">' +
+        '<span class="n">' + l.n + '</span><span class="t">' + esc(l.text) + '</span>' + right +
+        '<span class="go">' + App.icon('right', 14) + '</span></button>';
+    }).join('');
+    return '<div class="qz-ubody">' +
+      '<div class="qz-urow">' + (u.modes.length > 1 ? '<div class="qz-mchips">' + chips + '</div>' : '<div class="qz-mchips"></div>') +
+        (u.learn ? '<button type="button" class="qz-learnbtn" data-qzlearn="' + u.id + '" aria-expanded="false">Learn</button>' : '') + '</div>' +
+      (u.learn ? '<div class="qz-learn" id="qz-learn-' + u.id + '" hidden>' + u.learn + '</div>' : '') +
+      '<div class="qz-lvls">' + rows + '</div></div>';
+  }
+
+  // re-render ONE unit card in place: no page-wide redraw, no scroll jump
+  function repaintUnit(uid, animate) {
+    var t = TOPIC[topicId], u = null, card = el('qz-unit-' + uid);
+    t.units.forEach(function (x) { if (x.id === uid) u = x; });
+    if (!u || !card) { render(); return; }
+    var open = !!(openUnits[topicId] || {})[uid];
+    var lb = el('qz-learn-' + uid), learnOpen = !!(lb && !lb.hidden);
+    card.classList.toggle('open', open);
+    var head = card.querySelector('.qz-uhead');
+    if (head) head.setAttribute('aria-expanded', String(open));
+    var body = card.querySelector('.qz-ubody');
+    if (body) body.parentNode.removeChild(body);
+    if (!open) return;
+    card.insertAdjacentHTML('beforeend', unitBody(u, prog()));
+    if (learnOpen) {
+      var nl = el('qz-learn-' + uid), nb = card.querySelector('[data-qzlearn]');
+      if (nl) nl.hidden = false;
+      if (nb) nb.setAttribute('aria-expanded', 'true');
+    }
+    if (animate) { var b2 = card.querySelector('.qz-ubody'); if (b2) b2.classList.add('qz-in'); }
+  }
+
+  // The run view is a fixed shell (header, progress, card, footer); only the
+  // question inside the card is swapped, with a short fade — no full redraw.
   function renderRun() {
-    var q = cur.q, l = cur.lvl;
-    root.innerHTML =
-      '<div class="qz-runhead"><button type="button" class="btn sm" id="qz-back">' + App.icon('left', 14) + ' ' + esc(l.unit.name) + '</button>' +
-        '<span class="qz-crumb">' + esc(l.topic.name + ' · ' + MODE_NAME[l.mode] + ' · Level ' + l.n) + '</span>' +
-        '<span class="qz-score" id="qz-score"></span></div>' +
-      '<div class="qz-prog" id="qz-prog"></div>' +
-      '<div class="card qz-stage">' +
-        '<div class="qz-instr muted small">' + esc(l.text) + '</div>' +
-        '<div class="qz-prompt" id="qz-prompt">' + esc(q.prompt) + '</div>' +
-        '<div class="qz-vis" id="qz-vis"></div>' +
-        (q.audio ? '<button type="button" class="btn sm" id="qz-hear">' + App.icon('play', 13) + ' ' + (q.ear ? 'Hear it again' : 'Hear it') + '</button>' : '') +
-        '<div class="qz-ans" id="qz-ans"></div>' +
-        '<div class="qz-fb" id="qz-fb" role="status" aria-live="polite"></div>' +
-        '<div class="row tight qz-acts"><button type="button" class="btn sm" id="qz-showans">Show answer</button>' +
-          '<button type="button" class="btn primary" id="qz-next" hidden>Next ' + App.icon('right', 14) + '</button></div>' +
-      '</div>';
+    var l = cur.lvl, shell = el('qz-runshell');
+    if (!shell || shell.getAttribute('data-lvl') !== l.id) {
+      root.innerHTML =
+        '<div class="qz-view qz-run" id="qz-runshell" data-lvl="' + esc(l.id) + '">' +
+          '<div class="qz-runhead"><button type="button" class="qz-backlink" id="qz-back">' + App.icon('left', 14) + ' ' + esc(l.unit.name) + '</button>' +
+            '<span class="qz-lvltag">' + esc(MODE_NAME[l.mode] + ' · Level ' + l.n) + '</span>' +
+            '<span class="qz-count" id="qz-count"></span></div>' +
+          '<div class="qz-prog" id="qz-prog" aria-hidden="true"></div>' +
+          '<div class="card qz-stage">' +
+            '<div class="qz-q" id="qz-q"></div>' +
+            '<div class="qz-foot"><div class="qz-fb" id="qz-fb" role="status" aria-live="polite"></div>' +
+              '<button type="button" class="btn qz-act" id="qz-act"></button></div>' +
+          '</div>' +
+        '</div>';
+    }
+    paintQ();
     paintProg();
+    paintFoot();
+  }
+
+  function paintQ() {
+    var q = cur.q, box = el('qz-q');
+    if (!box) return;
+    var hear = q.audio && !q.ear
+      ? '<button type="button" class="qz-hear" id="qz-hear" aria-label="Hear it" title="Hear it (Space)">' + App.icon('play', 13) + '</button>' : '';
+    box.innerHTML = '<div class="qz-prompt"><span>' + esc(q.prompt) + '</span>' + hear + '</div>' +
+      '<div class="qz-vis" id="qz-vis"></div><div class="qz-ans" id="qz-ans"></div>';
+    box.classList.remove('qz-in');
+    void box.offsetWidth; // restart the entrance fade
+    box.classList.add('qz-in');
     paintVis();
     paintAns();
   }
@@ -1225,14 +1313,15 @@
   function paintProg() {
     var segs = '';
     for (var i = 0; i < cur.n; i++) {
-      segs += '<i class="' + (i < cur.res.length ? (cur.res[i] ? 'ok' : 'bad') : i === cur.res.length ? 'cur' : '') + '"></i>';
+      segs += '<i class="' + (i < cur.res.length ? (cur.res[i] ? 'ok' : 'bad') : (i === cur.res.length && !cur.answered ? 'cur' : '')) + '"></i>';
     }
-    var pe = el('qz-prog'), se = el('qz-score');
+    var pe = el('qz-prog'), ce = el('qz-count');
     if (pe) pe.innerHTML = segs;
-    if (se) se.textContent = cur.res.filter(Boolean).length + ' / ' + cur.res.length;
+    if (ce) ce.textContent = Math.min(cur.n, cur.res.length + (cur.answered ? 0 : 1)) + ' / ' + cur.n;
   }
 
-  // the visual (staff / keys / neck), unless the board below already shows it
+  // the visual (staff / keys / neck, or the big play button for ear
+  // questions), unless the answer board below already shows it
   function paintVis() {
     var q = cur.q, box = el('qz-vis');
     if (!box) return;
@@ -1240,6 +1329,12 @@
     if (cur.answered && q.reveal && q.reveal.staff) {
       var rv = q.reveal.staff;
       box.innerHTML = staffSVG({ clef: rv.clef || (sh && sh.clef) || 'treble', cols: rv.cols, okCol: rv.ok ? rv.cols.length - 1 : -1, okAll: rv.cols.length === 1 });
+      return;
+    }
+    if (q.ear) {
+      if (!box.querySelector('.qz-earbtn')) {
+        box.innerHTML = '<button type="button" class="qz-earbtn" id="qz-hear" aria-label="Play the sound again" title="Play again (Space)">' + App.icon('play', 30) + '</button>';
+      }
       return;
     }
     if (!sh || (q.kind !== 'choice' && sh.type === q.board)) { box.innerHTML = ''; return; }
@@ -1252,15 +1347,15 @@
     var q = cur.q, box = el('qz-ans');
     if (!box) return;
     if (q.kind === 'choice') {
-      box.innerHTML = '<div class="qz-choices">' + q.choices.map(function (c, i) {
+      box.innerHTML = '<div class="qz-choices' + (q.choices.length <= 2 ? ' two' : '') + '">' + q.choices.map(function (c, i) {
         return '<button type="button" class="qz-ch" data-qzc="' + esc(c.id) + '">' +
           (i < 9 ? '<span class="k" aria-hidden="true">' + (i + 1) + '</span>' : '') + esc(c.label) + '</button>';
       }).join('') + '</div>';
       return;
     }
-    var hint = '<div class="qz-hint">' + (q.kind === 'set'
-      ? 'Play it on your MIDI keyboard or guitar, or tap the keys and press Check.'
-      : 'Tap it, or play it on your MIDI keyboard or guitar.') + '</div>';
+    var hint = cur.answered ? '' : '<div class="qz-hint">' + (q.hint ? q.hint + ' ' : '') + (q.kind === 'set'
+      ? 'Tap the notes and press Check, or play them.'
+      : 'Tap it, or play it on your keyboard or guitar.') + '</div>';
     if (q.board === 'neck') {
       var nmk = [];
       if (cur.answered) {
@@ -1280,29 +1375,48 @@
       Object.keys(cur.tap).forEach(function (k) { marks[+k] = 'on'; });
     }
     var setBtns = q.kind === 'set' && !cur.answered
-      ? '<div class="row tight qz-acts"><button type="button" class="btn sm" id="qz-clear">Clear</button>' +
-        '<button type="button" class="btn sm primary" id="qz-check"' + (Object.keys(cur.tap).length ? '' : ' disabled') + '>Check</button></div>'
+      ? '<div class="qz-acts"><button type="button" class="btn sm" id="qz-clear">Clear</button>' +
+        (Object.keys(cur.tap).length ? '<button type="button" class="btn sm primary" id="qz-check">Check</button>'
+          : '<button type="button" class="btn sm" id="qz-check" disabled>Check</button>') + '</div>'
       : '';
     box.innerHTML = '<div class="qz-board">' + keysSVG(marks) + hint + setBtns + '</div>';
+  }
+
+  // footer: feedback on the left, ONE action on the right that changes in
+  // place (Show answer -> Next), so nothing jumps when you answer
+  function paintFoot() {
+    var b = el('qz-act'), fb = el('qz-fb');
+    if (!b) return;
+    if (cur.answered) {
+      b.className = 'btn primary qz-act';
+      b.innerHTML = (cur.res.length >= cur.n ? 'Finish' : 'Next') + ' ' + App.icon('right', 14);
+    } else {
+      b.className = 'btn qz-act qz-quiet';
+      b.textContent = 'Show answer';
+      if (fb) { fb.className = 'qz-fb'; fb.textContent = ''; }
+    }
   }
 
   function renderDone() {
     var l = cur.lvl, pass = cur.stars > 0, best = prog()[l.id];
     var misses = Object.keys(cur.miss).map(function (k) { return k + (cur.miss[k] > 1 ? ' ×' + cur.miss[k] : ''); });
     var nx = nextInCourse(l);
+    var acts = pass && nx
+      ? '<button type="button" class="btn primary" data-qzl="' + nx.id + '">Next level ' + App.icon('right', 14) + '</button>' +
+        '<button type="button" class="btn" id="qz-retry">Try again</button>'
+      : '<button type="button" class="btn primary" id="qz-retry">Try again</button>' +
+        (nx ? '<button type="button" class="btn" data-qzl="' + nx.id + '">Next level</button>' : '');
     root.innerHTML =
-      '<div class="card qz-done">' +
-        '<div class="qz-crumb">' + esc(lvlTitle(l)) + '</div>' +
-        '<h2>' + (pass ? (cur.stars === 3 ? 'Perfect!' : 'Level passed') : 'Not passed yet') + '</h2>' +
+      '<div class="qz-view"><div class="card qz-done qz-in">' +
+        '<div class="qz-lvltag">' + esc(lvlTitle(l)) + '</div>' +
         '<div class="qz-big">' + cur.score + '<span>/10</span></div>' +
         '<div class="qz-stars" aria-label="' + cur.stars + ' of 3 stars">' + starStr(cur.stars) + '</div>' +
-        (pass ? '' : '<div class="muted">Get 8 right to pass.</div>') +
-        (best ? '<div class="muted small">Best: ' + best.b + '/10</div>' : '') +
-        (misses.length ? '<div class="qz-miss"><span class="muted small">Practice these: </span>' + esc(misses.join(', ')) + '</div>' : '') +
-        '<div class="row tight qz-acts"><button type="button" class="btn" id="qz-retry">Try again</button>' +
-          (nx ? '<button type="button" class="btn primary" data-qzl="' + nx.id + '">Next level ' + App.icon('right', 14) + '</button>' : '') +
-          '<button type="button" class="btn" id="qz-back">Back to ' + esc(l.unit.name) + '</button></div>' +
-      '</div>';
+        '<div class="qz-verdict">' + (pass ? (cur.stars === 3 ? 'Perfect!' : 'Level passed') : 'Not passed yet — 8 right to pass') + '</div>' +
+        (best && best.b > cur.score ? '<div class="muted small">Your best: ' + best.b + '/10</div>' : '') +
+        (misses.length ? '<div class="qz-miss"><span class="muted">Practice: </span>' + esc(misses.join(', ')) + '</div>' : '') +
+        '<div class="qz-acts">' + acts + '</div>' +
+        '<button type="button" class="qz-backlink" id="qz-back">' + App.icon('left', 14) + ' ' + esc(l.unit.name) + '</button>' +
+      '</div></div>';
   }
 
   // ================= flow =================
@@ -1314,10 +1428,7 @@
     cur = { lvl: l, n: 10, res: [], miss: {}, q: null, answered: false, tap: {}, got: {}, played: null, playedPos: null, lastSig: null };
     view = 'run';
     newQ();
-    // bring the level header into view BELOW the sticky top bar
-    var bar = document.querySelector('.topbar'), r = root ? root.getBoundingClientRect() : null;
-    var hb = bar ? bar.getBoundingClientRect().bottom : 0;
-    if (r && r.top < hb + 4) window.scrollTo(0, Math.max(0, window.pageYOffset + r.top - hb - 8));
+    reveal(root);
   }
 
   function newQ() {
@@ -1358,18 +1469,18 @@
     } else {
       paintAns();
     }
-    paintVis();
+    if (q.reveal && q.reveal.staff) paintVis();
     var fb = el('qz-fb');
     if (fb) {
       fb.className = 'qz-fb ' + (ok ? 'ok' : 'bad');
-      fb.textContent = (ok ? 'Correct. ' : (note != null ? 'You played ' + PC_LABEL[mod(note, 12)] + '. ' : 'Not quite. ')) + (q.explain || '');
+      fb.innerHTML = '<b>' + (ok ? 'Correct.' : note != null ? 'You played ' + esc(PC_LABEL[mod(note, 12)]) + '.' : 'Not quite.') + '</b> ' + esc(q.explain || '');
     }
-    var sa = el('qz-showans'), nb = el('qz-next');
-    if (sa) sa.hidden = true;
-    if (nb) { nb.hidden = false; if (!ok) { try { nb.focus({ preventScroll: true }); } catch (e) { /* ok */ } } }
+    paintFoot();
     paintProg();
+    var nb = el('qz-act');
+    if (nb && !ok) { try { nb.focus({ preventScroll: true }); } catch (e) { /* ok */ } }
     if (q.kind === 'choice' && !q.ear) playQ(q); // hear what you just read
-    if (ok) advT = setTimeout(function () { if (cur && cur.q === q) nextQ(); }, q.ear ? 1200 : 1500);
+    if (ok) advT = setTimeout(function () { if (cur && cur.q === q) nextQ(); }, q.ear ? 1200 : 1400);
   }
 
   function finish() {
@@ -1380,6 +1491,7 @@
     cur.stars = s;
     view = 'done';
     render();
+    reveal(root);
   }
 
   function answerChoice(id) {
@@ -1435,13 +1547,19 @@
   function back() {
     clearTimeout(advT);
     if (view === 'run' || view === 'done') {
-      topicId = cur.lvl.topic.id;
-      openMode[cur.lvl.unit.id] = cur.lvl.mode;
+      var l = cur.lvl;
+      topicId = l.topic.id;
+      if (!openUnits[topicId]) openUnits[topicId] = {};
+      openUnits[topicId][l.unit.id] = true;
+      openMode[l.unit.id] = l.mode;
       view = 'topic';
+      render();
+      reveal(el('qz-unit-' + l.unit.id));
     } else {
       view = 'home';
+      render();
+      reveal(root);
     }
-    render();
   }
 
   // ================= events =================
@@ -1450,8 +1568,14 @@
     var t = e.target.closest ? e.target.closest('button') : null;
     if (!t || t.disabled) return;
     var a;
-    if ((a = t.getAttribute('data-qzt'))) { topicId = a; view = 'topic'; render(); return; }
-    if ((a = t.getAttribute('data-qzm'))) { var pr = a.split('|'); openMode[pr[0]] = pr[1]; render(); return; }
+    if ((a = t.getAttribute('data-qzt'))) { topicId = a; view = 'topic'; render(); reveal(root); return; }
+    if ((a = t.getAttribute('data-qzu'))) {
+      var o = openUnits[topicId] || (openUnits[topicId] = {});
+      o[a] = !o[a];
+      repaintUnit(a, true);
+      return;
+    }
+    if ((a = t.getAttribute('data-qzm'))) { var pr = a.split('|'); openMode[pr[0]] = pr[1]; repaintUnit(pr[0], false); return; }
     if ((a = t.getAttribute('data-qzl'))) { startLevel(a); return; }
     if ((a = t.getAttribute('data-qzc'))) { answerChoice(a); return; }
     if ((a = t.getAttribute('data-qzs'))) { App.store.set('qz.sound', a); paintSound(); return; }
@@ -1461,12 +1585,11 @@
       return;
     }
     switch (t.id) {
-      case 'qz-home': view = 'home'; render(); break;
+      case 'qz-home': view = 'home'; render(); reveal(root); break;
       case 'qz-cont': var n = nextLevel(); if (n) startLevel(n.id); break;
       case 'qz-back': back(); break;
       case 'qz-hear': if (cur) playQ(cur.q); break;
-      case 'qz-next': nextQ(); break;
-      case 'qz-showans': if (cur && !cur.answered) resolve(false, null); break;
+      case 'qz-act': if (!cur) break; if (cur.answered) nextQ(); else resolve(false, null); break;
       case 'qz-check': checkTaps(); break;
       case 'qz-clear': if (cur) { cur.tap = {}; cur.got = {}; paintAns(); } break;
       case 'qz-retry': if (cur) startLevel(cur.lvl.id); break;
@@ -1512,66 +1635,111 @@
 
   var CSS =
     '@font-face{font-family:SLMusic;src:url(fonts/slmusic.woff2) format("woff2");font-display:block}' +
-    '.qz-hero{display:grid;gap:12px;grid-template-columns:minmax(0,1fr)}' +
-    '.qz-herotop{display:flex;gap:14px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}' +
-    '.qz-herotext{flex:1 1 300px;min-width:0}' +
-    '.qz-herotop h2{margin:0 0 4px}' +
-    '.qz-opts{gap:10px;align-items:center;flex-wrap:wrap}' +
-    '.qz-total{margin-left:auto;font-variant-numeric:tabular-nums}' +
-    '.qz-topics{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-top:12px}' +
-    '.qz-topic{display:grid;gap:8px;align-content:start;text-align:left;padding:16px;border-radius:14px;border:1px solid var(--line);background:var(--card);color:var(--text);font:inherit;cursor:pointer}' +
-    '.qz-topic:hover,.qz-topic:focus-visible{border-color:var(--accent)}' +
-    '.qz-tname{font-family:var(--font-display);font-size:24px;letter-spacing:1px;text-transform:uppercase;line-height:1}' +
-    '.qz-tblurb{font-size:13.5px;color:var(--muted)}' +
-    '.qz-bar{display:block;height:6px;border-radius:3px;background:var(--card2);overflow:hidden}' +
+    '.qz-view{max-width:880px;margin:0 auto}' +
+    '.qz-in{animation:qz-in .18s ease-out}' +
+    '@keyframes qz-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}' +
+    '.qz-bar{display:block;height:5px;border-radius:3px;background:var(--card2);overflow:hidden}' +
     '.qz-bar i{display:block;height:100%;background:var(--accent);border-radius:3px}' +
-    '.qz-tmeta{font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}' +
-    '.qz-tophead{display:flex;align-items:center;gap:12px;margin-bottom:12px}' +
-    '.qz-tophead h2{margin:0}' +
-    '.qz-units{display:grid;gap:12px}' +
-    '.qz-unit{display:grid;gap:10px;grid-template-columns:minmax(0,1fr)}' +
-    '.qz-uhead{display:flex;align-items:center;gap:10px}' +
-    '.qz-uhead h3{margin:0;font-size:17px}' +
-    '.qz-uhead .btn{margin-left:auto}' +
-    '.qz-learn{font-size:14px;line-height:1.55;background:var(--card2);border-radius:10px;padding:2px 14px;max-width:72ch}' +
-    '.qz-mchips{display:flex;flex-wrap:wrap;gap:6px}' +
-    '.qz-mchip b{font-weight:600;color:var(--muted);margin-left:6px;font-variant-numeric:tabular-nums}' +
+    '.qz-backlink{display:inline-flex;align-items:center;gap:6px;padding:6px 8px;margin-left:-8px;border:0;border-radius:8px;background:transparent;color:var(--muted);font:600 14px var(--font-body);cursor:pointer}' +
+    '.qz-backlink:hover,.qz-backlink:focus-visible{color:var(--text);background:var(--card2)}' +
+    // home
+    '.qz-hero{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px 20px;align-items:center}' +
+    '.qz-hero h2{margin:0 0 6px}' +
+    '.qz-sub{margin:0;color:var(--muted);font-size:14px;line-height:1.45}' +
+    '.qz-heroact{display:grid;justify-items:end;gap:6px}' +
+    '.qz-go{padding:12px 26px;font-size:16px}' +
+    '.qz-nextup{font-size:12.5px;color:var(--muted);text-align:right}' +
+    '.qz-herofoot{grid-column:1/-1;display:flex;align-items:center;gap:12px;padding-top:12px;border-top:1px solid var(--line-soft)}' +
+    '.qz-total{font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}' +
+    '.qz-sound{margin-left:auto}' +
+    '.qz-sound button{padding:5px 12px;font-size:13px}' +
+    '.qz-topics{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}' +
+    '.qz-topic{display:grid;grid-template-rows:auto 1fr auto;gap:8px;text-align:left;padding:16px 18px;border-radius:var(--radius);border:1px solid var(--line);background:var(--card);color:var(--text);font:inherit;cursor:pointer;transition:border-color .12s ease}' +
+    '.qz-topic:hover,.qz-topic:focus-visible{border-color:var(--accent)}' +
+    '.qz-tname{font-family:var(--font-display);font-size:23px;letter-spacing:1px;text-transform:uppercase;line-height:1}' +
+    '.qz-tblurb{font-size:13.5px;line-height:1.45;color:var(--muted)}' +
+    '.qz-tfoot{display:flex;align-items:center;gap:10px}' +
+    '.qz-tfoot .qz-bar{flex:1}' +
+    '.qz-tmeta{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}' +
+    // topic
+    '.qz-tophead{display:flex;align-items:center;gap:12px;margin-bottom:14px}' +
+    '.qz-ttl{margin:0;font-family:var(--font-display);font-size:26px;font-weight:600;letter-spacing:1px;text-transform:uppercase;line-height:1}' +
+    '.qz-units{display:grid;gap:10px}' +
+    '.qz-unit{padding:0;margin:0;overflow:hidden}' +
+    '.qz-uhead{display:flex;align-items:center;gap:14px;width:100%;padding:16px 18px;border:0;background:transparent;color:var(--text);font:inherit;text-align:left;cursor:pointer}' +
+    '.qz-uhead:hover .qz-uname,.qz-uhead:focus-visible .qz-uname{color:var(--accent)}' +
+    '.qz-uname{flex:1;min-width:0;font-weight:600;font-size:16px}' +
+    '.qz-ubar{width:72px;flex:none}' +
+    '.qz-ucount{font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums;min-width:32px;text-align:right}' +
+    '.qz-chev{display:inline-flex;color:var(--muted);transition:transform .18s ease}' +
+    '.qz-unit.open .qz-chev{transform:rotate(180deg)}' +
+    '.qz-ubody{display:grid;gap:10px;padding:0 18px 18px}' +
+    '.qz-urow{display:flex;align-items:center;gap:10px}' +
+    '.qz-mchips{display:flex;flex-wrap:wrap;gap:6px;flex:1;min-width:0}' +
+    '.qz-mchip{cursor:pointer;color:var(--label)}' +
+    '.qz-tick{color:var(--green);font-weight:700}' +
+    '.qz-learnbtn{flex:none;border:0;background:transparent;color:var(--accent);font:600 13.5px var(--font-body);padding:6px 4px;cursor:pointer}' +
+    '.qz-learnbtn:hover,.qz-learnbtn:focus-visible{text-decoration:underline;text-underline-offset:3px}' +
+    '.qz-learn{font-size:14px;line-height:1.55;background:var(--card2);border-radius:10px;padding:2px 14px}' +
     '.qz-lvls{display:grid;gap:6px}' +
-    '.qz-lvl{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card2);color:var(--text);font:inherit;cursor:pointer}' +
+    '.qz-lvl{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:11px 12px;border:1px solid transparent;border-radius:10px;background:var(--card2);color:var(--text);font:inherit;cursor:pointer;transition:border-color .12s ease}' +
     '.qz-lvl:hover,.qz-lvl:focus-visible{border-color:var(--accent)}' +
-    '.qz-lvl .n{font-family:var(--font-display);font-size:20px;color:var(--accent);min-width:20px;text-align:center}' +
+    '.qz-lvl .n{font-family:var(--font-display);font-size:19px;color:var(--accent);min-width:18px;text-align:center}' +
     '.qz-lvl .t{flex:1;min-width:0}' +
-    '.qz-lvl .st{color:var(--accent);white-space:nowrap;font-variant-numeric:tabular-nums;letter-spacing:1px}' +
-    '.qz-lvl .st small{color:var(--muted);margin-left:6px;letter-spacing:0}' +
-    '.qz-lvl.pass{border-color:color-mix(in srgb,var(--accent) 45%,var(--line))}' +
-    '.qz-runhead{display:flex;align-items:center;gap:10px;flex-wrap:wrap}' +
-    '.qz-crumb{font-size:13px;color:var(--muted);flex:1;min-width:0}' +
-    '.qz-score{font-family:var(--font-display);font-size:24px;font-variant-numeric:tabular-nums}' +
-    '.qz-prog{display:flex;gap:4px;margin:10px 0 12px}' +
-    '.qz-prog i{flex:1;height:7px;border-radius:4px;background:var(--card2)}' +
+    '.qz-lvl .st{color:var(--accent);letter-spacing:1px;white-space:nowrap}' +
+    '.qz-lvl .sc{color:var(--muted);font-size:12.5px;font-variant-numeric:tabular-nums}' +
+    '.qz-lvl .go{display:inline-flex;color:var(--muted);opacity:.55}' +
+    // run
+    '.qz-runhead{display:flex;align-items:center;gap:10px}' +
+    '.qz-lvltag{font-size:12.5px;color:var(--muted)}' +
+    '.qz-count{margin-left:auto;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}' +
+    '.qz-prog{display:flex;gap:4px;margin:8px 0 12px}' +
+    '.qz-prog i{flex:1;height:6px;border-radius:3px;background:var(--card2);transition:background-color .2s ease}' +
     '.qz-prog i.ok{background:var(--green)}.qz-prog i.bad{background:var(--red)}.qz-prog i.cur{background:var(--accent)}' +
-    '.qz-stage{display:grid;gap:14px;grid-template-columns:minmax(0,1fr);justify-items:center;text-align:center}' +
-    '.qz-prompt{font-size:21px;font-weight:600;text-wrap:balance}' +
+    '.qz-stage{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;padding:24px 22px 16px}' +
+    '.qz-q{display:grid;grid-template-columns:minmax(0,1fr);gap:18px;justify-items:center;text-align:center}' +
+    '.qz-prompt{display:flex;align-items:center;justify-content:center;gap:10px;font-size:21px;font-weight:600;text-wrap:balance}' +
+    '.qz-hear{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;flex:none;border-radius:50%;border:1px solid var(--ctl-border);background:var(--card2);color:var(--accent);cursor:pointer}' +
+    '.qz-hear:hover,.qz-hear:focus-visible{border-color:var(--accent)}' +
+    '.qz-earbtn{display:inline-flex;align-items:center;justify-content:center;width:84px;height:84px;border-radius:50%;border:2px solid var(--accent);background:color-mix(in srgb,var(--accent) 12%,var(--card2));color:var(--accent);cursor:pointer;transition:transform .1s ease}' +
+    '.qz-earbtn:active{transform:scale(.96)}' +
+    '.qz-earbtn .ic{margin-left:4px}' +
     '.qz-vis{width:100%;display:flex;justify-content:center;color:var(--text)}' +
     '.qz-vis:empty{display:none}' +
+    '.qz-ans{width:100%;display:grid;grid-template-columns:minmax(0,1fr);justify-items:center}' +
+    '.qz-choices{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(124px,40%),1fr));gap:8px;width:100%;max-width:640px}' +
+    '.qz-choices.two{max-width:380px}' +
+    '.qz-ch{position:relative;min-height:52px;padding:10px 14px;border-radius:12px;border:1px solid var(--ctl-border);background:var(--card2);color:var(--text);font:600 16px/1.25 var(--font-body);cursor:pointer;transition:border-color .12s ease,background-color .15s ease,opacity .15s ease}' +
+    '.qz-ch:hover:not(:disabled),.qz-ch:focus-visible{border-color:var(--accent)}' +
+    '.qz-ch .k{display:none}' +
+    '@media (hover:hover) and (pointer:fine){.qz-ch .k{display:block;position:absolute;top:5px;left:8px;font-size:10px;font-weight:600;color:var(--muted);opacity:.7}}' +
+    '.qz-ch.ok{border-color:var(--green);background:color-mix(in srgb,var(--green) 22%,var(--card2))}' +
+    '.qz-ch.bad{border-color:var(--red);background:color-mix(in srgb,var(--red) 22%,var(--card2))}' +
+    '.qz-ch.dim{opacity:.4}' +
+    '.qz-ch:disabled{cursor:default}' +
+    '.qz-foot{display:flex;align-items:center;gap:14px;min-height:52px;padding-top:14px;border-top:1px solid var(--line-soft)}' +
+    '.qz-fb{flex:1;min-width:0;font-size:14.5px;line-height:1.45;text-align:left}' +
+    '.qz-fb.ok{color:var(--green)}.qz-fb.bad{color:var(--red)}' +
+    '.qz-act{flex:none;min-width:132px}' +
+    '.qz-act.qz-quiet{background:transparent;box-shadow:none;color:var(--muted);border-color:transparent}' +
+    '.qz-act.qz-quiet:hover{color:var(--text);border-color:var(--ctl-border)}' +
+    '.qz-acts{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;align-items:center}' +
+    '.qz-board{display:grid;gap:10px;grid-template-columns:minmax(0,1fr);justify-items:center;width:100%}' +
+    '.qz-hint{font-size:13px;color:var(--muted)}' +
+    // done
+    '.qz-done{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;justify-items:center;text-align:center;padding:28px 22px 18px}' +
+    '.qz-big{font-family:var(--font-display);font-size:68px;line-height:1;font-variant-numeric:tabular-nums;margin-top:6px}' +
+    '.qz-big span{font-size:28px;color:var(--muted)}' +
+    '.qz-stars{font-size:28px;color:var(--accent);letter-spacing:6px}' +
+    '.qz-verdict{font-size:18px;font-weight:600}' +
+    '.qz-miss{font-size:14px;max-width:520px;line-height:1.5}' +
+    '.qz-done .qz-acts{margin-top:10px}' +
+    '.qz-done .qz-backlink{margin:4px 0 0}' +
+    // notation, keys, neck
     '.qz-staff{max-width:100%;height:auto;overflow:visible}' +
     '.qz-sl{stroke:currentColor;stroke-width:1.4}.qz-ledger{stroke:currentColor;stroke-width:1.9}' +
     '.qz-mu{font-family:SLMusic;font-size:48px;fill:currentColor}' +
     '.qz-mu.qz-okn{fill:var(--green)}' +
-    '.qz-ans{width:100%;display:grid;grid-template-columns:minmax(0,1fr);justify-items:center}' +
-    '.qz-choices{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(118px,40%),1fr));gap:8px;width:100%;max-width:660px}' +
-    '.qz-ch{position:relative;min-height:50px;padding:10px 16px;border-radius:12px;border:1px solid var(--ctl-border);background:var(--card2);color:var(--text);font:600 16px/1.25 var(--font-body);cursor:pointer;transition:border-color .12s,background-color .12s}' +
-    '.qz-ch:hover:not(:disabled),.qz-ch:focus-visible{border-color:var(--accent)}' +
-    '.qz-ch .k{position:absolute;top:4px;left:8px;font-size:10.5px;color:var(--muted);font-weight:600}' +
-    '.qz-ch.ok{border-color:var(--green);background:color-mix(in srgb,var(--green) 24%,var(--card2))}' +
-    '.qz-ch.bad{border-color:var(--red);background:color-mix(in srgb,var(--red) 24%,var(--card2))}' +
-    '.qz-ch.dim{opacity:.45}' +
-    '.qz-ch:disabled{cursor:default}' +
-    '.qz-fb{min-height:22px;font-size:15px;max-width:640px;line-height:1.45}' +
-    '.qz-fb.ok{color:var(--green)}.qz-fb.bad{color:var(--red)}' +
-    '.qz-acts{gap:8px;justify-content:center}' +
-    '.qz-board{display:grid;gap:10px;grid-template-columns:minmax(0,1fr);justify-items:center;width:100%}' +
-    '.qz-hint{font-size:13px;color:var(--muted)}' +
     '.qz-keys{max-width:100%;height:auto;touch-action:none;user-select:none;-webkit-user-select:none}' +
     '.qz-key{cursor:pointer}' +
     '.qz-kw{fill:#f7f3ea;stroke:#b9b0a2;stroke-width:1}.qz-kb{fill:#221d20;stroke:#000;stroke-width:1}' +
@@ -1588,13 +1756,13 @@
     '.qz-fz{fill:transparent;cursor:pointer}' +
     '.qz-nm{stroke:var(--card);stroke-width:2;pointer-events:none}' +
     '.qz-nm.mk-a{fill:var(--accent)}.qz-nm.mk-ok{fill:var(--green)}.qz-nm.mk-bad{fill:var(--red)}' +
-    '.qz-done{display:grid;gap:10px;grid-template-columns:minmax(0,1fr);justify-items:center;text-align:center}' +
-    '.qz-done h2{margin:6px 0 0}' +
-    '.qz-big{font-family:var(--font-display);font-size:64px;line-height:1;font-variant-numeric:tabular-nums}' +
-    '.qz-big span{font-size:28px;color:var(--muted)}' +
-    '.qz-stars{font-size:26px;color:var(--accent);letter-spacing:4px}' +
-    '.qz-miss{font-size:14px;max-width:560px}' +
-    '@media (prefers-reduced-motion: reduce){.qz-ch{transition:none}}';
+    '@media (max-width:640px){' +
+      '.qz-hero{grid-template-columns:minmax(0,1fr)}.qz-heroact{justify-items:stretch}.qz-nextup{text-align:left}' +
+      '.qz-ubar{display:none}.qz-uhead{padding:14px 14px}.qz-ubody{padding:0 14px 14px}' +
+      '.qz-lvltag{display:none}' +
+      '.qz-stage{padding:18px 14px 14px}.qz-prompt{font-size:19px}' +
+      '.qz-foot{flex-wrap:wrap}.qz-fb{flex-basis:100%}.qz-fb:empty{display:none}.qz-act{flex:1}' +
+    '}';
 
   function init(rootEl) {
     root = rootEl;
@@ -1630,7 +1798,11 @@
 
   App.register('quiz', {
     init: init,
-    onShow: function () { if (view !== 'run') render(); },
+    onShow: function () {
+      // a focused space: silence the metronome / jam / loops while here
+      App.emit('transport:claim', { owner: 'quiz' });
+      if (view !== 'run') render();
+    },
     onHide: function () { clearTimeout(advT); },
     onKey: onKey
   });

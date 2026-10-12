@@ -34,6 +34,7 @@
     ],
     piano: [
       { t: 'Piano', x: 'The keyboard twin of the fretboard — same key, same degree colors. Play it by touch, with your computer keyboard (A W S E D… Z/X shifts octave), or a MIDI keyboard like a ROLI.' },
+      { sel: '#pn-chseg', t: 'Perform', x: 'Triads or 7ths turn every in-scale key into its chord (+Bass and Strum appear then). Arp plays what you hold as an arpeggio — its speed, direction, range and Hold appear once it’s on.' },
       { sel: '#pn-play', t: 'Practice runner', x: 'Runs scale exercises on the keys with fingering numbers — pick right or left hand and it moves to where that hand plays.' },
       { sel: '#pn-guide', t: 'Guide mode', x: 'Instead of playing FOR you, Guide waits for you to play each lit note — on screen, or lit up on a LUMI’s own keys.' }
     ],
@@ -179,6 +180,7 @@
   }
 
   function openTour(page, extraSteps) {
+    if (App.showBar) App.showBar(); // tours point at the top bar too
     close();
     steps = extraSteps || TOURS[page] || [
       { t: 'This page', x: 'Explore freely — nothing here can break anything. The bar at the top (key, scale, tempo) is shared by every page, and the gear holds app-wide settings.' }
