@@ -38,6 +38,7 @@
     <button type="button" class="btn sm" id="space-btn" aria-label="Switch workspace"></button>
     <button type="button" class="btn sm icon-btn" id="help-btn" aria-label="Help for this page" title="What is this page?"></button>
     <button type="button" class="btn sm icon-btn" id="settings-btn" aria-label="Settings" title="Settings"></button>
+    <button type="button" class="btn sm icon-btn" id="lights-btn" aria-label="Lights and help" title="Lights &amp; help" aria-haspopup="dialog" aria-expanded="false" aria-controls="sheet-lights"></button>
     <button type="button" class="btn sm icon-btn" id="met-btn" aria-label="Metronome" title="Metronome" aria-haspopup="dialog" aria-expanded="false" aria-controls="sheet-metronome"></button>
   </div>
   <div class="ctxbar" id="ctxbar">
@@ -61,6 +62,16 @@
       <button type="button" class="btn sm icon-btn" data-sheet-close aria-label="Close the metronome" title="Close (Esc)"></button>
     </div>
     <section class="sheet-body" id="panel-metronome"></section>
+  </div>
+</div>
+<div class="sheet" id="sheet-lights" hidden>
+  <div class="sheet-card" role="dialog" aria-modal="true" aria-labelledby="sheet-lights-t">
+    <div class="sheet-head">
+      <h2 id="sheet-lights-t">Lights &amp; help</h2>
+      <button type="button" class="btn sm icon-btn" data-sheet-help="lights" aria-label="Help for lights and help" title="How it works"></button>
+      <button type="button" class="btn sm icon-btn" data-sheet-close aria-label="Close" title="Close (Esc)"></button>
+    </div>
+    <section class="sheet-body" id="panel-lights"></section>
   </div>
 </div>
 <div id="wipe" aria-hidden="true" style="display:none">
@@ -117,6 +128,7 @@
 <script src="js/help.js"></script>
 <script src="js/plugins.js"></script>
 <script src="js/settings.js"></script>
+<script src="js/lights.js"></script>
 <script>
 App.boot();
 // Offline support — only meaningful when served over http(s); file:// and

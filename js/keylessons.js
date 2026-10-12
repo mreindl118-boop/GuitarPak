@@ -282,7 +282,7 @@
           '<span class="muted small">' + (p.passed + 1) + ' of ' + STEPS.length + ' levels passed' + (p.mastered ? ' · mastered' : '') + '</span></div>' +
         '<div class="kl-opts"><div class="seg" role="group" aria-label="Times through">' +
           [1, 2, 4].map(function (n) { return '<button type="button" data-klreps="' + n + '" class="' + (reps() === n ? 'active' : '') + '">' + n + '×</button>'; }).join('') +
-          '</div><span class="muted small">Help: ' + K().ASSIST_NAMES[help] + ' (set above the keyboard)</span></div>' +
+          '</div><button type="button" class="kl-helpbtn" id="kl-help">Help: ' + K().ASSIST_NAMES[help] + '</button></div>' +
         '<div class="kl-acts"><button type="button" class="btn primary" id="kl-start">' + App.icon('play', 13) + ' Start</button>' +
           '<button type="button" class="btn" id="kl-listen">Listen first</button></div>' +
         (recent.length ? '<details class="kl-hist"><summary>Your runs (' + p.runs.length + ')</summary><div class="kl-tblwrap"><table class="kl-table"><thead><tr><th>Day</th><th>Level</th><th>Help</th><th>Notes</th><th>Timing</th><th>Score</th></tr></thead><tbody>' +
@@ -430,6 +430,7 @@
       case 'kl-listen': start(true); break;
       case 'kl-stop': stopAll(false); break;
       case 'kl-back': view = 'list'; paint(); break;
+      case 'kl-help': App.switchTo('lights'); break;
       case 'kl-lesshelp': K().setAssist(Math.max(0, K().assist() - 1)); view = 'list'; paint(); break;
     }
   }
@@ -454,6 +455,7 @@
     '.kl-rname{display:grid;font-weight:600;font-size:14.5px}.kl-rname small{font-weight:500;color:var(--muted);font-size:12.5px}' +
     '.kl-rlv{font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}.kl-rstars{color:var(--accent);letter-spacing:1px;min-width:3.2em;text-align:right}' +
     '.kl-badge{font-size:11px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;padding:2px 7px;border-radius:6px;background:var(--accent);color:#221302}' +
+    '.kl-helpbtn{border:0;background:transparent;color:var(--muted);font:inherit;font-size:13px;text-decoration:underline;text-underline-offset:3px;cursor:pointer;padding:4px 0}' +
     '.kl-hist summary{cursor:pointer;font-size:13.5px;color:var(--muted);font-weight:600}' +
     '.kl-tblwrap{overflow-x:auto}.kl-table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums;margin-top:6px}' +
     '.kl-table th,.kl-table td{padding:6px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}.kl-table th{color:var(--muted);font-weight:600;font-size:12px}' +
@@ -485,7 +487,7 @@
       App.on('midi:note', function (d) { if (d && d.on && R) judge(d.midi, d.silent ? 'audio' : 'midi'); });
       App.on('note:input', function (d) { if (d && d.on && R) judge(d.midi, d.src === 'touch' ? 'touch' : 'qwerty'); });
       App.on('transport:claim', function (d) { if (R && d && d.owner !== 'keys') stopAll(false); });
-      App.on('keys:assist', function () { if (view === 'list') paint(); });
+      App.on('help:level', function () { if (view === 'list') paint(); });
       document.addEventListener('visibilitychange', function () { if (document.hidden) stopAll(false); });
       paint();
     },

@@ -44,7 +44,7 @@ window.App = (function () {
   };
   // overlays live outside both page sets: the metronome opens as a SHEET over
   // whatever page you're on (corner icon), settings toggles in place (gear)
-  var PANEL_ORDER = SPACES.practice.concat(SPACES.studio).concat(['metronome', 'settings']);
+  var PANEL_ORDER = SPACES.practice.concat(SPACES.studio).concat(['metronome', 'lights', 'settings']);
   // Tab GROUPS: related pages share one entry in the page menu; the members
   // show as a sub-tab strip under the context bar. Pages/modules are untouched
   // — this is navigation only, so cross-links (fb:practice, st:edit, plugin
@@ -89,7 +89,7 @@ window.App = (function () {
   //            when an APK is actually built. Older APKs read nothing else, so
   //            this must never run ahead of the real file: when it did, the
   //            Android app kept downloading the same old APK in a loop.
-  var APP_VERSION = '0.73.0';
+  var APP_VERSION = '0.74.0';
   var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
 
   function verNum(v) {
@@ -204,6 +204,7 @@ window.App = (function () {
     note: '<path d="M9 18V5.6l11-2.1V16"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/>',
     target: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.6"/><circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"/>',
     idea: '<path d="M9.5 18h5M10.5 21h3"/><path d="M12 3a6 6 0 0 0-3.7 10.7c.8.7 1.2 1.5 1.2 2.3h5c0-.8.4-1.6 1.2-2.3A6 6 0 0 0 12 3z"/>',
+    lights: '<rect x="3" y="10" width="18" height="10.5" rx="1.6"/><path d="M8 10v6M12 10v6M16 10v6"/><path d="M12 2.5v3M6.2 4.3l1.7 2.2M17.8 4.3l-1.7 2.2"/>',
     metronome: '<path d="M9.4 3.5h5.2l4.3 16.3a1 1 0 0 1-1 1.2H6.1a1 1 0 0 1-1-1.2z"/><path d="M7.6 16.5h8.8"/><path d="M12 16.5l4.6-9.3"/><circle cx="15.2" cy="10" r="1.4" fill="currentColor" stroke="none"/>',
     help: '<circle cx="12" cy="12" r="9.2"/><path d="M9.4 9.2a2.7 2.7 0 0 1 5.2 1c0 1.8-2.6 2.2-2.6 3.8"/><circle cx="12" cy="17.4" r="0.6" fill="currentColor"/>',
     gear: '<circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h.09a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.09a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1z"/>'
@@ -824,7 +825,7 @@ window.App = (function () {
   // The page underneath stays active (its runner, scroll and state are
   // untouched) and the sheet closes straight back to it: the corner icon,
   // the X, a tap outside the card, or Esc. Today: the metronome.
-  var SHEETS = { metronome: 'met-btn' };
+  var SHEETS = { metronome: 'met-btn', lights: 'lights-btn' };
   var sheet = null, sheetReturn = null;
 
   function openSheet(name) {
@@ -864,6 +865,27 @@ window.App = (function () {
   }
 
   function toggleSheet(name) { if (sheet === name) closeSheet(); else openSheet(name); }
+
+  // ---- HELP LEVEL: the one difficulty knob for practice — how much the
+  // screen and the keyboard's own lights show you (Keys page, scale lessons,
+  // Exercises answer lights, a LUMI's keybed). 4 Full, 3 Colors, 2 Target,
+  // 1 Tonic, 0 None. Set from the Keys page or the Lights & help sheet;
+  // 'help:level' {level} on every change. (pn.assist is the v0.73 key.)
+  var HELP_NAMES = ['None', 'Tonic', 'Target', 'Colors', 'Full'];
+  function helpLevel() {
+    var n = parseInt(store.get('help.level', store.get('pn.assist', 4)), 10);
+    return n >= 0 && n <= 4 ? n : 4;
+  }
+  var help = {
+    NAMES: HELP_NAMES,
+    level: helpLevel,
+    set: function (n) {
+      n = parseInt(n, 10);
+      if (!(n >= 0 && n <= 4) || n === helpLevel()) return;
+      store.set('help.level', n);
+      emit('help:level', { level: n });
+    }
+  };
 
   // ---- Back: Android's back gesture (and the browser's) walks back through
   // the app instead of leaving it: help tour, sheet, settings, the page's own
@@ -1354,6 +1376,7 @@ window.App = (function () {
     emit: emit,
     injectCSS: injectCSS,
     showBar: showBar,
+    help: help,
     openSheet: openSheet,
     closeSheet: closeSheet,
     get sheet() { return sheet; },

@@ -443,8 +443,9 @@
 
   App.register('pads', {
     init: init,
-    onShow: function () { ensureTrack(); render(); paintControls(); lightBase(); },
-    onHide: function () { rec = false; darkBase(); paintControls(); },
+    // the pads own the keybed while open (the scale layout steps aside)
+    onShow: function () { ensureTrack(); render(); paintControls(); if (App.midi && App.midi.claim) App.midi.claim('pads'); lightBase(); },
+    onHide: function () { rec = false; darkBase(); paintControls(); if (App.midi && App.midi.release) App.midi.release('pads'); },
     onKey: function (e) {
       if (e.repeat || e.type !== 'keydown') return;
       var lane = LANE_KEYS.indexOf(e.code);

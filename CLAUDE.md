@@ -27,12 +27,23 @@ js/app.js         shell: module registry, tab switching, shared AudioContext +
                   App.pluck, App.store (localStorage 'guitarlab.*'), App.on/emit
                   event bus, APP_VERSION + auto-update checker
 js/midi.js        Web MIDI service (App.midi: in/out ports, note/bend/pressure
-                  events on the bus; KEY LIGHTS midi.lights off|echo|scale —
-                  degree-graded note-echo LEDs for any lighting keybed; LUMI
-                  SysEx sync per benob/LUMI-lights doc: key/scale/light-mode +
-                  fb.colors degree colors, frame dev-id 0x37, values packed
-                  <5-bit type><value> — lumiSync repushes on fb:set/fb:scale/
-                  midi:state and palette edits) — loaded right after app.js
+                  events on the bus) + THE KEYBED (v0.74.0): ONE lighting
+                  engine for every page. Layout by App.help level: >=3 scale
+                  (a LUMI draws it via SysEx scale mode, root + scale colors
+                  midi.lumiRoot/Scale or palette deg 1/5, brightness
+                  lights.bright; other LED keyboards get note-on degree
+                  velocities), 1-2 tonic keys, 0 dark (LUMI night mode).
+                  Layers: guide(now, next) (Keys runner/Guide/lessons, chord
+                  player; now at help>=2, next blinks at >=3), reveal(pcs, ms)
+                  (Exercises answers, help>=2), hideLayout(owner, on) (quiz
+                  run), claim/release(owner) (Pads owns the keys). paint()
+                  composes + diffs note-ons. RANGE: learned from played notes
+                  (a LUMI's octave buttons), midi.rangeLo, 'midi:range'; all
+                  lights fold() into it. LUMI auto-detected by port name
+                  (midi.lumi null|true|false); lights.on default on for a
+                  LUMI, off for other outputs (a synth would play note-ons).
+                  LUMI SysEx per benob/LUMI-lights (dev-id 0x37 + 0x00, values
+                  <5-bit type><value>). Loaded right after app.js
 js/tonein.js      1/4"/audio-in TONE-IN: pitch-detects the selected audio
                   input (audio.inId; toggle audio.tonein in Settings) and
                   emits midi:note {silent:true} — instrument pages show the
@@ -85,7 +96,12 @@ js/jam.js         │ (jam: auto-band — genre presets write an intro/A/B/endin
 js/tuner.js       │
 js/trainer.js     │
 js/theorytab.js   │ (theory: circle of fifths + key guide + degree ear quiz)
-js/settings.js    ┘ (settings: app-level prefs — theme dark/light/auto)
+js/settings.js    ┘ (settings: app-level prefs — theme dark/light/auto; MIDI
+                     ports + bend; lighting moved to Lights & help)
+js/lights.js      LIGHTS & HELP control center (sheet 'lights', header
+                  #lights-btn): Help level + key lights (on/off, LUMI colors,
+                  brightness, keyboard type, status/range, test) — the same
+                  settings every page reads.
 js/studio.js      STUDIO workspace (DAW phase one): registers 'song' (sketch-
                   book home) + 'ideas' (capture inbox) pages and the app-wide
                   capture service behind #cx-rec (header ● on every page).
@@ -253,7 +269,13 @@ version.json      auto-update feed (source of truth for latest version)
   last member (app.gtab.<gid>). NAVIGATION ONLY — page ids unchanged, so
   App.switchTo(pageId) and every bus cross-link still work, and
   App.addPage wraps plugin pages in their own gpl-<id> group (icon 'plus').
-- OVERLAY SHEETS (v0.70.0; app.js SHEETS/openSheet/closeSheet): the METRONOME
+- HELP LEVEL (v0.74.0; app.js App.help {NAMES, level, set}, store
+  help.level, falls back to v0.73 pn.assist; 'help:level' event): the one
+  practice difficulty — Keys page colors/labels/rings, scale lessons,
+  Exercises answer lights, the keybed. Set on the Keys page or in Lights &
+  help; never add a per-page copy.
+- OVERLAY SHEETS (v0.70.0; app.js SHEETS/openSheet/closeSheet; v0.74.0 adds
+  'lights' = Lights & help): the METRONOME
   is not a page — #met-btn (top-right corner) opens #sheet-metronome OVER the
   current page (App.active unchanged, so runners keep going); X, backdrop,
   Esc or the icon close it; Tab is trapped inside; the click keeps running
@@ -346,7 +368,8 @@ version.json      auto-update feed (source of truth for latest version)
   (all) or `tests/run.sh game quiz` — serves the repo on 4573 itself
   (tests/serve.py). Needs Node + playwright + Chromium (cloud: NODE_PATH=
   /opt/node22/lib/node_modules, Chromium at /opt/pw-browsers; env.js reads
-  SL_URL / CHROMIUM / AAPT). Suites: fingering (pure Node), keys, practice,
+  SL_URL / CHROMIUM / AAPT). Suites: fingering (pure Node), lights (a fake
+  LUMI via a stubbed requestMIDIAccess), keys, practice,
   game, quiz, nav, smoke, taps, update. Run them before every release and add a
   suite or checks for new features.
 - The service worker is cache-first: after editing, bump `CACHE` in sw.js and,

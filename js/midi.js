@@ -17,14 +17,15 @@
  * are reported per channel and consumers apply them to the notes held on
  * that channel (ROLI sends each key on its own channel).
  *
- * Output: light(midi, vel) / dark(midi) send note messages — most LED
- * keyboards (LUMI included) light incoming notes, velocity as brightness.
- * lumiSync() additionally pushes the app's root + scale to a ROLI LUMI over
- * SysEx (community-documented protocol, EXPERIMENTAL — a harmless no-op on
- * other devices).
+ * Output: THE KEYBED engine (below) decides what the keyboard's own lights
+ * show — the scale by the app-wide Help level, plus guide / reveal layers —
+ * with note messages (most LED keyboards light incoming notes, velocity as
+ * brightness) and, for a ROLI LUMI, its SysEx scale mode (community-
+ * documented protocol — a harmless no-op on other devices). Controls live in
+ * Lights & help (js/lights.js).
  *
- * Everything is opt-in from Settings. Where neither backend exists (iOS
- * Safari PWA, the Android APK's WebView), the UI says so instead of breaking.
+ * Connecting is opt-in (Settings / Lights & help). Where neither backend
+ * exists (iOS Safari PWA, the Android APK's WebView), the UI says so.
  */
 (function () {
   'use strict';
@@ -228,8 +229,9 @@
   function light(midi, vel) {
     if (!hasOutput()) return;
     midi = Math.max(0, Math.min(127, Math.round(midi)));
-    sendBytes([0x90, midi, Math.max(1, Math.min(127, Math.round(vel == null ? 100 : vel)))]);
-    lit[midi] = true;
+    var v = Math.max(1, Math.min(127, Math.round(vel == null ? 100 : vel)));
+    sendBytes([0x90, midi, v]);
+    lit[midi] = v;
   }
 
   function dark(midi) {
@@ -278,6 +280,8 @@
     return [(type | ((v & 3) << 5)) & 0x7f, (v >> 2) & 0x7f];
   }
 
+  function brightness() { var b = parseInt(App.store.get('lights.bright', 80), 10); return b >= 5 && b <= 100 ? b : 80; }
+
   function hexRgb(hex) {
     var m = /^#?([0-9a-f]{6})$/i.exec(String(hex || ''));
     var n = m ? parseInt(m[1], 16) : 0xffab47;
@@ -295,17 +299,18 @@
       0x03]);
   }
 
+  function sysexOk() { return native ? true : !!(access && access.sysexEnabled); }
+
   function lumiSync() {
-    if (!App.store.get('midi.lumi', false) || !hasOutput()) return;
+    if (!isLumi() || !hasOutput() || !lightsOn()) return;
     var root = App.store.get('fb.root', 9);
     var scaleId = App.store.get('fb.scale', 'minorPent');
     var key = Theory.mod12(typeof root === 'number' ? root : 9);
     lumiCmd([0x10, 0x30].concat(lumiVal(0x03, key)));
     var sc = LUMI_SCALES[scaleId];
     if (sc !== undefined) lumiCmd([0x10, 0x60].concat(lumiVal(0x02, sc)));
-    var mode = LUMI_MODES[App.store.get('midi.lumiMode', 'scale')];
-    if (mode !== undefined) lumiCmd([0x10, 0x40].concat(lumiVal(0x02, mode)));
-    lumiCmd([0x10, 0x40].concat(lumiVal(0x04, 100))); // full LED brightness
+    lumiCmd([0x10, 0x40].concat(lumiVal(0x02, LUMI_MODES.scale)));
+    lumiCmd([0x10, 0x40].concat(lumiVal(0x04, brightness())));
     var cols = App.store.get('fb.colors', null) || [];
     // overridable in Settings — LED color rendering differs from screens, so
     // the two hardware slots can be dialed by eye; defaults follow the palette
@@ -315,15 +320,78 @@
     lumiColor(0x20, scaleC); // in-scale key slot
   }
 
-  // ---- key lights: degree-aware LED echo for ANY keyboard that lights
-  // incoming notes (LUMI, Launchkey, most LED keybeds). midi.lights:
-  //   'off'   nothing
-  //   'echo'  light the keys you play, brightness graded by scale degree
-  //   'scale' hold the whole in-scale layout lit (root brightest)
-  // Opt-in only: these are note-on messages — aimed at controllers, which
-  // light silently; a sound module on the output would play them.
+  // ---- THE KEYBED: one lighting engine for every page ----
+  // What the keyboard's own lights show follows the app-wide HELP LEVEL
+  // (App.help — the same knob that sets what the on-screen keys show):
+  //   Full / Colors  the scale in color — a LUMI in its scale mode with the
+  //                  app's root + scale colors (SysEx); other LED keyboards
+  //                  get the in-scale keys lit, the root brightest
+  //   Target / Tonic only the home keys glow
+  //   None           dark: play from memory
+  // On top, pages add a GUIDE (guide(now, next): the key to play now, the
+  // next one blinking — Keys runner, Guide mode, scale lessons, the chord
+  // player) and REVEALS (reveal(pcs, ms): Exercises shows the answer after
+  // you play). hideLayout(owner, on) darkens the layout while it would give
+  // answers away (an Exercises question); claim(owner) hands the whole keybed
+  // to one page (Pads paints its own 8 keys). Everything folds into the
+  // RANGE the keyboard is playing — learned from the notes you play, so a
+  // LUMI's octave buttons are followed (range(), 'midi:range').
+  // Settings: lights.on (false = leave the keyboard's lights alone),
+  // lights.bright, midi.lumi (null = detect a LUMI by its port name),
+  // midi.lumiRoot / midi.lumiScale color overrides. Note-on lighting is for
+  // controllers (they light silently); a sound module on the output would
+  // play the notes, so lights stay off until a keyboard output is chosen.
 
-  function lightsMode() { return App.store.get('midi.lights', 'off'); }
+  var LIGHT_LO = 24, LIGHT_HI = 108;
+  var guideNow = [], guideNext = [], blinkOn = false, blinkT = null;
+  var revealSet = [], revealT = null, hidden = {}, claimedBy = null;
+  var lumiShown = null; // last LUMI mode pushed: 'scale' | 'night'
+
+  // on by default for a LUMI (SysEx scale colors are safe); other outputs stay
+  // opt-in — a sound module there would PLAY note-on lights (old midi.lights)
+  function lightsOn() {
+    var v = App.store.get('lights.on', null);
+    if (v === true || v === false) return v;
+    return isLumi() || App.store.get('midi.lights', 'off') !== 'off';
+  }
+  // v0.74: the old opt-in "LUMI sync" checkbox becomes auto-detect
+  if (!App.store.get('lights.v1', false)) {
+    if (App.store.get('midi.lumi', null) === false) App.store.set('midi.lumi', null);
+    App.store.set('lights.v1', true);
+  }
+  function helpLvl() { return App.help ? App.help.level() : 4; }
+  function outName() {
+    return native ? (portName(nativePorts.outputs, nativeOutId) || '') : (output ? (output.name || '') : '');
+  }
+  function isLumi() {
+    var m = App.store.get('midi.lumi', null);
+    if (m === true || m === false) return m;
+    return /lumi/i.test(outName()) || /lumi/i.test(native ? (portName(nativePorts.inputs, nativeInId) || '') : (input ? input.name || '' : ''));
+  }
+
+  // ---- the playing range (a LUMI = 24 keys; its octave buttons move it) ----
+  function rangeSize() { return isLumi() ? 24 : 61; }
+  var rangeLo = parseInt(App.store.get('midi.rangeLo', 48), 10);
+  if (!(rangeLo >= 0 && rangeLo <= 108)) rangeLo = 48;
+  function range() { return { lo: rangeLo, hi: rangeLo + rangeSize() - 1, keys: rangeSize(), lumi: isLumi() }; }
+  function learnRange(midi) {
+    var r = range(), lo = rangeLo;
+    if (midi < r.lo) lo -= 12 * Math.ceil((r.lo - midi) / 12);
+    else if (midi > r.hi) lo += 12 * Math.ceil((midi - r.hi) / 12);
+    if (lo === rangeLo) return;
+    rangeLo = Math.max(0, Math.min(108, lo));
+    App.store.set('midi.rangeLo', rangeLo);
+    App.emit('midi:range', range());
+    paint();
+  }
+  function fold(m) { // the same note, moved by octaves onto keys the keyboard has
+    var r = range();
+    if (r.keys < 12) return m;
+    while (m < r.lo) m += 12;
+    while (m > r.hi) m -= 12;
+    return m;
+  }
+  function list(v) { return v == null || v === -1 ? [] : (Array.isArray(v) ? v : [v]); }
 
   function degVel(midi) {
     var root = App.store.get('fb.root', 9);
@@ -336,37 +404,69 @@
       ? 100 : 72;                                        // chord tones, any scale
   }
 
-  function paintScaleLights() {
-    allDark();
-    // a LUMI paints its own keybed (scale colors via SysEx + native pressed
-    // lights) — note-on lighting on top just fights it and looks broken
-    if (App.store.get('midi.lumi', false) === true) return;
-    if (lightsMode() !== 'scale' || !hasOutput()) return;
-    for (var m = 24; m <= 108; m++) {
-      var v = degVel(m);
-      if (v) light(m, v);
+  // which layout the keybed shows right now: 'scale' | 'tonic' | 'none'
+  function layoutKind() {
+    if (claimedBy) return 'none';
+    for (var k in hidden) if (hidden[k]) return 'none';
+    var h = helpLvl();
+    return h >= 3 ? 'scale' : h >= 1 ? 'tonic' : 'none';
+  }
+  function lumiScaleOk() { return LUMI_SCALES[App.store.get('fb.scale', 'minorPent')] !== undefined && sysexOk(); }
+
+  // the note-on lights wanted now: layout (where SysEx can't draw it) + reveals + guide
+  function wanted() {
+    var want = {}, kind = layoutKind(), r = range();
+    var lo = Math.max(LIGHT_LO, r.lo), hi = Math.min(LIGHT_HI, r.hi), m;
+    var root = App.store.get('fb.root', 9), rootPc = Theory.mod12(typeof root === 'number' ? root : 9);
+    if (kind === 'scale' && !(isLumi() && lumiScaleOk())) {
+      for (m = lo; m <= hi; m++) { var v = degVel(m); if (v) want[m] = v; }
+    } else if (kind === 'tonic') {
+      for (m = lo; m <= hi; m++) if (Theory.mod12(m) === rootPc) want[m] = 70;
     }
+    revealSet.forEach(function (pc) { for (var x = lo; x <= hi; x++) if (Theory.mod12(x) === pc) want[x] = 127; });
+    var h = helpLvl();
+    if (h >= 2) list(guideNow).forEach(function (n) { want[fold(n)] = 127; });
+    if (h >= 3 && blinkOn) list(guideNext).forEach(function (n) { var f = fold(n); if (!want[f] || want[f] < 127) want[f] = 45; });
+    return want;
   }
 
-  function setLights(mode) {
-    mode = ['off', 'echo', 'scale'].indexOf(mode) !== -1 ? mode : 'off';
-    App.store.set('midi.lights', mode);
-    paintScaleLights(); // paints for 'scale', clears for the others
+  // compose + diff: only changed keys are sent
+  function paint() {
+    if (!hasOutput()) return;
+    if (claimedBy) return; // that page drives the lights itself
+    if (!lightsOn()) { allDark(); return; }
+    if (isLumi()) lumiLayout();
+    var want = wanted(), m;
+    for (m in lit) if (!want[m]) dark(Number(m));
+    for (m in want) if (lit[m] !== want[m]) { light(Number(m), want[m]); lit[m] = want[m]; }
   }
 
-  function echoNote(d) {
-    if (App.store.get('midi.lumi', false) === true) return; // LUMI lights itself
-    if (!d || lightsMode() !== 'echo') return;
-    if (d.on) light(d.midi, degVel(d.midi) || 60); else dark(d.midi);
+  // a LUMI draws the scale itself (two colors: root + in-scale); otherwise dark
+  function lumiLayout(force) {
+    var mode = layoutKind() === 'scale' && lumiScaleOk() ? 'scale' : 'night';
+    if (mode === lumiShown && !force) return;
+    lumiShown = mode;
+    if (mode === 'scale') lumiSync(); else lumiCmd([0x10, 0x40].concat(lumiVal(0x02, LUMI_MODES.night)));
   }
 
-  App.on('note:input', echoNote); // on-screen piano / QWERTY
-  App.on('midi:note', echoNote);  // hardware keys, echoed back to the LEDs
+  function setGuide(now, next) {
+    guideNow = list(now);
+    guideNext = list(next);
+    if (blinkT) { clearInterval(blinkT); blinkT = null; }
+    blinkOn = true;
+    if (guideNext.length) blinkT = setInterval(function () { blinkOn = !blinkOn; paint(); }, 320);
+    paint();
+  }
 
-  // follow the app's key/scale/colors live
-  App.on('fb:set', function () { lumiSync(); paintScaleLights(); });
-  App.on('fb:scale', function () { lumiSync(); paintScaleLights(); });
-  App.on('midi:state', function () { lumiSync(); paintScaleLights(); });
+  App.on('note:input', function () { /* on-screen notes: the screen shows them */ });
+  App.on('midi:note', function (d) { if (d && d.on && !d.silent) learnRange(d.midi); });
+
+  // follow the app's key/scale/colors/help live
+  function repaintAll() { lumiShown = null; paint(); }
+  App.on('fb:set', repaintAll);
+  App.on('fb:scale', repaintAll);
+  App.on('midi:state', repaintAll);
+  App.on('help:level', function () { paint(); });
 
   // auto-reconnect: once MIDI was enabled and the permission granted, later
   // sessions (and app updates) reconnect silently — the LUMI is just there
@@ -396,11 +496,40 @@
     light: light,
     dark: dark,
     allDark: allDark,
-    lumiSync: lumiSync,
-    setLights: setLights,
-    get lights() { return lightsMode(); },
+    // the keybed engine (see THE KEYBED above)
+    guide: setGuide,
+    reveal: function (pcs, ms) {
+      clearTimeout(revealT);
+      revealSet = helpLvl() >= 2 ? list(pcs).map(function (n) { return Theory.mod12(n); }) : [];
+      paint();
+      if (revealSet.length) revealT = setTimeout(function () { revealSet = []; paint(); }, ms || 1500);
+    },
+    hideLayout: function (owner, on) { hidden[owner] = !!on; paint(); },
+    claim: function (owner) { if (claimedBy !== owner) { allDark(); claimedBy = owner; if (isLumi()) { lumiShown = null; lumiCmd([0x10, 0x40].concat(lumiVal(0x02, LUMI_MODES.night))); } } },
+    release: function (owner) { if (claimedBy === owner) { allDark(); claimedBy = null; repaintAll(); } },
+    repaint: repaintAll,
+    lumiSync: repaintAll,
+    range: range,
+    fold: fold,
+    get lumi() { return isLumi(); },
+    get outputName() { return outName(); },
+    get lightsOn() { return lightsOn(); },
+    setLightsOn: function (on) {
+      if (!on) { allDark(); if (isLumi() && hasOutput()) lumiCmd([0x10, 0x40].concat(lumiVal(0x02, LUMI_MODES.night))); }
+      App.store.set('lights.on', !!on);
+      repaintAll();
+    },
+    test: function () { // a C major arpeggio across the range, then back to normal
+      if (!hasOutput()) return false;
+      var r = range(), base = r.lo - Theory.mod12(r.lo) + 12 * Math.floor((r.keys - 12) / 24);
+      [0, 4, 7, 12].forEach(function (o, i) {
+        setTimeout(function () { light(fold(base + o), 127); }, i * 180);
+        setTimeout(function () { dark(fold(base + o)); if (i === 3) repaintAll(); }, i * 180 + 600);
+      });
+      return true;
+    },
     // colors/scale need SysEx: the browser permission can be silently
     // declined, which made LUMI sync fail with no visible error
-    get sysexOk() { return native ? true : !!(access && access.sysexEnabled); }
+    get sysexOk() { return sysexOk(); }
   };
 })();

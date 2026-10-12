@@ -648,10 +648,7 @@
     // (only while the Chords page is in front — the piano runner owns the
     // LEDs elsewhere) and invite a played match
     if (App.midi && App.midi.ready) {
-      if (App.midi.hasOutput && App.active === 'chords') {
-        App.midi.allDark();
-        midis.forEach(function (mm) { App.midi.light(mm, 90); });
-      }
+      if (App.midi.hasOutput && App.active === 'chords' && App.midi.guide) App.midi.guide(midis, null); // keybed engine: help level + octave range
       els.pnMatch.style.display = '';
       els.pnMatch.classList.remove('ch-matched');
       els.pnMatch.textContent = 'Play it on your keyboard…';
@@ -1384,7 +1381,7 @@
 
   function onHide() {
     stopPlayback();
-    if (App.midi && App.midi.hasOutput) App.midi.allDark(); // hand LEDs back
+    if (App.midi && App.midi.guide) App.midi.guide(null, null); // hand the keybed back
   }
 
   function onKey(e) {

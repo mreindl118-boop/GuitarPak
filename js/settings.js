@@ -124,8 +124,7 @@
       '<div class="card">' +
         '<h2>MIDI keyboard</h2>' +
         '<div class="muted small">Connect a USB or Bluetooth MIDI keyboard (ROLI LUMI, Launchkey&hellip;) to play the app&rsquo;s piano ' +
-          'with velocity, key-wiggle pitch bend and pressure &mdash; and to get LED guidance: the practice runner and the chord ' +
-          'explorer light the keys to play on the device itself. Guide mode on the Piano tab waits for you to play each lit note.</div>' +
+          'with velocity, key-wiggle pitch bend and pressure &mdash; its own lights show the scale and the keys to play, on every page.</div>' +
         '<div class="row tight" style="margin-top:12px" id="set-midi-row">' +
           '<button type="button" class="btn sm primary" id="set-midi-enable">Connect MIDI</button>' +
           '<span class="muted small" id="set-midi-msg"></span>' +
@@ -143,35 +142,9 @@
             '<button type="button" data-bend="48">&plusmn;48 (ROLI)</button>' +
           '</div>' +
         '</div>' +
-        '<div class="row" style="margin-top:14px">' +
-          '<label class="field">Key lights<select id="set-midi-lights">' +
-            '<option value="off">Off</option>' +
-            '<option value="echo">Played notes</option>' +
-            '<option value="scale">Whole scale layout</option></select></label>' +
-          '<span class="muted small">Lights the LED output&rsquo;s keys with the app&rsquo;s scale &mdash; the root brightest, chord tones next. FOR NON-LUMI keyboards: with LUMI sync on, these auto-disable &mdash; the LUMI paints its own keybed (root + in-scale colors over SysEx, pressed keys natively; two colors is the hardware&rsquo;s limit). ' +
-            'For LED controllers (they light silently); a sound module on that output would play the notes.</span>' +
-        '</div>' +
-        '<label class="row tight small muted" style="gap:6px;margin-top:12px">' +
-          '<input type="checkbox" id="set-midi-lumi">ROLI LUMI sync (experimental) &mdash; pushes the app&rsquo;s key, scale and degree colors to the LUMI&rsquo;s own lights (USB or Bluetooth)' +
-        '</label>' +
-        '<div class="row tight" style="margin-top:8px">' +
-          '<label class="field">Root key color<input type="color" id="set-lumi-root"></label>' +
-          '<label class="field">In-scale color<input type="color" id="set-lumi-scale"></label>' +
-          '<button type="button" class="btn sm" id="set-lumi-reset" title="Back to the app palette (degree 1 + degree 5)">Match palette</button>' +
-          '<label class="row tight small muted" style="gap:6px"><input type="checkbox" id="set-lumi-match">Two-color mode: paint the on-screen keyboard with just these two colors so screen and LUMI agree</label>' +
-          '<span class="muted small">LED colors render differently than the screen &mdash; dial these until the keybed looks right; every change pushes live.</span>' +
-        '</div>' +
-        '<div class="row tight" style="margin-top:8px">' +
-          '<button type="button" class="btn sm" id="set-midi-lumipush" title="Re-send key, scale, mode and colors to the LUMI right now">Push to LUMI now</button>' +
-          '<span class="muted small" id="set-midi-sysex"></span>' +
-        '</div>' +
-        '<div class="row" style="margin-top:8px">' +
-          '<label class="field">LUMI light mode<select id="set-midi-lumimode">' +
-            '<option value="scale">Scale colors (app palette)</option>' +
-            '<option value="rainbow">Rainbow</option>' +
-            '<option value="piano">Piano</option>' +
-            '<option value="night">Night</option></select></label>' +
-          '<span class="muted small">Scale colors uses the fretboard palette: root = degree&nbsp;1 color, other in-scale keys = degree&nbsp;5 color (the LUMI hardware supports two).</span>' +
+        '<div class="row tight" style="margin-top:14px">' +
+          '<button type="button" class="btn sm" id="set-open-lights">Lights &amp; help</button>' +
+          '<span class="muted small">Key lights (a LUMI shows the scale in your colors), brightness and the Help level live in one place: the keyboard icon at the top of every page.</span>' +
         '</div>' +
       '</div>' +
       '<div class="card">' +
@@ -527,11 +500,7 @@
       App.midi.bluetooth();
     });
     document.getElementById('set-midi-test').addEventListener('click', function () {
-      if (!App.midi.hasOutput) { midiMsg.textContent = 'No LED output selected.'; return; }
-      [60, 64, 67, 72].forEach(function (m, i) {
-        setTimeout(function () { App.midi.light(m, 120); }, i * 180);
-        setTimeout(function () { App.midi.dark(m); }, i * 180 + 600);
-      });
+      if (!App.midi.test()) midiMsg.textContent = 'No LED output selected.';
     });
 
     var bendSeg = document.getElementById('set-midi-bend');
@@ -548,73 +517,7 @@
     });
     if (App.midi) paintBend();
 
-    var lumiChk = document.getElementById('set-midi-lumi');
-    lumiChk.checked = !!App.store.get('midi.lumi', false);
-    lumiChk.addEventListener('change', function () {
-      App.store.set('midi.lumi', !!this.checked);
-      if (this.checked && App.midi) App.midi.lumiSync();
-    });
-
-    var lightsSel = document.getElementById('set-midi-lights');
-    lightsSel.value = App.store.get('midi.lights', 'off');
-    lightsSel.addEventListener('change', function () {
-      if (App.midi) App.midi.setLights(this.value);
-      else App.store.set('midi.lights', this.value);
-    });
-
-    var lumiModeSel = document.getElementById('set-midi-lumimode');
-    lumiModeSel.value = App.store.get('midi.lumiMode', 'scale');
-    lumiModeSel.addEventListener('change', function () {
-      App.store.set('midi.lumiMode', this.value);
-      if (App.midi) App.midi.lumiSync(); // re-push with the new mode
-    });
-
-    var lumiRootIn = document.getElementById('set-lumi-root');
-    var lumiScaleIn = document.getElementById('set-lumi-scale');
-    function paintLumiCols() {
-      var cols = App.store.get('fb.colors', null) || [];
-      lumiRootIn.value = App.store.get('midi.lumiRoot', '') || cols[0] || '#ffab47';
-      lumiScaleIn.value = App.store.get('midi.lumiScale', '') || cols[4] || '#6ea8fe';
-    }
-    lumiRootIn.addEventListener('input', function () {
-      App.store.set('midi.lumiRoot', this.value);
-      if (App.midi) App.midi.lumiSync();
-    });
-    lumiScaleIn.addEventListener('input', function () {
-      App.store.set('midi.lumiScale', this.value);
-      if (App.midi) App.midi.lumiSync();
-    });
-    document.getElementById('set-lumi-reset').addEventListener('click', function () {
-      App.store.set('midi.lumiRoot', '');
-      App.store.set('midi.lumiScale', '');
-      paintLumiCols();
-      if (App.midi) App.midi.lumiSync();
-    });
-    paintLumiCols();
-
-    var lumiMatch = document.getElementById('set-lumi-match');
-    lumiMatch.checked = App.store.get('midi.lumiMatch', false) === true;
-    lumiMatch.addEventListener('change', function () {
-      App.store.set('midi.lumiMatch', !!this.checked);
-    });
-
-    function paintSysex() {
-      var el = document.getElementById('set-midi-sysex');
-      if (!el || !App.midi) return;
-      if (!App.midi.ready) { el.textContent = ''; return; }
-      el.textContent = App.midi.sysexOk
-        ? 'SysEx OK — colors can reach the LUMI.'
-        : 'SysEx BLOCKED: the browser permission was declined, so key/scale/COLORS cannot reach the LUMI. Reload and allow the MIDI prompt that mentions SysEx.';
-    }
-    document.getElementById('set-midi-lumipush').addEventListener('click', function () {
-      if (App.midi) {
-        if (!App.store.get('midi.lumi', false)) { App.store.set('midi.lumi', true); lumiChk.checked = true; }
-        App.midi.lumiSync();
-      }
-      paintSysex();
-    });
-    App.on('midi:state', paintSysex);
-    paintSysex();
+    document.getElementById('set-open-lights').addEventListener('click', function () { App.switchTo('lights'); });
 
     var toneChk = document.getElementById('set-tonein');
     toneChk.checked = App.store.get('audio.tonein', false) === true;
