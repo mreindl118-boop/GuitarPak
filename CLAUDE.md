@@ -158,7 +158,7 @@ android/          APK project — build.ps1 (no Gradle: javac→d8→aapt→zipa
                   releases/soundLAB-alpha.apk (+ GuitarLab copy) and set
                   version.json "version". The signing key soundlab.keystore
                   (passwordless PKCS12, SHA-256 5A:10:EC:B5:...:17:1A) is
-                  NEVER in this repo; see "Signing key" below.
+                  NEVER in this repo; see APK NOTE below for where it lives.
 ios/              WKWebView wrapper (XcodeGen project.yml + Swift; needs a Mac
                   to build — the PWA is the primary iPad install)
 releases/         built signed APK (committed; raw URL = download link)
@@ -325,8 +325,13 @@ now com.mreindl.soundlab, signed with a NEW key (soundlab.keystore,
 cert SHA-256 5A:10:EC:B5:D5:CE:F1:42:...:D0:FD:17:1A), built in the cloud
 with android/build.sh. Because the app loads the live site, web releases
 need NO new APK — only changes to MainActivity/manifest do. To build one,
-the session needs the key from wherever the owner keeps it (ask), plus the
-SDK pieces (dl.google.com platform-34 + build-tools 34, r8 8.7.x).
+the session needs the KEY: it lives in the owner's PRIVATE claude.ai artifact
+https://claude.ai/artifact/VWL2AAhC1JQe6XXBPnNLKr ("soundLAB Signing Key"),
+published file soundlab.keystore.b64 (base64 of the passwordless PKCS12) —
+fetch it with the Artifact tool (action read, path soundlab.keystore.b64),
+base64 -d into the scratchpad, pass it as KEYSTORE to android/build.sh.
+Never copy it into this public repo, never share that artifact. Plus the SDK
+pieces: dl.google.com platform-34 + build-tools 34, and r8 8.7.x.
 
 All web work is possible (js/css/html, sw.js, version.json, README), and so
 is republishing the claude.ai artifact (see that section). NOT possible:
