@@ -11,22 +11,40 @@ import android.view.WindowManager;
 import android.webkit.JavascriptInterface;
 import android.webkit.PermissionRequest;
 import android.webkit.WebChromeClient;
+import android.webkit.WebResourceError;
+import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
 /**
- * GuitarLab wrapper: a full-screen WebView serving the bundled web app from
- * assets. Native concerns: bridging the WebView's microphone request (tuner
- * tab) to Android's runtime RECORD_AUDIO permission, and sending external
- * links (e.g. the auto-updater's APK download) to the system browser.
+ * soundLAB wrapper: a full-screen WebView running the LIVE web app (GitHub
+ * Pages), so every web release reaches Android the moment it ships — the same
+ * way the PWA updates, through the site's service worker, which also keeps it
+ * working offline once it has loaded. The copy bundled in this APK's assets is
+ * the fallback for a first launch with no connection (or the site being down).
+ *
+ * Because the app itself updates live, a new APK is only needed when THIS
+ * shell changes; version.json's "version" names the APK in releases/, and the
+ * web app compares it with shellVersion() before offering a download.
+ *
+ * Native concerns: bridging the WebView's microphone request (tuner, tone-in)
+ * to Android's RECORD_AUDIO permission, keep-screen-on, and sending links that
+ * leave the app (e.g. an APK download) to the system browser.
  */
 public class MainActivity extends Activity {
+
+    /** The live app. Navigation inside this prefix stays in the app. */
+    private static final String LIVE_URL = "https://mreindl118-boop.github.io/GuitarPak/";
+    /** The copy bundled into assets by build.ps1 — offline / site-down fallback. */
+    private static final String BUNDLED_URL = "file:///android_asset/index.html";
 
     private static final int REQ_MIC = 1;
 
     private WebView web;
     private PermissionRequest pendingMicRequest;
+    private boolean onBundled = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -37,17 +55,16 @@ public class MainActivity extends Activity {
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
         s.setMediaPlaybackRequiresUserGesture(false);
+        s.setCacheMode(WebSettings.LOAD_DEFAULT); // HTTP cache + the site's service worker
         s.setAllowFileAccess(true);
-        // Let the bundled app fetch version.json from GitHub for the startup
-        // update check — WebView blocks network requests from file:// pages
-        // without this. All file:// content here is our own bundled assets.
+        // The bundled fallback (file://) still fetches version.json from GitHub
+        // for its update check — WebView blocks network requests from file://
+        // pages without this. All file:// content here is our own assets.
         s.setAllowUniversalAccessFromFileURLs(true);
 
-        // Screen Wake Lock isn't available to file:// pages (not a secure
-        // context), so the web app calls GuitarLabHost.setKeepScreenOn(...) to
-        // hold the screen on during active practice. Only our own bundled
-        // assets run in this WebView (external links open in the browser), so
-        // exposing this single method is safe.
+        // Exposes two harmless methods: keep the screen on during practice, and
+        // report this shell's version for the update check. Only our own pages
+        // load in this WebView — anything else opens in the browser (route()).
         web.addJavascriptInterface(new WebHost(), "GuitarLabHost");
 
         web.setWebChromeClient(new WebChromeClient() {
@@ -73,17 +90,45 @@ public class MainActivity extends Activity {
 
         web.setWebViewClient(new WebViewClient() {
             @Override
+            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                return route(request.getUrl().toString());
+            }
+
+            @SuppressWarnings("deprecation")
+            @Override
             public boolean shouldOverrideUrlLoading(WebView view, String url) {
-                if (url.startsWith("file://")) return false; // in-app navigation
-                try {
-                    startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
-                } catch (Exception ignored) { /* no handler for this URL */ }
-                return true;
+                return route(url);
+            }
+
+            @Override
+            public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
+                if (request.isForMainFrame()) useBundled();
+            }
+
+            @Override
+            public void onReceivedHttpError(WebView view, WebResourceRequest request, WebResourceResponse response) {
+                if (request.isForMainFrame() && response.getStatusCode() >= 400) useBundled();
             }
         });
 
-        web.loadUrl("file:///android_asset/index.html");
+        web.loadUrl(LIVE_URL);
         setContentView(web);
+    }
+
+    /** true = handled here (opened outside), false = let the WebView load it. */
+    private boolean route(String url) {
+        if (url.startsWith(LIVE_URL) || url.startsWith("file:///android_asset/")) return false;
+        try {
+            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+        } catch (Exception ignored) { /* no handler for this URL */ }
+        return true;
+    }
+
+    /** No connection on first launch, or the site is down: run the bundled copy. */
+    private void useBundled() {
+        if (onBundled) return;
+        onBundled = true;
+        web.loadUrl(BUNDLED_URL);
     }
 
     @Override
@@ -119,8 +164,9 @@ public class MainActivity extends Activity {
         if (web != null) web.onResume();
     }
 
-    /** Bridge the web app's keep-awake requests to the window's screen flag. */
+    /** The JavaScript bridge (window.GuitarLabHost). */
     private final class WebHost {
+        /** Keep-awake: file:// has no Screen Wake Lock, and WebView lacks it too. */
         @JavascriptInterface
         public void setKeepScreenOn(final boolean on) {
             runOnUiThread(new Runnable() {
@@ -133,6 +179,16 @@ public class MainActivity extends Activity {
                     }
                 }
             });
+        }
+
+        /** This APK's versionName — compared with version.json's "version". */
+        @JavascriptInterface
+        public String shellVersion() {
+            try {
+                return getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+            } catch (Exception e) {
+                return "";
+            }
         }
     }
 }
