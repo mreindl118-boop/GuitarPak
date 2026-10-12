@@ -1957,12 +1957,30 @@
     });
     wireViewport();
 
+    // mouse/pen sound on PRESS — a click only fires on release, ~0.1s
+    // later. Touch keeps tap-to-play so dragging to scroll the neck never
+    // plucks a string.
+    var pressed = { hit: null, at: 0 };
+    els.scroll.addEventListener('pointerdown', function (e) {
+      if (e.pointerType === 'touch' || e.button !== 0) return;
+      if (els.settings.classList.contains('open')) return;
+      var hit = e.target.closest ? e.target.closest('.fb-hit') : null;
+      if (!hit) return;
+      pressed = { hit: hit, at: performance.now() };
+      playHit(hit);
+    });
+
     // one delegated listener survives every board re-render
     els.scroll.addEventListener('click', function (e) {
       if (els.settings.classList.contains('open')) { els.settings.classList.remove('open'); return; }
       if (suppressClick) return; // tail end of a pan / pinch
       var hit = e.target.closest ? e.target.closest('.fb-hit') : null;
       if (!hit) return;
+      if (hit === pressed.hit && performance.now() - pressed.at < 1500) return; // sounded on press
+      playHit(hit);
+    });
+
+    function playHit(hit) {
       var sIdx = parseInt(hit.getAttribute('data-fb-s'), 10);
       var f = parseInt(hit.getAttribute('data-fb-f'), 10);
       if (isNaN(sIdx) || sIdx < 0 || sIdx > 5 || isNaN(f) || f < 0) return;
@@ -1971,7 +1989,7 @@
         App.pluck(Theory.fretMidi(sIdx, f, state.tuning));
       } catch (err) { /* audio unavailable — keep UI responsive */ }
       flashAt(parseFloat(hit.getAttribute('data-fb-cx')), parseFloat(hit.getAttribute('data-fb-cy')));
-    });
+    }
 
     renderLegend();
     renderAll();

@@ -32,14 +32,15 @@ window.App = (function () {
   // Settings is deliberately in NEITHER list: it's an overlay page opened by
   // the ever-present gear in the header, from any page in either space.
   var SPACES = {
-    practice: ['metronome', 'fretboard', 'tab', 'notation', 'chords', 'piano', 'synth', 'pads', 'songs', 'jam', 'shed', 'tuner', 'trainer', 'theory'],
+    practice: ['quiz', 'metronome', 'fretboard', 'tab', 'notation', 'chords', 'piano', 'synth', 'pads', 'songs', 'jam', 'shed', 'tuner', 'trainer', 'theory'],
     studio: ['arrange', 'tracks', 'song', 'ideas']
   };
   var SPACE_LABELS = {
     metronome: 'Metronome', fretboard: 'Fretboard', tab: 'Tab', notation: 'Notation',
     chords: 'Chords', piano: 'Piano', songs: 'Songs', jam: 'Jam', tuner: 'Tuner',
     trainer: 'Trainer', theory: 'Theory', settings: 'Settings', shed: 'Shed', synth: 'Synth',
-    song: 'Song', arrange: 'Arrange', tracks: 'Tracks', pads: 'Pads', ideas: 'Ideas'
+    song: 'Song', arrange: 'Arrange', tracks: 'Tracks', pads: 'Pads', ideas: 'Ideas',
+    quiz: 'Exercises'
   };
   var PANEL_ORDER = SPACES.practice.concat(SPACES.studio).concat(['settings']);
   // Tab GROUPS: related pages share one entry in the page menu; the members
@@ -48,8 +49,8 @@ window.App = (function () {
   // pages) keep addressing pages by id and the owning group follows along.
   var GROUPS = {
     practice: [
+      { id: 'gtheory', label: 'Theory', pages: ['quiz', 'chords', 'theory'] }, // Exercises = the home
       { id: 'ginst', label: 'Instrument', pages: ['fretboard', 'tab', 'notation', 'piano', 'synth', 'pads'] },
-      { id: 'gtheory', label: 'Theory', pages: ['chords', 'theory'] },
       { id: 'gplay', label: 'Play', pages: ['songs', 'jam'] },
       { id: 'gprac', label: 'Practice', pages: ['shed', 'trainer'] }, // the game first
       { id: 'gtools', label: 'Tools', pages: ['metronome', 'tuner'] }
@@ -64,7 +65,8 @@ window.App = (function () {
     fretboard: 'Neck', tab: 'Tab', notation: 'Notation', piano: 'Keys',
     chords: 'Chords', theory: 'Circle', songs: 'Songs', jam: 'Jam',
     trainer: 'Trainer', shed: 'Woodshed', metronome: 'Metronome', tuner: 'Tuner',
-    song: 'Song', ideas: 'Ideas', tracks: 'Editor', arrange: 'Timeline', pads: 'Pads', synth: 'Synth'
+    song: 'Song', ideas: 'Ideas', tracks: 'Editor', arrange: 'Timeline', pads: 'Pads', synth: 'Synth',
+    quiz: 'Exercises'
   };
 
   function groupOf(name) {
@@ -80,7 +82,7 @@ window.App = (function () {
   // ---- auto-update ----
   // version.json on GitHub is the source of truth. Web builds refresh through
   // the service worker; the APK build (file://) links to the new APK download.
-  var APP_VERSION = '0.68.0';
+  var APP_VERSION = '0.69.0';
   var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
 
   function verNum(v) {
@@ -201,6 +203,18 @@ window.App = (function () {
     if (masterGain && audioCtx) masterGain.gain.setTargetAtTime(v / 100, audioCtx.currentTime, 0.02);
   }
 
+  // unity gain below 0.8, then a smooth knee that tops out near 1.0 for
+  // inputs up to 2.0 (the pre-gain of 0.5 maps that range onto -1..1)
+  function softClipCurve() {
+    var n = 2048, c = new Float32Array(n);
+    for (var i = 0; i < n; i++) {
+      var y = (i / (n - 1)) * 4 - 2, a = Math.abs(y);
+      var v = a < 0.8 ? a : 0.8 + 0.2 * Math.tanh((a - 0.8) / 0.2);
+      c[i] = y < 0 ? -v : v;
+    }
+    return c;
+  }
+
   function getAudio() {
     if (!audioCtx) {
       var Ctx = window.AudioContext || window.webkitAudioContext;
@@ -211,21 +225,24 @@ window.App = (function () {
       var speakers = audioCtx.destination;
       masterGain = audioCtx.createGain();
       masterGain.gain.value = volPref() / 100;
-      // gentle app-wide limiter: chords, the jam band and the studio stack
-      // voices — without this the sum clips harshly at the DAC
-      var limiter = audioCtx.createDynamicsCompressor();
-      limiter.threshold.value = -9;
-      limiter.knee.value = 6;
-      limiter.ratio.value = 12;
-      limiter.attack.value = 0.002;
-      limiter.release.value = 0.12;
-      masterGain.connect(limiter);
-      limiter.connect(speakers);
+      // app-wide soft clipper: chords, the jam band and the studio stack
+      // voices — without it the sum clips harshly at the DAC. A WaveShaper
+      // with oversample 'none' adds ZERO delay; the DynamicsCompressor used
+      // before carries a fixed ~6ms lookahead on every note.
+      var pre = audioCtx.createGain();
+      pre.gain.value = 0.5; // the curve spans +-2 of headroom
+      var clip = audioCtx.createWaveShaper();
+      clip.curve = softClipCurve();
+      clip.oversample = 'none';
+      masterGain.connect(pre);
+      pre.connect(clip);
+      clip.connect(speakers);
       try {
         Object.defineProperty(audioCtx, 'destination', { value: masterGain, configurable: true });
       } catch (e) { /* locked down — app plays at full volume */ }
     }
-    if (audioCtx.state === 'suspended') audioCtx.resume();
+    // 'interrupted' = WebKit after a call / Siri / another app took the audio
+    if (audioCtx.state === 'suspended' || audioCtx.state === 'interrupted') audioCtx.resume();
     decodeGuitar(); // turn any prefetched sample bytes into playable buffers
     return audioCtx;
   }
@@ -345,6 +362,7 @@ window.App = (function () {
         delete pluckRaw[tone][m]; // decodeAudioData detaches the buffer
         audioCtx.decodeAudioData(bytes, function (buf) {
           pluckBuf[tone][m] = condense(buf, 3.2);
+          analyzeSample(pluckBuf[tone][m]); // lead/level scan now, not on first note
           pluckReadyN[tone]++;
         }, function () { /* undecodable — synth fallback */ });
       });
@@ -444,8 +462,11 @@ window.App = (function () {
   // ---- tiny event bus (cross-module links, e.g. shared tempo) ----
   var busListeners = {};
 
-  function on(evt, fn) {
-    (busListeners[evt] = busListeners[evt] || []).push(fn);
+  // first=true puts a listener at the FRONT: instruments that make sound
+  // register this way so audio is scheduled before any page repaints
+  function on(evt, fn, first) {
+    var list = (busListeners[evt] = busListeners[evt] || []);
+    if (first) list.unshift(fn); else list.push(fn);
   }
 
   function emit(evt, data) {
@@ -919,6 +940,41 @@ window.App = (function () {
     });
   }
 
+  // ---- audio warm-up ----
+  // Browsers only start audio after a click/tap/key press, and opening the
+  // output device can take 50-200ms. Start it on the FIRST gesture anywhere
+  // (a silent one-sample blip), so the first real note doesn't pay for it.
+  // MIDI note-ons don't count as a gesture: if the keyboard is played while
+  // sound is still locked, say so instead of staying silent.
+  function wireAudioWarmup() {
+    var hint = null;
+    function unlocked() { return !!audioCtx && audioCtx.state === 'running'; }
+    function dropHint() { if (hint && hint.parentNode) hint.parentNode.removeChild(hint); hint = null; }
+    function warm() {
+      try {
+        var was = unlocked();
+        var c = getAudio(); // resumes a suspended / interrupted context too
+        if (was) { dropHint(); return; }
+        var b = c.createBuffer(1, 1, c.sampleRate);
+        var src = c.createBufferSource();
+        src.buffer = b;
+        src.connect(c.destination);
+        src.start();
+      } catch (e) { /* no audio here */ }
+      dropHint();
+    }
+    document.addEventListener('pointerdown', warm, true);
+    document.addEventListener('keydown', warm, true);
+    on('midi:note', function (d) {
+      if (!d || !d.on || d.silent || unlocked() || hint) return;
+      hint = document.createElement('div');
+      hint.id = 'snd-hint';
+      hint.setAttribute('role', 'status');
+      hint.textContent = 'Your keyboard is connected. Click or tap anywhere to turn on sound — browsers keep audio off until you interact with the page.';
+      document.body.appendChild(hint);
+    });
+  }
+
   function boot() {
     PANEL_ORDER.forEach(function (name) {
       var el = document.getElementById('panel-' + name);
@@ -976,6 +1032,7 @@ window.App = (function () {
 
     applyTheme(store.get('app.theme', 'dark'));
     wireContextBar();
+    wireAudioWarmup();
 
     var spaceBtn = document.getElementById('space-btn');
     if (spaceBtn) {

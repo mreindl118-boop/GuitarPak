@@ -42,6 +42,11 @@ Jam-tab instrument samples are per-note renders of the **FluidR3 GM soundfont**
 (Frank Wen, MIT) from [gleitz/midi-js-soundfonts](https://github.com/gleitz/midi-js-soundfonts)
 (MIT) — details in [samples/CREDITS.md](samples/CREDITS.md). Drums are synthesized.
 
+Music notation in Exercises is engraved with **SLMusic**, a subset of the SMuFL
+font **Bravura** (Steinberg Media Technologies GmbH), used under the SIL Open
+Font License 1.1 and renamed as that license requires for modified versions —
+see [fonts/OFL-Bravura.txt](fonts/OFL-Bravura.txt).
+
 ## Architecture
 
 ```
