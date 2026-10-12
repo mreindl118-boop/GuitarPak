@@ -149,7 +149,14 @@ html, body {
   position: sticky;
   top: 0;
   z-index: 50;
+  transition: transform 220ms ease;
 }
+
+/* auto-hide while scrolling down (app.js wireAutoHideBar) */
+.topbar.bar-hidden { transform: translateY(calc(-100% - 4px)); }
+
+/* pages that don't use the shared key/tempo (app.js NO_CTX) */
+.noctx #ctxbar { display: none; }
 
 .brand {
   display: inline-flex;
@@ -699,6 +706,7 @@ button .ic, .chip .ic { display: inline-block; }
 
 @media (max-width: 640px) {
   .topbar { padding: 8px 12px 4px; gap: 10px; }
+  .brand .tag { display: none; }
   .brand { font-size: 21px; }
   .wordmark { height: 21px; }
   #nav-select { font-size: 16px; padding: 7px 36px 7px 12px; letter-spacing: 1.2px; }

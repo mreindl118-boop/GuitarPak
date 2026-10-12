@@ -79,6 +79,11 @@ js/quiz.js        EXERCISES ('quiz', the practice HOME since v0.69.0): Musicca-
                   silent:true) and on-screen keys/neck feed inputNote. Staff
                   engraved with fonts/slmusic.woff2 (SLMusic = a Bravura subset,
                   renamed per its OFL Reserved Font Name; fonts/OFL-Bravura.txt).
+                  Views: home / topic (collapsible unit cards, repaintUnit
+                  re-renders ONE card) / run (a fixed shell — #qz-runshell —
+                  whose question area #qz-q is swapped with a fade; one footer
+                  action #qz-act: Show answer -> Next) / done. onShow claims
+                  the transport (silences met/jam/loops).
                   Stores qz.prog / qz.items (weak items picked more) /
                   qz.sound / qz.landed (one-time landing). window.SLQuiz =
                   test hook (levels, gen, start, pick, q, view, theory).
@@ -171,8 +176,15 @@ version.json      auto-update feed (source of truth for latest version)
   App.switchTo(pageId) and every bus cross-link still work (the owning group
   follows), and App.addPage wraps plugin pages in their own gpl-<id> group.
   The settings overlay hides the strip; leaving settings repaints it.
+- QUIET CHROME (v0.69.1): the whole .topbar (nav + context bar + pill strip)
+  auto-hides while the window scrolls DOWN and returns on any scroll up / at
+  the top (app.js wireAutoHideBar; .bar-hidden; App.showBar() forces it back
+  — help tours call it). Pages in app.js NO_CTX (quiz, settings) hide the
+  context bar via html.noctx. Show a control only when it does something
+  (e.g. Keys: +Bass/Strum only with Triads/7ths, arp rate/dir/oct/Hold only
+  with Arp on — paintPerf toggles `hidden`, scoped `#pn-perf [hidden]`).
 - Context bar (index.html #ctxbar, wired in app.js): the single home for key/
-  scale/mode/BPM/time signature, always visible under the tabs. It reads the
+  scale/mode/BPM/time signature, visible under the tabs (except NO_CTX pages). It reads the
   shared stores (fb.root/fb.scale/fb.mode, met.bpm, met.sig) and pushes changes
   over the bus; pages must NOT grow their own duplicate selects for these.
   Also hosts #cx-met (transport) and #cx-rec (studio capture ●).

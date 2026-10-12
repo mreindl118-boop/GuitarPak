@@ -82,7 +82,7 @@ window.App = (function () {
   // ---- auto-update ----
   // version.json on GitHub is the source of truth. Web builds refresh through
   // the service worker; the APK build (file://) links to the new APK download.
-  var APP_VERSION = '0.69.0';
+  var APP_VERSION = '0.69.1';
   var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
 
   function verNum(v) {
@@ -660,6 +660,7 @@ window.App = (function () {
       var sn = document.getElementById('subnav');
       if (sn) sn.hidden = true; // strip belongs to the page under the overlay
       paintGear();
+      paintChrome();
       return;
     }
     // crossing into the other workspace? go through the wipe
@@ -684,6 +685,41 @@ window.App = (function () {
     }
     store.set(tabStoreKey(space), name);
     paintGear();
+    paintChrome();
+  }
+
+  // pages that never use the shared key / tempo drop the context bar, so
+  // the top of the screen is just navigation
+  var NO_CTX = { quiz: true, settings: true };
+  function paintChrome() {
+    document.documentElement.classList.toggle('noctx', !!NO_CTX[active]);
+    showBar();
+  }
+
+  // The top bar slides away while you scroll DOWN a page and comes back on
+  // the smallest scroll up (or at the top) — the screen goes to the page,
+  // and navigation is never more than a flick away.
+  var topbar = null, barHidden = false;
+  function setBarHidden(h) {
+    if (!topbar || h === barHidden) return;
+    barHidden = h;
+    topbar.classList.toggle('bar-hidden', h);
+  }
+  function showBar() { setBarHidden(false); }
+  function wireAutoHideBar() {
+    topbar = document.querySelector('.topbar');
+    if (!topbar) return;
+    var lastY = window.pageYOffset || 0;
+    window.addEventListener('scroll', function () {
+      var y = window.pageYOffset || 0, dy = y - lastY;
+      if (y <= topbar.offsetHeight) { setBarHidden(false); lastY = y; return; }
+      if (Math.abs(dy) < 8) return; // ignore jitter
+      lastY = y;
+      var ae = document.activeElement;
+      if (dy > 0 && ae && ae.tagName === 'INPUT' && topbar.contains(ae)) return; // typing the BPM
+      setBarHidden(dy > 0);
+    }, { passive: true });
+    topbar.addEventListener('focusin', showBar);
   }
 
   // plugin surface: add a whole page at runtime (SoundLab.registerPage)
@@ -1033,6 +1069,7 @@ window.App = (function () {
     applyTheme(store.get('app.theme', 'dark'));
     wireContextBar();
     wireAudioWarmup();
+    wireAutoHideBar();
 
     var spaceBtn = document.getElementById('space-btn');
     if (spaceBtn) {
@@ -1108,6 +1145,7 @@ window.App = (function () {
     on: on,
     emit: emit,
     injectCSS: injectCSS,
+    showBar: showBar,
     wake: wake,
     setTheme: setTheme,
     get themePref() { return store.get('app.theme', 'dark'); },
