@@ -1145,6 +1145,8 @@
   function render() {
     if (!root) return;
     clearTimeout(advT);
+    // the keyboard's lights must not give answers away mid-question
+    if (App.midi && App.midi.hideLayout) App.midi.hideLayout('quiz', view === 'run' && App.active === 'quiz');
     if (view === 'home') renderHome();
     else if (view === 'topic') renderTopic();
     else if (view === 'run') renderRun();
@@ -1522,6 +1524,9 @@
       paintAns();
     }
     if (q.reveal && q.reveal.staff) paintVis();
+    // the keyboard lights the answer (Help: Target and up)
+    var apcs = q.kind === 'single' ? [q.pc] : q.kind === 'set' ? Object.keys(q.pcs || {}).map(Number) : q.pcAnswer != null ? [q.pcAnswer] : [];
+    if (apcs.length && App.midi && App.midi.reveal) App.midi.reveal(apcs, cur.sprint ? 700 : 1800);
     var fb = el('qz-fb');
     if (fb) {
       fb.className = 'qz-fb ' + (ok ? 'ok' : 'bad');
@@ -2515,12 +2520,17 @@
     onShow: function () {
       // a focused space: silence the metronome / jam / loops while here
       App.emit('transport:claim', { owner: 'quiz' });
+      if (App.midi && App.midi.hideLayout) App.midi.hideLayout('quiz', view === 'run');
       if (view !== 'run') {
         render();
         if (view === 'home' && homeTab === 'path' && window.pageYOffset < 60) showCurrentNode();
       }
     },
-    onHide: function () { clearTimeout(advT); if (cur && cur.sprint && !cur.sprint.done && view === 'run') finishSprint(); },
+    onHide: function () {
+      clearTimeout(advT);
+      if (cur && cur.sprint && !cur.sprint.done && view === 'run') finishSprint();
+      if (App.midi && App.midi.hideLayout) App.midi.hideLayout('quiz', false);
+    },
     onBack: function () {
       if (view !== 'home') { back(); return true; }
       if (selNode >= 0) { selNode = -1; paintHomeBody(); return true; }

@@ -158,7 +158,7 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
     const title = document.querySelector('.kl-title b').textContent;
     document.querySelector('[data-klstep="1"]').click();
     const lvl = document.querySelector('.kl-level b').textContent;
-    return { rows, title, lvl, help: document.querySelector('.kl-opts .muted').textContent };
+    return { rows, title, lvl, help: document.getElementById('kl-help').textContent };
   });
   ok(ui.rows >= 7 && /B major/.test(ui.title) && ui.lvl === 'Level 2' && /Help: Colors/.test(ui.help), 'lesson list, picking, level +/−, help shown: ' + JSON.stringify(ui));
   const pg = await page.evaluate(() => {

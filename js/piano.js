@@ -106,8 +106,8 @@
   // colors + rings, no labels; 2 Target = plain keys, tonic outlined, only
   // the note to play now ringed; 1 Tonic = plain keys, tonic outlined; 0 None
   // = a plain keyboard. At every level a pressed key flashes its degree color.
-  var ASSIST_NAMES = ['None', 'Tonic', 'Target', 'Colors', 'Full'];
-  var assist = 4;
+  var ASSIST_NAMES = App.help.NAMES; // the app-wide Help level (App.help)
+  var assist = App.help.level();
 
   // the piano's twin of the fretboard's mode box: for 7-note scales, one
   // octave starting on the modal tonic, placed in the register the chosen
@@ -668,6 +668,19 @@
       }
     }
 
+    // the keys your MIDI keyboard is playing right now — a LUMI's octave
+    // buttons move it (App.midi learns the range from the notes you play)
+    if (App.midi && App.midi.ready && App.midi.inputId != null) {
+      var kr = App.midi.range(), rl = Math.max(LO, kr.lo), rh = Math.min(HI, kr.hi);
+      if (rl <= rh) {
+        var rx0 = whiteIndex(rl) * W + (WHITE_PCS.indexOf(Theory.mod12(rl)) === -1 ? -BW / 2 : 0);
+        var rx1 = rh >= HI ? totalW : whiteIndex(rh + 1) * W - (WHITE_PCS.indexOf(Theory.mod12(rh)) === -1 ? W - BW / 2 : 0);
+        labels += '<rect class="pn-range" x="' + rx0 + '" y="' + (H + 2) + '" width="' + Math.max(4, rx1 - rx0) + '" height="4" rx="2"/>' +
+          '<text class="pn-rangel" x="' + (rx1 - 4) + '" y="' + (H + 17) + '" text-anchor="end">' + (kr.lumi ? 'LUMI' : 'Keyboard') + ' ' +
+          Theory.midiName(kr.lo, false) + '–' + Theory.midiName(kr.hi, false) + '</text>';
+      }
+    }
+
     var TH = H + 24;
     // horizontal: natural strip, scrolls sideways. Vertical: the whole group
     // rotates 90° cw as ONE unit (fretboard convention) into a portrait
@@ -736,35 +749,14 @@
   };
 
   // LED guidance on a connected MIDI keyboard: the sounding note bright, the
-  // upcoming note dim — "play this, this is next". Cleared on stop.
-  var led = { cur: -1, next: -1, blink: null, on: false };
-
+  // upcoming note blinking — "play this, this is next". The keybed engine
+  // (App.midi.guide) applies the Help level and the keyboard's octave range.
   function ledGuide(cur, next) {
-    if (!App.midi || !App.midi.hasOutput) return;
-    if (assist < 2) cur = -1;
-    if (assist < 3) next = -1;
-    if (led.cur !== -1 && led.cur !== cur && led.cur !== next) App.midi.dark(led.cur);
-    if (led.next !== -1 && led.next !== next && led.next !== cur) App.midi.dark(led.next);
-    if (cur !== -1) App.midi.light(cur, 120);
-    led.cur = cur; led.next = next;
-    // the NEXT note blinks — solid vs blinking reads on every keybed, even
-    // ones (LUMI) that normalize incoming-note brightness
-    if (led.blink) { clearInterval(led.blink); led.blink = null; }
-    if (next !== -1 && next !== cur) {
-      led.on = true;
-      App.midi.light(next, 45);
-      led.blink = setInterval(function () {
-        if (led.next === -1) { clearInterval(led.blink); led.blink = null; return; }
-        led.on = !led.on;
-        if (led.on) App.midi.light(led.next, 45); else App.midi.dark(led.next);
-      }, 320);
-    }
+    if (App.midi && App.midi.guide) App.midi.guide(cur === -1 ? null : cur, next === -1 ? null : next);
   }
 
   function ledClear() {
-    if (led.blink) { clearInterval(led.blink); led.blink = null; }
-    if (App.midi && App.midi.hasOutput) App.midi.allDark();
-    led.cur = led.next = -1;
+    if (App.midi && App.midi.guide) App.midi.guide(null, null);
   }
 
   function ppSeq(path, pattern, dir) {
@@ -1201,6 +1193,7 @@
       '.pn-key.pn-hit-meh{stroke:#ffd166 !important;stroke-width:5 !important}' +
       '.pn-key.pn-hit-bad{stroke:#ff5d5d !important;stroke-width:5 !important;fill:#ff8f8f !important}' +
       '#panel-synth #pn-lessons{display:none}' +
+      '.pn-range{fill:var(--accent);opacity:.85}.pn-rangel{font:600 10.5px var(--font-body);fill:var(--accent)}' +
       '#pn-assist button{min-width:0}'
     );
 
@@ -1319,8 +1312,7 @@
     state.display = String(App.store.get('pn.display', 'notes'));
     if (!/^(notes|intervals|degrees)$/.test(state.display)) state.display = 'notes';
     state.orient = App.store.get('pn.orient', 'h') === 'v' ? 'v' : 'h';
-    assist = parseInt(App.store.get('pn.assist', 4), 10);
-    if (!(assist >= 0 && assist <= 4)) assist = 4;
+    assist = App.help.level();
     document.getElementById('pn-assist').addEventListener('click', function (e) {
       var b = e.target.closest('button[data-pnassist]');
       if (b) setAssist(parseInt(b.getAttribute('data-pnassist'), 10));
@@ -1647,6 +1639,14 @@
     App.on('fb:set', function () { render(); ppRebuild(); });
     App.on('fb:scale', function () { render(); ppRebuild(); });
     App.on('jam:chord', function (ev) { jamLast = ev; jamPaint(ev); });
+    App.on('midi:range', function (r) {
+      render();
+      if (state.orient !== 'h' || !els.stage || !r) return;
+      var x0 = whiteIndex(Math.max(LO, r.lo)) * W, x1 = whiteIndex(Math.min(HI, r.hi)) * W + W;
+      var st = els.stage, sl = st.scrollLeft, vw = st.clientWidth;
+      if (x0 < sl || x1 > sl + vw) st.scrollLeft = Math.max(0, x0 - 8);
+    });
+    App.on('midi:state', function () { render(); });
     App.on('jam:stopped', function () { jamLast = null; jamPaint(null); });
 
     // pause (keep position) when the whole app goes to the background
@@ -1672,15 +1672,14 @@
     if (disp) disp.hidden = assist < 4; // labels only show at Full
   }
 
-  function setAssist(n) {
-    if (!(n >= 0 && n <= 4) || n === assist) return;
-    assist = n;
-    App.store.set('pn.assist', n);
+  // one Help level for the whole app: set here or in Lights & help
+  function setAssist(n) { App.help.set(n); }
+  App.on('help:level', function (d) {
+    assist = d.level;
     paintAssist();
     render();
     if (pp.guiding) guideTarget();
-    App.emit('keys:assist', { level: n });
-  }
+  });
 
   function setHand(h) {
     h = h === 'left' ? 'left' : 'right';
