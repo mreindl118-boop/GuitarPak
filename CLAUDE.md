@@ -32,7 +32,10 @@ js/midi.js        MIDI service (App.midi: in/out ports, note/bend/pressure
                   post({cmd: init|send|setOutput|bluetooth})) spoken by the
                   iOS CoreMIDI bridge AND (v0.75.0) the Android APK's
                   MidiBridge (window.SoundLabMidi.post(JSON)); App.midi.
-                  platform 'web'|'ios'|'android'. + THE KEYBED (v0.74.0):
+                  platform 'web'|'ios'|'android'. Pitch bend is OFF by
+                  default (midi.bendOn; Settings Pitch bend Off/±2/±12/±48):
+                  dispatch drops 0xE0 unless on; setBendOn(false) emits
+                  midi:bend semis 0 on all 16 channels. + THE KEYBED (v0.74.0):
                   ONE lighting engine for every page. Layout by App.help
                   level: >=3 scale, 1-2 tonic keys, 0 dark. A LUMI is PAINTED
                   PER KEY (v0.75.0): its default LittleFoot program lights an

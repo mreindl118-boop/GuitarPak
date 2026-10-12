@@ -45,6 +45,9 @@
   var held = {};                        // midi -> vel (currently held notes)
   var bendRange = App.store.get('midi.bendRange', 2);
   if ([2, 12, 48].indexOf(bendRange) === -1) bendRange = 2;
+  // pitch bend is OFF unless switched on in Settings (midi.bendOn): a LUMI's
+  // key-wiggle bends every note out of tune while you practice
+  function bendOn() { return App.store.get('midi.bendOn', false) === true; }
 
   function post(msg) {
     try {
@@ -91,7 +94,7 @@
       App.emit('midi:note', { on: false, midi: d[1], vel: 0, chan: chan });
     } else if (st === 0xe0) {
       var raw = ((d[2] << 7) | d[1]) - 8192;
-      App.emit('midi:bend', { chan: chan, semis: (raw / 8192) * bendRange });
+      if (bendOn()) App.emit('midi:bend', { chan: chan, semis: (raw / 8192) * bendRange });
     } else if (st === 0xd0) {
       App.emit('midi:pressure', { chan: chan, val: d[1] });
     } else if (st === 0xa0) { // poly aftertouch -> pressure for that channel
@@ -541,6 +544,12 @@
     get hasOutput() { return hasOutput(); },
     get held() { return Object.keys(held).map(Number); },
     get bendRange() { return bendRange; },
+    get bendOn() { return bendOn(); },
+    setBendOn: function (on) {
+      App.store.set('midi.bendOn', !!on);
+      // switching off lets go of any bend still applied, on every channel
+      if (!on) for (var c = 0; c < 16; c++) App.emit('midi:bend', { chan: c, semis: 0 });
+    },
     setBendRange: function (r) {
       bendRange = [2, 12, 48].indexOf(r) !== -1 ? r : 2;
       App.store.set('midi.bendRange', bendRange);

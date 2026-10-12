@@ -1,6 +1,6 @@
 {
   "version": "0.75.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/soundLAB-alpha.apk",
-  "web": "0.75.0",
-  "notes": "NEW ANDROID APP: YOUR KEYBOARD WORKS IN IT. This update installs a new soundLAB app (v0.75.0) with its own MIDI connection: plug your LUMI in with USB, or open Lights & help and tap Find a Bluetooth keyboard. It reconnects by itself next time. Everything that works with a keyboard in Chrome now works in the app: playing, Scale lessons, Exercises answers and the key lights. THE LUMI NOW SHOWS EVERY SCALE NOTE IN ITS OWN COLOR, the same degree colors as the screen (matched to the LUMI's own palette). The note to play glows white and Exercises answers light green. Lights & help shows each screen color next to the color your LUMI will use."
+  "web": "0.75.1",
+  "notes": "Pitch bend from your keyboard is now off by default, so a LUMI's key wiggle no longer bends notes out of tune. Turn it on in Settings › MIDI keyboard › Pitch bend (±2, ±12 or ±48). Also in 0.75: the new Android app with its own MIDI connection (USB and Bluetooth), and your LUMI showing every scale note in its own color."
 }

@@ -158,6 +158,27 @@ const keys = o => Object.keys(o).map(Number).sort((a, b) => a - b);
   ok(cc.level === 3 && cc.keysSeg === 'Colors' && /scale in color/.test(cc.desc), 'one Help level: set in the sheet, the Keys page follows');
   ok(cc.mirror === 'None', 'and set on the Keys page, the sheet follows');
   ok(cc.other === false && cc.auto === true, 'keyboard type: Other / Auto (detected)');
+  console.log('# pitch bend: off by default, on in Settings');
+  const pb = await page.evaluate(() => {
+    const got = []; App.on('midi:bend', d => got.push(d));
+    const bend = () => __in.onmidimessage({ data: new Uint8Array([0xe0, 0x00, 0x60]) }); // +0.5 of the range
+    const o = { def: App.midi.bendOn };
+    bend(); o.offCount = got.length;
+    App.switchTo('settings');
+    o.offActive = document.querySelector('#set-midi-bend .active').textContent;
+    document.querySelector('#set-midi-bend [data-bend="12"]').click();
+    bend(); o.on = got.slice(-1)[0];
+    o.stored = JSON.parse(localStorage.getItem('guitarlab.midi.bendOn'));
+    got.length = 0;
+    document.querySelector('#set-midi-bend [data-bend="0"]').click();
+    o.reset = got.length === 16 && got.every(d => d.semis === 0);
+    got.length = 0; bend(); o.offAgain = got.length;
+    App.switchTo('quiz');
+    return o;
+  });
+  ok(pb.def === false && pb.offCount === 0 && pb.offActive === 'Off', 'pitch bend is off by default: a LUMI wiggle bends nothing');
+  ok(pb.on && pb.on.semis === 6 && pb.stored === true, 'turned on in Settings (±12): bends arrive: ' + JSON.stringify(pb.on));
+  ok(pb.reset && pb.offAgain === 0, 'turned off again: held bends released, new ones ignored');
   ok(errs.length === 0, 'no page errors' + (errs.length ? ': ' + errs.join(' | ') : ''));
   await ctx.close();
 
