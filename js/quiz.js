@@ -1863,6 +1863,18 @@
     }).join('') + '</div>';
   }
 
+  // Keys scale lessons (js/keylessons.js): level reached, best score, last timing
+  function keysLessonsHTML() {
+    var kl = App.keysLessons && App.keysLessons.summary ? App.keysLessons.summary() : [];
+    var body = kl.length ? '<ul class="qz-recs">' + kl.map(function (x) {
+      return '<li><button type="button" class="qz-rec" data-qzkeys="' + x.id + '"><span>' + esc(x.name) + '<small>' + esc(x.hand) + ' · level ' + x.level + ' of ' + x.levels +
+        ' · last timing ±' + x.timing + ' ms' + (x.mastered ? ' · mastered' : '') + '</small></span><span class="qz-klbar" title="' + x.passed + ' of ' + x.levels + ' levels passed"><i style="width:' +
+        Math.round(100 * x.passed / x.levels) + '%"></i></span><b>' + x.best + '</b></button></li>';
+    }).join('') + '</ul>'
+      : '<p class="muted small">No lessons yet. On the Keys page, pick a scale lesson and play it with the click.</p>';
+    return '<section class="card qz-pcard"><div class="qz-pchead"><h3>Keys lessons</h3><span class="muted small">Levels passed and best score per lesson</span></div>' + body + '</section>';
+  }
+
   function progressHTML() {
     var X = XP(), lv = X.level(), st = X.streak(), tot = X.totals(), g = X.goal(), t = X.today();
     var sprints = X.sprints(), sk = Object.keys(sprints).filter(function (k) { return NODE_BY_ID[k]; });
@@ -1886,6 +1898,7 @@
       '<section class="card qz-pcard"><div class="qz-pchead"><h3>Answer speed</h3><span class="muted small">Average seconds per right answer, by week · lower is faster</span></div><div class="qz-chart" id="qz-ch-speed"></div>' +
         '<div class="qz-tblwrap"><table class="qz-table qz-ttopic"><thead><tr><th scope="col">Topic</th><th scope="col">Answers</th><th scope="col">Right</th><th scope="col">Speed</th><th scope="col">Change</th></tr></thead><tbody>' +
         topicSpeedRows() + '</tbody></table></div><p class="muted small qz-tnote">Speed is your average over the last 7 days. Change compares it with the 4 weeks before: up means faster.</p></section>' +
+      keysLessonsHTML() +
       '<section class="card qz-pcard"><div class="qz-pchead"><h3>Sprint records</h3><span class="muted small">Most right answers in 60 seconds</span></div>' +
         (sk.length ? '<ul class="qz-recs">' + sk.map(function (k) {
           var nd = NODE_BY_ID[k];
@@ -2150,6 +2163,7 @@
     if ((a = t.getAttribute('data-qzh'))) { setHomeTab(a); return; }
     if ((a = t.getAttribute('data-qzn'))) { selectNode(+a); return; }
     if ((a = t.getAttribute('data-qzsprint'))) { startSprint(+a); return; }
+    if ((a = t.getAttribute('data-qzkeys'))) { App.switchTo('piano'); if (App.keysLessons) App.keysLessons.open(a); var kc = document.querySelector('.kl-card'); if (kc) kc.scrollIntoView({ block: 'start' }); return; }
     if ((a = t.getAttribute('data-qzapply'))) { var ap = applyFor(a); if (ap) ap.go(); return; }
     if ((a = t.getAttribute('data-qzjump'))) { startLevel(NODES[+a].levels[0].id, { jump: +a }); return; }
     if ((a = t.getAttribute('data-qzgoal'))) { XP().setGoal(+a); paintHomeBody(); var sh = root.querySelector('.qz-strip'); if (sh) sh.outerHTML = statsStrip(); return; }
@@ -2412,6 +2426,7 @@
     '.qz-donelinks{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 18px}' +
     '.qz-areas{display:grid;gap:6px;margin-top:12px}.qz-arow{display:grid;grid-template-columns:90px minmax(0,1fr) 62px;align-items:center;gap:10px;font-size:13.5px}.qz-arow b{font-weight:600;text-align:right;font-variant-numeric:tabular-nums}' +
     '.qz-abar{height:8px;border-radius:4px;background:var(--card2);overflow:hidden}.qz-abar i{display:block;height:100%;border-radius:4px;background:var(--accent)}' +
+    '.qz-rec .qz-klbar{flex:none;display:block;width:70px;height:6px;border-radius:3px;background:var(--line);overflow:hidden}.qz-klbar i{display:block;height:100%;background:var(--accent);border-radius:3px}' +
     '.qz-halo{paint-order:stroke;stroke:var(--card);stroke-width:4px;stroke-linejoin:round}.qz-tnote{margin:8px 0 0}' +
     '.qz-barm{fill:var(--accent)}.qz-linem{fill:none;stroke:var(--accent);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}' +
     '.qz-area{fill:var(--accent);opacity:.1}.qz-dot{fill:var(--accent);stroke:var(--card);stroke-width:2}' +

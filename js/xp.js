@@ -35,7 +35,7 @@
   var KEEP_DAYS = 180;
   var PLAY_DAY = 300;       // seconds of playing that make a streak day
   var PLAY_TAGS = { 'fb-run': 'Guitar', 'pn-run': 'Keys', 'ch-play': 'Chords', 'sg-run': 'Songs', 'jam-run': 'Jam',
-    'ws-run': 'Woodshed', 'tr-sess': 'Trainer', 'tr-cc': 'Trainer', met: 'Metronome' };
+    'ws-run': 'Woodshed', 'tr-sess': 'Trainer', 'tr-cc': 'Trainer', 'kl-run': 'Keys', met: 'Metronome' };
   var PAGE_AREA = { fretboard: 'Guitar', tab: 'Guitar', notation: 'Guitar', piano: 'Keys', synth: 'Keys', pads: 'Keys',
     chords: 'Chords', songs: 'Songs', jam: 'Jam', shed: 'Woodshed', trainer: 'Trainer', theory: 'Theory', tuner: 'Tuner' };
 

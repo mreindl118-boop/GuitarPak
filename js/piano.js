@@ -101,6 +101,14 @@
 
   function handBase() { return hand === 'left' ? 36 : 48; }
 
+  // HELP LEVEL (pn.assist): how much the keyboard tells you. 4 Full = degree
+  // colors + note labels + fingering + now/next rings and LEDs; 3 Colors =
+  // colors + rings, no labels; 2 Target = plain keys, tonic outlined, only
+  // the note to play now ringed; 1 Tonic = plain keys, tonic outlined; 0 None
+  // = a plain keyboard. At every level a pressed key flashes its degree color.
+  var ASSIST_NAMES = ['None', 'Tonic', 'Target', 'Colors', 'Full'];
+  var assist = 4;
+
   // the piano's twin of the fretboard's mode box: for 7-note scales, one
   // octave starting on the modal tonic, placed in the register the chosen
   // hand plays. Keys inside it draw at full color, in-scale keys outside
@@ -113,11 +121,11 @@
 
   // practice path: the highlighted octave (modal window for 7-note scales,
   // root octave otherwise), tonic to tonic
-  function practicePath() {
+  function practicePath(octaves) {
     var info = Theory.scaleInfo(curRoot(), curScale(), preferFlat());
     var mwin = modeWindow(info);
     var lo = mwin ? mwin[0] : handBase() + Theory.mod12(curRoot());
-    var hi = mwin ? mwin[1] : lo + 12;
+    var hi = lo + 12 * (octaves === 2 ? 2 : 1);
     var path = [];
     for (var m = lo; m <= hi && m <= HI; m++) {
       if (info.pcSet.has(Theory.mod12(m))) path.push({ midi: m });
@@ -151,21 +159,24 @@
   }
   function fingering(path) {
     var n = path.length, j;
-    if (n === 8) {
-      var pcs = [];
+    if (n === 8 || n === 15) { // one or two octaves of a 7-note scale
+      var pcs = [], out = [];
       if (hand === 'left') {
-        for (j = 0; j < 7; j++) pcs.push(Theory.mod12(path[7 - j].midi));
+        for (j = 0; j < 7; j++) pcs.push(Theory.mod12(path[n - 1 - j].midi));
         var g = cycleFingers(pcs);
         if (g) {
-          var out = [];
-          for (j = 0; j < 7; j++) out[7 - j] = g[j];
+          for (j = 0; j < n - 1; j++) out[n - 1 - j] = g[j % 7];
           out[0] = g[0] === 1 ? g[6] + 1 : g[0];
           return out;
         }
       } else {
         for (j = 0; j < 7; j++) pcs.push(Theory.mod12(path[j].midi));
         var f = cycleFingers(pcs);
-        if (f) return f.concat([f[0] === 1 ? f[6] + 1 : f[0]]);
+        if (f) {
+          for (j = 0; j < n - 1; j++) out.push(f[j % 7]);
+          out.push(f[0] === 1 ? f[6] + 1 : f[0]);
+          return out;
+        }
       }
     }
     var gen = [];
@@ -602,8 +613,9 @@
       // the two key heights still read); out-of-scale stays ivory/ebony.
       // Inline style beats the class fill; the pressed state uses filter +
       // stroke (with !important) so it stays visible over any color.
-      var keyStyle = '';
-      if (inScale) {
+      var keyStyle = '', dc = inScale ? ' data-dc="' + cols[step % 7] + '"' : '';
+      if (isRoot && assist > 0 && assist < 3) keyStyle = ' style="stroke:var(--accent);stroke-width:3.5"';
+      if (inScale && assist >= 3) {
         var kc = cols[step % 7];
         var fillC = isWhite
           ? (outWin ? mixHex(kc, '#f7f3ea', 0.55) : kc)
@@ -615,7 +627,7 @@
       if (isWhite) {
         x = whiteIndex(midi) * W;
         totalW = Math.max(totalW, x + W);
-        whites += '<rect class="pn-key pn-w" data-midi="' + midi + '" data-pc="' + pc + '" x="' + x +
+        whites += '<rect class="pn-key pn-w" data-midi="' + midi + '" data-pc="' + pc + '"' + dc + ' x="' + x +
           '" y="0" width="' + W + '" height="' + H + '" rx="4"' + keyStyle + '/>';
         cx = x + W / 2; cy = H - 26;
         if (pc === 0) { // octave marker under every C
@@ -624,7 +636,7 @@
         }
       } else {
         x = whiteIndex(midi) * W - BW / 2;
-        blacks += '<rect class="pn-key pn-b" data-midi="' + midi + '" data-pc="' + pc + '" x="' + x +
+        blacks += '<rect class="pn-key pn-b" data-midi="' + midi + '" data-pc="' + pc + '"' + dc + ' x="' + x +
           '" y="0" width="' + BW + '" height="' + BH + '" rx="3"' + keyStyle + '/>';
         cx = x + BW / 2; cy = BH - 18;
       }
@@ -642,7 +654,7 @@
         }
       }
       // fingering numbers above the practice-window dots (1=thumb … 5=pinky)
-      if (fingerMap[midi]) {
+      if (fingerMap[midi] && assist >= 4) {
         labels += '<text class="' + (isWhite ? 'pn-fing' : 'pn-fingb') + '" x="' + cx +
           '" y="' + (cy - 17) + '" text-anchor="middle">' + fingerMap[midi] + '</text>';
       }
@@ -651,9 +663,8 @@
         // sits straight on the painted key, contrast-picked per key type
         dots += '<g class="pn-dotg" data-midi="' + midi + '" data-pc="' + pc + '" data-cx="' + cx + '" data-cy="' + cy + '">' +
           '<circle class="pn-jamring" data-pc="' + pc + '" cx="' + cx + '" cy="' + cy + '" r="15.5" fill="none"/>' +
-          '<text class="pn-dott" x="' + cx + '" y="' + (cy + 3.5) + '" text-anchor="middle"' +
-          (isWhite ? '' : ' fill="#f2ede4"') + '>' +
-          keyLabel(midi, info, pf) + '</text></g>';
+          (assist >= 4 ? '<text class="pn-dott" x="' + cx + '" y="' + (cy + 3.5) + '" text-anchor="middle"' +
+          (isWhite ? '' : ' fill="#f2ede4"') + '>' + keyLabel(midi, info, pf) + '</text>' : '') + '</g>';
       }
     }
 
@@ -679,15 +690,17 @@
         '"></span>' + info.intervals[i] + ' &middot; ' + info.names[i] + '</span>';
     }
     els.legend.innerHTML = lg;
+    els.legend.hidden = assist < 3; // the legend explains colors that aren't shown
   }
 
-  function scrollToWindow() {
+  function scrollToWindow(alignLeft) {
     var info = Theory.scaleInfo(curRoot(), curScale(), preferFlat());
     var mwin = modeWindow(info);
-    var lo = mwin ? mwin[0] : 48 + Theory.mod12(curRoot());
+    var lo = mwin ? mwin[0] : handBase() + Theory.mod12(curRoot());
     var frac = (whiteIndex(lo) * W) / (whiteIndex(HI) * W + W);
     if (state.orient === 'h') {
-      els.stage.scrollLeft = Math.max(0, frac * els.stage.scrollWidth - els.stage.clientWidth / 4);
+      // lessons start the octave at the left edge so a phone shows all of it
+      els.stage.scrollLeft = Math.max(0, frac * els.stage.scrollWidth - (alignLeft ? 6 : els.stage.clientWidth / 4));
     } else {
       var svg = els.stage.querySelector('svg');
       if (svg) window.scrollTo({ top: els.stage.offsetTop + frac * svg.getBoundingClientRect().height - 220 });
@@ -701,8 +714,15 @@
     if (!svg) return;
     var k = svg.querySelector('.pn-key[data-midi="' + midi + '"]');
     if (!k) return;
-    k.classList.add('pn-down');
-    setTimeout(function () { k.classList.remove('pn-down'); }, dur || 180);
+    keyDown(k, true);
+    setTimeout(function () { keyDown(k, false); }, dur || 180);
+  }
+
+  function keyDown(k, down) {
+    k.classList.toggle('pn-down', down);
+    var dc = k.getAttribute('data-dc');
+    if (!dc || assist >= 3) return; // painted keys already show their color
+    k.style.fill = down ? dc : '';
   }
 
   // ---------------- practice runner (fretboard engine on the keys) ----------------
@@ -721,6 +741,8 @@
 
   function ledGuide(cur, next) {
     if (!App.midi || !App.midi.hasOutput) return;
+    if (assist < 2) cur = -1;
+    if (assist < 3) next = -1;
     if (led.cur !== -1 && led.cur !== cur && led.cur !== next) App.midi.dark(led.cur);
     if (led.next !== -1 && led.next !== next && led.next !== cur) App.midi.dark(led.next);
     if (cur !== -1) App.midi.light(cur, 120);
@@ -845,7 +867,7 @@
     var ring = mk('pn-now');
     ring.setAttribute('stroke', 'var(--accent)');
     ring.setAttribute('stroke-width', '3.5');
-    var g = svg.querySelector('.pn-dotg[data-midi="' + midi + '"]');
+    var g = assist >= 2 && midi != null ? svg.querySelector('.pn-dotg[data-midi="' + midi + '"]') : null;
     if (!g) ring.setAttribute('opacity', '0');
     else {
       ring.setAttribute('opacity', '1');
@@ -856,7 +878,7 @@
     nring.setAttribute('stroke', 'var(--accent)');
     nring.setAttribute('stroke-width', '2.5');
     nring.setAttribute('stroke-dasharray', '5 4');
-    var g2 = nextMidi != null && nextMidi !== midi
+    var g2 = assist >= 3 && nextMidi != null && nextMidi !== midi
       ? svg.querySelector('.pn-dotg[data-midi="' + nextMidi + '"]') : null;
     if (!g2) { nring.style.display = 'none'; } // display, not opacity — the pulse animation owns opacity
     else {
@@ -911,7 +933,7 @@
   function showFinger(pathIdx) {
     var el = document.getElementById('pn-finger');
     if (!el) return;
-    var f = pp.path && pp.path.length ? fingerFor(pathIdx, pp.path) : 0;
+    var f = pp.path && pp.path.length && assist >= 4 ? fingerFor(pathIdx, pp.path) : 0;
     if (!f) { el.style.display = 'none'; return; }
     el.style.display = '';
     el.textContent = f;
@@ -1091,7 +1113,7 @@
     var svg = document.getElementById('pn-svg');
     if (!svg) return;
     var k = svg.querySelector('.pn-key[data-midi="' + midi + '"]');
-    if (k) k.classList.toggle('pn-down', down);
+    if (k) keyDown(k, down);
   }
 
   function renderQwPanel() {
@@ -1174,7 +1196,12 @@
       // compact practice strip — selects keep chevron clearance (fretboard rule)
       '.pn-practice{margin-top:12px}' +
       '.pn-practice select{padding:6px 26px 6px 9px;font-size:13px;background-position:right 8px center}' +
-      '.pn-practice input[type=number]{padding:6px 8px;font-size:13px}'
+      '.pn-practice input[type=number]{padding:6px 8px;font-size:13px}' +
+      '.pn-key.pn-hit-ok{stroke:#4cc9b0 !important;stroke-width:5 !important}' +
+      '.pn-key.pn-hit-meh{stroke:#ffd166 !important;stroke-width:5 !important}' +
+      '.pn-key.pn-hit-bad{stroke:#ff5d5d !important;stroke-width:5 !important;fill:#ff8f8f !important}' +
+      '#panel-synth #pn-lessons{display:none}' +
+      '#pn-assist button{min-width:0}'
     );
 
     rootEl.innerHTML =
@@ -1182,6 +1209,9 @@
         '<div class="row tight spread">' +
           '<span class="pn-title" id="pn-title"></span>' +
           '<span class="row tight">' +
+            '<div class="seg" id="pn-assist" role="group" aria-label="Help level" title="How much the keyboard helps: Full shows colors, names, fingers and the next note; None is a plain keyboard">' +
+              ASSIST_NAMES.map(function (nm, i) { return '<button type="button" data-pnassist="' + i + '">' + nm + '</button>'; }).reverse().join('') +
+            '</div>' +
             '<div class="seg" id="pn-display">' +
               '<button type="button" data-pnmode="notes">Notes</button>' +
               '<button type="button" data-pnmode="intervals">Intervals</button>' +
@@ -1276,8 +1306,9 @@
         '</div>' +
         '<div class="pn-stage" id="pn-stage"></div>' +
         '<div class="row tight pn-legend" id="pn-legend"></div>' +
-        '<div class="muted small" style="margin-top:10px">Tap, type (home row = white keys, Z / X = octave) or play a MIDI keyboard.</div>' +
-      '</div>';
+        '<div class="muted small pn-foot" style="margin-top:10px">Tap, type (home row = white keys, Z / X = octave) or play a MIDI keyboard.</div>' +
+      '</div>' +
+      '<div id="pn-lessons"></div>';
 
     els.title = document.getElementById('pn-title');
     els.stage = document.getElementById('pn-stage');
@@ -1288,6 +1319,13 @@
     state.display = String(App.store.get('pn.display', 'notes'));
     if (!/^(notes|intervals|degrees)$/.test(state.display)) state.display = 'notes';
     state.orient = App.store.get('pn.orient', 'h') === 'v' ? 'v' : 'h';
+    assist = parseInt(App.store.get('pn.assist', 4), 10);
+    if (!(assist >= 0 && assist <= 4)) assist = 4;
+    document.getElementById('pn-assist').addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-pnassist]');
+      if (b) setAssist(parseInt(b.getAttribute('data-pnassist'), 10));
+    });
+    paintAssist();
 
     // QWERTY input: persisted toggle, octave, custom map
     qw.on = App.store.get('pn.qw', true) !== false;
@@ -1618,6 +1656,52 @@
 
     prefetch();
     render();
+    if (App.keysLessons) {
+      try { App.keysLessons.init(document.getElementById('pn-lessons')); } catch (e) { console.error('keys lessons', e); }
+    }
+  }
+
+  function paintAssist() {
+    var seg = document.getElementById('pn-assist');
+    if (seg) seg.querySelectorAll('button').forEach(function (b) {
+      var on = parseInt(b.getAttribute('data-pnassist'), 10) === assist;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-pressed', String(on));
+    });
+    var disp = document.getElementById('pn-display');
+    if (disp) disp.hidden = assist < 4; // labels only show at Full
+  }
+
+  function setAssist(n) {
+    if (!(n >= 0 && n <= 4) || n === assist) return;
+    assist = n;
+    App.store.set('pn.assist', n);
+    paintAssist();
+    render();
+    if (pp.guiding) guideTarget();
+    App.emit('keys:assist', { level: n });
+  }
+
+  function setHand(h) {
+    h = h === 'left' ? 'left' : 'right';
+    if (h === hand) return;
+    hand = h;
+    App.store.set('pn.hand', hand);
+    var seg = document.getElementById('pn-handseg');
+    if (seg) seg.querySelectorAll('button').forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-pnhand') === hand); });
+    render();
+  }
+
+  // lesson feedback on a key: 'ok' | 'meh' | 'bad' outline for a moment
+  function flashKey(midi, kind) {
+    var svg = document.getElementById('pn-svg');
+    var k = svg && svg.querySelector('.pn-key[data-midi="' + midi + '"]');
+    if (!k) return;
+    k.classList.remove('pn-hit-ok', 'pn-hit-meh', 'pn-hit-bad');
+    void k.getBoundingClientRect();
+    k.classList.add('pn-hit-' + kind);
+    clearTimeout(k._hitT);
+    k._hitT = setTimeout(function () { k.classList.remove('pn-hit-' + kind); }, 320);
   }
 
   function onShow() {
@@ -1628,6 +1712,7 @@
 
   function onHide() {
     ppPause();      // exercise pauses (keeps its place) when leaving the tab
+    if (App.keysLessons) App.keysLessons.stop(); // a lesson run ends (unscored)
     // release any computer-keyboard notes whose keyup we'll never see
     Object.keys(qw.held).forEach(function (c) {
       noteOff(qw.held[c], 99);
@@ -1640,6 +1725,20 @@
   // the prefetched bank now; ready() = a sampled bank can play
   App.keys = {
     play: play,
+    // lessons (js/keylessons.js) drive the keyboard through these
+    assist: function () { return assist; },
+    setAssist: setAssist,
+    ASSIST_NAMES: ASSIST_NAMES,
+    setHand: setHand,
+    hand: function () { return hand; },
+    path: function (octaves) { return practicePath(octaves); },
+    fingering: function (path) { return fingering(path); },
+    ring: function (midi, next) { ppRing(midi, next); ledGuide(midi == null ? -1 : midi, next == null ? -1 : next); },
+    clearRing: function () { ppRing(null, null); ledClear(); },
+    flash: flashKey,
+    stopRunner: ppStop,
+    scrollTo: function (alignLeft) { scrollToWindow(!!alignLeft); },
+    render: function () { render(); },
     warm: function () { try { decodeAll(App.getAudio()); } catch (e) { /* no audio */ } },
     ready: function () { var b = pianoBank().bank; for (var k in b) return true; return false; }
   };

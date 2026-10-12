@@ -50,7 +50,26 @@ js/chords.js      │ DOM ids/CSS prefixed met-/fb-/ch-/jam-/tun-/tr-
                   │  pauses on leaving it)
 js/piano.js       │ (piano: keyboard twin of the fretboard — degree-colored
                   │  keys, shared fb.colors palette, sampled piano voice,
-                  │  follows fb:set/fb:scale + jam:chord)
+                  │  follows fb:set/fb:scale + jam:chord; HELP LEVEL
+                  │  pn.assist 4 Full/3 Colors/2 Target/1 Tonic/0 None gates
+                  │  colors, labels, fingers, now/next rings + LEDs; pressed
+                  │  keys flash data-dc (their degree color) at every level;
+                  │  key-aware fingering cycleFingers/fingering, 1-2 octaves;
+                  │  App.keys = the API keylessons.js drives)
+js/keylessons.js  │ SCALE LESSONS on the Keys page (mounted into #pn-lessons
+                  │  by piano.js init): LESSONS (25, tiers start/build/
+                  │  stretch) x STEPS (10 speed levels, quarters@60 ->
+                  │  16ths@72). A run: fb:set the lesson key, setHand, one
+                  │  bar count-in, exerciseSeq updown x reps + tonic; click
+                  │  on a 25ms lookahead timer; judge() matches midi:note /
+                  │  note:input by pitch class within accept() of the beat,
+                  │  minus outputLatency and ws.cal (Woodshed calibration);
+                  │  WIN 35/70/120 ms. Score = acc x (0.6 + 0.4 timing);
+                  │  85 levels up, 70 passes; App.xp.finishLevel counts it.
+                  │  Focus mode html.kl-running folds the page controls.
+                  │  Stores kl.prog/kl.sel/kl.tier/kl.reps; wake tag kl-run
+                  │  (ledger area Keys); stops on transport:claim, page
+                  │  hide, app hide; summary() feeds Exercises Progress.
 js/songs.js       │ (songs: user-imported ASCII tab / MIDI parsed on-device,
                   │  bar-loop player at shared tempo, key detect → fb:set)
 js/jam.js         │ (jam: auto-band — genre presets write an intro/A/B/ending
@@ -327,8 +346,8 @@ version.json      auto-update feed (source of truth for latest version)
   (all) or `tests/run.sh game quiz` — serves the repo on 4573 itself
   (tests/serve.py). Needs Node + playwright + Chromium (cloud: NODE_PATH=
   /opt/node22/lib/node_modules, Chromium at /opt/pw-browsers; env.js reads
-  SL_URL / CHROMIUM / AAPT). Suites: fingering (pure Node), practice, game,
-  quiz, nav, smoke, taps, update. Run them before every release and add a
+  SL_URL / CHROMIUM / AAPT). Suites: fingering (pure Node), keys, practice,
+  game, quiz, nav, smoke, taps, update. Run them before every release and add a
   suite or checks for new features.
 - The service worker is cache-first: after editing, bump `CACHE` in sw.js and,
   in the preview, unregister SW + clear caches + reload twice — otherwise you
