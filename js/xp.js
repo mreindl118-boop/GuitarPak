@@ -3,10 +3,19 @@
  * practice time, per-unit answer speed, and 60-second sprint records.
  * No DOM except one class on <html> (goal-due: today's goal not met yet).
  *
+ * PRACTICE LEDGER: playing on any page counts too. While a practice tool
+ * runs (its App.wake tag: fretboard/keys runner, chords player, songs, jam,
+ * woodshed, trainer, metronome) or notes come in from MIDI / tone-in / the
+ * on-screen instruments, the time is logged per area, earns 2 XP a minute,
+ * and 5 minutes make the day count for the streak. A forgotten loop stops
+ * counting after 10 minutes without a touch or a played note.
+ *
  * Stores (App.store → localStorage 'guitarlab.*'):
  *   xp.total   lifetime XP
- *   xp.days    { 'YYYY-MM-DD': { x: XP, s: seconds practiced, q: answered,
- *                k: correct, l: levels finished, u: { unitId: [ok, ms, asked] } } }
+ *   xp.days    { 'YYYY-MM-DD': { x: XP, s: seconds answering in Exercises,
+ *                q: answered, k: correct, l: levels finished,
+ *                u: { unitId: [ok, ms, asked] }, p: seconds playing elsewhere,
+ *                a: { area: seconds }, pm: playing minutes already paid XP } }
  *              (u = correct answers, their summed answer time, and all
  *              answers per unit; kept ~180 days)
  *   xp.goal    daily XP goal: 20 | 50 | 100 | 150
@@ -24,6 +33,11 @@
   var GOAL_NAMES = { 20: 'Casual', 50: 'Regular', 100: 'Serious', 150: 'Intense' };
   var PAR = { choice: 4000, ear: 6500, play: 9000 }; // fast-answer bonus thresholds (ms)
   var KEEP_DAYS = 180;
+  var PLAY_DAY = 300;       // seconds of playing that make a streak day
+  var PLAY_TAGS = { 'fb-run': 'Guitar', 'pn-run': 'Keys', 'ch-play': 'Chords', 'sg-run': 'Songs', 'jam-run': 'Jam',
+    'ws-run': 'Woodshed', 'tr-sess': 'Trainer', 'tr-cc': 'Trainer', met: 'Metronome' };
+  var PAGE_AREA = { fretboard: 'Guitar', tab: 'Guitar', notation: 'Guitar', piano: 'Keys', synth: 'Keys', pads: 'Keys',
+    chords: 'Chords', songs: 'Songs', jam: 'Jam', shed: 'Woodshed', trainer: 'Trainer', theory: 'Theory', tuner: 'Tuner' };
 
   var now = function () { return new Date(); }; // tests override via SLXP._now
 
@@ -74,8 +88,9 @@
     return { lv: lv, into: rest, need: need, title: title };
   }
 
-  // ---- streak: a day counts once a level is finished in it ----
-  function active(k) { var d = peek(k); return !!(d && d.l > 0); }
+  // ---- streak: a day counts once a level is finished or 5 minutes played ----
+  function dayActive(d) { return !!(d && (d.l > 0 || (d.p || 0) >= PLAY_DAY)); }
+  function active(k) { return dayActive(peek(k)); }
   function frozenList() { var f = get('xp.frozen', []); return Array.isArray(f) ? f : []; }
   function covered(k) { return active(k) || frozenList().indexOf(k) >= 0; }
 
@@ -132,21 +147,64 @@
 
   // a finished level (or sprint): bonuses, the streak day, freezes
   function finishLevel(o) {
-    var t = day(), before = t.x, wasActive = t.l > 0;
+    var t = day(), before = t.x, wasActive = dayActive(t);
     t.l++;
     var bonus = (o.passed ? 5 : 0) + (o.perfect ? 5 : 0) + (o.record ? 5 : 0);
     addXP(bonus);
     saveDays();
-    var st = streak(), earned = false;
-    if (st.n > (+get('xp.best', 0) || 0)) set('xp.best', st.n);
-    if (!wasActive && st.n > 0 && st.n % 7 === 0 && get('xp.fzAt', '') !== dayKey() && (+get('xp.freeze', 0) || 0) < 2) {
-      set('xp.freeze', (+get('xp.freeze', 0) || 0) + 1);
-      set('xp.fzAt', dayKey());
-      earned = true;
-    }
+    var st = afterActive(wasActive);
     var g = goal();
     changed(bonus);
-    return { bonus: bonus, goalHit: before < g && t.x >= g, streak: st.n, extended: !wasActive, freezeEarned: earned };
+    return { bonus: bonus, goalHit: before < g && t.x >= g, streak: st.n, extended: !wasActive, freezeEarned: st.earned };
+  }
+
+  // after today may have become a streak day: best streak + the 7-day freeze
+  function afterActive(wasActive) {
+    var st = streak();
+    st.earned = false;
+    if (st.n > (+get('xp.best', 0) || 0)) set('xp.best', st.n);
+    if (!wasActive && st.today && st.n > 0 && st.n % 7 === 0 && get('xp.fzAt', '') !== dayKey() && (+get('xp.freeze', 0) || 0) < 2) {
+      set('xp.freeze', (+get('xp.freeze', 0) || 0) + 1);
+      set('xp.fzAt', dayKey());
+      st.earned = true;
+      st.freezes++;
+    }
+    return st;
+  }
+
+  // ---- the practice ledger: seconds of playing on any page ----
+  function practice(sec, area) {
+    var t = day(), wasActive = dayActive(t), before = t.x, g = goal();
+    t.p = (t.p || 0) + sec;
+    t.a = t.a || {};
+    t.a[area] = (t.a[area] || 0) + sec;
+    var mins = Math.floor(t.p / 60), paid = t.pm || 0, gained = 0;
+    if (mins > paid) { gained = 2 * (mins - paid); t.pm = mins; addXP(gained); }
+    var nowActive = dayActive(t);
+    if (gained || nowActive !== wasActive) saveDays(); // else saved on hide / next minute
+    var r = { xp: gained, dayDone: nowActive && !wasActive, goalHit: before < g && t.x >= g };
+    if (r.dayDone) { var st = afterActive(false); r.streak = st.n; r.freezeEarned = st.earned; }
+    if (gained || r.dayDone) changed(gained);
+    if (r.dayDone || r.goalHit) App.emit('xp:practice', r);
+    return r;
+  }
+
+  var lastTouch = Date.now(), lastNote = 0, TICK = 5;
+  function tick() {
+    if (document.hidden || !App.wake || !App.wake.held) return;
+    var page = App.active, t = Date.now(), area = null;
+    if (page === 'quiz' || page === 'settings') return; // Exercises logs its own answer time
+    App.wake.held().forEach(function (g) { if (!area && PLAY_TAGS[g]) area = PLAY_TAGS[g]; });
+    if (!area && t - lastNote < 20000) area = PAGE_AREA[page] || 'Playing';
+    if (!area || t - Math.max(lastTouch, lastNote) > 600000) return;
+    practice(TICK, area);
+  }
+  function wireLedger() {
+    ['pointerdown', 'keydown'].forEach(function (e) { document.addEventListener(e, function () { lastTouch = Date.now(); }, true); });
+    App.on('midi:note', function (d) { if (d && d.on) lastNote = Date.now(); });
+    App.on('note:input', function (d) { if (d && d.on) lastNote = Date.now(); });
+    document.addEventListener('visibilitychange', function () { if (document.hidden) saveDays(); });
+    setInterval(tick, TICK * 1000);
   }
 
   function setGoal(g) { if (GOALS.indexOf(+g) >= 0) { set('xp.goal', +g); changed(0); } }
@@ -155,7 +213,7 @@
     var out = [], k = addDays(dayKey(), -(n - 1));
     for (var i = 0; i < n; i++) {
       var d = peek(k) || { x: 0, s: 0, q: 0, k: 0, l: 0, u: {} };
-      out.push({ key: k, x: d.x, s: d.s, q: d.q, k: d.k, l: d.l, frozen: frozenList().indexOf(k) >= 0 });
+      out.push({ key: k, x: d.x, s: d.s, p: d.p || 0, a: d.a || {}, q: d.q, k: d.k, l: d.l, active: dayActive(d), frozen: frozenList().indexOf(k) >= 0 });
       k = addDays(k, 1);
     }
     return out;
@@ -189,13 +247,23 @@
   }
 
   function totals() {
-    var all = D(), t = { q: 0, k: 0, s: 0, l: 0, days: 0 };
+    var all = D(), t = { q: 0, k: 0, s: 0, p: 0, l: 0, days: 0 };
     Object.keys(all).forEach(function (k) {
       var d = all[k];
-      t.q += d.q; t.k += d.k; t.s += d.s; t.l += d.l;
-      if (d.l > 0) t.days++;
+      t.q += d.q; t.k += d.k; t.s += d.s; t.p += d.p || 0; t.l += d.l;
+      if (dayActive(d)) t.days++;
     });
     return t;
+  }
+
+  // seconds per area over the last n days (Exercises included), biggest first
+  function areas(n) {
+    var out = {};
+    history(n).forEach(function (d) {
+      if (d.s) out.Exercises = (out.Exercises || 0) + d.s;
+      Object.keys(d.a).forEach(function (a) { out[a] = (out[a] || 0) + d.a[a]; });
+    });
+    return Object.keys(out).map(function (a) { return { area: a, s: out[a] }; }).sort(function (x, y) { return y.s - x.s; });
   }
 
   // answers / correct per unit over all kept days
@@ -224,20 +292,22 @@
   function setJump(i) { if (i > jumpIdx()) set('xp.jump', i); }
 
   seed();
+  wireLedger();
 
   window.SLXP = App.xp = {
     GOALS: GOALS, GOAL_NAMES: GOAL_NAMES,
     total: total, goal: goal, setGoal: setGoal, level: function () { return levelOf(total()); }, levelOf: levelOf,
-    today: function () { var d = peek(dayKey()); return d || { x: 0, s: 0, q: 0, k: 0, l: 0, u: {} }; },
+    today: function () { var d = peek(dayKey()); return d || { x: 0, s: 0, p: 0, q: 0, k: 0, l: 0, u: {} }; },
     streak: streak, answer: answer, finishLevel: finishLevel, history: history,
-    speed: speed, speedWeeks: speedWeeks, totals: totals, unitStats: unitStats,
+    speed: speed, speedWeeks: speedWeeks, totals: totals, unitStats: unitStats, practice: practice, areas: areas, PLAY_DAY: PLAY_DAY,
     sprintBest: sprintBest, sprintRecord: sprintRecord, jump: jumpIdx, setJump: setJump,
     sprints: function () { var o = get('xp.sprint', {}); return o && typeof o === 'object' ? o : {}; },
     dayKey: dayKey, addDays: addDays,
     refresh: function () { changed(0); },
     // tests: pin the clock, drop the cache
     _now: function (fn) { now = fn || function () { return new Date(); }; },
-    _reload: function () { days = null; }
+    _reload: function () { days = null; },
+    _tick: tick
   };
 
   // paint the Learn-tab dot once the shell exists

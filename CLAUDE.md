@@ -102,7 +102,12 @@ js/quiz.js        EXERCISES ('quiz', the practice HOME since v0.69.0): Musicca-
                   at container width (XP/day + goal line, minutes/day, weekly
                   answer speed; hover tips + table views) and topic speed
                   table. Results show XP/time/per-answer + streak/goal/speed
-                  notes (speed note ignores sub-300ms test taps).
+                  notes (speed note ignores sub-300ms test taps). v0.72.0:
+                  node cards open with the unit's LEARN lesson; wrong picks
+                  say "You chose X"; DRILL THESE re-asks only the missed
+                  q.item keys (cur.drill, 5-10 questions, never writes
+                  qz.prog); applyFor(unit) links lessons to the Fretboard
+                  (fb:practice with the scale), Chords or the Circle.
                   window.SLQuiz = test hook (levels, gen, start, pick, q,
                   view, cur, nodes, node(i), current, sprint, finishSprint,
                   tab, theory).
@@ -116,8 +121,18 @@ js/xp.js          XP / streak service under the course (App.xp = window.SLXP,
                   Stores xp.total (seeded once from qz.prog), xp.days {day:
                   {x, s, q, k, l, u:{unit:[ok, ms, asked]}}} kept 180 days,
                   xp.goal, xp.freeze/frozen/fzAt/best, xp.sprint, xp.jump.
-                  Tests pin the clock with SLXP._now(fn) + SLXP._reload().
-                  Loaded right before quiz.js.
+                  PRACTICE LEDGER (v0.72.0): playing anywhere counts — a 5 s
+                  tick logs time while a practice App.wake tag is held
+                  (PLAY_TAGS: fb-run, pn-run, ch-play, sg-run, jam-run,
+                  ws-run, tr-*, met) or notes came in (midi:note /
+                  note:input, 20 s), gated by a touch or note in the last
+                  10 min; never on quiz/settings (answers log their own
+                  time). day.p/a/pm: 2 XP per minute, a day with >= 300 s
+                  playing counts for the streak; emits 'xp:practice' (quiz.js
+                  shows the #xp-toast). Woodshed still keeps its own ws.xp.
+                  Tests pin the clock with SLXP._now(fn) + SLXP._reload();
+                  SLXP._tick() runs one ledger tick. Loaded right before
+                  quiz.js.
 js/help.js        (?) button + guided page tours (TOURS per page id, spotlight
                   ring + card overlay, first-run welcome; help.seen/help.done)
 js/plugins.js     window.SoundLab plugin API v1: registerPage (App.addPage),
@@ -234,6 +249,14 @@ version.json      auto-update feed (source of truth for latest version)
   context bar via html.noctx. Show a control only when it does something
   (e.g. Keys: +Bass/Strum only with Triads/7ths, arp rate/dir/oct/Hold only
   with Arp on — paintPerf toggles `hidden`, scoped `#pn-perf [hidden]`).
+- BACK (v0.72.0; app.js wireBack/backStep): Android Back (MainActivity
+  goBack) and browser Back walk back through the app: help tour, sheet,
+  settings, module.onBack() (return true when handled — quiz: run -> path,
+  node card, tab), the page stack (cleared on reaching the space's home),
+  the practice home. One {sl:'top'} history guard is re-pushed after each
+  handled Back; at the very start it stays down, #back-hint says the next
+  Back leaves, and any pointerdown re-arms it. Pages with sub-views should
+  implement onBack.
 - Context bar (index.html #ctxbar, wired in app.js): the single home for key/
   scale/mode/BPM/time signature, visible under the tabs (except NO_CTX pages). It reads the
   shared stores (fb.root/fb.scale/fb.mode, met.bpm, met.sig) and pushes changes
@@ -300,6 +323,13 @@ version.json      auto-update feed (source of truth for latest version)
 
 - Serve: launch config "guitarlab" (`python -m http.server 4573`). No Node on
   this machine; Python 3.12 is on PATH.
+- TESTS (tests/, v0.72.0): headless Playwright suites — `tests/run.sh`
+  (all) or `tests/run.sh game quiz` — serves the repo on 4573 itself
+  (tests/serve.py). Needs Node + playwright + Chromium (cloud: NODE_PATH=
+  /opt/node22/lib/node_modules, Chromium at /opt/pw-browsers; env.js reads
+  SL_URL / CHROMIUM / AAPT). Suites: fingering (pure Node), practice, game,
+  quiz, nav, smoke, taps, update. Run them before every release and add a
+  suite or checks for new features.
 - The service worker is cache-first: after editing, bump `CACHE` in sw.js and,
   in the preview, unregister SW + clear caches + reload twice — otherwise you
   WILL verify stale files (this has bitten repeatedly).
