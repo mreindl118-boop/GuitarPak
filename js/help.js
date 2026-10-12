@@ -60,10 +60,10 @@
       { t: 'Trainer', x: 'Practice prompts: it deals you a key, scale and tempo to work on. Hit Go and it sets up the Fretboard for that exact drill — a fresh challenge every time.' }
     ],
     quiz: [
-      { t: 'Exercises', x: 'A step-by-step course like a music-theory textbook with a teacher built in: Notes, Intervals, Chords, Scales and Key signatures. Each level is 10 questions — get 8 right to pass, 9 or 10 for more stars.' },
-      { sel: '.qz-topics', t: 'Pick a topic', x: 'Each topic splits into units, and each unit into ways to practice: read it on the staff, find it on the piano or the neck, or hear it (ear training). Tap Learn on any unit for a short explanation first.' },
-      { sel: '#qz-cont', t: 'Or just continue', x: 'This button always starts the next level you haven’t passed, in course order.' },
-      { t: 'Answer by playing', x: 'Tap an answer (or press 1–9) — or PLAY it: your MIDI keyboard, the on-screen keys, or your guitar through Tone-in (Settings) all count. Space replays the sound.' }
+      { t: 'Exercises', x: 'A course in short levels of 10 questions: Notes, Intervals, Chords, Scales and Key signatures. Every right answer earns XP; quick answers and runs of 5 earn more.' },
+      { sel: '.qz-strip', t: 'Your day', x: 'Your streak grows each day you finish a level, the ring fills toward your daily XP goal, and XP raises your level. Seven days in a row earns a streak freeze that covers a missed day.' },
+      { sel: '.qz-hometabs', t: 'Path, Topics, Progress', x: 'The Path walks you through the course step by step, and each step opens the next. Topics lets you practice anything. Progress shows your XP, practice time and how your answer speed improves.' },
+      { t: 'Sprints and jumps', x: 'Tap a step on the path for its levels and a 60-second sprint: as many right answers as you can, against your own record. Already know it? Tap a locked step and Jump here: 9 out of 10 opens the path up to there.' }
     ],
     theory: [
       { t: 'Theory', x: 'The circle of fifths, a guide to what chords live in every key, and an ear quiz for scale degrees. Tap around the circle — the app’s key follows.' }

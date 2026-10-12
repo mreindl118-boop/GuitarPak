@@ -89,8 +89,35 @@ js/quiz.js        EXERCISES ('quiz', the practice HOME since v0.69.0): Musicca-
                   action #qz-act: Show answer -> Next) / done. onShow claims
                   the transport (silences met/jam/loops).
                   Stores qz.prog / qz.items (weak items picked more) /
-                  qz.sound / qz.landed (one-time landing). window.SLQuiz =
-                  test hook (levels, gen, start, pick, q, view, theory).
+                  qz.sound / qz.landed (one-time landing) / qz.home (home tab).
+                  GAME LAYER (v0.71.0, Duolingo-style): home = stats strip
+                  (streak, goal ring, level, Continue) + tabs Path / Topics /
+                  Progress. PATH = NODES (one per unit x mode, course order);
+                  a node opens when the previous one has a passed level, or
+                  by a JUMP TEST (its level 1, 9/10 -> xp.jump; a failed jump
+                  saves nothing); currentNode skips jumped-over nodes. Node
+                  card = levels + 60-SECOND SPRINT (highest passed level,
+                  auto-advance, never writes qz.prog; record per node).
+                  Progress = tiles, week strip, goal picker, SVG charts built
+                  at container width (XP/day + goal line, minutes/day, weekly
+                  answer speed; hover tips + table views) and topic speed
+                  table. Results show XP/time/per-answer + streak/goal/speed
+                  notes (speed note ignores sub-300ms test taps).
+                  window.SLQuiz = test hook (levels, gen, start, pick, q,
+                  view, cur, nodes, node(i), current, sprint, finishSprint,
+                  tab, theory).
+js/xp.js          XP / streak service under the course (App.xp = window.SLXP,
+                  no DOM except html.goal-due = the Learn-tab dot): 2 XP per
+                  right answer, +1 under PAR ms, +1 at a run of 5; level
+                  +5 pass, +5 perfect, +5 sprint record. Player level: 40 XP
+                  to Lv 2, +20 per level. Streak day = a level finished that
+                  day; a freeze is earned per 7-day multiple (max 2) and is
+                  spent only when the banked freezes cover the whole gap.
+                  Stores xp.total (seeded once from qz.prog), xp.days {day:
+                  {x, s, q, k, l, u:{unit:[ok, ms, asked]}}} kept 180 days,
+                  xp.goal, xp.freeze/frozen/fzAt/best, xp.sprint, xp.jump.
+                  Tests pin the clock with SLXP._now(fn) + SLXP._reload().
+                  Loaded right before quiz.js.
 js/help.js        (?) button + guided page tours (TOURS per page id, spotlight
                   ring + card overlay, first-run welcome; help.seen/help.done)
 js/plugins.js     window.SoundLab plugin API v1: registerPage (App.addPage),
