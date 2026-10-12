@@ -124,7 +124,7 @@
       '<div class="card">' +
         '<h2>MIDI keyboard</h2>' +
         '<div class="muted small">Connect a USB or Bluetooth MIDI keyboard (ROLI LUMI, Launchkey&hellip;) to play the app&rsquo;s piano ' +
-          'with velocity, key-wiggle pitch bend and pressure &mdash; its own lights show the scale and the keys to play, on every page.</div>' +
+          'with velocity and pressure (pitch bend is off unless you turn it on below) &mdash; its own lights show the scale and the keys to play, on every page.</div>' +
         '<div class="row tight" style="margin-top:12px" id="set-midi-row">' +
           '<button type="button" class="btn sm primary" id="set-midi-enable">Connect MIDI</button>' +
           '<span class="muted small" id="set-midi-msg"></span>' +
@@ -135,8 +135,9 @@
           '<button type="button" class="btn sm" id="set-midi-test" title="Briefly lights a C major arpeggio on the device">Light test</button>' +
           '<button type="button" class="btn sm" id="set-midi-bt" style="display:none" title="Open the system Bluetooth MIDI pairing sheet">Pair Bluetooth&hellip;</button>' +
         '</div>' +
-        '<div class="fb-field" style="margin-top:14px">Pitch-bend range' +
-          '<div class="seg" id="set-midi-bend">' +
+        '<div class="fb-field" style="margin-top:14px">Pitch bend' +
+          '<div class="seg" id="set-midi-bend" role="group" aria-label="Pitch bend">' +
+            '<button type="button" data-bend="0">Off</button>' +
             '<button type="button" data-bend="2">&plusmn;2</button>' +
             '<button type="button" data-bend="12">&plusmn;12</button>' +
             '<button type="button" data-bend="48">&plusmn;48 (ROLI)</button>' +
@@ -506,13 +507,16 @@
     var bendSeg = document.getElementById('set-midi-bend');
     function paintBend() {
       bendSeg.querySelectorAll('button').forEach(function (b) {
-        b.classList.toggle('active', parseInt(b.getAttribute('data-bend'), 10) === App.midi.bendRange);
+        var v = parseInt(b.getAttribute('data-bend'), 10);
+        b.classList.toggle('active', v === 0 ? !App.midi.bendOn : App.midi.bendOn && v === App.midi.bendRange);
       });
     }
     bendSeg.addEventListener('click', function (e) {
       var b = e.target.closest('button[data-bend]');
       if (!b) return;
-      App.midi.setBendRange(parseInt(b.getAttribute('data-bend'), 10));
+      var v = parseInt(b.getAttribute('data-bend'), 10);
+      if (v === 0) App.midi.setBendOn(false);
+      else { App.midi.setBendRange(v); App.midi.setBendOn(true); }
       paintBend();
     });
     if (App.midi) paintBend();
