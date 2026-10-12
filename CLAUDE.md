@@ -3,9 +3,12 @@
 Guitar + keys practice PWA (vanilla HTML/CSS/JS, no build step) + Android
 WebView wrapper. GitHub: https://github.com/mreindl118-boop/GuitarPak
 Branded **soundLAB** (formerly GuitarLab) since v0.43.0 — the rename is
-user-facing ONLY: storage keys stay 'guitarlab.*', the Android package stays
-com.mreindl.guitarlab, the APK now ships as soundLAB-alpha.apk (a
-GuitarLab-alpha.apk copy remains one release for stragglers), and internal ids/comments are untouched. The wordmark is a
+user-facing ONLY: storage keys stay 'guitarlab.*', the APK ships as
+soundLAB-alpha.apk (a GuitarLab-alpha.apk copy keeps old links alive), and
+internal ids/comments are untouched. ANDROID (v0.70.2): the app is now
+com.mreindl.soundlab signed with soundlab.keystore (new key) — the old
+com.mreindl.guitarlab (old key) is retired; users installed the new app and
+deleted the old one. The wordmark is a
 custom SVG letterform set (stems = piano black keys: flat top, rounded
 bottom): inline in index.html's header (theme-aware via currentColor +
 --accent), standalone in icons/logo.svg, app icon icons/icon.svg (three
@@ -146,12 +149,16 @@ js/daw/synth.js   MPE poly synth ported from the OpenStudio DAW repo
 samples/          MIT FluidR3 instrument MP3s (see samples/CREDITS.md)
 android/          APK project — build.ps1 (no Gradle: javac→d8→aapt→zipalign→
                   apksigner); keystore is gitignored, do NOT commit it.
-                  Since v0.70.1 MainActivity loads the LIVE site (LIVE_URL)
-                  and falls back to the bundled assets offline; the JS bridge
-                  GuitarLabHost = setKeepScreenOn + shellVersion. build.ps1
-                  writes releases/soundLAB-alpha.apk (+ GuitarLab copy) and
-                  sets version.json "version". Compile-check without the PC:
-                  javac -source 8 -target 8 -cp <android-34 android.jar>
+                  MainActivity (src/com/mreindl/soundlab/) loads the LIVE
+                  site (LIVE_URL) and falls back to the bundled assets offline;
+                  the JS bridge GuitarLabHost = setKeepScreenOn + shellVersion.
+                  build.ps1 (PC) and build.sh (Linux/cloud: ANDROID_JAR,
+                  BUILD_TOOLS, KEYSTORE, D8_JAR — build-tools-34 d8 crashes on
+                  JDK 21, use r8 8.7.x from Google Maven) both write
+                  releases/soundLAB-alpha.apk (+ GuitarLab copy) and set
+                  version.json "version". The signing key soundlab.keystore
+                  (passwordless PKCS12, SHA-256 5A:10:EC:B5:...:17:1A) is
+                  NEVER in this repo; see "Signing key" below.
 ios/              WKWebView wrapper (XcodeGen project.yml + Swift; needs a Mac
                   to build — the PWA is the primary iPad install)
 releases/         built signed APK (committed; raw URL = download link)
@@ -313,11 +320,13 @@ dialogs are refused by the frame — everything else runs. `tools/bundle.py`
 
 ## Cloud / mobile sessions (claude.ai/code, PC off)
 
-APK NOTE (2026-08-25): the in-cloud APK toolchain (scratchpad) was lost to
-container reclamation INCLUDING the cloud-generated signing keystore. New
-cloud APKs would carry a NEW cert = one uninstall/reinstall for users.
-Until re-keyed (owner's call) or rebuilt on the PC, ship releases web-only
-and say so in version.json notes.
+APK NOTE (2026-10-12, v0.70.2): re-keyed at the owner's request. The app is
+now com.mreindl.soundlab, signed with a NEW key (soundlab.keystore,
+cert SHA-256 5A:10:EC:B5:D5:CE:F1:42:...:D0:FD:17:1A), built in the cloud
+with android/build.sh. Because the app loads the live site, web releases
+need NO new APK — only changes to MainActivity/manifest do. To build one,
+the session needs the key from wherever the owner keeps it (ask), plus the
+SDK pieces (dl.google.com platform-34 + build-tools 34, r8 8.7.x).
 
 All web work is possible (js/css/html, sw.js, version.json, README), and so
 is republishing the claude.ai artifact (see that section). NOT possible:
@@ -333,5 +342,6 @@ to main so the owner can review from their phone.
   single quotes in commit messages).
 - APK: mic + update checks need the WebView flags already set in
   MainActivity.java; fetch() fails on file:// — use XHR for local assets.
-- Same signature = in-place APK update. Losing android/guitarlab.keystore
-  means users must uninstall/reinstall — keep it safe, never commit it.
+- Same signature = in-place APK update. Losing soundlab.keystore (the
+  current key; guitarlab.keystore signed the retired com.mreindl.guitarlab)
+  means users must reinstall — keep it safe, never commit it.

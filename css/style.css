@@ -127,6 +127,12 @@ html, body {
 
 ::selection { background: rgba(255, 171, 71, 0.3); }
 
+/* an app, not a document: taps never select words — which is also what
+   triggers Chrome's "Touch to Search" Google panel on Android — and long
+   presses don't pop the copy/share callout. Typing fields stay selectable. */
+body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
+
 /* inline SVG icons (App.icon) — follow the button/text color they sit in */
 .ic { display: inline-block; vertical-align: -0.22em; flex: 0 0 auto; pointer-events: none; }
 

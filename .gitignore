@@ -1,2 +1,6 @@
 # apksigner side-files next to the released APK
 releases/*.idsig
+# signing keys never belong in the repo
+*.keystore
+*.jks
+*.p12
