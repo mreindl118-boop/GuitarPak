@@ -145,7 +145,13 @@ js/daw/synth.js   MPE poly synth ported from the OpenStudio DAW repo
                   More of that engine lands here as the studio grows.
 samples/          MIT FluidR3 instrument MP3s (see samples/CREDITS.md)
 android/          APK project — build.ps1 (no Gradle: javac→d8→aapt→zipalign→
-                  apksigner); keystore is gitignored, do NOT commit it
+                  apksigner); keystore is gitignored, do NOT commit it.
+                  Since v0.70.1 MainActivity loads the LIVE site (LIVE_URL)
+                  and falls back to the bundled assets offline; the JS bridge
+                  GuitarLabHost = setKeepScreenOn + shellVersion. build.ps1
+                  writes releases/soundLAB-alpha.apk (+ GuitarLab copy) and
+                  sets version.json "version". Compile-check without the PC:
+                  javac -source 8 -target 8 -cp <android-34 android.jar>
 ios/              WKWebView wrapper (XcodeGen project.yml + Swift; needs a Mac
                   to build — the PWA is the primary iPad install)
 releases/         built signed APK (committed; raw URL = download link)
@@ -270,7 +276,13 @@ version.json      auto-update feed (source of truth for latest version)
 ## Release checklist (all five, every release)
 
 1. `APP_VERSION` in js/app.js
-2. `version.json` (version + notes — this drives everyone's update banner)
+2. `version.json`: bump `web` + `notes` (drives the web / PWA / Android-app
+   update banner). NEVER bump `version` by hand: it is the APK channel = the
+   versionName of releases/soundLAB-alpha.apk, and android\build.ps1 sets it
+   after a successful build. Running it ahead of the real APK made Android
+   users download the same old APK in a loop (fixed v0.70.1; app.js
+   checkForUpdate reads `web` for web builds, `version` vs
+   GuitarLabHost.shellVersion() inside the Android app).
 3. `android/AndroidManifest.xml` versionCode (+1) and versionName
 4. `sw.js` CACHE bump (guitarlab-vN+1); add any new files to ASSETS
 5. Build APK: `android\build.ps1` (outputs to releases/; sets JAVA_HOME itself;

@@ -82,9 +82,14 @@ window.App = (function () {
   var prevTab = null; // where the gear came from, to toggle back to
 
   // ---- auto-update ----
-  // version.json on GitHub is the source of truth. Web builds refresh through
-  // the service worker; the APK build (file://) links to the new APK download.
-  var APP_VERSION = '0.70.0';
+  // version.json on GitHub is the source of truth. It carries TWO channels:
+  //   web      the latest web build — browsers, the PWA and the Android app
+  //            (which runs the live site) refresh through the service worker
+  //   version  the APK file in releases/ — ONLY bumped by android/build.ps1
+  //            when an APK is actually built. Older APKs read nothing else, so
+  //            this must never run ahead of the real file: when it did, the
+  //            Android app kept downloading the same old APK in a loop.
+  var APP_VERSION = '0.70.1';
   var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
 
   function verNum(v) {
@@ -103,28 +108,46 @@ window.App = (function () {
     fetch(UPDATE_INFO_URL, { cache: 'no-store' })
       .then(function (r) { return r.json(); })
       .then(function (info) {
-        if (info && info.version && verNum(info.version) > verNum(APP_VERSION)) showUpdateBanner(info);
+        if (!info) return;
+        var bundled = location.protocol === 'file:', shell = shellVersion();
+        if (bundled || shell) {
+          // inside the Android app: offer a download only for a genuinely
+          // newer APK than the one installed
+          var mine = shell || APP_VERSION;
+          if (info.version && info.apk && verNum(info.version) > verNum(mine)) { showUpdateBanner(info, 'apk'); return; }
+          if (bundled) return; // the bundled offline copy can't refresh itself
+        }
+        var latest = info.web || info.version;
+        if (latest && verNum(latest) > verNum(APP_VERSION)) showUpdateBanner({ version: latest }, 'web');
       })
       .catch(function () {
         lastUpdateCheck = 0; // failed (offline / blocked) — allow an early retry
       });
   }
 
-  function showUpdateBanner(info) {
+  // the Android app's own version (its JS bridge) — '' everywhere else
+  function shellVersion() {
+    var h = window.GuitarLabHost;
+    try { return h && typeof h.shellVersion === 'function' ? String(h.shellVersion() || '') : ''; } catch (e) { return ''; }
+  }
+
+  function showUpdateBanner(info, kind) {
     if (document.getElementById('app-update')) return;
     var bar = document.createElement('div');
     bar.id = 'app-update';
     var msg = document.createElement('span');
-    msg.textContent = 'soundLAB v' + String(info.version) + ' is available.';
+    msg.textContent = kind === 'apk'
+      ? 'A new soundLAB Android app (v' + String(info.version) + ') is available.'
+      : 'soundLAB v' + String(info.version) + ' is available.';
     bar.appendChild(msg);
 
     var go = document.createElement('button');
     go.className = 'btn sm primary';
-    if (location.protocol === 'file:') {
-      go.textContent = 'Get update';
+    if (kind === 'apk') {
+      go.textContent = 'Download';
       go.onclick = function () {
         // plain navigation — the APK's WebViewClient routes it to the browser
-        location.href = info.apk || 'https://github.com/mreindl118-boop/GuitarPak';
+        location.href = info.apk;
       };
     } else {
       go.textContent = 'Update now';
