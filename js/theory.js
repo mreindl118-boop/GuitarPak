@@ -6,6 +6,7 @@
  *   Theory.FLAT_KEYS                        Set of pitch classes conventionally spelled flat
  *   Theory.SCALES                           { id: { name, steps:[semitones from root] } }
  *   Theory.SCALE_ORDER                      array of scale ids in display order
+ *   Theory.SCALE_GROUPS                     [{label, ids}] — grouped for pickers
  *   Theory.TUNINGS                          { id: { name, midi:[6] low-string-first } }
  *   Theory.TUNING_ORDER                     array of tuning ids
  *   Theory.QUALITIES                        { id: { name, intervals, symbol } }
@@ -53,6 +54,13 @@ window.Theory = (function () {
   };
   var SCALE_ORDER = ['major', 'dorian', 'phrygian', 'lydian', 'mixolydian', 'aeolian', 'locrian',
     'majorPent', 'minorPent', 'blues', 'harmonicMinor', 'melodicMinor', 'phrygDom'];
+  // how pickers present the scales: the everyday ones first, then families
+  var SCALE_GROUPS = [
+    { label: 'Common', ids: ['major', 'aeolian', 'majorPent', 'minorPent', 'blues'] },
+    { label: 'Minor family', ids: ['harmonicMinor', 'melodicMinor'] },
+    { label: 'Modes', ids: ['dorian', 'phrygian', 'lydian', 'mixolydian', 'locrian'] },
+    { label: 'Exotic', ids: ['phrygDom'] }
+  ];
 
   var TUNINGS = {
     standard: { name: 'Standard (E A D G B E)',   midi: [40, 45, 50, 55, 59, 64] },
@@ -547,6 +555,7 @@ window.Theory = (function () {
     INTERVAL_NAMES: INTERVAL_NAMES,
     SCALES: SCALES,
     SCALE_ORDER: SCALE_ORDER,
+    SCALE_GROUPS: SCALE_GROUPS,
     TUNINGS: TUNINGS,
     TUNING_ORDER: TUNING_ORDER,
     QUALITIES: QUALITIES,

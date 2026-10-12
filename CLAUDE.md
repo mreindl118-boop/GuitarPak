@@ -35,7 +35,8 @@ js/tonein.js      1/4"/audio-in TONE-IN: pitch-detects the selected audio
                   emits midi:note {silent:true} — instrument pages show the
                   visuals (rings/presses/guide) but never re-sound; pauses on
                   'shed' (its own mic) — loaded right after midi.js
-js/metronome.js   ┐ feature modules; each registers
+js/metronome.js   ┐ feature modules; each registers (metronome = the corner
+                  │  sheet, not a page — see OVERLAY SHEETS)
 js/fretboard.js   │ App.register(name, {init, onShow, onHide, onKey})
 js/chords.js      │ DOM ids/CSS prefixed met-/fb-/ch-/jam-/tun-/tr-
                   │ (chords: chord-explorer neck + theory panel + progression
@@ -165,17 +166,27 @@ version.json      auto-update feed (source of truth for latest version)
   App.switchTo cross spaces automatically; per-space last tab in app.tab /
   app.tabStudio, current space in app.space, <html data-space>. The context
   bar, clock, key and MIDI service are shared across both — that's the point.
-- TAB GROUPS (app.js GROUPS, v0.54.0): the nav select lists GROUPS of pages,
-  not pages — practice: Theory (quiz=Exercises HOME/chords/theory — first
-  since v0.69.0), Instrument (fretboard/tab/notation/piano), Play
-  (songs/jam), Practice (trainer/shed), Tools
-  (metronome/tuner) — Instrument also carries 'pads' (v0.64.0); studio:
-  Studio (arrange=Timeline HOME / tracks=Editor), Sketch (song/ideas). Members show as a pill strip (#subnav, .subtab) under the context
-  bar; single-page groups hide the strip; each group remembers its last
-  member (app.gtab.<gid>). NAVIGATION ONLY — pages/modules/ids unchanged, so
-  App.switchTo(pageId) and every bus cross-link still work (the owning group
-  follows), and App.addPage wraps plugin pages in their own gpl-<id> group.
-  The settings overlay hides the strip; leaving settings repaints it.
+- SECTION TAB BAR (v0.70.0; app.js GROUPS + populateNav): the main nav is a
+  tab bar of GROUPS (icon + label), not a drop-down — practice: Learn
+  (quiz=Exercises HOME/chords/theory), Guitar (fretboard/tab/notation), Keys
+  (piano/synth/pads), Play (songs/jam), Practice (shed/trainer/tuner);
+  studio: Studio (arrange=Timeline HOME / tracks=Editor), Sketch (song/ideas).
+  Rendered twice: #tabbar inside the top bar (> 900px) and #tabbar-m fixed
+  along the bottom (<= 900px) — #tabbar-m sits OUTSIDE <header> because the
+  header's backdrop-filter / auto-hide transform would trap a fixed child.
+  Tapping the open tab scrolls to top. Members show as the pill strip
+  (#subnav, .subtab); single-page groups hide it; each group remembers its
+  last member (app.gtab.<gid>). NAVIGATION ONLY — page ids unchanged, so
+  App.switchTo(pageId) and every bus cross-link still work, and
+  App.addPage wraps plugin pages in their own gpl-<id> group (icon 'plus').
+- OVERLAY SHEETS (v0.70.0; app.js SHEETS/openSheet/closeSheet): the METRONOME
+  is not a page — #met-btn (top-right corner) opens #sheet-metronome OVER the
+  current page (App.active unchanged, so runners keep going); X, backdrop,
+  Esc or the icon close it; Tab is trapped inside; the click keeps running
+  after closing and #met-btn shows .on / pulses .tick. App.switchTo
+  ('metronome') opens the sheet; switching to any page closes it; keys go to
+  the sheet's module while open (App.sheet). PANEL_ORDER appends
+  ['metronome', 'settings'] so both still init. Bottom sheet on phones.
 - QUIET CHROME (v0.69.1): the whole .topbar (nav + context bar + pill strip)
   auto-hides while the window scrolls DOWN and returns on any scroll up / at
   the top (app.js wireAutoHideBar; .bar-hidden; App.showBar() forces it back

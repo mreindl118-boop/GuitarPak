@@ -152,6 +152,8 @@ html, body {
   transition: transform 220ms ease;
 }
 
+@media (max-width: 1120px) and (min-width: 901px) { .brand .tag { display: none; } }
+
 /* auto-hide while scrolling down (app.js wireAutoHideBar) */
 .topbar.bar-hidden { transform: translateY(calc(-100% - 4px)); }
 
@@ -225,21 +227,85 @@ html, body {
   text-shadow: none;
 }
 
-/* single page-picker menu — replaces the old tab row */
-.nav { margin-left: auto; }
+/* ---------- section tab bar (the app's main navigation) ----------
+   Rendered twice by app.js: .tabbar-top sits in the top bar on wide
+   screens, .tabbar-bottom is fixed along the bottom on phones / portrait
+   tablets. It lives OUTSIDE the header on purpose: the header's
+   backdrop-filter + auto-hide transform would trap a fixed child. */
+.tabbar { display: flex; align-items: center; gap: 2px; }
+.tabbar-top { margin-left: 10px; }
+.tabbar-bottom { display: none; }
 
-#nav-select {
-  font-family: var(--font-display);
-  font-size: 19px;
+.tabbar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 13px;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  background: transparent;
+  color: var(--label);
+  font-family: var(--font-body);
+  font-size: 13px;
   font-weight: 600;
-  letter-spacing: 1.6px;
+  letter-spacing: 1.1px;
   text-transform: uppercase;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: color 120ms ease, background 120ms ease, border-color 120ms ease;
+}
+.tabbar-btn:hover { color: var(--text); background: var(--card2); }
+.tabbar-btn.active {
   color: var(--accent);
-  padding: 8px 42px 8px 16px;
-  border-radius: 12px;
+  background: rgba(255, 171, 71, 0.1);
+  border-color: rgba(255, 171, 71, 0.35);
 }
 
-#nav-select option { text-transform: none; letter-spacing: normal; }
+/* corner tools: workspace, help, settings, metronome */
+.tb-tools { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+.icon-btn { display: inline-flex; align-items: center; justify-content: center; padding: 6px 8px; min-width: 36px; }
+#met-btn.on { color: var(--accent); border-color: rgba(255, 171, 71, 0.7); }
+#met-btn.tick { box-shadow: 0 0 14px var(--accent-glow), inset 0 0 6px var(--accent-glow); }
+#met-btn.active, #settings-btn.active { border-color: var(--accent); }
+
+/* ---------- overlay sheets (the metronome) ---------- */
+.sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 420;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  background: rgba(8, 7, 9, 0.55);
+}
+.sheet[hidden] { display: none; }
+.sheet-card {
+  width: min(640px, 100%);
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.5);
+  padding: 16px 20px 20px;
+}
+.sheet.open .sheet-card { animation: sheet-in 200ms ease-out; }
+@keyframes sheet-in {
+  from { opacity: 0; transform: translateY(14px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+.sheet-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.sheet-head h2 {
+  flex: 1;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+}
 
 /* ---------- persistent context bar (key / scale / mode / bpm / time) ---------- */
 
@@ -704,12 +770,58 @@ button .ic, .chip .ic { display: inline-block; }
 
 /* ---------- small screens ---------- */
 
+/* phones + portrait tablets: the section tabs move to a fixed bottom bar */
+@media (max-width: 900px) {
+  .tabbar-top { display: none; }
+  .tabbar-bottom {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 60;
+    gap: 0;
+    padding: 4px calc(6px + env(safe-area-inset-right, 0px)) calc(4px + env(safe-area-inset-bottom, 0px)) calc(6px + env(safe-area-inset-left, 0px));
+    background: rgba(25, 21, 24, 0.96);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-top: 1px solid var(--line);
+  }
+  :root[data-theme="light"] .tabbar-bottom { background: rgba(250, 247, 242, 0.96); }
+  .tabbar-bottom .tabbar-btn {
+    flex: 1 1 0;
+    min-width: 0;
+    flex-direction: column;
+    gap: 3px;
+    padding: 6px 2px 4px;
+    border: 0;
+    border-radius: 10px;
+    font-size: 10.5px;
+    letter-spacing: 0.7px;
+  }
+  .tabbar-bottom .tabbar-btn.active { background: transparent; }
+  .tabbar-bottom .tabbar-btn .ic { width: 22px; height: 22px; }
+  main { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
+  .foot { padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+  #snd-hint, #app-update { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+}
+
 @media (max-width: 640px) {
   .topbar { padding: 8px 12px 4px; gap: 10px; }
   .brand .tag { display: none; }
   .brand { font-size: 21px; }
   .wordmark { height: 21px; }
-  #nav-select { font-size: 16px; padding: 7px 36px 7px 12px; letter-spacing: 1.2px; }
+  .tb-tools { gap: 5px; }
+  /* the metronome becomes a bottom sheet */
+  .sheet { align-items: flex-end; padding: 0; }
+  .sheet-card {
+    width: 100%;
+    max-height: 88vh;
+    border-radius: 18px 18px 0 0;
+    border-bottom: 0;
+    padding: 14px 14px calc(18px + env(safe-area-inset-bottom, 0px));
+  }
+  @keyframes sheet-in { from { transform: translateY(40px); opacity: 0.6; } to { transform: none; opacity: 1; } }
   main { padding: 18px 12px 60px; }
   .card { padding: 16px; }
   .big-display { font-size: 60px; }

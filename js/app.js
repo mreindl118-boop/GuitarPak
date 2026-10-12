@@ -32,7 +32,7 @@ window.App = (function () {
   // Settings is deliberately in NEITHER list: it's an overlay page opened by
   // the ever-present gear in the header, from any page in either space.
   var SPACES = {
-    practice: ['quiz', 'metronome', 'fretboard', 'tab', 'notation', 'chords', 'piano', 'synth', 'pads', 'songs', 'jam', 'shed', 'tuner', 'trainer', 'theory'],
+    practice: ['quiz', 'fretboard', 'tab', 'notation', 'chords', 'piano', 'synth', 'pads', 'songs', 'jam', 'shed', 'tuner', 'trainer', 'theory'],
     studio: ['arrange', 'tracks', 'song', 'ideas']
   };
   var SPACE_LABELS = {
@@ -42,27 +42,29 @@ window.App = (function () {
     song: 'Song', arrange: 'Arrange', tracks: 'Tracks', pads: 'Pads', ideas: 'Ideas',
     quiz: 'Exercises'
   };
-  var PANEL_ORDER = SPACES.practice.concat(SPACES.studio).concat(['settings']);
+  // overlays live outside both page sets: the metronome opens as a SHEET over
+  // whatever page you're on (corner icon), settings toggles in place (gear)
+  var PANEL_ORDER = SPACES.practice.concat(SPACES.studio).concat(['metronome', 'settings']);
   // Tab GROUPS: related pages share one entry in the page menu; the members
   // show as a sub-tab strip under the context bar. Pages/modules are untouched
   // — this is navigation only, so cross-links (fb:practice, st:edit, plugin
   // pages) keep addressing pages by id and the owning group follows along.
   var GROUPS = {
     practice: [
-      { id: 'gtheory', label: 'Theory', pages: ['quiz', 'chords', 'theory'] }, // Exercises = the home
-      { id: 'ginst', label: 'Instrument', pages: ['fretboard', 'tab', 'notation', 'piano', 'synth', 'pads'] },
-      { id: 'gplay', label: 'Play', pages: ['songs', 'jam'] },
-      { id: 'gprac', label: 'Practice', pages: ['shed', 'trainer'] }, // the game first
-      { id: 'gtools', label: 'Tools', pages: ['metronome', 'tuner'] }
+      { id: 'gtheory', label: 'Learn', icon: 'learn', pages: ['quiz', 'chords', 'theory'] }, // Exercises = the home
+      { id: 'ginst', label: 'Guitar', icon: 'guitar', pages: ['fretboard', 'tab', 'notation'] },
+      { id: 'gkeys', label: 'Keys', icon: 'keys', pages: ['piano', 'synth', 'pads'] },
+      { id: 'gplay', label: 'Play', icon: 'note', pages: ['songs', 'jam'] },
+      { id: 'gprac', label: 'Practice', icon: 'target', pages: ['shed', 'trainer', 'tuner'] } // the game first
     ],
     studio: [
-      { id: 'gstudio', label: 'Studio', pages: ['arrange', 'tracks'] }, // the DAW home
-      { id: 'gsketch', label: 'Sketch', pages: ['song', 'ideas'] }
+      { id: 'gstudio', label: 'Studio', icon: 'sliders', pages: ['arrange', 'tracks'] }, // the DAW home
+      { id: 'gsketch', label: 'Sketch', icon: 'idea', pages: ['song', 'ideas'] }
     ]
   };
   // short member names for the strip (fall back to SPACE_LABELS)
   var SUB_LABELS = {
-    fretboard: 'Neck', tab: 'Tab', notation: 'Notation', piano: 'Keys',
+    fretboard: 'Neck', tab: 'Tab', notation: 'Notation', piano: 'Piano',
     chords: 'Chords', theory: 'Circle', songs: 'Songs', jam: 'Jam',
     trainer: 'Trainer', shed: 'Woodshed', metronome: 'Metronome', tuner: 'Tuner',
     song: 'Song', ideas: 'Ideas', tracks: 'Editor', arrange: 'Timeline', pads: 'Pads', synth: 'Synth',
@@ -82,7 +84,7 @@ window.App = (function () {
   // ---- auto-update ----
   // version.json on GitHub is the source of truth. Web builds refresh through
   // the service worker; the APK build (file://) links to the new APK download.
-  var APP_VERSION = '0.69.1';
+  var APP_VERSION = '0.70.0';
   var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
 
   function verNum(v) {
@@ -173,6 +175,14 @@ window.App = (function () {
     minus: '<path d="M5 12h14"/>',
     pickdown: '<path d="M6 19.5v-9a6 6 0 0 1 12 0v9"/>',
     pickup: '<path d="M5 5.5 12 19l7-13.5"/>',
+    learn: '<path d="M12 6.8C10.2 5.3 7.8 4.6 3.5 4.6v13.2c4.3 0 6.7.7 8.5 2.2 1.8-1.5 4.2-2.2 8.5-2.2V4.6c-4.3 0-6.7.7-8.5 2.2z"/><path d="M12 6.8V20"/>',
+    guitar: '<path d="M13.6 10.4 19.2 4.8"/><path d="M17.6 3.2l3.2 3.2"/><path d="M10.9 8.4c-1.6-.7-3.4-.2-4.3 1-.6.8-.7 1.8-.4 2.7-1.4.1-2.6.9-3.1 2.2-.8 2 .4 4.4 2.6 5.3 2 .8 4.2.1 5-1.6.4-.8.4-1.7.1-2.5 1.1-.2 2.1-.9 2.5-2 .5-1.5-.3-3.2-1.9-4"/><circle cx="9.2" cy="14.8" r="1.3" fill="currentColor" stroke="none"/>',
+    keys: '<rect x="3" y="4.5" width="18" height="15" rx="2"/><path d="M7.5 13.5v6M12 13.5v6M16.5 4.5v15"/><rect x="6" y="4.5" width="3" height="9" rx=".8" fill="currentColor" stroke="none"/><rect x="10.5" y="4.5" width="3" height="9" rx=".8" fill="currentColor" stroke="none"/>',
+    note: '<path d="M9 18V5.6l11-2.1V16"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/>',
+    target: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.6"/><circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"/>',
+    idea: '<path d="M9.5 18h5M10.5 21h3"/><path d="M12 3a6 6 0 0 0-3.7 10.7c.8.7 1.2 1.5 1.2 2.3h5c0-.8.4-1.6 1.2-2.3A6 6 0 0 0 12 3z"/>',
+    metronome: '<path d="M9.4 3.5h5.2l4.3 16.3a1 1 0 0 1-1 1.2H6.1a1 1 0 0 1-1-1.2z"/><path d="M7.6 16.5h8.8"/><path d="M12 16.5l4.6-9.3"/><circle cx="15.2" cy="10" r="1.4" fill="currentColor" stroke="none"/>',
+    help: '<circle cx="12" cy="12" r="9.2"/><path d="M9.4 9.2a2.7 2.7 0 0 1 5.2 1c0 1.8-2.6 2.2-2.6 3.8"/><circle cx="12" cy="17.4" r="0.6" fill="currentColor"/>',
     gear: '<circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h.09a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.09a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1z"/>'
   };
 
@@ -611,16 +621,33 @@ window.App = (function () {
 
   function tabStoreKey(sp) { return sp === 'studio' ? 'app.tabStudio' : 'app.tab'; }
 
+  // SECTION TAB BAR — the app's main navigation: one tab per group of the
+  // current space (icon + label). Rendered twice: in the top bar on wide
+  // screens and fixed along the bottom on phones / portrait tablets (CSS
+  // shows one). The pages inside a section are the pill strip (#subnav).
   function populateNav() {
-    var nav = document.getElementById('nav-select');
-    if (!nav) return;
-    var h = '';
+    var cur = active && groupOf(active), h = '';
     GROUPS[space].forEach(function (g) {
-      h += '<option value="' + g.id + '">' + g.label + '</option>';
+      var on = cur === g;
+      h += '<button type="button" class="tabbar-btn' + (on ? ' active' : '') + '" data-group="' + g.id + '"' +
+        (on ? ' aria-current="page"' : '') + '>' + icon(g.icon || 'plus', 20) + '<span>' + g.label + '</span></button>';
     });
-    nav.innerHTML = h;
-    var g = active && groupOf(active);
-    if (g && GROUPS[space].indexOf(g) !== -1) nav.value = g.id;
+    ['tabbar', 'tabbar-m'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.innerHTML = h;
+    });
+  }
+
+  function goGroup(gid) {
+    var gs = GROUPS[space];
+    for (var i = 0; i < gs.length; i++) {
+      if (gs[i].id !== gid) continue;
+      if (groupOf(active) === gs[i]) { window.scrollTo({ top: 0, behavior: 'smooth' }); return; } // tap the open tab: back to the top
+      var pg = store.get('app.gtab.' + gid, gs[i].pages[0]);
+      if (gs[i].pages.indexOf(pg) === -1) pg = gs[i].pages[0];
+      switchTo(pg);
+      return;
+    }
   }
 
   function paintSubnav(name) {
@@ -643,6 +670,7 @@ window.App = (function () {
   }
 
   function switchTo(name) {
+    if (sheet && !SHEETS[name]) closeSheet(); // going somewhere: the overlay steps aside
     if (name === active) return;
     // settings is space-agnostic: overlay in place, no wipe, no nav entry
     if (name === 'settings') {
@@ -659,10 +687,13 @@ window.App = (function () {
       }
       var sn = document.getElementById('subnav');
       if (sn) sn.hidden = true; // strip belongs to the page under the overlay
+      populateNav(); // no section is current while settings is open
       paintGear();
       paintChrome();
       return;
     }
+    // overlay utilities open over the current page instead of replacing it
+    if (SHEETS[name]) { openSheet(name); return; }
     // crossing into the other workspace? go through the wipe
     if (spaceOf(name) !== space) { setSpace(spaceOf(name), name); return; }
     if (active && modules[active] && modules[active].onHide) {
@@ -670,9 +701,8 @@ window.App = (function () {
     }
     active = name;
     var g = groupOf(name);
-    var nav = document.getElementById('nav-select');
-    if (nav && g && nav.value !== g.id) nav.value = g.id;
     if (g) store.set('app.gtab.' + g.id, name); // remember the member per group
+    populateNav();
     paintSubnav(name);
     document.querySelectorAll('.tab').forEach(function (b) {
       b.classList.toggle('active', b.dataset.panel === name);
@@ -736,7 +766,7 @@ window.App = (function () {
     SPACE_LABELS[id] = String(label || id).slice(0, 20);
     SPACES[sp].push(id);
     PANEL_ORDER.push(id);
-    GROUPS[sp].push({ id: 'gpl-' + id, label: SPACE_LABELS[id], pages: [id] });
+    GROUPS[sp].push({ id: 'gpl-' + id, label: SPACE_LABELS[id], icon: 'plus', pages: [id] });
     SUB_LABELS[id] = SPACE_LABELS[id];
     modules[id] = mod;
     try {
@@ -757,6 +787,83 @@ window.App = (function () {
       switchTo(back);
     } else {
       switchTo('settings');
+    }
+  }
+
+  // ---- overlay sheets: utilities that open OVER the page you're on ----
+  // The page underneath stays active (its runner, scroll and state are
+  // untouched) and the sheet closes straight back to it: the corner icon,
+  // the X, a tap outside the card, or Esc. Today: the metronome.
+  var SHEETS = { metronome: 'met-btn' };
+  var sheet = null, sheetReturn = null;
+
+  function openSheet(name) {
+    if (!SHEETS[name] || sheet === name) return;
+    if (sheet) closeSheet();
+    var el = document.getElementById('sheet-' + name);
+    if (!el) return;
+    sheet = name;
+    sheetReturn = document.activeElement;
+    el.hidden = false;
+    void el.offsetWidth; // commit before the entrance animation
+    el.classList.add('open');
+    document.documentElement.classList.add('sheet-open');
+    var b = document.getElementById(SHEETS[name]);
+    if (b) { b.classList.add('active'); b.setAttribute('aria-expanded', 'true'); }
+    if (modules[name] && modules[name].onShow) {
+      try { modules[name].onShow(); } catch (e) { console.error(name + '.onShow', e); }
+    }
+    var x = el.querySelector('[data-sheet-close]');
+    if (x) { try { x.focus({ preventScroll: true }); } catch (e) { /* old engines */ } }
+  }
+
+  function closeSheet() {
+    if (!sheet) return;
+    var name = sheet, el = document.getElementById('sheet-' + name);
+    sheet = null;
+    if (el) { el.classList.remove('open'); el.hidden = true; }
+    document.documentElement.classList.remove('sheet-open');
+    var b = document.getElementById(SHEETS[name]);
+    if (b) { b.classList.remove('active'); b.setAttribute('aria-expanded', 'false'); }
+    if (modules[name] && modules[name].onHide) {
+      try { modules[name].onHide(); } catch (e) { console.error(name + '.onHide', e); }
+    }
+    var r = sheetReturn;
+    sheetReturn = null;
+    if (r && r.focus && document.body.contains(r)) { try { r.focus({ preventScroll: true }); } catch (e) { /* ok */ } }
+  }
+
+  function toggleSheet(name) { if (sheet === name) closeSheet(); else openSheet(name); }
+
+  function wireSheets() {
+    Object.keys(SHEETS).forEach(function (name) {
+      var el = document.getElementById('sheet-' + name), b = document.getElementById(SHEETS[name]);
+      if (b) {
+        b.innerHTML = icon(name, 18);
+        b.addEventListener('click', function () { toggleSheet(name); });
+      }
+      if (!el) return;
+      var x = el.querySelector('[data-sheet-close]');
+      if (x) x.innerHTML = icon('close', 16);
+      var hb = el.querySelector('[data-sheet-help]');
+      if (hb) {
+        hb.innerHTML = icon('help', 16);
+        hb.addEventListener('click', function () { if (window.Help) Help.open(name); });
+      }
+      el.addEventListener('click', function (e) {
+        if (e.target === el || (e.target.closest && e.target.closest('[data-sheet-close]'))) closeSheet();
+      });
+    });
+    // the corner icon tells you the click is running, and pulses on the beat
+    var mb = document.getElementById('met-btn');
+    if (mb) {
+      var t = null;
+      on('met:state', function (d) { mb.classList.toggle('on', !!(d && d.running)); if (!(d && d.running)) mb.classList.remove('tick'); });
+      on('met:beat', function () {
+        mb.classList.add('tick');
+        if (t) clearTimeout(t);
+        t = setTimeout(function () { mb.classList.remove('tick'); }, 110);
+      });
     }
   }
 
@@ -840,8 +947,20 @@ window.App = (function () {
     }
     root.innerHTML = h;
     h = '';
+    // grouped: everyday scales first, then the families (any scale missing
+    // from the groups still lands at the end, so nothing can disappear)
+    var listed = {};
+    (Theory.SCALE_GROUPS || []).forEach(function (g) {
+      h += '<optgroup label="' + g.label + '">';
+      g.ids.forEach(function (id) {
+        if (!Theory.SCALES[id]) return;
+        listed[id] = true;
+        h += '<option value="' + id + '">' + Theory.SCALES[id].name + '</option>';
+      });
+      h += '</optgroup>';
+    });
     Theory.SCALE_ORDER.forEach(function (id) {
-      h += '<option value="' + id + '">' + Theory.SCALES[id].name + '</option>';
+      if (!listed[id]) h += '<option value="' + id + '">' + Theory.SCALES[id].name + '</option>';
     });
     scale.innerHTML = h;
     h = '';
@@ -1028,22 +1147,17 @@ window.App = (function () {
       }
     });
 
-    // single page-picker menu (native select = native picker sheet on mobile)
-    var navSel = document.getElementById('nav-select');
-    if (navSel) {
-      navSel.addEventListener('change', function () {
-        var gid = this.value, gs = GROUPS[space];
-        for (var i = 0; i < gs.length; i++) {
-          if (gs[i].id === gid) {
-            var pg = store.get('app.gtab.' + gid, gs[i].pages[0]);
-            if (gs[i].pages.indexOf(pg) === -1) pg = gs[i].pages[0];
-            switchTo(pg);
-            break;
-          }
-        }
-        this.blur(); // keep focus off the menu so keyboard input reaches the page
+    // section tab bars (top on wide screens, bottom on phones)
+    ['tabbar', 'tabbar-m'].forEach(function (id) {
+      var tb = document.getElementById(id);
+      if (!tb) return;
+      tb.addEventListener('click', function (e) {
+        var b = e.target.closest('.tabbar-btn');
+        if (!b) return;
+        goGroup(b.getAttribute('data-group'));
+        b.blur(); // keep keyboard input going to the page
       });
-    }
+    });
     var subEl = document.getElementById('subnav');
     if (subEl) {
       subEl.addEventListener('click', function (e) {
@@ -1060,9 +1174,23 @@ window.App = (function () {
     }
 
     document.addEventListener('keydown', function (e) {
+      if (sheet) {
+        if (e.key === 'Escape') { e.preventDefault(); closeSheet(); return; }
+        if (e.key === 'Tab') { // keep focus inside the open sheet
+          var card = document.querySelector('#sheet-' + sheet + ' .sheet-card');
+          var f = card ? Array.prototype.filter.call(card.querySelectorAll('button, input, select, summary, [tabindex]:not([tabindex="-1"])'),
+            function (x) { return !x.disabled && x.offsetParent !== null; }) : [];
+          if (f.length) {
+            var i = f.indexOf(document.activeElement);
+            if (e.shiftKey && i <= 0) { e.preventDefault(); f[f.length - 1].focus(); }
+            else if (!e.shiftKey && (i === -1 || i === f.length - 1)) { e.preventDefault(); f[0].focus(); }
+          }
+          return;
+        }
+      }
       var t = e.target;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
-      var mod = modules[active];
+      var mod = modules[sheet || active];
       if (mod && mod.onKey) mod.onKey(e);
     });
 
@@ -1070,6 +1198,7 @@ window.App = (function () {
     wireContextBar();
     wireAudioWarmup();
     wireAutoHideBar();
+    wireSheets();
 
     var spaceBtn = document.getElementById('space-btn');
     if (spaceBtn) {
@@ -1146,6 +1275,9 @@ window.App = (function () {
     emit: emit,
     injectCSS: injectCSS,
     showBar: showBar,
+    openSheet: openSheet,
+    closeSheet: closeSheet,
+    get sheet() { return sheet; },
     wake: wake,
     setTheme: setTheme,
     get themePref() { return store.get('app.theme', 'dark'); },
