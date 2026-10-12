@@ -81,78 +81,86 @@
   var els = {};
 
   var CSS = [
-    '.tab.met-live::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;' +
-      'background:var(--accent);margin-right:7px;vertical-align:1px;' +
-      'box-shadow:0 0 8px var(--accent-glow);animation:met-pulse 0.9s ease-in-out infinite alternate;}',
-    '.tab.active.met-live::before{background:var(--bg);box-shadow:none;}',
     '@keyframes met-pulse{from{opacity:0.45;}to{opacity:1;}}',
-    '.met-dots{display:flex;gap:10px;align-items:center;flex-wrap:wrap;min-height:34px;}',
+    '.met-main{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;justify-items:center;text-align:center}',
+    '.met-bpmrow{display:flex;align-items:center;justify-content:center;gap:8px;width:100%}',
+    '.met-read{min-width:150px}',
+    '.met-read .big-display{line-height:0.95}',
+    '.met-step{min-width:48px;padding:10px 0;font-variant-numeric:tabular-nums}',
+    '.met-dots{display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;min-height:34px;}',
     '.met-dot{width:26px;height:26px;border-radius:50%;background:var(--card2);border:2px solid var(--line);cursor:pointer;padding:0;transition:transform 60ms ease,background 90ms ease,border-color 90ms ease,box-shadow 90ms ease;}',
     '.met-dot.met-acc{border-color:var(--accent);background:rgba(255,180,84,0.18);}',
     '.met-dot.met-mute{opacity:0.35;background:transparent;border-style:dashed;}',
     '.met-dot.met-on{background:var(--accent);border-color:var(--accent);transform:scale(1.22);box-shadow:0 0 12px rgba(255,180,84,0.55);}',
     '.met-dot.met-mute.met-on{background:var(--muted);border-color:var(--muted);box-shadow:none;}',
-    '.met-wide{width:100%;margin-top:12px;}',
+    '.met-wide{width:100%;}',
     // fixed 3-digit width: 99 -> 100 BPM must never reflow the row while tapping
     '#met-bpm-display{min-width:3ch;}',
-    '.met-tap{min-width:96px;min-height:60px;font-family:var(--font-display);font-size:20px;' +
+    '.met-go{display:flex;gap:10px;justify-content:center;width:100%}',
+    '.met-go #met-startstop{flex:1;max-width:260px}',
+    '.met-tap{min-width:96px;min-height:58px;font-family:var(--font-display);font-size:20px;' +
       'font-weight:700;letter-spacing:2.5px;text-transform:uppercase;' +
       'border-color:rgba(255,171,71,0.55);touch-action:manipulation;}',
     '.met-tap:active{transform:none;border-color:var(--accent);' +
       'box-shadow:0 0 14px var(--accent-glow),inset 0 2px 5px rgba(0,0,0,0.4);}',
-    '.met-mt{margin-top:14px;}',
+    '.met-opts{display:flex;flex-wrap:wrap;gap:12px 16px;justify-content:center;align-items:flex-end}',
+    '.met-mt{margin-top:12px;}',
     '.met-num{width:80px;}',
-    '#met-vol{width:200px;max-width:60vw;}',
-    '.met-check{display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:600;cursor:pointer;}'
+    '#met-vol{width:150px;max-width:40vw;}',
+    '.met-check{display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:600;cursor:pointer;}',
+    '.met-more{margin-top:14px;border-top:1px solid var(--line-soft);padding-top:10px}',
+    '.met-more summary{cursor:pointer;font-weight:600;font-size:14px;color:var(--label);padding:4px 0;list-style-position:inside}',
+    '.met-more summary:hover{color:var(--text)}',
+    '.met-more[open] summary{color:var(--accent)}',
+    '.met-hint{margin:14px 0 0;text-align:center}',
+    '@media (max-width:640px){.met-bpmrow{gap:6px}.met-read{min-width:0;flex:1}.met-step{min-width:42px;padding:9px 0}' +
+      '.met-tap{min-width:84px}#met-vol{width:130px}}'
   ].join('\n');
 
   var HTML = [
-    '<div class="card">',
-    '  <h2>Metronome</h2>',
-    '  <div class="row spread">',
-    '    <div>',
+    '<div class="met-main">',
+    '  <div class="met-bpmrow">',
+    '    <button class="btn met-step" id="met-m5" type="button" aria-label="5 BPM slower">&minus;5</button>',
+    '    <button class="btn met-step" id="met-m1" type="button" aria-label="1 BPM slower">&minus;1</button>',
+    '    <div class="met-read">',
     '      <div class="big-display" id="met-bpm-display">120</div>',
     '      <div class="muted small">BPM</div>',
     '    </div>',
-    '    <div class="row tight">',
-    '      <button class="btn" id="met-m5" type="button">-5</button>',
-    '      <button class="btn" id="met-m1" type="button">-1</button>',
-    '      <button class="btn" id="met-p1" type="button">+1</button>',
-    '      <button class="btn" id="met-p5" type="button">+5</button>',
-    '      <button class="btn met-tap" id="met-tap" type="button" title="Tap the beat to set the tempo">Tap</button>',
-    '    </div>',
+    '    <button class="btn met-step" id="met-p1" type="button" aria-label="1 BPM faster">+1</button>',
+    '    <button class="btn met-step" id="met-p5" type="button" aria-label="5 BPM faster">+5</button>',
     '  </div>',
-    '  <input type="range" id="met-bpm-slider" class="met-wide" min="30" max="280" step="1">',
-    '  <div class="row met-mt">',
-    '    <label class="field">Time signature',
+    '  <input type="range" id="met-bpm-slider" class="met-wide" min="30" max="280" step="1" aria-label="Tempo">',
+    '  <div class="met-dots" id="met-dots" title="Tap a dot: accent / normal / muted"></div>',
+    '  <div class="met-go">',
+    '    <button class="btn big primary" id="met-startstop" type="button">Start</button>',
+    '    <button class="btn met-tap" id="met-tap" type="button" title="Tap the beat to set the tempo">Tap</button>',
+    '  </div>',
+    '  <div class="met-opts">',
+    '    <label class="field">Time',
     '      <input type="text" id="met-sig" list="met-sig-list" maxlength="5" autocomplete="off"',
-    '             title="Type any signature, e.g. 7/16, 11/8, 13/4 — beats over 1, 2, 4, 8, 16 or 32" style="width:76px">',
+    '             title="Type any signature, e.g. 7/16, 11/8, 13/4 — beats over 1, 2, 4, 8, 16 or 32" style="width:70px">',
     '      <datalist id="met-sig-list"></datalist>',
     '    </label>',
-    '    <div class="met-dots" id="met-dots"></div>',
-    '  </div>',
-    '  <div class="row met-mt">',
     '    <label class="field">Subdivision',
     '      <select id="met-subdiv"></select>',
     '    </label>',
-    '    <label class="field"><span>Volume (<span id="met-vol-val">80</span>%)</span>',
+    '    <label class="field"><span>Volume <span id="met-vol-val">80</span>%</span>',
     '      <input type="range" id="met-vol" min="0" max="100" step="1">',
     '    </label>',
     '  </div>',
+    '  <div class="error" id="met-err" hidden></div>',
+    '</div>',
+    '<details class="met-more">',
+    '  <summary>Click sounds</summary>',
     '  <div class="row met-mt">',
     '    <label class="field">Bar tone (beat 1)<select id="met-snd-acc"></select></label>',
     '    <label class="field">Beat tone<select id="met-snd-beat"></select></label>',
     '    <label class="field">Upbeat tone<select id="met-snd-sub"></select></label>',
     '  </div>',
+    '</details>',
+    '<details class="met-more" id="met-trbox">',
+    '  <summary>Tempo trainer</summary>',
     '  <div class="row met-mt">',
-    '    <button class="btn big primary" id="met-startstop" type="button">Start</button>',
-    '    <span class="muted small">Space toggles start/stop. Click a beat dot to cycle accent / normal / muted.</span>',
-    '  </div>',
-    '  <div class="error met-mt" id="met-err" hidden></div>',
-    '</div>',
-    '<div class="card">',
-    '  <h2>Tempo trainer</h2>',
-    '  <div class="row">',
     '    <label class="met-check"><input type="checkbox" id="met-tr-on"> Enable</label>',
     '    <label class="field">+N BPM',
     '      <input type="number" id="met-tr-inc" class="met-num" min="1" max="20" step="1">',
@@ -165,7 +173,8 @@
     '    </label>',
     '  </div>',
     '  <div class="muted small met-mt" id="met-tr-status"></div>',
-    '</div>'
+    '</details>',
+    '<p class="muted small met-hint">Space starts and stops it. It keeps playing when you close this.</p>'
   ].join('\n');
 
   // ---- helpers ----
@@ -476,11 +485,8 @@
     App.emit('met:state', { running: false });
   }
 
-  // pulsing dot on the Metronome tab while the click runs from another tab
-  function setLive(on) {
-    var btn = document.querySelector('.tab[data-panel="metronome"]');
-    if (btn) btn.classList.toggle('met-live', on);
-  }
+  // the corner icon shows the running state (app.js listens to met:state)
+  function setLive() { /* kept for call sites; met:state drives the icon */ }
 
   function toggle() { if (running) stop(); else start(); }
 
@@ -674,6 +680,7 @@
 
     buildDots();
     updateTrainerStatus();
+    if (trainer.on) { var tb = $('met-trbox'); if (tb) tb.open = true; } // a running plan stays in view
 
     // follow tempo changes made elsewhere (fretboard practice strip)
     App.on('tempo', function (d) {

@@ -33,12 +33,13 @@
     </svg>
     <span class="tag">alpha</span>
   </div>
-  <nav class="nav" id="tabs">
-    <select id="nav-select" aria-label="Go to page"></select>
+  <nav class="tabbar tabbar-top" id="tabbar" aria-label="Sections"></nav>
+  <div class="tb-tools" id="tabs">
     <button type="button" class="btn sm" id="space-btn" aria-label="Switch workspace"></button>
-    <button type="button" class="btn sm" id="help-btn" aria-label="Help for this page" title="What is this page?"></button>
-    <button type="button" class="btn sm" id="settings-btn" aria-label="Settings" title="Settings"></button>
-  </nav>
+    <button type="button" class="btn sm icon-btn" id="help-btn" aria-label="Help for this page" title="What is this page?"></button>
+    <button type="button" class="btn sm icon-btn" id="settings-btn" aria-label="Settings" title="Settings"></button>
+    <button type="button" class="btn sm icon-btn" id="met-btn" aria-label="Metronome" title="Metronome" aria-haspopup="dialog" aria-expanded="false" aria-controls="sheet-metronome"></button>
+  </div>
   <div class="ctxbar" id="ctxbar">
     <label class="cx-field">Key<select id="cx-root"></select></label>
     <label class="cx-field">Scale<select id="cx-scale"></select></label>
@@ -51,6 +52,17 @@
   </div>
   <div class="subnav" id="subnav" hidden></div>
 </header>
+<nav class="tabbar tabbar-bottom" id="tabbar-m" aria-label="Sections"></nav>
+<div class="sheet" id="sheet-metronome" hidden>
+  <div class="sheet-card" role="dialog" aria-modal="true" aria-labelledby="sheet-metronome-t">
+    <div class="sheet-head">
+      <h2 id="sheet-metronome-t">Metronome</h2>
+      <button type="button" class="btn sm icon-btn" data-sheet-help="metronome" aria-label="Help for the metronome" title="How it works"></button>
+      <button type="button" class="btn sm icon-btn" data-sheet-close aria-label="Close the metronome" title="Close (Esc)"></button>
+    </div>
+    <section class="sheet-body" id="panel-metronome"></section>
+  </div>
+</div>
 <div id="wipe" aria-hidden="true" style="display:none">
   <svg viewBox="0 0 512 512" width="120" height="120">
     <path d="M118 96 H206 V308 A44 44 0 0 1 118 308 Z M212 96 H300 V372 A44 44 0 0 1 212 372 Z M306 96 H394 V308 A44 44 0 0 1 306 308 Z" fill="#ffab47" opacity="0.9"/>
@@ -58,7 +70,6 @@
 </div>
 <main>
   <section class="panel" id="panel-quiz"></section>
-  <section class="panel" id="panel-metronome"></section>
   <section class="panel" id="panel-fretboard"></section>
   <section class="panel" id="panel-tab"></section>
   <section class="panel" id="panel-notation"></section>

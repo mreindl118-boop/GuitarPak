@@ -13,9 +13,10 @@
 
   var TOURS = {
     metronome: [
-      { t: 'Metronome', x: 'This sets the beat for the whole app. The BPM up top is ONE shared tempo — the Jam band, the practice runners and the Studio all follow it.' },
-      { sel: '#cx-bpm', t: 'One tempo everywhere', x: 'Change the tempo here from any page and everything follows. The time signature lives right next to it.' },
-      { sel: '#cx-met', t: 'Start it from anywhere', x: 'This little play button starts and stops the metronome no matter which page you’re on.' }
+      { t: 'Metronome', x: 'It opens over whatever page you’re on and keeps clicking after you close it — the icon in the top corner glows and pulses on the beat while it runs. Its tempo is the ONE shared tempo: the Jam band, the practice runners and the Studio all follow it.' },
+      { sel: '#met-tap', t: 'Tap tempo', x: 'Tap along to a song and the BPM follows your taps. −5 / −1 / +1 / +5 and the slider fine-tune it.' },
+      { sel: '#met-dots', t: 'Accents', x: 'Tap a beat dot to cycle it between accent, normal and muted.' },
+      { sel: '#met-trbox', t: 'Tempo trainer', x: 'Speeds you up automatically: +N BPM every M bars until the target. Sounds lets you pick each click’s voice.' }
     ],
     fretboard: [
       { t: 'Fretboard', x: 'Every dot is a note in your key. Colors mean scale degrees — amber is the root, and the same colors mean the same thing on the Piano and in the Studio’s note editor.' },
@@ -201,9 +202,10 @@
 
   function welcome() {
     openTour(null, [
-      { t: 'Welcome to soundLAB', x: 'Start with Exercises: a short theory and ear-training course you answer by playing. Beyond it are two workspaces: Practice (fretboard, piano, jam band, tuner…) and the Studio (record ideas, build loops, finger-drum). The button next to the page menu switches between them.' },
+      { t: 'Welcome to soundLAB', x: 'Start with Exercises: a short theory and ear-training course you answer by playing. Around it are two workspaces: Practice (guitar, keys, jam band, tuner…) and the Studio (record ideas, build loops, finger-drum). The Studio button in the top corner switches between them.' },
       { t: 'One musical brain', x: 'The bar at the top — key, scale, tempo — is shared by EVERYTHING. Change it once and the fretboard re-colors, the jam re-harmonizes, and the Studio follows.' },
-      { t: 'Grouped pages', x: 'Each entry in the page menu is a small group of related views — the pill strip under the top bar flips between them (Neck / Tab / Notation / Keys, Songs / Jam, Loop / Arrange…).' },
+      { t: 'Sections', x: 'The tabs — Learn, Guitar, Keys, Play, Practice (along the bottom on phones) — are the app’s sections. The pills under the top bar switch pages inside a section (Neck / Tab / Notation, Piano / Synth / Pads…).' },
+      { sel: '#met-btn', t: 'The metronome', x: 'Always one tap away in the top corner: it opens over any page and keeps playing when you close it.' },
       { t: 'Whenever you’re lost', x: 'Tap the ? in the top bar — it explains whichever page you’re on, step by step. Try it on every page once.' }
     ]);
   }
