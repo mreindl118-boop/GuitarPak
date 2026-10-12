@@ -30,8 +30,12 @@
 (function () {
   'use strict';
 
-  var native = !!(window.webkit && window.webkit.messageHandlers &&
-                  window.webkit.messageHandlers.midi);
+  // native backends speak one protocol: the iOS wrapper's CoreMIDI bridge
+  // and the Android APK's MidiBridge (USB + Bluetooth LE MIDI)
+  var iosMidi = !!(window.webkit && window.webkit.messageHandlers &&
+                   window.webkit.messageHandlers.midi);
+  var androidMidi = !!(window.SoundLabMidi && window.SoundLabMidi.post);
+  var native = iosMidi || androidMidi;
 
   var access = null;                    // Web MIDI backend
   var input = null, output = null;
@@ -43,7 +47,10 @@
   if ([2, 12, 48].indexOf(bendRange) === -1) bendRange = 2;
 
   function post(msg) {
-    try { window.webkit.messageHandlers.midi.postMessage(msg); } catch (e) { /* bridge gone */ }
+    try {
+      if (iosMidi) window.webkit.messageHandlers.midi.postMessage(msg);
+      else if (androidMidi) window.SoundLabMidi.post(JSON.stringify(msg));
+    } catch (e) { /* bridge gone */ }
   }
 
   function supported() { return native || (typeof navigator !== 'undefined' && !!navigator.requestMIDIAccess); }
@@ -162,7 +169,9 @@
       if (!nativeReady || !bytes) return;
       if (nativeInId !== null && srcId !== 0 && srcId !== nativeInId) return;
       splitAndDispatch(bytes);
-    }
+    },
+    // Bluetooth progress from the Android bridge ("Looking…", "Connected: LUMI")
+    onstatus: function (text) { App.emit('midi:status', { text: String(text || '') }); }
   };
 
   function enable() {
@@ -301,8 +310,10 @@
 
   function sysexOk() { return native ? true : !!(access && access.sysexEnabled); }
 
-  function lumiSync() {
-    if (!isLumi() || !hasOutput() || !lightsOn()) return;
+  // the LUMI's OWN scale display (key, scale, two colors) — what it shows
+  // when the app's lights are off
+  function lumiNative() {
+    if (!isLumi() || !hasOutput()) return;
     var root = App.store.get('fb.root', 9);
     var scaleId = App.store.get('fb.scale', 'minorPent');
     var key = Theory.mod12(typeof root === 'number' ? root : 9);
@@ -323,9 +334,10 @@
   // ---- THE KEYBED: one lighting engine for every page ----
   // What the keyboard's own lights show follows the app-wide HELP LEVEL
   // (App.help — the same knob that sets what the on-screen keys show):
-  //   Full / Colors  the scale in color — a LUMI in its scale mode with the
-  //                  app's root + scale colors (SysEx); other LED keyboards
-  //                  get the in-scale keys lit, the root brightest
+  //   Full / Colors  the scale in color — on a LUMI every key in its own
+  //                  degree color, exactly like the screen (per-key note-on
+  //                  colors over a dark night-mode background); other LED
+  //                  keyboards get the in-scale keys lit, the root brightest
   //   Target / Tonic only the home keys glow
   //   None           dark: play from memory
   // On top, pages add a GUIDE (guide(now, next): the key to play now, the
@@ -338,11 +350,48 @@
   // LUMI's octave buttons are followed (range(), 'midi:range').
   // Settings: lights.on (false = leave the keyboard's lights alone),
   // lights.bright, midi.lumi (null = detect a LUMI by its port name),
-  // midi.lumiRoot / midi.lumiScale color overrides. Note-on lighting is for
+  // midi.lumiRoot / midi.lumiScale = the LUMI's own two colors when the app's
+  // lights are off (lumiNative). Note-on lighting is for
   // controllers (they light silently); a sound module on the output would
   // play the notes, so lights stay off until a keyboard output is chosen.
 
   var LIGHT_LO = 24, LIGHT_HI = 108;
+
+  // A LUMI colors EACH KEY by the velocity of the note sent to it: its
+  // default program lights an incoming note in colourLookup[velocity] (0 off,
+  // 1-126 a hue sweep red > yellow > green > cyan > blue > violet, 127 white),
+  // only within its current 24-key octave window. So the app's degree colors
+  // go to the keybed one key at a time, matched to the nearest table color.
+  var LUMI_TABLE = (function () {
+    var hex = '000000ff506fff546cff5869ff5c66ff6063ff6460ff695cff6d59ff7156ff7553ff7950ff7d4dff814aff8547ff8944ff8d41ff923dff963aff9a37ff9e34ffa231ffa62effaa2effae2dffb12dffb52cffb92cffbd2bffc12bffc42bffc82affcc2affd029ffd429ffd828ffdb28ffdf28ffe327ffe727ffeb26ffee26fff225fff625f7f62af0f72ee8f733e1f837d9f83cd1f841caf945c2f94abaf94fb3fa53abfa58a4fb5c9cfb6194fb668dfc6a85fc6f7dfc7476fd786efd7d67fe815ffe865cfc8b59fa8f56f89453f69850f49d4df2a24af0a647eeab44ecb041eab43ee9b93be7bd38e5c235e3c732e1cb2fdfd02cddd529dbd926d9de23d7e220d5e723d0e826cbe929c6ea2cc1ec2fbced32b7ee35b2ef38adf03ba8f13ea3f2409ff4439af54695f64990f74c8bf84f86f95281fa557cfc5877fd5b72fe5e6dff616bfe6469fd6767fc6b64fb6e62fa7160f9745ef8775cf77a5af67e58f58155f38453f28751f18a4ff08d4def904bee9448ed9746ec9a44eb9d42eaffffff', out = [];
+    for (var i = 0; i < 128; i++) out.push(parseInt(hex.substr(i * 6, 6), 16));
+    return out;
+  })();
+  var lumiVelCache = {};
+  function lumiVel(hex) { // nearest LUMI palette entry (1-126) to a CSS hex color
+    if (lumiVelCache[hex]) return lumiVelCache[hex];
+    var c = parseInt(String(hex).replace('#', ''), 16) || 0;
+    var r = (c >> 16) & 255, g = (c >> 8) & 255, b = c & 255, best = 1, bd = 1e12;
+    for (var i = 1; i < 127; i++) {
+      var t = LUMI_TABLE[i], r2 = (t >> 16) & 255, g2 = (t >> 8) & 255, b2 = t & 255, rm = (r + r2) / 2;
+      var d = (2 + rm / 256) * (r - r2) * (r - r2) + 4 * (g - g2) * (g - g2) + (2 + (255 - rm) / 256) * (b - b2) * (b - b2);
+      if (d < bd) { bd = d; best = i; }
+    }
+    lumiVelCache[hex] = best;
+    return best;
+  }
+  function palette() {
+    var cols = App.store.get('fb.colors', null);
+    return Array.isArray(cols) && cols.length === 7 ? cols : ['#ffab47', '#e8d44d', '#7ad97a', '#4cc9b0', '#6ea8fe', '#b48ef0', '#ff85b3'];
+  }
+  // the LUMI velocity (= color) for a key in the current scale, 0 = not in it
+  function lumiKeyVel(m) {
+    var root = App.store.get('fb.root', 9), rootPc = Theory.mod12(typeof root === 'number' ? root : 9);
+    var info = Theory.scaleInfo(rootPc, App.store.get('fb.scale', 'minorPent'));
+    var step = info.pcToStep.get(Theory.mod12(m));
+    return step === undefined ? 0 : lumiVel(palette()[step % 7]);
+  }
+  var LUMI_WHITE = 127, LUMI_GREEN = 60;
   var guideNow = [], guideNext = [], blinkOn = false, blinkT = null;
   var revealSet = [], revealT = null, hidden = {}, claimedBy = null;
   var lumiShown = null; // last LUMI mode pushed: 'scale' | 'night'
@@ -411,22 +460,28 @@
     var h = helpLvl();
     return h >= 3 ? 'scale' : h >= 1 ? 'tonic' : 'none';
   }
-  function lumiScaleOk() { return LUMI_SCALES[App.store.get('fb.scale', 'minorPent')] !== undefined && sysexOk(); }
 
-  // the note-on lights wanted now: layout (where SysEx can't draw it) + reveals + guide
+  // the note-on lights wanted now: layout + reveals + guide. A LUMI gets
+  // COLORS (velocity = palette index): every scale key in its degree color,
+  // the note to play white, answers green. Other keyboards get brightness.
   function wanted() {
-    var want = {}, kind = layoutKind(), r = range();
-    var lo = Math.max(LIGHT_LO, r.lo), hi = Math.min(LIGHT_HI, r.hi), m;
+    var want = {}, kind = layoutKind(), r = range(), lumi = isLumi();
+    var lo = Math.max(LIGHT_LO, r.lo), hi = Math.min(LIGHT_HI, r.hi), m, v;
     var root = App.store.get('fb.root', 9), rootPc = Theory.mod12(typeof root === 'number' ? root : 9);
-    if (kind === 'scale' && !(isLumi() && lumiScaleOk())) {
-      for (m = lo; m <= hi; m++) { var v = degVel(m); if (v) want[m] = v; }
+    if (kind === 'scale') {
+      for (m = lo; m <= hi; m++) { v = lumi ? lumiKeyVel(m) : degVel(m); if (v) want[m] = v; }
     } else if (kind === 'tonic') {
-      for (m = lo; m <= hi; m++) if (Theory.mod12(m) === rootPc) want[m] = 70;
+      for (m = lo; m <= hi; m++) if (Theory.mod12(m) === rootPc) want[m] = lumi ? lumiVel(palette()[0]) : 70;
     }
-    revealSet.forEach(function (pc) { for (var x = lo; x <= hi; x++) if (Theory.mod12(x) === pc) want[x] = 127; });
+    revealSet.forEach(function (pc) { for (var x = lo; x <= hi; x++) if (Theory.mod12(x) === pc) want[x] = lumi ? LUMI_GREEN : 127; });
     var h = helpLvl();
-    if (h >= 2) list(guideNow).forEach(function (n) { want[fold(n)] = 127; });
-    if (h >= 3 && blinkOn) list(guideNext).forEach(function (n) { var f = fold(n); if (!want[f] || want[f] < 127) want[f] = 45; });
+    if (h >= 2) list(guideNow).forEach(function (n) { want[fold(n)] = lumi ? LUMI_WHITE : 127; });
+    if (h >= 3) list(guideNext).forEach(function (n) {
+      var f = fold(n);
+      if (want[f] === LUMI_WHITE || want[f] === 127) return; // it's also the note to play now
+      if (!blinkOn) delete want[f];                          // the next note blinks
+      else want[f] = lumi ? (lumiKeyVel(f) || lumiVel(palette()[0])) : 45;
+    });
     return want;
   }
 
@@ -441,12 +496,13 @@
     for (m in want) if (lit[m] !== want[m]) { light(Number(m), want[m]); lit[m] = want[m]; }
   }
 
-  // a LUMI draws the scale itself (two colors: root + in-scale); otherwise dark
+  // the app paints a LUMI key by key, so its own background goes dark (night
+  // mode) — then only the app's colors show; brightness rides along
   function lumiLayout(force) {
-    var mode = layoutKind() === 'scale' && lumiScaleOk() ? 'scale' : 'night';
-    if (mode === lumiShown && !force) return;
-    lumiShown = mode;
-    if (mode === 'scale') lumiSync(); else lumiCmd([0x10, 0x40].concat(lumiVal(0x02, LUMI_MODES.night)));
+    if (lumiShown === 'night' && !force) return;
+    lumiShown = 'night';
+    lumiCmd([0x10, 0x40].concat(lumiVal(0x02, LUMI_MODES.night)));
+    lumiCmd([0x10, 0x40].concat(lumiVal(0x04, brightness())));
   }
 
   function setGuide(now, next) {
@@ -506,17 +562,19 @@
     },
     hideLayout: function (owner, on) { hidden[owner] = !!on; paint(); },
     claim: function (owner) { if (claimedBy !== owner) { allDark(); claimedBy = owner; if (isLumi()) { lumiShown = null; lumiCmd([0x10, 0x40].concat(lumiVal(0x02, LUMI_MODES.night))); } } },
+    lumiColor: function (hex) { return '#' + ('00000' + LUMI_TABLE[lumiVel(hex)].toString(16)).slice(-6); }, // what a LUMI shows for a screen color
+    get platform() { return iosMidi ? 'ios' : androidMidi ? 'android' : 'web'; },
     release: function (owner) { if (claimedBy === owner) { allDark(); claimedBy = null; repaintAll(); } },
     repaint: repaintAll,
-    lumiSync: repaintAll,
+    lumiSync: repaintAll, // (old name)
     range: range,
     fold: fold,
     get lumi() { return isLumi(); },
     get outputName() { return outName(); },
     get lightsOn() { return lightsOn(); },
     setLightsOn: function (on) {
-      if (!on) { allDark(); if (isLumi() && hasOutput()) lumiCmd([0x10, 0x40].concat(lumiVal(0x02, LUMI_MODES.night))); }
       App.store.set('lights.on', !!on);
+      if (!on) { allDark(); if (isLumi() && hasOutput()) { lumiShown = null; lumiNative(); } }
       repaintAll();
     },
     test: function () { // a C major arpeggio across the range, then back to normal

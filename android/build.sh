@@ -34,7 +34,7 @@ cp -r "$web/css" "$web/js" "$web/icons" "$web/fonts" "$web/samples" "$out/assets
 
 echo "==> javac"
 javac -source 8 -target 8 -nowarn -classpath "$ANDROID_JAR" -d "$out/obj" \
-  "$proj/src/com/mreindl/soundlab/MainActivity.java"
+  "$proj"/src/com/mreindl/soundlab/*.java
 
 echo "==> d8"
 if [ -n "${D8_JAR:-}" ]; then d8=(java -cp "$D8_JAR" com.android.tools.r8.D8); else d8=("$BUILD_TOOLS/d8"); fi

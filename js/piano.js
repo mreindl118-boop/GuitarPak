@@ -79,13 +79,6 @@
     var cols = App.store.get('fb.colors', null);
     cols = (Object.prototype.toString.call(cols) === '[object Array]' && cols.length === 7 &&
       cols.every(function (c) { return /^#[0-9a-fA-F]{6}$/.test(c); })) ? cols : DEG_DEFAULTS;
-    // LUMI match: the hardware shows exactly TWO colors (root + in-scale) —
-    // paint the on-screen keyboard the same way so screen and keybed agree
-    if (App.store.get('midi.lumiMatch', false) === true) {
-      var rc = App.store.get('midi.lumiRoot', '') || cols[0];
-      var sc = App.store.get('midi.lumiScale', '') || cols[4];
-      return [rc, sc, sc, sc, sc, sc, sc];
-    }
     return cols;
   }
 

@@ -30,7 +30,7 @@ Copy-Item "$web\index.html" "$out\assets\"
 Copy-Item "$web\manifest.webmanifest" "$out\assets\"
 Copy-Item -Recurse "$web\css", "$web\js", "$web\icons", "$web\fonts", "$web\samples" "$out\assets\"
 
-Step 'javac' { & "$jdk\bin\javac.exe" -source 8 -target 8 -nowarn -classpath $platform -d "$out\obj" "$proj\src\com\mreindl\soundlab\MainActivity.java" }
+Step 'javac' { & "$jdk\bin\javac.exe" -source 8 -target 8 -nowarn -classpath $platform -d "$out\obj" (Get-ChildItem "$proj\src\com\mreindl\soundlab\*.java" | ForEach-Object { $_.FullName }) }
 
 $classes = (Get-ChildItem "$out\obj" -Recurse -Filter *.class).FullName
 Step 'd8' { & "$bt\d8.bat" --release --lib $platform --output "$out\dex" @classes }

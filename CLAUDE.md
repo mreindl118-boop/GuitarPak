@@ -26,13 +26,24 @@ js/theory.js      pure music-theory engine (scales, tunings, chords, diatonic
 js/app.js         shell: module registry, tab switching, shared AudioContext +
                   App.pluck, App.store (localStorage 'guitarlab.*'), App.on/emit
                   event bus, APP_VERSION + auto-update checker
-js/midi.js        Web MIDI service (App.midi: in/out ports, note/bend/pressure
-                  events on the bus) + THE KEYBED (v0.74.0): ONE lighting
-                  engine for every page. Layout by App.help level: >=3 scale
-                  (a LUMI draws it via SysEx scale mode, root + scale colors
-                  midi.lumiRoot/Scale or palette deg 1/5, brightness
-                  lights.bright; other LED keyboards get note-on degree
-                  velocities), 1-2 tonic keys, 0 dark (LUMI night mode).
+js/midi.js        MIDI service (App.midi: in/out ports, note/bend/pressure
+                  events on the bus). Backends: Web MIDI, or the NATIVE
+                  bridge protocol (window.__glMIDI.onports/onmidi/onstatus +
+                  post({cmd: init|send|setOutput|bluetooth})) spoken by the
+                  iOS CoreMIDI bridge AND (v0.75.0) the Android APK's
+                  MidiBridge (window.SoundLabMidi.post(JSON)); App.midi.
+                  platform 'web'|'ios'|'android'. + THE KEYBED (v0.74.0):
+                  ONE lighting engine for every page. Layout by App.help
+                  level: >=3 scale, 1-2 tonic keys, 0 dark. A LUMI is PAINTED
+                  PER KEY (v0.75.0): its default LittleFoot program lights an
+                  incoming note in colourLookup[velocity] (0 off, 1-126 hue
+                  sweep, 127 white; table copied as LUMI_TABLE, lumiVel(hex)
+                  = nearest), only inside its 24-key octave window — so each
+                  scale key gets its fb.colors degree color, the note to play
+                  white (127), answers green (60), over a night-mode (SysEx)
+                  background + lights.bright. Lights off = lumiNative() (its
+                  own scale mode, midi.lumiRoot/Scale). Other LED keyboards:
+                  note-on brightness by degree.
                   Layers: guide(now, next) (Keys runner/Guide/lessons, chord
                   player; now at help>=2, next blinks at >=3), reveal(pcs, ms)
                   (Exercises answers, help>=2), hideLayout(owner, on) (quiz
@@ -228,7 +239,11 @@ android/          APK project — build.ps1 (no Gradle: javac→d8→aapt→zipa
                   apksigner); keystore is gitignored, do NOT commit it.
                   MainActivity (src/com/mreindl/soundlab/) loads the LIVE
                   site (LIVE_URL) and falls back to the bundled assets offline;
-                  the JS bridge GuitarLabHost = setKeepScreenOn + shellVersion.
+                  the JS bridge GuitarLabHost = setKeepScreenOn + shellVersion;
+                  MidiBridge.java (v0.75.0) = window.SoundLabMidi: Android
+                  MidiManager (USB + any system MIDI device) + Bluetooth LE
+                  MIDI scan/connect (BLUETOOTH_SCAN/CONNECT; location <= 11),
+                  last BLE device reconnects at launch. Same protocol as iOS.
                   build.ps1 (PC) and build.sh (Linux/cloud: ANDROID_JAR,
                   BUILD_TOOLS, KEYSTORE, D8_JAR — build-tools-34 d8 crashes on
                   JDK 21, use r8 8.7.x from Google Maven) both write
@@ -419,7 +434,8 @@ dialogs are refused by the frame — everything else runs. `tools/bundle.py`
 
 ## Cloud / mobile sessions (claude.ai/code, PC off)
 
-APK NOTE (2026-10-12, v0.70.2): re-keyed at the owner's request. The app is
+APK NOTE (2026-10-12, v0.70.2; v0.75.0 = the MIDI bridge APK, also built
+in the cloud the same way): re-keyed at the owner's request. The app is
 now com.mreindl.soundlab, signed with a NEW key (soundlab.keystore,
 cert SHA-256 5A:10:EC:B5:D5:CE:F1:42:...:D0:FD:17:1A), built in the cloud
 with android/build.sh. Because the app loads the live site, web releases

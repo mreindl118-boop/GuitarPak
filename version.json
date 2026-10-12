@@ -1,6 +1,6 @@
 {
-  "version": "0.70.2",
+  "version": "0.75.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/soundLAB-alpha.apk",
-  "web": "0.74.0",
-  "notes": "LIGHTS & HELP, ONE PLACE. A new keyboard button at the top of every page opens Lights & help. The Help level (Full, Colors, Target, Tonic, None) is now one setting for the whole app: it sets what the Keys page, Scale lessons and Exercises show, and what your keyboard's own lights show. A ROLI LUMI is detected by name and shows the scale in your colors (home key and scale), following the app's key on every page. Target and Tonic light just the home keys and the note to play; None leaves it dark. Pick its two colors and brightness right there. Your LUMI's octave buttons are followed: play a note after shifting and the lights and the Keys page move with it (the Keys page marks the keys your LUMI covers). Exercises keep the keyboard dark while you answer, then light the right notes. The Pads page takes over the keys while it's open. The old LUMI and key-light options in Settings are gone; other LED keyboards can switch lights on in Lights & help."
+  "web": "0.75.0",
+  "notes": "NEW ANDROID APP: YOUR KEYBOARD WORKS IN IT. This update installs a new soundLAB app (v0.75.0) with its own MIDI connection: plug your LUMI in with USB, or open Lights & help and tap Find a Bluetooth keyboard. It reconnects by itself next time. Everything that works with a keyboard in Chrome now works in the app: playing, Scale lessons, Exercises answers and the key lights. THE LUMI NOW SHOWS EVERY SCALE NOTE IN ITS OWN COLOR, the same degree colors as the screen (matched to the LUMI's own palette). The note to play glows white and Exercises answers light green. Lights & help shows each screen color next to the color your LUMI will use."
 }

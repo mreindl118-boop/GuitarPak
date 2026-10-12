@@ -99,7 +99,7 @@
     ],
     lights: [
       { t: 'Lights & help', x: 'One place for how much the app helps you. The Help level is the difficulty: Full shows the scale in color with names, fingers and the next note; None is a bare keyboard. It applies to the Keys page, Scale lessons, Exercises and your keyboard’s own lights.' },
-      { t: 'Your keyboard’s lights', x: 'A LUMI shows the scale in two colors (home key and scale) and follows the app’s key on every page. Play a note after pressing its octave buttons and the app follows the new octave too.' }
+      { t: 'Your keyboard’s lights', x: 'A LUMI lights every key in its scale-degree color, just like the screen, and follows the app’s key on every page. Play a note after pressing its octave buttons and the app follows the new octave too.' }
     ],
     settings: [
       { t: 'Settings', x: 'App-wide preferences, grouped by section: theme and accent color, one master volume for everything, studio capture options, screen wake, MIDI setup, and plugins for advanced workflows.' }
