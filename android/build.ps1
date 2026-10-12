@@ -30,7 +30,7 @@ Copy-Item "$web\index.html" "$out\assets\"
 Copy-Item "$web\manifest.webmanifest" "$out\assets\"
 Copy-Item -Recurse "$web\css", "$web\js", "$web\icons", "$web\fonts", "$web\samples" "$out\assets\"
 
-Step 'javac' { & "$jdk\bin\javac.exe" -source 8 -target 8 -nowarn -classpath $platform -d "$out\obj" "$proj\src\com\mreindl\guitarlab\MainActivity.java" }
+Step 'javac' { & "$jdk\bin\javac.exe" -source 8 -target 8 -nowarn -classpath $platform -d "$out\obj" "$proj\src\com\mreindl\soundlab\MainActivity.java" }
 
 $classes = (Get-ChildItem "$out\obj" -Recurse -Filter *.class).FullName
 Step 'd8' { & "$bt\d8.bat" --release --lib $platform --output "$out\dex" @classes }
@@ -46,12 +46,14 @@ Step 'zipalign' { & "$bt\zipalign.exe" -f 4 "$out\unsigned.apk" "$out\aligned.ap
 # The keystore (passwordless PKCS12; the file itself is the secret) must already
 # exist. Never auto-generate a replacement: a new key changes the app signature
 # and breaks in-place updates for every install.
-if (-not (Test-Path "$proj\guitarlab.keystore")) {
-    throw 'android/guitarlab.keystore is missing - restore it from backup. Do NOT generate a new one.'
+# Since v0.70.2 the app (com.mreindl.soundlab) is signed with soundlab.keystore
+# — NOT the old guitarlab.keystore (that signed the retired com.mreindl.guitarlab).
+if (-not (Test-Path "$proj\soundlab.keystore")) {
+    throw 'android/soundlab.keystore is missing - restore it from backup. Do NOT generate a new one.'
 }
 
 New-Item -ItemType Directory -Force (Split-Path $apkOut) | Out-Null
-Step 'apksigner' { & "$bt\apksigner.bat" sign --ks "$proj\guitarlab.keystore" --ks-pass pass: --out $apkOut "$out\aligned.apk" }
+Step 'apksigner' { & "$bt\apksigner.bat" sign --ks "$proj\soundlab.keystore" --ks-pass pass: --out $apkOut "$out\aligned.apk" }
 
 Copy-Item $apkOut $apkOld -Force
 

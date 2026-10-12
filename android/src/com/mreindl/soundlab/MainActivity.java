@@ -1,4 +1,4 @@
-package com.mreindl.guitarlab;
+package com.mreindl.soundlab;
 
 import android.Manifest;
 import android.app.Activity;

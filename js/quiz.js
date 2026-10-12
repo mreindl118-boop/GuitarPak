@@ -1143,6 +1143,18 @@
     window.scrollTo(0, Math.max(0, window.pageYOffset + r.top - hb - 10));
   }
 
+  // keep a control clear of the fixed bottom tab bar on phones (and of the
+  // bottom edge everywhere), scrolling only as far as needed
+  function keepVisible(elm) {
+    if (!elm || !elm.getBoundingClientRect) return;
+    var tb = document.getElementById('tabbar-m');
+    var bar = tb && getComputedStyle(tb).display !== 'none' ? tb.getBoundingClientRect().height : 0;
+    var r = elm.getBoundingClientRect(), limit = window.innerHeight - bar - 12;
+    if (r.bottom > limit) {
+      try { window.scrollBy({ top: r.bottom - limit, behavior: 'smooth' }); } catch (e) { window.scrollBy(0, r.bottom - limit); }
+    }
+  }
+
   function renderHome() {
     var p = prog(), allPass = 0, h = '';
     COURSE.forEach(function (t) {
@@ -1432,7 +1444,7 @@
   }
 
   function newQ() {
-    var q, tries = 0;
+    var q, tries = 0, again = !!(cur && cur.q);
     do { q = GEN[cur.lvl.gen](cur.lvl.o); } while (q.sig === cur.lastSig && tries++ < 6);
     cur.lastSig = q.sig;
     cur.q = q;
@@ -1443,6 +1455,7 @@
     cur.played = null;
     cur.playedPos = null;
     render();
+    if (again) { var qb = el('qz-q'); if (qb && qb.getBoundingClientRect().top < 0) reveal(el('qz-prog')); }
     if (q.auto) setTimeout(function () { whenVoiceReady(function () { if (cur && cur.q === q && view === 'run') playQ(q); }); }, 280);
   }
 
@@ -1479,6 +1492,7 @@
     paintProg();
     var nb = el('qz-act');
     if (nb && !ok) { try { nb.focus({ preventScroll: true }); } catch (e) { /* ok */ } }
+    keepVisible(nb); // the feedback + Next must be on screen, not under the tab bar
     if (q.kind === 'choice' && !q.ear) playQ(q); // hear what you just read
     if (ok) advT = setTimeout(function () { if (cur && cur.q === q) nextQ(); }, q.ear ? 1200 : 1400);
   }
@@ -1736,7 +1750,9 @@
     '.qz-done .qz-acts{margin-top:10px}' +
     '.qz-done .qz-backlink{margin:4px 0 0}' +
     // notation, keys, neck
-    '.qz-staff{max-width:100%;height:auto;overflow:visible}' +
+    // the staff is a picture: its glyph boxes overflow the SVG (clef, ledger
+    // notes) and must never swallow taps meant for the play button above it
+    '.qz-staff{max-width:100%;height:auto;overflow:visible;pointer-events:none}' +
     '.qz-sl{stroke:currentColor;stroke-width:1.4}.qz-ledger{stroke:currentColor;stroke-width:1.9}' +
     '.qz-mu{font-family:SLMusic;font-size:48px;fill:currentColor}' +
     '.qz-mu.qz-okn{fill:var(--green)}' +

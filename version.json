@@ -1,6 +1,6 @@
 {
-  "version": "0.67.1",
+  "version": "0.70.2",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/soundLAB-alpha.apk",
-  "web": "0.70.1",
-  "notes": "FIXED: the Android update loop. The Android app kept saying an update was available, sent you to Chrome to download the APK, and then nothing changed — because the downloadable APK is still the 0.67.1 build (new APKs can only be built on the PC), while the update feed advertised the newer web version. The feed now keeps the two apart: the Android app is only offered a download when a genuinely newer APK exists, and the next Android build loads the live app itself, so from then on it updates the moment the web does (with the bundled copy kept for offline). Want the newest version on Android today? Open mreindl118-boop.github.io/GuitarPak in Chrome and choose Install app — it updates itself and MIDI keyboards work there."
+  "web": "0.70.2",
+  "notes": "THE ANDROID APP IS BACK, AS A REAL APP. A new soundLAB APK (v0.70.2) runs the live app inside it, so from now on it updates itself every time soundLAB updates — no more update prompts that download the same old version. It installs as a new app: install it, then delete the old soundLAB. (Settings from the old app don't carry over.) Also fixed: the play button next to questions in Exercises didn't respond on phones — the music staff's clef was sitting over it; and tapping text no longer pops up Chrome's Google search panel. On phones, Next scrolls into view by itself after you answer."
 }
