@@ -40,19 +40,26 @@ const keys = o => Object.keys(o).map(Number).sort((a, b) => a - b);
   const lv = await page.evaluate(() => {
     App.emit('fb:set', { source: 't', root: 0, scale: 'major', mode: 1 });
     const out = { lumi: App.midi.lumi, on: App.midi.lightsOn, range: App.midi.range() };
-    for (const h of [4, 3, 2, 1, 0]) { App.help.set(h); out[h] = { mode: __mode(), lit: Object.keys(__lit()).map(Number).sort((a, b) => a - b) }; }
+    for (const h of [4, 3, 2, 1, 0]) { App.help.set(h); const l = __lit(); out[h] = { mode: __mode(), lit: Object.keys(l).map(Number).sort((a, b) => a - b), vel: l }; }
+    out.chip = App.midi.lumiColor('#6ea8fe');
     return out;
   });
   ok(lv.lumi && lv.on && lv.range.lo === 48 && lv.range.keys === 24, 'LUMI detected by name, lights on, 24 keys from C3: ' + JSON.stringify(lv.range));
-  ok(lv[4].mode === 1 && lv[4].lit.length === 0 && lv[3].mode === 1, 'Full / Colors: the LUMI draws the scale itself (scale mode), no note-on clutter');
-  ok(lv[2].mode === 3 && lv[2].lit.join() === '48,60' && lv[1].lit.join() === '48,60', 'Target / Tonic: keybed dark (night), only the home keys lit: ' + lv[1].lit);
+  // C major in C3-B4, default palette -> the LUMI's own color table (velocity = color)
+  const deg = { 0: 23, 2: 34, 4: 60, 5: 74, 7: 97, 9: 116, 11: 6 };
+  const colorsOk = l => l.lit.length === 14 && l.lit.every(m => deg[m % 12] === l.vel[m]);
+  ok(lv[4].mode === 3 && colorsOk(lv[4]), 'Full: every scale key in its own degree color (velocity = LUMI color), dark background: ' + JSON.stringify(lv[4].vel));
+  ok(lv[3].mode === 3 && colorsOk(lv[3]), 'Colors: the same per-key coloration');
+  ok(lv.chip === '#439af5', 'the sheet shows the LUMI color each screen color becomes: ' + lv.chip);
+  ok(lv[2].mode === 3 && lv[2].lit.join() === '48,60' && lv[1].lit.join() === '48,60' && lv[1].vel[48] === 23, 'Target / Tonic: only the home keys, in the home color: ' + lv[1].lit);
   ok(lv[0].mode === 3 && lv[0].lit.length === 0, 'None: nothing lit');
   const col = await page.evaluate(() => {
-    App.help.set(4); __sent.length = 0; App.store.set('lights.bright', 40); App.midi.repaint();
-    const sx = __sent.filter(b => b[0] === 0xf0 && b[6] === 0x10);
-    return { bright: sx.some(b => b[7] === 0x40 && (b[8] & 0x1f) === 0x04 && ((b[8] >> 5) | (b[9] << 2)) === 40), key: sx.some(b => b[7] === 0x30 && (b[8] & 0x1f) === 0x03), colors: sx.filter(b => b[7] === 0x20 || (b[7] === 0x30 && (b[8] & 0x1f) === 0x04)).length };
+    App.help.set(4); const from = __sent.length; App.store.set('lights.bright', 40); App.midi.repaint();
+    const sx = __sent.slice(from).filter(b => b[0] === 0xf0 && b[6] === 0x10);
+    return { bright: sx.some(b => b[7] === 0x40 && (b[8] & 0x1f) === 0x04 && ((b[8] >> 5) | (b[9] << 2)) === 40),
+      night: sx.some(b => b[7] === 0x40 && (b[8] & 0x1f) === 0x02 && ((b[8] >> 5) | (b[9] << 2)) === 3) };
   });
-  ok(col.bright && col.key && col.colors >= 2, 'scale layout pushes key, brightness and both colors: ' + JSON.stringify(col));
+  ok(col.bright && col.night, 'a repaint re-sends the dark background and the brightness: ' + JSON.stringify(col));
 
   console.log('# guide lights obey the Help level');
   const gd = await page.evaluate(() => {
@@ -61,9 +68,11 @@ const keys = o => Object.keys(o).map(Number).sort((a, b) => a - b);
     App.midi.guide(null, null); o.clear = __lit();
     return o;
   });
-  ok(gd[4][64] === 127 && gd[4][65] === 45, 'Full: the note to play bright, the next one blinking');
+  ok(gd[4][64] === 127 && gd[4][65] === 74 && gd[4][60] === 23, 'Full: the note to play white, the next one blinking in its color, the rest of the scale stays colored');
   ok(gd[2][64] === 127 && !gd[2][65], 'Target: only the note to play');
   ok(!gd[1][64] && keys(gd[1]).join() === '48,60', 'Tonic: no guide, home keys only');
+  const blink = await page.evaluate(async () => { App.help.set(4); App.midi.guide(64, 65); const a = __lit()[65]; await new Promise(r => setTimeout(r, 350)); const b = __lit()[65]; App.midi.guide(null, null); App.help.set(1); return [a, b]; });
+  ok(blink[0] === 74 && blink[1] === undefined, 'the next note really blinks (color, off): ' + JSON.stringify(blink));
   ok(keys(gd.clear).join() === '48,60', 'guide cleared, the layout stays');
 
   console.log('# the octave buttons are followed');
@@ -116,6 +125,7 @@ const keys = o => Object.keys(o).map(Number).sort((a, b) => a - b);
     App.switchTo('piano');
     o.back = __mode();
     App.midi.setLightsOn(false);
+    o.offMode = __mode();
     __sent.length = 0;
     App.emit('fb:set', { source: 't', root: 7, scale: 'major' });
     App.midi.guide(60, 62);
@@ -125,8 +135,8 @@ const keys = o => Object.keys(o).map(Number).sort((a, b) => a - b);
     return o;
   });
   ok(pd.mode === 3 && pd.lit === 8 && pd.noScale, 'Pads own the keybed: LUMI dark, its 8 pad keys lit, no scale pushes meanwhile');
-  ok(pd.back === 1, 'leaving Pads hands the keybed back (scale layout)');
-  ok(pd.offSent === 0 && pd.onMode === 1, 'lights off leaves the keyboard alone; on again repaints');
+  ok(pd.back === 3, 'leaving Pads hands the keybed back to the app');
+  ok(pd.offSent === 0 && pd.onMode === 3 && pd.offMode === 1, 'lights off: the LUMI gets its own scale display back and is left alone; on again repaints');
 
   console.log('# control center');
   const cc = await page.evaluate(() => {
@@ -167,6 +177,48 @@ const keys = o => Object.keys(o).map(Number).sort((a, b) => a - b);
   ok(gk.scaleKeys && gk.rootBright, 'turned on: the scale keys lit, home brightest, chord tones next');
   ok(errs.length === 0, 'no page errors (generic)');
   await ctx.close();
+
+  console.log('# the Android app bridge (window.SoundLabMidi, same protocol as iOS)');
+  {
+    const ctx2 = await browser.newContext({ viewport: { width: 1200, height: 900 } });
+    await ctx2.addInitScript(() => {
+      ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
+      window.__posts = [];
+      window.GuitarLabHost = { shellVersion: () => '0.75.0', setKeepScreenOn: () => {} };
+      window.SoundLabMidi = { post: j => {
+        const m = JSON.parse(j); window.__posts.push(m);
+        if (m.cmd === 'init') setTimeout(() => window.__glMIDI.onports({ inputs: [{ id: 7, name: 'LUMI Keys BLOCK' }], outputs: [{ id: 7, name: 'LUMI Keys BLOCK' }] }), 0);
+        if (m.cmd === 'bluetooth') setTimeout(() => window.__glMIDI.onstatus('Connected: LUMI Keys BLOCK'), 0);
+      } };
+    });
+    const p2 = await ctx2.newPage(), e2 = [];
+    p2.on('pageerror', e => e2.push(e.message));
+    await p2.goto(env.URL);
+    await p2.waitForFunction(() => window.App && App.midi && App.midi.hasOutput && App.active === 'quiz');
+    const an = await p2.evaluate(async () => {
+      const o = { platform: App.midi.platform, native: App.midi.native, lumi: App.midi.lumi, cmds: __posts.map(m => m.cmd) };
+      o.setOut = (__posts.find(m => m.cmd === 'setOutput') || {}).id;
+      o.sends = __posts.filter(m => m.cmd === 'send').length;
+      o.sysex = __posts.some(m => m.cmd === 'send' && m.data[0] === 0xf0);
+      o.notes = __posts.some(m => m.cmd === 'send' && m.data[0] === 0x90);
+      let got = null; App.on('midi:note', d => { if (d.on) got = d.midi; });
+      window.__glMIDI.onmidi(7, [0x90, 62, 100, 0x80, 62, 0]);      // a packed packet, like the bridge sends
+      o.got = got;
+      App.switchTo('lights');
+      document.getElementById('lc-bt').click();
+      await new Promise(r => setTimeout(r, 30));
+      o.bt = __posts.some(m => m.cmd === 'bluetooth');
+      o.status = [...document.querySelectorAll('#panel-lights p')].map(p => p.textContent).join(' | ');
+      return o;
+    });
+    ok(an.platform === 'android' && an.native && an.lumi, 'the APK bridge is picked up as a native MIDI backend: ' + JSON.stringify(an).slice(0, 120));
+    ok(an.cmds[0] === 'init' && an.setOut === 7, 'it starts the bridge and picks the LUMI as the output');
+    ok(an.sysex && an.notes, 'lights go out through the bridge (SysEx background + per-key note colors): ' + an.sends + ' sends');
+    ok(an.got === 62, 'notes from the keyboard arrive as midi:note (packed packets split)');
+    ok(an.bt && /Connected: LUMI/.test(an.status), 'Find a Bluetooth keyboard asks the bridge and shows its progress: ' + an.status.slice(0, 120));
+    ok(e2.length === 0, 'no page errors (android bridge)');
+    await ctx2.close();
+  }
 
   await browser.close();
   console.log(fails ? '\n' + fails + ' FAILED' : '\nALL PASS');

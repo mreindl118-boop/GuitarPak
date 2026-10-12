@@ -30,7 +30,8 @@ import android.webkit.WebViewClient;
  * web app compares it with shellVersion() before offering a download.
  *
  * Native concerns: bridging the WebView's microphone request (tuner, tone-in)
- * to Android's RECORD_AUDIO permission, keep-screen-on, and sending links that
+ * to Android's RECORD_AUDIO permission, keep-screen-on, MIDI keyboards (USB +
+ * Bluetooth, MidiBridge — the WebView has no Web MIDI), and sending links that
  * leave the app (e.g. an APK download) to the system browser.
  */
 public class MainActivity extends Activity {
@@ -43,6 +44,7 @@ public class MainActivity extends Activity {
     private static final int REQ_MIC = 1;
 
     private WebView web;
+    private MidiBridge midi;
     private PermissionRequest pendingMicRequest;
     private boolean onBundled = false;
 
@@ -66,6 +68,9 @@ public class MainActivity extends Activity {
         // report this shell's version for the update check. Only our own pages
         // load in this WebView — anything else opens in the browser (route()).
         web.addJavascriptInterface(new WebHost(), "GuitarLabHost");
+        // MIDI keyboards: same protocol as the iOS CoreMIDI bridge (js/midi.js)
+        midi = new MidiBridge(this, web);
+        web.addJavascriptInterface(midi.new Js(), "SoundLabMidi");
 
         web.setWebChromeClient(new WebChromeClient() {
             @Override
@@ -133,6 +138,12 @@ public class MainActivity extends Activity {
 
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] results) {
+        if (requestCode == MidiBridge.REQ_BT && midi != null) {
+            boolean all = results.length > 0;
+            for (int r : results) all &= r == PackageManager.PERMISSION_GRANTED;
+            midi.onPermission(all);
+            return;
+        }
         if (requestCode == REQ_MIC && pendingMicRequest != null) {
             if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) {
                 pendingMicRequest.grant(pendingMicRequest.getResources());
@@ -150,6 +161,12 @@ public class MainActivity extends Activity {
         } else {
             super.onBackPressed();
         }
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (midi != null) midi.close();
+        super.onDestroy();
     }
 
     @Override
