@@ -37,7 +37,9 @@
       { t: 'Piano', x: 'The keyboard twin of the fretboard — same key, same degree colors. Play it by touch, with your computer keyboard (A W S E D… Z/X shifts octave), or a MIDI keyboard like a ROLI.' },
       { sel: '#pn-chseg', t: 'Perform', x: 'Triads or 7ths turn every in-scale key into its chord (+Bass and Strum appear then). Arp plays what you hold as an arpeggio — its speed, direction, range and Hold appear once it’s on.' },
       { sel: '#pn-play', t: 'Practice runner', x: 'Runs scale exercises on the keys with fingering numbers — pick right or left hand and it moves to where that hand plays.' },
-      { sel: '#pn-guide', t: 'Guide mode', x: 'Instead of playing FOR you, Guide waits for you to play each lit note — on screen, or lit up on a LUMI’s own keys.' }
+      { sel: '#pn-guide', t: 'Guide mode', x: 'Instead of playing FOR you, Guide waits for you to play each lit note — on screen, or lit up on a LUMI’s own keys.' },
+      { sel: '#pn-assist', t: 'Help level', x: 'How much the keyboard tells you. Full shows the degree colors, note names, fingers and the next note; Colors drops the names; Target only rings the note to play; Tonic marks home; None is a bare keyboard. Pressed keys always flash their color.' },
+      { sel: '.kl-card', t: 'Scale lessons', x: 'Graded scale lessons played with the click. Every note is checked for the right key and how close it lands to the beat. Score 85 to level up to a faster tempo; your runs and best scores are saved here and on the Exercises Progress tab.' }
     ],
     songs: [
       { t: 'Songs', x: 'Bring your own music: paste an ASCII guitar tab (the six-line kind from any tab site) or import a MIDI file. soundLAB detects the key, and you can loop any bars at your own tempo to practice them.' }

@@ -18,6 +18,12 @@ for (let r = 0; r < 12; r++) {
   hand = 'left'; const lh = fingering(path).join('');
   ok(rh === STD[NAMES[r]][0] && lh === STD[NAMES[r]][1], NAMES[r] + ' major RH ' + rh + ' LH ' + lh);
 }
+// two octaves keep cycling the same groups (C major: 123 1234 123 1234 5)
+hand = 'right';
+const two = [0, 2, 4, 5, 7, 9, 11, 12, 14, 16, 17, 19, 21, 23, 24].map(s => ({ midi: 60 + s }));
+ok(fingering(two).join('') === '123123412312345', 'C major RH, 2 octaves: ' + fingering(two).join(''));
+hand = 'left';
+ok(fingering(two).join('') === '543213214321321', 'C major LH, 2 octaves: ' + fingering(two).join(''));
 // the thumb never lands on a black key in any 7-note scale/mode the app offers
 const SCALES = { minor: [0, 2, 3, 5, 7, 8, 10, 12], harm: [0, 2, 3, 5, 7, 8, 11, 12], mel: [0, 2, 3, 5, 7, 9, 11, 12], dorian: [0, 2, 3, 5, 7, 9, 10, 12] };
 const BLACK = [0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0];
