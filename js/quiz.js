@@ -1063,6 +1063,24 @@
     });
   });
 
+
+  // ================= the path =================
+  // One node per unit × practice mode, in course order. A node opens when the
+  // node before it has a passed level (or a jump test reached it); its ring
+  // fills as its levels are passed.
+  var NODES = [], NODE_BY_ID = {}, UNIT_TOPIC = {};
+  COURSE.forEach(function (t) {
+    t.units.forEach(function (u) {
+      UNIT_TOPIC[u.id] = t;
+      u.modes.forEach(function (m) {
+        var nd = { i: NODES.length, id: u.id + '|' + m.key, topic: t, unit: u, mode: m.key, levels: m.levels };
+        m.levels.forEach(function (l) { l.node = nd; });
+        NODES.push(nd);
+        NODE_BY_ID[nd.id] = nd;
+      });
+    });
+  });
+
   // ================= state + persistence =================
 
   var root = null, view = 'home', topicId = null, openMode = {}, cur = null, advT = 0;
@@ -1156,39 +1174,12 @@
   }
 
   function renderHome() {
-    var p = prog(), allPass = 0, h = '';
-    COURSE.forEach(function (t) {
-      var pass = 0, tot = 0;
-      LEVELS.forEach(function (l) {
-        if (l.topic !== t) return;
-        tot++;
-        if (passed(p, l)) pass++;
-      });
-      allPass += pass;
-      h += '<button type="button" class="qz-topic" data-qzt="' + t.id + '">' +
-        '<span class="qz-tname">' + esc(t.name) + '</span>' +
-        '<span class="qz-tblurb">' + esc(t.blurb) + '</span>' +
-        '<span class="qz-tfoot"><span class="qz-bar"><i style="width:' + Math.round(100 * pass / tot) + '%"></i></span>' +
-        '<span class="qz-tmeta">' + pass + '/' + tot + '</span></span></button>';
-    });
-    var nx = nextLevel();
-    root.innerHTML =
-      '<div class="qz-view">' +
-        '<div class="card qz-hero">' +
-          '<div class="qz-herotext"><h2>Exercises</h2>' +
-            '<p class="qz-sub">Theory and ear training, ten questions at a time. Tap the answer, or play it.</p></div>' +
-          '<div class="qz-heroact">' +
-            (nx ? '<button type="button" class="btn primary qz-go" id="qz-cont">' + App.icon('play', 13) + ' ' + (allPass ? 'Continue' : 'Start') + '</button>' +
-              '<span class="qz-nextup">' + esc(nx.topic.name + ' · ' + nx.unit.name + ' · ' + MODE_NAME[nx.mode] + ' ' + nx.n) + '</span>'
-              : '<span class="qz-nextup">Every level passed. Replay any level for more stars.</span>') +
-          '</div>' +
-          '<div class="qz-herofoot"><span class="qz-total">' + allPass + ' of ' + LEVELS.length + ' levels passed</span>' +
-            '<div class="seg qz-sound" role="group" aria-label="Exercise sound">' +
-              '<button type="button" data-qzs="piano">Piano</button><button type="button" data-qzs="guitar">Guitar</button></div></div>' +
-        '</div>' +
-        '<div class="qz-topics">' + h + '</div>' +
-      '</div>';
-    paintSound();
+    var tabs = [['path', 'Path'], ['topics', 'Topics'], ['progress', 'Progress']];
+    root.innerHTML = '<div class="qz-view">' + statsStrip() +
+      '<div class="seg qz-hometabs" role="tablist" aria-label="Exercises">' + tabs.map(function (t) {
+        return '<button type="button" role="tab" data-qzh="' + t[0] + '">' + t[1] + '</button>';
+      }).join('') + '</div><div id="qz-homebody"></div></div>';
+    paintHomeBody();
   }
 
   function paintSound() {
@@ -1258,6 +1249,7 @@
     }).join('');
     return '<div class="qz-ubody">' +
       '<div class="qz-urow">' + (u.modes.length > 1 ? '<div class="qz-mchips">' + chips + '</div>' : '<div class="qz-mchips"></div>') +
+        '<button type="button" class="qz-learnbtn" data-qzsprint="' + NODE_BY_ID[u.id + '|' + md.key].i + '">' + ico('bolt', 14) + ' Sprint</button>' +
         (u.learn ? '<button type="button" class="qz-learnbtn" data-qzlearn="' + u.id + '" aria-expanded="false">Learn</button>' : '') + '</div>' +
       (u.learn ? '<div class="qz-learn" id="qz-learn-' + u.id + '" hidden>' + u.learn + '</div>' : '') +
       '<div class="qz-lvls">' + rows + '</div></div>';
@@ -1288,14 +1280,17 @@
   // The run view is a fixed shell (header, progress, card, footer); only the
   // question inside the card is swapped, with a short fade — no full redraw.
   function renderRun() {
-    var l = cur.lvl, shell = el('qz-runshell');
-    if (!shell || shell.getAttribute('data-lvl') !== l.id) {
+    var l = cur.lvl, shell = el('qz-runshell'), sid = (cur.sprint ? 'sprint:' : cur.jump != null ? 'jump:' : '') + l.id;
+    if (!shell || shell.getAttribute('data-lvl') !== sid) {
+      var tag = cur.sprint ? '60-second sprint · ' + MODE_NAME[l.mode] : cur.jump != null ? 'Jump test · ' + MODE_NAME[l.mode] : MODE_NAME[l.mode] + ' · Level ' + l.n;
       root.innerHTML =
-        '<div class="qz-view qz-run" id="qz-runshell" data-lvl="' + esc(l.id) + '">' +
-          '<div class="qz-runhead"><button type="button" class="qz-backlink" id="qz-back">' + App.icon('left', 14) + ' ' + esc(l.unit.name) + '</button>' +
-            '<span class="qz-lvltag">' + esc(MODE_NAME[l.mode] + ' · Level ' + l.n) + '</span>' +
+        '<div class="qz-view qz-run" id="qz-runshell" data-lvl="' + esc(sid) + '">' +
+          '<div class="qz-runhead"><button type="button" class="qz-backlink" id="qz-back">' + App.icon('left', 14) + ' ' + esc(cur.sprint ? 'End sprint' : l.unit.name) + '</button>' +
+            '<span class="qz-lvltag">' + esc(tag) + '</span>' +
+            '<span class="qz-xpp" id="qz-xpp" aria-live="polite"></span>' +
             '<span class="qz-count" id="qz-count"></span></div>' +
-          '<div class="qz-prog" id="qz-prog" aria-hidden="true"></div>' +
+          (cur.sprint ? '<div class="qz-timebar" aria-hidden="true"><i id="qz-timefill"></i></div>'
+            : '<div class="qz-prog" id="qz-prog" aria-hidden="true"></div>') +
           '<div class="card qz-stage">' +
             '<div class="qz-q" id="qz-q"></div>' +
             '<div class="qz-foot"><div class="qz-fb" id="qz-fb" role="status" aria-live="polite"></div>' +
@@ -1306,6 +1301,7 @@
     paintQ();
     paintProg();
     paintFoot();
+    paintRunXP();
   }
 
   function paintQ() {
@@ -1323,6 +1319,7 @@
   }
 
   function paintProg() {
+    if (cur.sprint) { tickSprint(); return; }
     var segs = '';
     for (var i = 0; i < cur.n; i++) {
       segs += '<i class="' + (i < cur.res.length ? (cur.res[i] ? 'ok' : 'bad') : (i === cur.res.length && !cur.answered ? 'cur' : '')) + '"></i>';
@@ -1404,42 +1401,67 @@
       b.innerHTML = (cur.res.length >= cur.n ? 'Finish' : 'Next') + ' ' + App.icon('right', 14);
     } else {
       b.className = 'btn qz-act qz-quiet';
-      b.textContent = 'Show answer';
+      b.textContent = cur.sprint ? 'Skip' : 'Show answer';
       if (fb) { fb.className = 'qz-fb'; fb.textContent = ''; }
     }
   }
 
   function renderDone() {
-    var l = cur.lvl, pass = cur.stars > 0, best = prog()[l.id];
-    var misses = Object.keys(cur.miss).map(function (k) { return k + (cur.miss[k] > 1 ? ' ×' + cur.miss[k] : ''); });
-    var nx = nextInCourse(l);
-    var acts = pass && nx
-      ? '<button type="button" class="btn primary" data-qzl="' + nx.id + '">Next level ' + App.icon('right', 14) + '</button>' +
-        '<button type="button" class="btn" id="qz-retry">Try again</button>'
-      : '<button type="button" class="btn primary" id="qz-retry">Try again</button>' +
-        (nx ? '<button type="button" class="btn" data-qzl="' + nx.id + '">Next level</button>' : '');
-    root.innerHTML =
-      '<div class="qz-view"><div class="card qz-done qz-in">' +
-        '<div class="qz-lvltag">' + esc(lvlTitle(l)) + '</div>' +
+    var l = cur.lvl, nd = l.node, html;
+    if (cur.sprint) {
+      var rec = cur.rec || { best: cur.score, old: 0, isBest: false };
+      html = '<div class="qz-lvltag">' + esc('60-second sprint · ' + l.unit.name + ' · ' + MODE_NAME[l.mode]) + '</div>' +
+        '<div class="qz-big">' + cur.score + '<span> right</span></div>' +
+        '<div class="qz-verdict">' + (rec.isBest && cur.score ? (rec.old ? 'New record! Your best was ' + rec.old + '.' : 'First record set.') : 'Your record: ' + rec.best + '.') + '</div>' +
+        doneStats() + doneNotes() +
+        '<div class="qz-acts"><button type="button" class="btn primary" data-qzsprint="' + nd.i + '">' + ico('bolt', 15) + ' Sprint again</button>' +
+          '<button type="button" class="btn" id="qz-tohome">Back to the path</button></div>';
+    } else {
+      var pass = cur.stars > 0, best = prog()[l.id], jump = cur.jump != null, jumped = jump && cur.score >= 9;
+      var misses = Object.keys(cur.miss).map(function (k) { return k + (cur.miss[k] > 1 ? ' ×' + cur.miss[k] : ''); });
+      var nx = nextInCourse(l);
+      var verdict = jump ? (jumped ? 'Jumped ahead. The path is open up to here.' : 'Not quite: 9 right opens the path up to here.')
+        : pass ? (cur.stars === 3 ? 'Perfect!' : 'Level passed') : 'Not passed yet — 8 right to pass';
+      var acts = jump
+        ? (jumped ? '<button type="button" class="btn primary" id="qz-tohome">Back to the path</button>'
+          : '<button type="button" class="btn primary" data-qzjump="' + nd.i + '">Try the jump again</button><button type="button" class="btn" id="qz-tohome">Back to the path</button>')
+        : (pass && nx
+          ? '<button type="button" class="btn primary" data-qzl="' + nx.id + '">Next level ' + App.icon('right', 14) + '</button>' +
+            '<button type="button" class="btn" id="qz-retry">Try again</button>'
+          : '<button type="button" class="btn primary" id="qz-retry">Try again</button>' +
+            (nx ? '<button type="button" class="btn" data-qzl="' + nx.id + '">Next level</button>' : ''));
+      html = '<div class="qz-lvltag">' + esc(lvlTitle(l)) + '</div>' +
         '<div class="qz-big">' + cur.score + '<span>/10</span></div>' +
-        '<div class="qz-stars" aria-label="' + cur.stars + ' of 3 stars">' + starStr(cur.stars) + '</div>' +
-        '<div class="qz-verdict">' + (pass ? (cur.stars === 3 ? 'Perfect!' : 'Level passed') : 'Not passed yet — 8 right to pass') + '</div>' +
-        (best && best.b > cur.score ? '<div class="muted small">Your best: ' + best.b + '/10</div>' : '') +
+        (jump ? '' : '<div class="qz-stars" aria-label="' + cur.stars + ' of 3 stars">' + starStr(cur.stars) + '</div>') +
+        '<div class="qz-verdict">' + verdict + '</div>' +
+        (best && best.b > cur.score && !jump ? '<div class="muted small">Your best: ' + best.b + '/10</div>' : '') +
+        doneStats() + doneNotes() +
         (misses.length ? '<div class="qz-miss"><span class="muted">Practice: </span>' + esc(misses.join(', ')) + '</div>' : '') +
         '<div class="qz-acts">' + acts + '</div>' +
-        '<button type="button" class="qz-backlink" id="qz-back">' + App.icon('left', 14) + ' ' + esc(l.unit.name) + '</button>' +
-      '</div></div>';
+        (jump ? '' : '<button type="button" class="qz-backlink" id="qz-back">' + App.icon('left', 14) + ' ' + esc(cur.from === 'topic' ? l.unit.name : 'The path') + '</button>');
+    }
+    root.innerHTML = '<div class="qz-view"><div class="card qz-done qz-in">' + html + '</div></div>';
   }
 
   // ================= flow =================
 
-  function startLevel(lid) {
+  // opt: { sprint: nodeIndex } for a 60-second sprint, { jump: nodeIndex } for a jump test
+  function startLevel(lid, opt) {
     var l = BY_ID[lid];
     if (!l) return;
     clearTimeout(advT);
-    cur = { lvl: l, n: 10, res: [], miss: {}, q: null, answered: false, tap: {}, got: {}, played: null, playedPos: null, lastSig: null };
+    stopSprint();
+    opt = opt || {};
+    var from = view === 'topic' ? 'topic' : view === 'home' ? 'path' : (cur && cur.from) || 'path';
+    cur = { lvl: l, n: 10, res: [], miss: {}, q: null, answered: false, tap: {}, got: {}, played: null, playedPos: null, lastSig: null,
+      from: from, xp: 0, combo: 0, times: [], ms: 0, prevSpeed: XP().speed(l.unit.id), jump: opt.jump != null ? opt.jump : null, sprint: null };
+    if (opt.sprint != null) {
+      cur.n = 1e9;
+      cur.sprint = { i: opt.sprint, key: NODES[opt.sprint].id, end: Date.now() + 60000, timer: 0, done: false };
+    }
     view = 'run';
     newQ();
+    if (cur.sprint) cur.sprint.timer = setInterval(tickSprint, 100);
     reveal(root);
   }
 
@@ -1455,13 +1477,15 @@
     cur.played = null;
     cur.playedPos = null;
     render();
-    if (again) { var qb = el('qz-q'); if (qb && qb.getBoundingClientRect().top < 0) reveal(el('qz-prog')); }
+    cur.t0 = (window.performance || Date).now();
+    if (again) { var qb = el('qz-q'); if (qb && qb.getBoundingClientRect().top < 0) reveal(el('qz-runshell')); }
     if (q.auto) setTimeout(function () { whenVoiceReady(function () { if (cur && cur.q === q && view === 'run') playQ(q); }); }, 280);
   }
 
   function nextQ() {
     clearTimeout(advT);
     if (!cur) return;
+    if (cur.sprint) { if (Date.now() >= cur.sprint.end) finishSprint(); else newQ(); return; }
     if (cur.res.length >= cur.n) finish(); else newQ();
   }
 
@@ -1472,6 +1496,12 @@
     cur.lastOk = ok;
     cur.res.push(ok);
     recordItem(q.item, ok);
+    var ms = Math.max(0, (window.performance || Date).now() - (cur.t0 || 0));
+    cur.combo = ok ? cur.combo + 1 : 0;
+    cur.ms += Math.min(ms, 45000);
+    if (ok) cur.times.push(Math.min(ms, 30000));
+    var xr = XP().answer({ unit: cur.lvl.unit.id, ok: ok, ms: ms, combo: cur.combo, kind: q.ear ? 'ear' : q.kind === 'choice' ? 'choice' : 'play' });
+    cur.xp += xr.xp;
     if (!ok && q.miss) cur.miss[q.miss] = (cur.miss[q.miss] || 0) + 1;
     if (q.kind === 'choice') {
       root.querySelectorAll('[data-qzc]').forEach(function (b) {
@@ -1490,7 +1520,13 @@
     }
     paintFoot();
     paintProg();
+    paintRunXP();
+    xpPop(xr);
     var nb = el('qz-act');
+    if (cur.sprint) { // keep the pace: right answers move on fast, misses show the answer briefly
+      advT = setTimeout(function () { if (cur && cur.q === q) nextQ(); }, ok ? 380 : 1100);
+      return;
+    }
     if (nb && !ok) { try { nb.focus({ preventScroll: true }); } catch (e) { /* ok */ } }
     keepVisible(nb); // the feedback + Next must be on screen, not under the tab bar
     if (q.kind === 'choice' && !q.ear) playQ(q); // hear what you just read
@@ -1499,10 +1535,14 @@
 
   function finish() {
     var score = cur.res.filter(Boolean).length, s = starsFor(score), p = prog(), old = p[cur.lvl.id];
-    if (!old || score > old.b) p[cur.lvl.id] = { b: score, s: Math.max(s, old ? old.s : 0) };
+    // a jump test only counts once it opens the path (9+), so a near miss can't unlock the step
+    if ((!old || score > old.b) && (cur.jump == null || score >= 9)) p[cur.lvl.id] = { b: score, s: Math.max(s, old ? old.s : 0) };
     App.store.set('qz.prog', p);
     cur.score = score;
     cur.stars = s;
+    if (cur.jump != null && score >= 9) XP().setJump(cur.jump);
+    cur.fin = XP().finishLevel({ passed: s > 0, perfect: score === 10 });
+    cur.xp += cur.fin.bonus;
     view = 'done';
     render();
     reveal(root);
@@ -1558,8 +1598,18 @@
     resolve(ok);
   }
 
+  function toPath(nodeIdx) {
+    view = 'home';
+    if (homeTab !== 'path') { homeTab = 'path'; App.store.set('qz.home', 'path'); }
+    selNode = nodeIdx == null ? -1 : nodeIdx;
+    render();
+    if (selNode >= 0) { var n = el('qz-node-' + selNode); if (n) reveal(n); } else reveal(root);
+  }
+
   function back() {
     clearTimeout(advT);
+    stopSprint();
+    if ((view === 'run' || view === 'done') && cur && cur.from !== 'topic') { toPath(cur.lvl.node.i); return; }
     if (view === 'run' || view === 'done') {
       var l = cur.lvl;
       topicId = l.topic.id;
@@ -1576,6 +1626,474 @@
     }
   }
 
+  // ================= game layer: path, XP, sprints, progress =================
+
+  function XP() { return window.SLXP; }
+
+  var ICO = {
+    flame: '<path d="M12 2.5c.7 3 4.6 4.9 4.6 9.6a4.6 4.6 0 0 1-9.2 0c0-2.1.9-3.5 2-4.4.2 1.7.9 2.6 1.8 2.9-.4-2.7-.1-5.6.8-8.1z"/>',
+    bolt: '<path d="M13 2.5 4.5 13.5H11L10 21.5l8.5-11H12z"/>',
+    snow: '<path d="M12 2.5v19M3.8 7.2l16.4 9.6M3.8 16.8l16.4-9.6"/><path d="m9.2 4.3 2.8 1.9 2.8-1.9M9.2 19.7l2.8-1.9 2.8 1.9"/>',
+    lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+    check: '<polyline points="5 12.5 10 17.5 19 7"/>',
+    clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    ear: '<path d="M7.5 9.5a4.5 4.5 0 0 1 9 0c0 2.6-2.5 3.6-2.5 6.5a3 3 0 0 1-6 .5"/><path d="M10.5 9.5a1.5 1.5 0 0 1 3 0c0 1.2-1.5 1.5-1.5 3"/>',
+    star: '<path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>',
+    faster: '<path d="M12 19V5"/><polyline points="5 12 12 5 19 12"/>',
+    slower: '<path d="M12 5v14"/><polyline points="19 12 12 19 5 12"/>'
+  };
+  function ico(n, s, cls) {
+    if (!ICO[n]) return App.icon(n, s);
+    return '<svg class="ic' + (cls ? ' ' + cls : '') + '" width="' + s + '" height="' + s + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+      'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' + ICO[n] + '</svg>';
+  }
+  var MODE_ICON = { treble: 'note', bass: 'note', staff: 'note', piano: 'keys', neck: 'guitar', ear: 'ear', theory: 'learn' };
+
+  var homeTab = App.store.get('qz.home', 'path'), selNode = -1, chartT = 0;
+  if (['path', 'topics', 'progress'].indexOf(homeTab) < 0) homeTab = 'path';
+
+  function nodeDone(nd, p) { var c = 0; nd.levels.forEach(function (l) { if (passed(p, l)) c++; }); return c; }
+  function unlocked(i, p) {
+    return i === 0 || nodeDone(NODES[i], p) > 0 || nodeDone(NODES[i - 1], p) > 0 || i <= XP().jump();
+  }
+  // "you are here": the newest open node not started yet, else the first unfinished one
+  // (steps a jump test skipped over don't count as "not started")
+  function currentNode(p) {
+    var i, firstOpen = -1, jmp = XP().jump();
+    for (i = 0; i < NODES.length; i++) {
+      if (!unlocked(i, p)) break;
+      var d = nodeDone(NODES[i], p);
+      if (d === 0 && i < jmp) continue;
+      if (d === 0) return i;
+      if (firstOpen < 0 && d < NODES[i].levels.length) firstOpen = i;
+    }
+    return firstOpen >= 0 ? firstOpen : Math.min(i, NODES.length - 1);
+  }
+  function nodeLevel(nd, p) {
+    for (var i = 0; i < nd.levels.length; i++) if (!passed(p, nd.levels[i])) return nd.levels[i];
+    return nd.levels[nd.levels.length - 1];
+  }
+  function fmtTime(ms) { var s = Math.round(ms / 1000); return Math.floor(s / 60) + ':' + ('0' + s % 60).slice(-2); }
+  function fmtDur(sec) {
+    var m = Math.round(sec / 60);
+    return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h ' + (m % 60) + ' min';
+  }
+  function secs(ms) { return (ms / 1000).toFixed(1) + ' s'; }
+
+  // ---- the stats strip: streak · today's goal · player level · continue ----
+  function goalRing(pct, size) {
+    var r = (size - 6) / 2, c = 2 * Math.PI * r, off = c * (1 - Math.min(1, pct / 100));
+    return '<svg class="qz-ring" width="' + size + '" height="' + size + '" viewBox="0 0 ' + size + ' ' + size + '" aria-hidden="true">' +
+      '<circle cx="' + size / 2 + '" cy="' + size / 2 + '" r="' + r + '" class="trk"/>' +
+      '<circle cx="' + size / 2 + '" cy="' + size / 2 + '" r="' + r + '" class="val" stroke-dasharray="' + c.toFixed(1) + '" stroke-dashoffset="' + off.toFixed(1) +
+      '" transform="rotate(-90 ' + size / 2 + ' ' + size / 2 + ')"/></svg>';
+  }
+
+  function statsStrip() {
+    var X = XP(), st = X.streak(), lv = X.level(), t = X.today(), g = X.goal(), p = prog();
+    var pct = Math.round(100 * t.x / g), ci = currentNode(p), nl = nodeLevel(NODES[ci], p);
+    var note;
+    if (st.n > 0 && !st.today) note = 'Finish a level today to keep your ' + st.n + '-day streak' + (st.freezes ? ' (you have ' + st.freezes + ' streak freeze' + (st.freezes > 1 ? 's' : '') + ')' : '') + '.';
+    else if (!st.today) note = X.total() ? 'Finish a level to start a new streak.' : 'Finish your first level to start a streak.';
+    else if (t.x < g) note = 'Streak safe today. ' + (g - t.x) + ' XP to your daily goal.';
+    else note = 'Daily goal reached. See you tomorrow.';
+    return '<div class="card qz-strip">' +
+      '<div class="qz-stat' + (st.today ? ' lit' : '') + '">' + ico('flame', 26) + '<div><b>' + st.n + '</b><span>day streak</span></div></div>' +
+      '<div class="qz-stat">' + goalRing(pct, 40) + '<div><b>' + t.x + '<small>/' + g + '</small></b><span>XP today</span></div></div>' +
+      '<div class="qz-stat qz-lvstat"><span class="qz-lvbadge" aria-hidden="true">' + lv.lv + '</span><div class="qz-lvtext"><b>Level ' + lv.lv + ' · ' + lv.title + '</b>' +
+        '<span class="qz-bar"><i style="width:' + Math.round(100 * lv.into / lv.need) + '%"></i></span><span>' + (lv.need - lv.into) + ' XP to level ' + (lv.lv + 1) + '</span></div></div>' +
+      '<button type="button" class="btn primary qz-go" id="qz-cont" data-qzl="' + nl.id + '">' + App.icon('play', 13) + ' ' + (X.total() ? 'Continue' : 'Start') + '</button>' +
+      '<p class="qz-stripnote">' + esc(note) + '</p>' +
+    '</div>';
+  }
+
+  // ---- path view ----
+  var ZIG = [0, 1, 1.5, 1, 0, -1, -1.5, -1];
+
+  function pathHTML() {
+    var p = prog(), ci = currentNode(p), h = '', sec = null, k = 0, n = 0;
+    NODES.forEach(function (nd, i) {
+      if (nd.topic !== sec) {
+        if (sec) h += '</div></section>';
+        sec = nd.topic; k = 0; n++;
+        var tp = 0, tt = 0;
+        LEVELS.forEach(function (l) { if (l.topic === sec) { tt++; if (passed(p, l)) tp++; } });
+        h += '<section class="qz-psec"><header class="qz-pban"><span class="qz-eyebrow">Section ' + n + '</span><h3>' + esc(sec.name) + '</h3>' +
+          '<span class="qz-pmeta">' + tp + '/' + tt + ' levels</span></header><div class="qz-pnodes">';
+      }
+      var done = nodeDone(nd, p), all = nd.levels.length, open = unlocked(i, p);
+      var state = !open ? 'locked' : done === all ? 'done' : i === ci ? 'cur' : done ? 'part' : 'open';
+      h += '<div class="qz-nwrap" id="qz-node-' + i + '" style="--x:' + ZIG[k % 8] + '">' + nodeBtn(nd, i, state, done, all) +
+        (i === selNode ? nodePop(nd, i, p) : '') + '</div>';
+      k++;
+    });
+    return '<div class="qz-path">' + h + '</div></section></div>';
+  }
+
+  function nodeBtn(nd, i, state, done, all) {
+    var lab = nd.unit.name + ', ' + MODE_NAME[nd.mode] + ': ' + (state === 'locked' ? 'locked' : done + ' of ' + all + ' levels passed');
+    var face = state === 'locked' ? ico('lock', 22) : state === 'done' ? ico('check', 28) : ico(MODE_ICON[nd.mode], 26);
+    return '<button type="button" class="qz-node ' + state + (i === selNode ? ' sel' : '') + '" data-qzn="' + i + '" aria-expanded="' + (i === selNode) + '" aria-label="' + esc(lab) + '">' +
+      (state === 'cur' ? '<span class="qz-nstart" aria-hidden="true">Start</span>' : '') +
+      '<span class="qz-ndisc" style="--p:' + Math.round(100 * done / all) + '%"><span class="qz-nface">' + face + '</span></span>' +
+      '<span class="qz-nlbl" aria-hidden="true">' + esc(nd.unit.name) + '<small>' + esc(MODE_NAME[nd.mode]) + (done && done < all ? ' · ' + done + '/' + all : '') + '</small></span></button>';
+  }
+
+  function nodePop(nd, i, p) {
+    var open = unlocked(i, p), nl = nodeLevel(nd, p), best = XP().sprintBest(nd.id);
+    var rows = nd.levels.map(function (l) {
+      var s = p[l.id];
+      return '<button type="button" class="qz-lvl" data-qzl="' + l.id + '">' +
+        '<span class="n">' + l.n + '</span><span class="t">' + esc(l.text) + '</span>' +
+        (!s ? '' : s.s ? '<span class="st" aria-label="' + s.s + ' of 3 stars">' + starStr(s.s) + '</span>' : '<span class="sc">' + s.b + '/10</span>') +
+        '<span class="go">' + App.icon('right', 14) + '</span></button>';
+    }).join('');
+    var acts = open
+      ? '<button type="button" class="btn primary" data-qzl="' + nl.id + '">' + App.icon('play', 13) + ' ' + (nodeDone(nd, p) ? 'Level ' + nl.n : 'Start') + '</button>' +
+        '<button type="button" class="btn" data-qzsprint="' + i + '">' + ico('bolt', 15) + ' 60-second sprint' + (best ? ' · best ' + best : '') + '</button>'
+      : '<button type="button" class="btn primary" data-qzjump="' + i + '">Jump here</button>';
+    return '<div class="card qz-npop qz-in" role="region" aria-label="' + esc(nd.unit.name + ', ' + MODE_NAME[nd.mode]) + '">' +
+      '<div class="qz-npophead"><b>' + esc(nd.unit.name) + '</b><span>' + esc(nd.topic.name + ' · ' + MODE_NAME[nd.mode]) + '</span></div>' +
+      (open ? '<div class="qz-lvls">' + rows + '</div>'
+        : '<p class="qz-lockmsg">' + ico('lock', 15) + '<span>Pass a level in the step before this one to open it. Or jump ahead: score 9 out of 10 on its first level.</span></p>') +
+      '<div class="qz-acts">' + acts + '</div></div>';
+  }
+
+  function selectNode(i) {
+    selNode = selNode === i ? -1 : i;
+    paintHomeBody();
+    if (selNode >= 0) keepVisible(document.querySelector('.qz-npop'));
+  }
+
+  function showCurrentNode() {
+    var p = prog(), ci = currentNode(p);
+    if (ci < 3) return;
+    var n = el('qz-node-' + ci);
+    if (!n) return;
+    var r = n.getBoundingClientRect();
+    if (r.top > window.innerHeight * 0.7 || r.bottom < 0) window.scrollTo(0, Math.max(0, window.pageYOffset + r.top - window.innerHeight * 0.4));
+  }
+
+  // ---- topics view (free practice, nothing locked) ----
+  function topicsHTML() {
+    var p = prog(), h = '';
+    COURSE.forEach(function (t) {
+      var pass = 0, tot = 0;
+      LEVELS.forEach(function (l) { if (l.topic === t) { tot++; if (passed(p, l)) pass++; } });
+      h += '<button type="button" class="qz-topic" data-qzt="' + t.id + '">' +
+        '<span class="qz-tname">' + esc(t.name) + '</span>' +
+        '<span class="qz-tblurb">' + esc(t.blurb) + '</span>' +
+        '<span class="qz-tfoot"><span class="qz-bar"><i style="width:' + Math.round(100 * pass / tot) + '%"></i></span>' +
+        '<span class="qz-tmeta">' + pass + '/' + tot + '</span></span></button>';
+    });
+    return '<p class="qz-tabnote">Practice any topic, in any order. Everything here earns XP too.</p><div class="qz-topics">' + h + '</div>';
+  }
+
+  // ---- progress view ----
+  function tile(icon, label, value, sub) {
+    return '<div class="qz-tile">' + (icon ? '<span class="qz-tileic">' + ico(icon, 18) + '</span>' : '') +
+      '<span class="qz-tilelab">' + esc(label) + '</span><b class="qz-tileval">' + value + '</b>' + (sub ? '<span class="qz-tilesub">' + sub + '</span>' : '') + '</div>';
+  }
+
+  function weekStrip() {
+    var X = XP(), days = X.history(7), today = X.dayKey(), WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    return '<div class="qz-week">' + days.map(function (d) {
+      var dt = new Date(+d.key.slice(0, 4), +d.key.slice(5, 7) - 1, +d.key.slice(8, 10));
+      var state = d.l > 0 ? 'done' : d.frozen ? 'frozen' : d.key === today ? 'today' : 'missed';
+      var word = { done: 'practiced', frozen: 'covered by a streak freeze', today: 'not yet today', missed: 'missed' }[state];
+      return '<div class="qz-wday ' + state + '" title="' + esc(WD[dt.getDay()] + ': ' + word) + '"><span class="qz-wdot">' +
+        (state === 'done' ? ico('flame', 16) : state === 'frozen' ? ico('snow', 15) : '') + '</span><span>' + WD[dt.getDay()].charAt(0) + '</span>' +
+        '<span class="sr">' + WD[dt.getDay()] + ' ' + word + '</span></div>';
+    }).join('') + '</div>';
+  }
+
+  function topicSpeedRows() {
+    var X = XP(), today = X.dayKey(), weekAgo = X.addDays(today, -6), monthAgo = X.addDays(today, -34), tomorrow = X.addDays(today, 1);
+    var us = X.unitStats();
+    return COURSE.map(function (t) {
+      var ids = t.units.map(function (u) { return u.id; }), ok = 0, asked = 0;
+      ids.forEach(function (id) { if (us[id]) { ok += us[id].ok; asked += us[id].asked; } });
+      var recent = X.speed(ids, weekAgo, tomorrow), earlier = X.speed(ids, monthAgo, weekAgo);
+      var change = '–';
+      if (recent.n >= 3 && earlier.n >= 3) {
+        var d = (earlier.avg - recent.avg) / 1000;
+        change = Math.abs(d) < 0.1 ? 'Steady'
+          : '<span class="qz-chg ' + (d > 0 ? 'up' : 'down') + '">' + ico(d > 0 ? 'faster' : 'slower', 13) + Math.abs(d).toFixed(1) + ' s<span class="qz-chgw"> ' + (d > 0 ? 'faster' : 'slower') + '</span></span>';
+      }
+      return '<tr><th scope="row">' + esc(t.name) + '</th><td>' + asked + '</td><td>' + (asked ? Math.round(100 * ok / asked) + '%' : '–') + '</td>' +
+        '<td>' + (recent.n ? secs(recent.avg) : '–') + '</td><td>' + change + '</td></tr>';
+    }).join('');
+  }
+
+  function progressHTML() {
+    var X = XP(), lv = X.level(), st = X.streak(), tot = X.totals(), g = X.goal(), t = X.today();
+    var sprints = X.sprints(), sk = Object.keys(sprints).filter(function (k) { return NODE_BY_ID[k]; });
+    sk.sort(function (a, b) { return NODE_BY_ID[a].i - NODE_BY_ID[b].i; });
+    var goalSeg = X.GOALS.map(function (v) {
+      return '<button type="button" data-qzgoal="' + v + '" class="' + (v === g ? 'active' : '') + '" aria-pressed="' + (v === g) + '">' + X.GOAL_NAMES[v] + ' <small>' + v + '</small></button>';
+    }).join('');
+    return '<div class="qz-prog2">' +
+      '<div class="qz-tiles">' +
+        tile('star', 'Level', lv.lv + ' · ' + esc(lv.title), (lv.need - lv.into) + ' XP to level ' + (lv.lv + 1)) +
+        tile('bolt', 'Total XP', X.total().toLocaleString(), t.x + ' today') +
+        tile('flame', 'Streak', st.n + (st.n === 1 ? ' day' : ' days'), 'Best ' + st.best + ' · ' + st.freezes + ' freeze' + (st.freezes === 1 ? '' : 's') + ' saved') +
+        tile('clock', 'Practice time', fmtDur(tot.s), tot.l + ' levels · ' + tot.q + ' answers') +
+      '</div>' +
+      '<section class="card qz-pcard"><div class="qz-pchead"><h3>This week</h3><span class="muted small">A day counts once you finish a level. Every 7 days in a row earns a streak freeze (up to 2), which covers one missed day.</span></div>' + weekStrip() + '</section>' +
+      '<section class="card qz-pcard"><div class="qz-pchead"><h3>Daily goal</h3><span class="muted small">' + t.x + ' of ' + g + ' XP today</span></div>' +
+        '<div class="seg qz-goals" role="group" aria-label="Daily XP goal">' + goalSeg + '</div>' +
+        '<p class="muted small qz-xprules">You earn 2 XP per right answer, +1 for a quick one, +1 on a run of 5 or more, and +5 for passing a level (+5 more for 10/10).</p></section>' +
+      '<section class="card qz-pcard"><div class="qz-pchead"><h3>XP per day</h3><span class="muted small">Last 14 days · the line is your daily goal</span></div><div class="qz-chart" id="qz-ch-xp"></div></section>' +
+      '<section class="card qz-pcard"><div class="qz-pchead"><h3>Practice time</h3><span class="muted small">Minutes per day, last 14 days</span></div><div class="qz-chart" id="qz-ch-time"></div></section>' +
+      '<section class="card qz-pcard"><div class="qz-pchead"><h3>Answer speed</h3><span class="muted small">Average seconds per right answer, by week · lower is faster</span></div><div class="qz-chart" id="qz-ch-speed"></div>' +
+        '<div class="qz-tblwrap"><table class="qz-table qz-ttopic"><thead><tr><th scope="col">Topic</th><th scope="col">Answers</th><th scope="col">Right</th><th scope="col">Speed</th><th scope="col">Change</th></tr></thead><tbody>' +
+        topicSpeedRows() + '</tbody></table></div><p class="muted small qz-tnote">Speed is your average over the last 7 days. Change compares it with the 4 weeks before: up means faster.</p></section>' +
+      '<section class="card qz-pcard"><div class="qz-pchead"><h3>Sprint records</h3><span class="muted small">Most right answers in 60 seconds</span></div>' +
+        (sk.length ? '<ul class="qz-recs">' + sk.map(function (k) {
+          var nd = NODE_BY_ID[k];
+          return '<li><button type="button" class="qz-rec" data-qzsprint="' + nd.i + '"><span>' + esc(nd.unit.name) + '<small>' + esc(MODE_NAME[nd.mode]) + '</small></span><b>' + sprints[k] + '</b>' + ico('bolt', 15) + '</button></li>';
+        }).join('') + '</ul>'
+          : '<p class="muted small">No sprints yet. Open any step on the path and choose 60-second sprint.</p>') + '</section>' +
+      '<section class="card qz-pcard"><div class="qz-pchead"><h3>Lesson sound</h3></div>' +
+        '<div class="seg qz-sound" role="group" aria-label="Exercise sound"><button type="button" data-qzs="piano">Piano</button><button type="button" data-qzs="guitar">Guitar</button></div></section>' +
+    '</div>';
+  }
+
+  // ---- charts: built at the container's real pixel width (no scaled text) ----
+  function niceMax(v) {
+    if (v <= 0) return 1;
+    var e = Math.pow(10, Math.floor(Math.log(v) / Math.LN10)), f = v / e;
+    return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * e;
+  }
+  function dayLabel(k, short) {
+    var d = new Date(+k.slice(0, 4), +k.slice(5, 7) - 1, +k.slice(8, 10));
+    var wd = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()];
+    return short ? wd.charAt(0) : wd + ' ' + d.getDate() + ' ' + ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getMonth()];
+  }
+
+  function barChart(box, rows, o) {
+    var W = Math.max(260, box.clientWidth), H = 170, L = 34, R = 10, T = 14, B = 24, pw = W - L - R, ph = H - T - B;
+    var max = niceMax(Math.max(o.goal || 0, Math.max.apply(null, rows.map(function (r) { return r.v; }))));
+    var band = pw / rows.length, bw = Math.min(24, band * 0.62), s = '';
+    [0, max / 2, max].forEach(function (v) {
+      var y = T + ph - ph * v / max;
+      s += '<line class="qz-grid" x1="' + L + '" x2="' + (W - R) + '" y1="' + y.toFixed(1) + '" y2="' + y.toFixed(1) + '"/>' +
+        '<text class="qz-axis" x="' + (L - 6) + '" y="' + (y + 4).toFixed(1) + '" text-anchor="end">' + (Math.round(v * 10) / 10) + '</text>';
+    });
+    if (o.goal) {
+      var gy = T + ph - ph * o.goal / max;
+      s += '<line class="qz-goalline" x1="' + L + '" x2="' + (W - R) + '" y1="' + gy.toFixed(1) + '" y2="' + gy.toFixed(1) + '"/>' +
+        '<text class="qz-axis qz-halo" x="' + (L + 4) + '" y="' + (gy - 5).toFixed(1) + '">Goal ' + o.goal + '</text>';
+    }
+    rows.forEach(function (r, i) {
+      var cx = L + band * i + band / 2, h = ph * r.v / max, x0 = cx - bw / 2, x1 = cx + bw / 2, yb = T + ph, yt = yb - h, rr = Math.min(4, h, bw / 2);
+      if (h > 0.5) {
+        s += '<path class="qz-barm' + (i === rows.length - 1 ? ' last' : '') + '" d="M' + x0.toFixed(1) + ' ' + yb + 'V' + (yt + rr).toFixed(1) +
+          'Q' + x0.toFixed(1) + ' ' + yt.toFixed(1) + ' ' + (x0 + rr).toFixed(1) + ' ' + yt.toFixed(1) + 'H' + (x1 - rr).toFixed(1) +
+          'Q' + x1.toFixed(1) + ' ' + yt.toFixed(1) + ' ' + x1.toFixed(1) + ' ' + (yt + rr).toFixed(1) + 'V' + yb + 'Z"/>';
+      }
+      if (i === rows.length - 1 && r.v > 0) s += '<text class="qz-val qz-halo" x="' + cx.toFixed(1) + '" y="' + (yt - 5).toFixed(1) + '" text-anchor="middle">' + r.lab + '</text>';
+      if (rows.length <= 8 || i % 2 === (rows.length - 1) % 2) s += '<text class="qz-axis" x="' + cx.toFixed(1) + '" y="' + (H - 7) + '" text-anchor="middle">' + r.x + '</text>';
+      s += '<rect class="qz-hit" x="' + (L + band * i).toFixed(1) + '" y="' + T + '" width="' + band.toFixed(1) + '" height="' + ph + '" data-tip="' + esc(r.tip) + '"/>';
+    });
+    box.innerHTML = '<svg class="qz-svg" width="' + W + '" height="' + H + '" role="img" aria-label="' + esc(o.label) + '">' + s + '</svg><div class="qz-tip" hidden></div>' + o.table;
+  }
+
+  function lineChart(box, rows, o) {
+    var W = Math.max(260, box.clientWidth), H = 170, L = 38, R = 14, T = 16, B = 24, pw = W - L - R, ph = H - T - B;
+    var vals = rows.filter(function (r) { return r.v != null; }).map(function (r) { return r.v; });
+    var max = niceMax(Math.max.apply(null, vals.concat([1])) * 1.1), band = pw / rows.length, s = '', pts = [];
+    [0, max / 2, max].forEach(function (v) {
+      var y = T + ph - ph * v / max;
+      s += '<line class="qz-grid" x1="' + L + '" x2="' + (W - R) + '" y1="' + y.toFixed(1) + '" y2="' + y.toFixed(1) + '"/>' +
+        '<text class="qz-axis" x="' + (L - 6) + '" y="' + (y + 4).toFixed(1) + '" text-anchor="end">' + (Math.round(v * 10) / 10) + ' s</text>';
+    });
+    rows.forEach(function (r, i) {
+      var cx = L + band * i + band / 2;
+      if (r.v != null) pts.push([cx, T + ph - ph * r.v / max, r]);
+      if (i % 2 === (rows.length - 1) % 2) s += '<text class="qz-axis" x="' + cx.toFixed(1) + '" y="' + (H - 7) + '" text-anchor="middle">' + r.x + '</text>';
+    });
+    // a gap week breaks the line: draw runs of consecutive weeks
+    var run = [], runs = [];
+    rows.forEach(function (r, i) {
+      var pt = null;
+      pts.forEach(function (q) { if (q[2] === r) pt = q; });
+      if (pt) run.push(pt); else { if (run.length) runs.push(run); run = []; }
+    });
+    if (run.length) runs.push(run);
+    runs.forEach(function (rn) {
+      if (rn.length > 1) {
+        var d = rn.map(function (q, j) { return (j ? 'L' : 'M') + q[0].toFixed(1) + ' ' + q[1].toFixed(1); }).join('');
+        s += '<path class="qz-area" d="' + d + 'L' + rn[rn.length - 1][0].toFixed(1) + ' ' + (T + ph) + 'L' + rn[0][0].toFixed(1) + ' ' + (T + ph) + 'Z"/>' +
+          '<path class="qz-linem" d="' + d + '"/>';
+      }
+    });
+    pts.forEach(function (q, j) {
+      s += '<circle class="qz-dot" cx="' + q[0].toFixed(1) + '" cy="' + q[1].toFixed(1) + '" r="4"/>';
+      if (j === pts.length - 1) {
+        var below = j > 0 && pts[j - 1][1] < q[1] && q[1] + 20 < T + ph;
+        s += '<text class="qz-val qz-halo" x="' + q[0].toFixed(1) + '" y="' + (below ? q[1] + 19 : q[1] - 9).toFixed(1) + '" text-anchor="middle">' + q[2].lab + '</text>';
+      }
+    });
+    rows.forEach(function (r, i) {
+      s += '<rect class="qz-hit" x="' + (L + band * i).toFixed(1) + '" y="' + T + '" width="' + band.toFixed(1) + '" height="' + ph + '" data-tip="' + esc(r.tip) + '"/>';
+    });
+    box.innerHTML = '<svg class="qz-svg" width="' + W + '" height="' + H + '" role="img" aria-label="' + esc(o.label) + '">' + s + '</svg><div class="qz-tip" hidden></div>' + o.table;
+  }
+
+  function tableHTML(head, rows) {
+    return '<details class="qz-tbl"><summary>Show as a table</summary><div class="qz-tblwrap"><table class="qz-table"><thead><tr>' +
+      head.map(function (h) { return '<th scope="col">' + h + '</th>'; }).join('') + '</tr></thead><tbody>' +
+      rows.map(function (r) { return '<tr>' + r.map(function (c, i) { return i ? '<td>' + c + '</td>' : '<th scope="row">' + c + '</th>'; }).join('') + '</tr>'; }).join('') +
+      '</tbody></table></div></details>';
+  }
+
+  function wireTips(box) {
+    if (box.__tips) return;
+    box.__tips = true;
+    function hide() { var tip = box.querySelector('.qz-tip'); if (tip) tip.hidden = true; }
+    function show(e) {
+      var t = e.target.closest ? e.target.closest('[data-tip]') : null, tip = box.querySelector('.qz-tip');
+      if (!t || !tip) { hide(); return; }
+      tip.textContent = t.getAttribute('data-tip');
+      tip.hidden = false;
+      var br = box.getBoundingClientRect(), tr = t.getBoundingClientRect();
+      var x = tr.left - br.left + tr.width / 2, w = tip.offsetWidth;
+      tip.style.left = Math.max(0, Math.min(br.width - w, x - w / 2)) + 'px';
+      tip.style.top = '0px';
+    }
+    box.addEventListener('pointermove', show);
+    box.addEventListener('pointerdown', show);
+    box.addEventListener('pointerleave', hide);
+  }
+
+  function drawCharts() {
+    var X = XP(), g = X.goal();
+    var hx = el('qz-ch-xp'), ht = el('qz-ch-time'), hs = el('qz-ch-speed');
+    if (!hx || !ht || !hs) return;
+    var days = X.history(14), empty = '<p class="muted small qz-empty">Nothing yet in the last 14 days. Finish a level and it shows up here.</p>';
+    if (days.some(function (d) { return d.x > 0; })) {
+      barChart(hx, days.map(function (d, i) {
+        return { v: d.x, x: dayLabel(d.key, true), lab: d.x + ' XP', tip: (i === days.length - 1 ? 'Today' : dayLabel(d.key)) + ': ' + d.x + ' XP · ' + d.l + ' level' + (d.l === 1 ? '' : 's') };
+      }), { goal: g, label: 'XP per day over the last 14 days', table: tableHTML(['Day', 'XP', 'Levels'], days.map(function (d) { return [dayLabel(d.key), d.x, d.l]; })) });
+    } else hx.innerHTML = empty;
+    if (days.some(function (d) { return d.s > 0; })) {
+      barChart(ht, days.map(function (d, i) {
+        var m = Math.round(d.s / 6) / 10;
+        return { v: m, x: dayLabel(d.key, true), lab: m + ' min', tip: (i === days.length - 1 ? 'Today' : dayLabel(d.key)) + ': ' + m + ' min · ' + d.q + ' answers' };
+      }), { label: 'Practice minutes per day over the last 14 days', table: tableHTML(['Day', 'Minutes', 'Answers'], days.map(function (d) { return [dayLabel(d.key), Math.round(d.s / 6) / 10, d.q]; })) });
+    } else ht.innerHTML = empty;
+    var wk = X.speedWeeks(8);
+    if (wk.some(function (w) { return w.n > 0; })) {
+      lineChart(hs, wk.map(function (w, i) {
+        var v = w.n ? Math.round(w.avg / 100) / 10 : null;
+        return { v: v, x: i === wk.length - 1 ? 'Now' : dayLabel(w.from).split(' ').slice(1).join(' '), lab: v != null ? v + ' s' : '',
+          tip: 'Week of ' + dayLabel(w.from) + ': ' + (v != null ? v + ' s per right answer · ' + w.n + ' answers' : 'no practice') };
+      }), { label: 'Average seconds per right answer, by week', table: tableHTML(['Week of', 'Seconds', 'Right answers'], wk.map(function (w) { return [dayLabel(w.from), w.n ? (w.avg / 1000).toFixed(1) : '–', w.n]; })) });
+    } else hs.innerHTML = '<p class="muted small qz-empty">Answer speed appears after your first right answers.</p>';
+    [hx, ht, hs].forEach(wireTips);
+  }
+
+  // ---- home ----
+  function paintHomeBody() {
+    var b = el('qz-homebody');
+    if (!b) return;
+    root.querySelectorAll('[data-qzh]').forEach(function (t) {
+      var on = t.getAttribute('data-qzh') === homeTab;
+      t.classList.toggle('active', on);
+      t.setAttribute('aria-selected', String(on));
+    });
+    if (homeTab === 'topics') b.innerHTML = topicsHTML();
+    else if (homeTab === 'progress') { b.innerHTML = progressHTML(); drawCharts(); }
+    else b.innerHTML = pathHTML();
+    paintSound();
+  }
+
+  function setHomeTab(t) {
+    homeTab = t;
+    App.store.set('qz.home', t);
+    selNode = -1;
+    paintHomeBody();
+    if (t === 'path') showCurrentNode();
+  }
+
+  // ---- sprints: 60 seconds, as many right answers as you can ----
+  function startSprint(i) {
+    var nd = NODES[i], p = prog(), lvl = nd.levels[0];
+    nd.levels.forEach(function (l) { if (passed(p, l)) lvl = l; });
+    startLevel(lvl.id, { sprint: i });
+  }
+
+  function tickSprint() {
+    if (!cur || !cur.sprint || cur.sprint.done) return;
+    var left = Math.max(0, cur.sprint.end - Date.now()), f = el('qz-timefill');
+    if (f) f.style.width = (100 * left / 60000).toFixed(2) + '%';
+    var c = el('qz-count');
+    if (c) c.textContent = cur.res.filter(Boolean).length + ' right · ' + Math.ceil(left / 1000) + ' s';
+    if (left <= 0) finishSprint();
+  }
+
+  function stopSprint() {
+    if (cur && cur.sprint) { clearInterval(cur.sprint.timer); cur.sprint.timer = 0; }
+  }
+
+  function finishSprint() {
+    if (!cur || !cur.sprint || cur.sprint.done) return;
+    var sp = cur.sprint;
+    sp.done = true;
+    stopSprint();
+    clearTimeout(advT);
+    var score = cur.res.filter(Boolean).length, rec = XP().sprintRecord(sp.key, score);
+    cur.rec = rec;
+    cur.fin = XP().finishLevel({ record: rec.isBest && score > 0 });
+    cur.xp += cur.fin.bonus;
+    cur.score = score;
+    view = 'done';
+    render();
+    reveal(root);
+  }
+
+  // XP fly-up next to the footer on a right answer
+  function xpPop(r) {
+    var f = el('qz-act');
+    if (!f || !r.xp) return;
+    var s = document.createElement('span');
+    s.className = 'qz-xppop';
+    s.textContent = '+' + r.xp + ' XP' + (r.fast ? ' · quick' : '');
+    f.parentNode.insertBefore(s, f);
+    setTimeout(function () { if (s.parentNode) s.parentNode.removeChild(s); }, 1300);
+  }
+
+  function paintRunXP() {
+    var e = el('qz-xpp');
+    if (!e || !cur) return;
+    e.innerHTML = (cur.combo >= 3 ? '<span class="qz-combo">' + ico('flame', 14) + cur.combo + ' in a row</span>' : '') +
+      '<span class="qz-xpn">' + ico('bolt', 14) + cur.xp + ' XP</span>';
+  }
+
+  // ---- results ----
+  function doneStats() {
+    var avg = cur.times.length ? cur.times.reduce(function (a, b) { return a + b; }, 0) / cur.times.length : 0;
+    return '<div class="qz-dstats">' +
+      tile('bolt', 'XP earned', '+' + cur.xp) +
+      (cur.sprint ? tile('star', 'Record', String((cur.rec || {}).best || cur.score)) : tile('clock', 'Time', fmtTime(cur.ms))) +
+      tile('faster', 'Per right answer', avg ? secs(avg) : '–') + '</div>';
+  }
+
+  function doneNotes() {
+    var X = XP(), f = cur.fin || {}, st = X.streak(), t = X.today(), g = X.goal(), out = [];
+    if (f.extended && st.n) out.push([st.n === 1 ? 'Day 1 of a new streak.' : st.n + '-day streak. Keep it going tomorrow.', 'flame']);
+    if (f.freezeEarned) out.push(['You earned a streak freeze. It covers one missed day.', 'snow']);
+    if (f.goalHit) out.push(['Daily goal reached: ' + t.x + ' XP today.', 'check']);
+    else if (t.x < g) out.push([t.x + ' of ' + g + ' XP toward today’s goal.', 'star']);
+    var avg = cur.times.length ? cur.times.reduce(function (a, b) { return a + b; }, 0) / cur.times.length : 0;
+    if (avg >= 300 && cur.times.length >= 3 && cur.prevSpeed && cur.prevSpeed.n >= 5) {
+      var d = (cur.prevSpeed.avg - avg) / 1000;
+      if (Math.abs(d) >= 0.1) out.push([Math.abs(d).toFixed(1) + ' s ' + (d > 0 ? 'faster' : 'slower') + ' than your usual on ' + cur.lvl.unit.name + '.', d > 0 ? 'faster' : 'slower']);
+    }
+    return '<ul class="qz-dnotes">' + out.map(function (o) { return '<li>' + ico(o[1], 16) + '<span>' + esc(o[0]) + '</span></li>'; }).join('') + '</ul>';
+  }
+
   // ================= events =================
 
   function onClick(e) {
@@ -1590,6 +2108,11 @@
       return;
     }
     if ((a = t.getAttribute('data-qzm'))) { var pr = a.split('|'); openMode[pr[0]] = pr[1]; repaintUnit(pr[0], false); return; }
+    if ((a = t.getAttribute('data-qzh'))) { setHomeTab(a); return; }
+    if ((a = t.getAttribute('data-qzn'))) { selectNode(+a); return; }
+    if ((a = t.getAttribute('data-qzsprint'))) { startSprint(+a); return; }
+    if ((a = t.getAttribute('data-qzjump'))) { startLevel(NODES[+a].levels[0].id, { jump: +a }); return; }
+    if ((a = t.getAttribute('data-qzgoal'))) { XP().setGoal(+a); paintHomeBody(); var sh = root.querySelector('.qz-strip'); if (sh) sh.outerHTML = statsStrip(); return; }
     if ((a = t.getAttribute('data-qzl'))) { startLevel(a); return; }
     if ((a = t.getAttribute('data-qzc'))) { answerChoice(a); return; }
     if ((a = t.getAttribute('data-qzs'))) { App.store.set('qz.sound', a); paintSound(); return; }
@@ -1600,7 +2123,8 @@
     }
     switch (t.id) {
       case 'qz-home': view = 'home'; render(); reveal(root); break;
-      case 'qz-cont': var n = nextLevel(); if (n) startLevel(n.id); break;
+      case 'qz-tohome': stopSprint(); toPath(cur ? cur.lvl.node.i : null); break;
+      case 'qz-cont': break; // carries data-qzl (path frontier)
       case 'qz-back': back(); break;
       case 'qz-hear': if (cur) playQ(cur.q); break;
       case 'qz-act': if (!cur) break; if (cur.answered) nextQ(); else resolve(false, null); break;
@@ -1772,12 +2296,104 @@
     '.qz-fz{fill:transparent;cursor:pointer}' +
     '.qz-nm{stroke:var(--card);stroke-width:2;pointer-events:none}' +
     '.qz-nm.mk-a{fill:var(--accent)}.qz-nm.mk-ok{fill:var(--green)}.qz-nm.mk-bad{fill:var(--red)}' +
+    // game layer: stats strip, home tabs, path, run XP, sprint, results, progress
+    '.qz-strip{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto;gap:10px 22px;align-items:center;padding:16px 20px}' +
+    '.qz-stat{display:flex;align-items:center;gap:10px;min-width:0}' +
+    '.qz-stat b{display:block;font:600 22px/1.1 var(--font-body);font-variant-numeric:tabular-nums}' +
+    '.qz-stat b small{font-size:14px;color:var(--muted);font-weight:500}' +
+    '.qz-stat span{font-size:12.5px;color:var(--muted)}' +
+    '.qz-stat>.ic{color:var(--muted)}.qz-stat.lit>.ic{color:var(--accent);fill:color-mix(in srgb,var(--accent) 30%,transparent)}' +
+    '.qz-ring .trk{fill:none;stroke:var(--card2);stroke-width:5}.qz-ring .val{fill:none;stroke:var(--accent);stroke-width:5;stroke-linecap:round;transition:stroke-dashoffset .4s ease}' +
+    '.qz-stat .qz-lvbadge{display:grid;place-items:center;width:40px;height:40px;flex:none;border-radius:12px;background:var(--accent);color:#221302;font:400 24px/1 var(--font-display)}' +
+    '.qz-lvtext{display:grid;gap:4px;min-width:0;flex:1}.qz-lvtext b{font-size:15px}' +
+    '.qz-stripnote{grid-column:1/-1;margin:0;padding-top:10px;border-top:1px solid var(--line-soft);font-size:13.5px;color:var(--muted)}' +
+    '.qz-hometabs{display:flex;width:100%;margin:2px 0 14px}.qz-hometabs button{flex:1}' +
+    '.qz-tabnote{margin:0 0 12px;color:var(--muted);font-size:14px}' +
+    '.qz-path{display:grid;gap:22px}' +
+    '.qz-psec{display:grid;gap:8px}' +
+    '.qz-pban{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:2px 12px;padding:14px 18px;border-radius:var(--radius);background:color-mix(in srgb,var(--accent) 14%,var(--card));border:1px solid color-mix(in srgb,var(--accent) 30%,var(--line))}' +
+    '.qz-eyebrow{grid-column:1/-1;font-size:11.5px;font-weight:600;letter-spacing:1.6px;text-transform:uppercase;color:var(--accent)}' +
+    '.qz-pban h3{margin:0;font:400 26px/1 var(--font-display);letter-spacing:1px;text-transform:uppercase}' +
+    '.qz-pmeta{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}' +
+    '.qz-pnodes{display:grid;gap:6px;padding:10px 0}' +
+    '.qz-nwrap{display:grid;justify-items:center;gap:10px;--zz:min(54px,12vw)}' +
+    '.qz-node{position:relative;display:grid;justify-items:center;gap:6px;padding:4px;border:0;background:transparent;color:var(--text);font:inherit;cursor:pointer;transform:translateX(calc(var(--x) * var(--zz)));-webkit-tap-highlight-color:transparent}' +
+    '.qz-ndisc{display:grid;place-items:center;width:68px;height:68px;border-radius:50%;background:conic-gradient(var(--accent) var(--p),var(--card2) 0);transition:transform .12s ease}' +
+    '.qz-nface{display:grid;place-items:center;width:56px;height:56px;border-radius:50%;background:var(--card);color:var(--accent);box-shadow:inset 0 -3px 0 color-mix(in srgb,var(--text) 10%,transparent)}' +
+    '.qz-node:hover .qz-ndisc,.qz-node:focus-visible .qz-ndisc{transform:scale(1.06)}' +
+    '.qz-node:active .qz-ndisc{transform:scale(.97)}' +
+    '.qz-node.done .qz-nface{background:var(--accent);color:#221302}' +
+    '.qz-node.cur .qz-ndisc{box-shadow:0 0 0 5px color-mix(in srgb,var(--accent) 25%,transparent)}' +
+    '.qz-node.locked{cursor:pointer}.qz-node.locked .qz-ndisc{background:var(--card2)}.qz-node.locked .qz-nface{color:var(--muted);background:var(--card2);box-shadow:none}' +
+    '.qz-node.locked .qz-nlbl{color:var(--muted)}' +
+    '.qz-node.sel .qz-ndisc{outline:2px solid var(--accent);outline-offset:3px}' +
+    '.qz-nlbl{display:grid;font-size:13px;font-weight:600;line-height:1.25;text-align:center;max-width:150px}.qz-nlbl small{font-weight:500;color:var(--muted);font-size:12px}' +
+    '.qz-nstart{position:absolute;top:-24px;left:50%;transform:translateX(-50%);padding:3px 10px;border-radius:8px;background:var(--accent);color:#221302;font:600 11px/1.4 var(--font-body);letter-spacing:1px;text-transform:uppercase;white-space:nowrap;animation:qz-bob 1.6s ease-in-out infinite}' +
+    '.qz-nstart::after{content:"";position:absolute;left:50%;bottom:-5px;margin-left:-5px;border:5px solid transparent;border-bottom:0;border-top-color:var(--accent)}' +
+    '@keyframes qz-bob{0%,100%{transform:translate(-50%,0)}50%{transform:translate(-50%,-3px)}}' +
+    '.qz-node.cur{margin-top:22px}' +
+    '.qz-npop{width:min(440px,100%);margin:0;display:grid;gap:10px;padding:14px}' +
+    '.qz-npophead{display:grid}.qz-npophead span{font-size:13px;color:var(--muted)}' +
+    '.qz-lockmsg{display:flex;gap:8px;align-items:flex-start;margin:0;font-size:14px;color:var(--muted)}.qz-lockmsg .ic{flex:none;margin-top:2px}' +
+    '.qz-npop .qz-acts{justify-content:flex-start}' +
+    '.qz-xpp{display:flex;gap:8px;align-items:center;margin-left:auto;font-size:13px;font-weight:600;font-variant-numeric:tabular-nums}' +
+    '.qz-xpp+.qz-count{margin-left:0}' +
+    '.qz-xpn,.qz-combo{display:inline-flex;align-items:center;gap:3px}.qz-xpn{color:var(--accent)}.qz-combo{color:var(--text)}.qz-combo .ic{color:var(--accent)}' +
+    '.qz-xppop{position:absolute;right:14px;bottom:100%;font:600 14px var(--font-body);color:var(--accent);pointer-events:none;animation:qz-pop 1.2s ease-out forwards}' +
+    '.qz-foot{position:relative}' +
+    '@keyframes qz-pop{0%{opacity:0;transform:translateY(6px)}15%{opacity:1}100%{opacity:0;transform:translateY(-22px)}}' +
+    '.qz-timebar{height:8px;margin:8px 0 12px;border-radius:4px;background:var(--card2);overflow:hidden}' +
+    '.qz-timebar i{display:block;height:100%;width:100%;background:var(--accent);border-radius:4px;transition:width .1s linear}' +
+    '.qz-dstats,.qz-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(150px,45%),1fr));gap:10px;width:100%;max-width:560px}' +
+    '.qz-tiles{max-width:none;margin-bottom:12px}' +
+    '.qz-tile{display:grid;gap:2px;padding:12px 14px;border-radius:12px;background:var(--card2);text-align:left;position:relative}' +
+    '.qz-tileic{position:absolute;top:12px;right:12px;color:var(--accent)}' +
+    '.qz-tilelab{font-size:12.5px;color:var(--muted)}.qz-tileval{font:600 20px/1.2 var(--font-body)}.qz-tilesub{font-size:12px;color:var(--muted)}' +
+    '.qz-dnotes{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:6px;text-align:left;max-width:520px}' +
+    '.qz-dnotes li{display:flex;gap:8px;align-items:flex-start;font-size:14.5px}.qz-dnotes .ic{flex:none;margin-top:2px;color:var(--accent)}' +
+    '.qz-prog2{display:grid;gap:12px}' +
+    '.qz-pcard{margin:0;display:grid;gap:12px}' +
+    '.qz-pchead{display:grid;gap:2px}.qz-pchead h3{margin:0;font-size:16px;color:var(--text);letter-spacing:.3px;text-transform:none}' +
+    '.qz-week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;max-width:420px}' +
+    '.qz-wday{display:grid;justify-items:center;gap:4px;font-size:12px;color:var(--muted)}' +
+    '.qz-wdot{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:var(--card2);color:var(--muted)}' +
+    '.qz-wday.done .qz-wdot{background:var(--accent);color:#221302}' +
+    '.qz-wday.frozen .qz-wdot{background:color-mix(in srgb,var(--blue) 30%,var(--card2));color:var(--text)}' +
+    '.qz-wday.today .qz-wdot{box-shadow:inset 0 0 0 2px var(--accent)}' +
+    '.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}' +
+    '.qz-goals{display:flex;flex-wrap:wrap;width:fit-content;max-width:100%}.qz-goals small{color:var(--muted);font-weight:500;margin-left:2px}' +
+    '.qz-xprules{margin:0}' +
+    '.qz-chart{position:relative;min-width:0}' +
+    '.qz-svg{display:block;overflow:visible}' +
+    '.qz-grid{stroke:var(--line);stroke-width:1}.qz-goalline{stroke:var(--muted);stroke-width:1}' +
+    '.qz-axis{font:500 11px var(--font-body);fill:var(--muted)}.qz-val{font:600 12px var(--font-body);fill:var(--text)}' +
+    '.qz-halo{paint-order:stroke;stroke:var(--card);stroke-width:4px;stroke-linejoin:round}.qz-tnote{margin:8px 0 0}' +
+    '.qz-barm{fill:var(--accent)}.qz-linem{fill:none;stroke:var(--accent);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}' +
+    '.qz-area{fill:var(--accent);opacity:.1}.qz-dot{fill:var(--accent);stroke:var(--card);stroke-width:2}' +
+    '.qz-hit{fill:transparent;cursor:default}.qz-hit:hover{fill:color-mix(in srgb,var(--text) 6%,transparent)}' +
+    '.qz-tip{position:absolute;top:0;padding:5px 9px;border-radius:8px;background:var(--text);color:var(--card);font-size:12.5px;font-weight:600;white-space:nowrap;pointer-events:none;transform:translateY(-100%)}' +
+    '.qz-empty{margin:0}' +
+    '.qz-tbl summary{cursor:pointer;font-size:13px;color:var(--muted);margin-top:4px}' +
+    '.qz-tblwrap{overflow-x:auto}' +
+    '.qz-table{width:100%;border-collapse:collapse;font-size:13.5px;font-variant-numeric:tabular-nums}' +
+    '.qz-table th,.qz-table td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}' +
+    '.qz-table thead th{font-size:12px;color:var(--muted);font-weight:600}' +
+    '.qz-chg{display:inline-flex;align-items:center;gap:3px;font-weight:600}.qz-chg.up{color:var(--green)}.qz-chg.down{color:var(--red)}' +
+    '.qz-recs{list-style:none;margin:0;padding:0;display:grid;gap:6px}' +
+    '.qz-rec{display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:1px solid transparent;border-radius:10px;background:var(--card2);color:var(--text);font:inherit;text-align:left;cursor:pointer}' +
+    '.qz-rec:hover,.qz-rec:focus-visible{border-color:var(--accent)}' +
+    '.qz-rec span{flex:1;display:grid}.qz-rec small{color:var(--muted)}.qz-rec b{font-size:18px;font-variant-numeric:tabular-nums}.qz-rec .ic{color:var(--accent)}' +
     '@media (max-width:640px){' +
+      '.qz-strip{grid-template-columns:auto minmax(0,1fr);gap:12px 14px;padding:14px}.qz-lvstat{grid-column:1/-1}.qz-strip .qz-go{grid-column:1/-1;justify-self:stretch}' +
+      '.qz-ndisc{width:62px;height:62px}.qz-nface{width:50px;height:50px}' +
       '.qz-hero{grid-template-columns:minmax(0,1fr)}.qz-heroact{justify-items:stretch}.qz-nextup{text-align:left}' +
       '.qz-ubar{display:none}.qz-uhead{padding:14px 14px}.qz-ubody{padding:0 14px 14px}' +
       '.qz-lvltag{display:none}' +
       '.qz-stage{padding:18px 14px 14px}.qz-prompt{font-size:19px}' +
       '.qz-foot{flex-wrap:wrap}.qz-fb{flex-basis:100%}.qz-fb:empty{display:none}.qz-act{flex:1}' +
+      '.qz-dstats{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.qz-dstats .qz-tile{padding:10px}.qz-dstats .qz-tileic{display:none}.qz-dstats .qz-tileval{font-size:18px}' +
+      '.qz-ttopic th:nth-child(2),.qz-ttopic td:nth-child(2){display:none}.qz-table th,.qz-table td{padding:7px 6px}' +
+      '.qz-chgw{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}' +
     '}';
 
   function init(rootEl) {
@@ -1794,6 +2410,11 @@
       document.fonts.load('48px SLMusic').then(function () { if (view === 'run' && cur) paintVis(); }, function () { /* fallback glyphs */ });
     }
     render();
+    // charts are drawn at their real pixel width — redraw when it changes
+    window.addEventListener('resize', function () {
+      clearTimeout(chartT);
+      chartT = setTimeout(function () { if (App.active === 'quiz' && view === 'home' && homeTab === 'progress') drawCharts(); }, 150);
+    });
     // new in 0.69: land here once so the course is the first thing seen
     if (!App.store.get('qz.landed', false)) {
       App.store.set('qz.landed', true);
@@ -1809,6 +2430,13 @@
     pick: answerChoice,
     get q() { return cur ? cur.q : null; },
     get view() { return view; },
+    get cur() { return cur; },
+    nodes: function () { return NODES.map(function (n) { return n.id; }); },
+    node: function (i) { var n = NODES[i], p = prog(); return n ? { id: n.id, first: n.levels[0].id, open: unlocked(i, p), done: nodeDone(n, p), levels: n.levels.length } : null; },
+    current: function () { return currentNode(prog()); },
+    sprint: startSprint,
+    tab: setHomeTab,
+    finishSprint: finishSprint,
     theory: { nt: nt, midiOf: midiOf, nm: nm, addIv: addIv, IV: IV, buildChord: buildChord, buildScale: buildScale, keyChords: keyChords, KEYS: KEYS }
   };
 
@@ -1817,9 +2445,12 @@
     onShow: function () {
       // a focused space: silence the metronome / jam / loops while here
       App.emit('transport:claim', { owner: 'quiz' });
-      if (view !== 'run') render();
+      if (view !== 'run') {
+        render();
+        if (view === 'home' && homeTab === 'path' && window.pageYOffset < 60) showCurrentNode();
+      }
     },
-    onHide: function () { clearTimeout(advT); },
+    onHide: function () { clearTimeout(advT); if (cur && cur.sprint && !cur.sprint.done && view === 'run') finishSprint(); },
     onKey: onKey
   });
 })();

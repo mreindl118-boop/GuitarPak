@@ -267,6 +267,21 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
   border-color: rgba(255, 171, 71, 0.35);
 }
 
+/* accountability: a dot on Learn until today's XP goal is met (js/xp.js) */
+.tabbar-btn { position: relative; }
+.goal-due .tabbar-btn[data-group="gtheory"]::after {
+  content: '';
+  position: absolute;
+  top: 5px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--bg);
+}
+.goal-due .tabbar-bottom .tabbar-btn[data-group="gtheory"]::after { right: calc(50% - 18px); }
+
 /* corner tools: workspace, help, settings, metronome */
 .tb-tools { margin-left: auto; display: flex; align-items: center; gap: 6px; }
 .icon-btn { display: inline-flex; align-items: center; justify-content: center; padding: 6px 8px; min-width: 36px; }

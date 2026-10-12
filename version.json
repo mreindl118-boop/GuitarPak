@@ -1,6 +1,6 @@
 {
   "version": "0.70.2",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/soundLAB-alpha.apk",
-  "web": "0.70.2",
-  "notes": "THE ANDROID APP IS BACK, AS A REAL APP. A new soundLAB APK (v0.70.2) runs the live app inside it, so from now on it updates itself every time soundLAB updates — no more update prompts that download the same old version. It installs as a new app: install it, then delete the old soundLAB. (Settings from the old app don't carry over.) Also fixed: the play button next to questions in Exercises didn't respond on phones — the music staff's clef was sitting over it; and tapping text no longer pops up Chrome's Google search panel. On phones, Next scrolls into view by itself after you answer."
+  "web": "0.71.0",
+  "notes": "EXERCISES IS NOW A GAME. Every right answer earns XP (more for quick answers and for runs of 5 in a row), and XP raises your player level. Pick a daily goal (Casual to Intense); the Learn tab shows a dot until you reach it. Finish a level each day to build a streak: every 7 days in a row earns a streak freeze that covers a missed day. The course is now a path: each step opens when you pass a level in the one before it, or skip ahead with a jump test (9 of 10). New 60-second sprints test your speed and keep your record for each step. The new Progress tab charts your XP per day, practice minutes and answer speed by week, with your speed and accuracy for each topic. The Topics tab still lets you practice anything freely."
 }
