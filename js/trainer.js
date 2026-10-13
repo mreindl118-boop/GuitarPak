@@ -81,6 +81,10 @@
     els.sessStart.textContent = (!sessRunning && sessAccum > 0) ? 'Resume' : 'Start';
     els.sessPause.disabled = !sessRunning;
     els.sessFinish.disabled = sessTotalMs() < 1000;
+    // show only what does something now: Start/Resume or Pause, + Finish once there's time
+    els.sessStart.hidden = sessRunning;
+    els.sessPause.hidden = !sessRunning;
+    els.sessFinish.hidden = sessTotalMs() < 1000;
   }
 
   function sessStart() {
@@ -137,6 +141,7 @@
     var recent = arr.slice(-12).reverse();
     if (!recent.length) {
       els.sessList.innerHTML = '<li><span class="muted">No sessions logged yet.</span></li>';
+      els.sessClear.hidden = true;
       return;
     }
     var html = '';
@@ -148,6 +153,7 @@
         '<span class="muted">' + when + '</span></li>';
     }
     els.sessList.innerHTML = html;
+    els.sessClear.hidden = false;
   }
 
   // ================================================================
@@ -195,6 +201,7 @@
     }
     promptCur = text;
     els.prCur.textContent = text;
+    els.prCur.classList.remove('tr-empty');
     els.prGo.style.display = promptGo ? '' : 'none';
     renderPromptHist();
   }
@@ -224,7 +231,7 @@
 
   function updateBestChip() {
     var b = App.store.get('tr.best.' + ccPairKey(), null);
-    els.ccBest.textContent = 'best: ' + (b == null ? '—' : b);
+    els.ccBest.textContent = 'Best: ' + (b == null ? '—' : b);
   }
 
   function ccStart() {
@@ -368,6 +375,10 @@
     App.injectCSS('trainer', [
       '.tr-mt { margin-top: 10px; }',
       '.tr-prompt { font-size: 23px; line-height: 1.3; margin: 14px 0 10px; min-height: 30px; }',
+      // prompts name chords and keys (Db, Ebm, B°) — mixed-case condensed, never Bebas caps
+      '#tr-pr-cur { font-family: var(--font-condensed); font-weight: 700; font-size: 25px; letter-spacing: 0.2px; }',
+      '#tr-pr-cur.tr-empty { font-family: var(--font-body); font-size: 15px; font-weight: 500; color: var(--muted); }',
+      '.tr-sessrow [hidden], #tr-sess-clear[hidden] { display: none; }',
       '.tr-prompt-hist li { font-size: 12.5px; }',
       '.tr-label-input { width: 230px; max-width: 100%; }',
       '.tr-cc-count { width: 100%; font-size: 22px; padding: 20px 10px; margin: 12px 0 10px; border-radius: 12px; }',
@@ -403,7 +414,7 @@
             '<input type="text" id="tr-sess-label" class="tr-label-input" maxlength="60" placeholder="e.g. barre chords">' +
           '</label>' +
         '</div>' +
-        '<div class="row tr-mt">' +
+        '<div class="row tr-mt tr-sessrow">' +
           '<div class="mid-display" id="tr-sess-time">00:00</div>' +
           '<button class="btn primary" id="tr-sess-start">Start</button>' +
           '<button class="btn" id="tr-sess-pause" disabled>Pause</button>' +
@@ -425,7 +436,7 @@
           '<button class="btn" id="tr-pr-chord">Random chord</button>' +
           '<button class="btn primary" id="tr-pr-chal">Random challenge</button>' +
         '</div>' +
-        '<div class="mid-display tr-prompt" id="tr-pr-cur">Press a button for a prompt…</div>' +
+        '<div class="mid-display tr-prompt tr-empty" id="tr-pr-cur">Press a button for a prompt…</div>' +
         '<button class="btn primary sm" id="tr-pr-go" style="display:none" title="Set up the fretboard and start practicing">Go ' + App.icon('right', 13) + ' Fretboard</button>' +
         '<div class="small muted" id="tr-pr-prevhead" style="display:none">Previous</div>' +
         '<ul class="list tr-prompt-hist" id="tr-pr-hist"></ul>' +
@@ -437,7 +448,7 @@
         '<div class="row tight">' +
           '<label class="field">chord A<select id="tr-cc-a">' + ccOpts + '</select></label>' +
           '<label class="field">chord B<select id="tr-cc-b">' + ccOpts + '</select></label>' +
-          '<span class="chip" id="tr-cc-best">best: —</span>' +
+          '<span class="chip" id="tr-cc-best">Best: —</span>' +
         '</div>' +
         '<div class="row tr-mt">' +
           '<div class="big-display" id="tr-cc-clock">60</div>' +
@@ -460,13 +471,13 @@
         '<div class="row tight">' +
           '<button class="btn primary" id="tr-ear-play">Play interval</button>' +
           '<button class="btn" id="tr-ear-replay" disabled>Replay</button>' +
-          '<label class="chip tr-harm-chip"><input type="checkbox" id="tr-ear-harm"> harmonic</label>' +
+          '<label class="chip tr-harm-chip"><input type="checkbox" id="tr-ear-harm"> Harmonic</label>' +
         '</div>' +
         '<div class="tr-ear-grid" id="tr-ear-grid">' + ansHtml + '</div>' +
         '<div class="row tight">' +
-          '<span class="chip">score <b id="tr-ear-score">0</b></span>' +
-          '<span class="chip">streak <b id="tr-ear-streak">0</b></span>' +
-          '<span class="chip">best <b id="tr-ear-best">0</b></span>' +
+          '<span class="chip">Score <b id="tr-ear-score">0</b></span>' +
+          '<span class="chip">Streak <b id="tr-ear-streak">0</b></span>' +
+          '<span class="chip">Best <b id="tr-ear-best">0</b></span>' +
         '</div>' +
         '<div class="small muted tr-mt" id="tr-ear-msg">Press Play to hear an interval.</div>' +
       '</div>' +

@@ -594,6 +594,10 @@
 
     var whites = '', blacks = '', dots = '', labels = '';
     var totalW = 0;
+    var vert = state.orient === 'v';
+    // portrait rotates the whole group 90deg cw: turn each label back -90deg
+    // about its visual centre (baseline - 0.35em) so it reads upright
+    function up(x, y, fs) { return vert ? ' transform="rotate(-90 ' + x + ' ' + (y - 0.35 * fs).toFixed(1) + ')"' : ''; }
     for (var midi = LO; midi <= HI; midi++) {
       var pc = Theory.mod12(midi);
       var isWhite = WHITE_PCS.indexOf(pc) !== -1;
@@ -624,7 +628,7 @@
           '" y="0" width="' + W + '" height="' + H + '" rx="4"' + keyStyle + '/>';
         cx = x + W / 2; cy = H - 26;
         if (pc === 0) { // octave marker under every C
-          labels += '<text class="pn-oct" x="' + cx + '" y="' + (H + 16) + '" text-anchor="middle">C' +
+          labels += '<text class="pn-oct" x="' + cx + '" y="' + (H + 16) + '"' + up(cx, H + 16, 11) + ' text-anchor="middle">C' +
             (Math.floor(midi / 12) - 1) + '</text>';
         }
       } else {
@@ -640,23 +644,23 @@
           var qc = qwCodeFor(qOff);
           if (qc) {
             // white hints sit below the black-key zone where the key is clear
-            labels += '<text class="' + (isWhite ? 'pn-qwl' : 'pn-qwlb') + '" x="' +
-              (isWhite ? x + W / 2 : x + BW / 2) + '" y="' + (isWhite ? BH + 14 : 18) +
-              '" text-anchor="middle">' + qwKeyLabel(qc) + '</text>';
+            var qx = isWhite ? x + W / 2 : x + BW / 2, qy = isWhite ? BH + 14 : 18;
+            labels += '<text class="' + (isWhite ? 'pn-qwl' : 'pn-qwlb') + '" x="' + qx + '" y="' + qy + '"' +
+              up(qx, qy, 10) + ' text-anchor="middle">' + qwKeyLabel(qc) + '</text>';
           }
         }
       }
       // fingering numbers above the practice-window dots (1=thumb … 5=pinky)
       if (fingerMap[midi] && assist >= 4) {
         labels += '<text class="' + (isWhite ? 'pn-fing' : 'pn-fingb') + '" x="' + cx +
-          '" y="' + (cy - 17) + '" text-anchor="middle">' + fingerMap[midi] + '</text>';
+          '" y="' + (cy - 17) + '"' + up(cx, cy - 17, 11) + ' text-anchor="middle">' + fingerMap[midi] + '</text>';
       }
       if (inScale) {
         // the KEY is the color now — the old degree dot is gone; the label
         // sits straight on the painted key, contrast-picked per key type
         dots += '<g class="pn-dotg" data-midi="' + midi + '" data-pc="' + pc + '" data-cx="' + cx + '" data-cy="' + cy + '">' +
           '<circle class="pn-jamring" data-pc="' + pc + '" cx="' + cx + '" cy="' + cy + '" r="15.5" fill="none"/>' +
-          (assist >= 4 ? '<text class="pn-dott" x="' + cx + '" y="' + (cy + 3.5) + '" text-anchor="middle"' +
+          (assist >= 4 ? '<text class="pn-dott" x="' + cx + '" y="' + (cy + 3.5) + '"' + up(cx, cy + 3.5, 11) + ' text-anchor="middle"' +
           (isWhite ? '' : ' fill="#f2ede4"') + '>' + keyLabel(midi, info, pf) + '</text>' : '') + '</g>';
       }
     }
@@ -678,7 +682,7 @@
     // horizontal: natural strip, scrolls sideways. Vertical: the whole group
     // rotates 90° cw as ONE unit (fretboard convention) into a portrait
     // column that scales to the container and scrolls down.
-    var horiz = state.orient === 'h';
+    var horiz = !vert;
     els.stage.classList.toggle('pn-v', !horiz);
     els.stage.innerHTML =
       '<svg id="pn-svg" viewBox="0 0 ' + (horiz ? totalW + ' ' + TH : TH + ' ' + totalW) + '"' +
@@ -705,8 +709,16 @@
     var lo = mwin ? mwin[0] : handBase() + Theory.mod12(curRoot());
     var frac = (whiteIndex(lo) * W) / (whiteIndex(HI) * W + W);
     if (state.orient === 'h') {
-      // lessons start the octave at the left edge so a phone shows all of it
-      els.stage.scrollLeft = Math.max(0, frac * els.stage.scrollWidth - (alignLeft ? 6 : els.stage.clientWidth / 4));
+      // lessons start the octave at the left edge so a phone shows all of it;
+      // land on a white-key edge so the strip never opens on a cut key sliver
+      // (the svg may be drawn scaled to the stage: work in drawn pixels)
+      var hsvg = els.stage.querySelector('svg');
+      var kw = hsvg ? W * hsvg.getBoundingClientRect().width / (whiteIndex(HI) * W + W) : 0;
+      if (!kw) kw = W;
+      // a black first note: start one white key earlier so it is not halved
+      var wi = whiteIndex(lo) - (alignLeft && WHITE_PCS.indexOf(Theory.mod12(lo)) === -1 ? 1 : 0);
+      var n = Math.max(0, Math.round((wi * kw - (alignLeft ? 0 : els.stage.clientWidth / 4)) / kw));
+      els.stage.scrollLeft = n ? n * kw + 2 : 0; // +2 = the stage's left padding
     } else {
       var svg = els.stage.querySelector('svg');
       if (svg) window.scrollTo({ top: els.stage.offsetTop + frac * svg.getBoundingClientRect().height - 220 });
@@ -1137,13 +1149,23 @@
   function init(rootEl) {
     pianoRoot = rootEl;
     App.injectCSS('piano',
-      '.pn-title{font-family:var(--font-display);font-size:19px;font-weight:600;letter-spacing:1px;text-transform:uppercase}' +
+      // the scale name is the card's h2 (global .card h2: Bebas + amber dot)
+      '.card h2.pn-title{margin:0}' +
       '.pn-stage{overflow-x:auto;-webkit-overflow-scrolling:touch;padding:6px 2px 2px;touch-action:pan-x}' +
       '.pn-stage svg{display:block}' +
       // portrait column: the rotated keyboard scales to a comfortable width
       // and the page scrolls down it, exactly like the vertical fretboard
       '.pn-stage.pn-v{overflow-x:visible;touch-action:manipulation;display:flex;justify-content:center}' +
       '.pn-stage.pn-v svg{width:min(360px,94%);height:auto}' +
+      // the long 'LUMI C3–C5' caption can't stand upright in the 24px gutter;
+      // the amber range bar still marks the span
+      '.pn-v .pn-rangel{display:none}' +
+      // wide screens: C2–C6 scales to the stage (keys ~37px) — no sideways
+      // scroll for the last 200px and no cut key at either edge
+      '@media (min-width:1100px){.pn-stage:not(.pn-v) svg{width:100%;height:auto}' +
+        // labels sized up to offset the ~0.84 scale
+        '.pn-stage:not(.pn-v) .pn-dott{font-size:12.5px}.pn-stage:not(.pn-v) .pn-fing,.pn-stage:not(.pn-v) .pn-fingb{font-size:12.5px}' +
+        '.pn-stage:not(.pn-v) .pn-qwl,.pn-stage:not(.pn-v) .pn-qwlb{font-size:11px}.pn-stage:not(.pn-v) .pn-oct{font-size:12.5px}}' +
       '.pn-key{cursor:pointer;transition:fill 60ms ease}' +
       '.pn-nxtring{animation:pn-nx 1.1s ease-in-out infinite}' +
       '@keyframes pn-nx{0%,100%{opacity:0.6}50%{opacity:0.25}}' +
@@ -1167,7 +1189,8 @@
       '.pn-leg{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);font-weight:600}' +
       '.pn-legend{margin-top:12px}' +
       // QWERTY key hints on the drawn keys + the remap panel
-      '.pn-qwl{font:600 10px var(--font-body);fill:#8d8375;pointer-events:none}' +
+      // dark ink at 70%: a quiet hint that still reads on every degree color
+      '.pn-qwl{font:600 9.5px var(--font-body);fill:rgba(28,18,6,.7);pointer-events:none}' +
       '.pn-qwlb{font:600 10px var(--font-body);fill:#b9b0a2;pointer-events:none}' +
       '.pn-qwpanel{display:none;margin-top:12px;padding:12px 14px;background:var(--card2);' +
         'border:1px solid var(--line);border-radius:12px}' +
@@ -1175,7 +1198,7 @@
       '.pn-qwslot{cursor:pointer;font-family:inherit;color:var(--text);gap:6px}' +
       '.pn-qwslot b{color:var(--accent);font-size:12px}' +
       // fingering numbers over the practice-window dots
-      '.pn-fing{font:700 11px var(--font-body);fill:#a3562a}' +
+      '.pn-fing{font:700 11px var(--font-body);fill:#5c2608}' +
       '.pn-fingb{font:700 11px var(--font-body);fill:#e8c48a}' +
       '#pn-octlabel{font-variant-numeric:tabular-nums}' +
       // compact practice strip — selects keep chevron clearance (fretboard rule)
@@ -1187,13 +1210,22 @@
       '.pn-key.pn-hit-bad{stroke:#ff5d5d !important;stroke-width:5 !important;fill:#ff8f8f !important}' +
       '#panel-synth #pn-lessons{display:none}' +
       '.pn-range{fill:var(--accent);opacity:.85}.pn-rangel{font:600 10.5px var(--font-body);fill:var(--accent)}' +
-      '#pn-assist button{min-width:0}'
+      '#pn-assist button{min-width:0}' +
+      // Voice / Strum: the label sits beside its control, not above it
+      'label.field.pn-inl{flex-direction:row;align-items:center;gap:8px}' +
+      // segs in the Keys card a touch tighter, so the help seg fits at 360px
+      '.pn-card .seg button{padding:4px 11px;font-size:13.5px}' +
+      '.pn-card select{font-size:13.5px}' +
+      // touch phones have no typing keyboard: hide the QWERTY toggle, its
+      // octave stepper, Remap and the key letters (tablets/desktops keep them)
+      '@media (hover:none) and (pointer:coarse) and (max-width:640px){' +
+        '#pn-qw,#pn-octrow,#pn-qwmap,.pn-qwl,.pn-qwlb,.pn-tyhint{display:none}}'
     );
 
     rootEl.innerHTML =
-      '<div class="card">' +
+      '<div class="card pn-card">' +
         '<div class="row tight spread">' +
-          '<span class="pn-title" id="pn-title"></span>' +
+          '<h2 class="pn-title" id="pn-title"></h2>' +
           '<span class="row tight">' +
             '<div class="seg" id="pn-assist" role="group" aria-label="Help level" title="How much the keyboard helps: Full shows colors, names, fingers and the next note; None is a plain keyboard">' +
               ASSIST_NAMES.map(function (nm, i) { return '<button type="button" data-pnassist="' + i + '">' + nm + '</button>'; }).reverse().join('') +
@@ -1203,31 +1235,33 @@
               '<button type="button" data-pnmode="intervals">Intervals</button>' +
               '<button type="button" data-pnmode="degrees">Degrees</button>' +
             '</div>' +
-            '<button type="button" class="chip fb-chip" id="pn-qw" title="Play the piano with your computer or iPad keyboard — home row = white keys, top row = black keys, Z/X shift octaves">Keys</button>' +
+            '<button type="button" class="chip fb-chip" id="pn-qw" title="Play the piano with your computer or iPad keyboard — home row = white keys, top row = black keys, Z/X shift octaves">Typing</button>' +
             '<span class="row tight" id="pn-octrow" title="Which octaves the typing keys cover (Z / X also shift)">' +
               '<button type="button" class="btn sm" id="pn-octdn" aria-label="Keys octave down">' + App.icon('minus', 13) + '</button>' +
               '<span class="chip" id="pn-octlabel"></span>' +
               '<button type="button" class="btn sm" id="pn-octup" aria-label="Keys octave up">' + App.icon('plus', 13) + '</button>' +
             '</span>' +
-            '<label class="field" title="What this keyboard sounds like — the sampled grand, or the Studio&rsquo;s MPE synth presets (full pitch-bend / pressure expression from a ROLI)">Voice' +
+            '<label class="field pn-inl" title="What this keyboard sounds like — the sampled grand, or the Studio&rsquo;s MPE synth presets (full pitch-bend / pressure expression from a ROLI)">Voice' +
               '<select id="pn-voice"><option value="piano">Grand piano</option></select></label>' +
             '<button type="button" class="btn sm" id="pn-qwmap" title="Remap which computer key plays which note">Remap</button>' +
             '<button type="button" class="btn sm" id="pn-rotate" title="Rotate the keyboard (portrait / landscape)" aria-label="Rotate the keyboard">' + App.icon('rotate', 14) + '</button>' +
           '</span>' +
         '</div>' +
         '<div class="row tight" id="pn-perf" style="margin-top:10px">' +
-          '<span class="muted small" style="letter-spacing:1.2px">PERFORM</span>' +
+          '<span class="ctl-label">Perform</span>' +
           '<div class="seg" id="pn-chseg" title="Smart chords: in-scale keys play full diatonic chords">' +
-            '<button type="button" data-pnch="off">Notes</button>' +
+            '<button type="button" data-pnch="off" title="One note per key">Single</button>' +
             '<button type="button" data-pnch="triad">Triads</button>' +
             '<button type="button" data-pnch="7th">7ths</button></div>' +
           '<button type="button" class="chip fb-chip" id="pn-bass" title="Add the bass note an octave down">+Bass</button>' +
-          '<label class="field" id="pn-strumf">Strum<input type="range" id="pn-strum" min="0" max="100" step="10" style="width:76px"></label>' +
+          '<label class="field pn-inl" id="pn-strumf">Strum<input type="range" id="pn-strum" min="0" max="100" step="10" style="width:76px"></label>' +
           '<button type="button" class="chip fb-chip" id="pn-arp" title="Arpeggiate held notes at the shared tempo">Arp</button>' +
           '<div class="seg" id="pn-arprate"><button type="button" data-pnar="2">1/8</button>' +
-            '<button type="button" data-pnar="3">Trip</button><button type="button" data-pnar="4">1/16</button></div>' +
-          '<div class="seg" id="pn-arpdir"><button type="button" data-pnad="up">Up</button>' +
-            '<button type="button" data-pnad="down">Down</button><button type="button" data-pnad="updown">UD</button></div>' +
+            '<button type="button" data-pnar="3" title="Eighth-note triplets">1/8T</button><button type="button" data-pnar="4">1/16</button></div>' +
+          '<div class="seg" id="pn-arpdir" title="Arp direction">' +
+            '<button type="button" data-pnad="up" title="Arp up" aria-label="Arp up">' + App.icon('up', 15) + '</button>' +
+            '<button type="button" data-pnad="down" title="Arp down" aria-label="Arp down">' + App.icon('down', 15) + '</button>' +
+            '<button type="button" data-pnad="updown" title="Arp up and down" aria-label="Arp up and down">' + App.icon('updown', 15) + '</button></div>' +
           '<div class="seg" id="pn-arpoct"><button type="button" data-pnao="1">1 oct</button>' +
             '<button type="button" data-pnao="2">2 oct</button></div>' +
           '<button type="button" class="chip fb-chip" id="pn-hold" title="Latch: arpeggio keeps running after you lift">Hold</button>' +
@@ -1284,7 +1318,7 @@
             '<option value="start">at start</option><option value="end">at end</option>' +
             '<option value="both">both sides</option>' +
           '</select>' +
-          '<label class="row tight small muted" style="gap:5px"><input type="checkbox" id="pn-sound">Notes</label>' +
+          '<label class="row tight small muted" style="gap:5px" title="Play the exercise notes out loud"><input type="checkbox" id="pn-sound">Sound</label>' +
           '<label class="row tight small muted" style="gap:5px"><input type="checkbox" id="pn-click">Click</label>' +
           '<button type="button" class="chip fb-chip" id="pn-guide" ' +
             'title="Guide mode: the app lights the note to play (on screen and on a connected MIDI keyboard&#39;s LEDs) and waits for you to play it — advance at your own pace">Guide</button>' +
@@ -1292,7 +1326,7 @@
         '</div>' +
         '<div class="pn-stage" id="pn-stage"></div>' +
         '<div class="row tight pn-legend" id="pn-legend"></div>' +
-        '<div class="muted small pn-foot" style="margin-top:10px">Tap, type (home row = white keys, Z / X = octave) or play a MIDI keyboard.</div>' +
+        '<div class="muted small pn-foot" style="margin-top:10px">Tap<span class="pn-tyhint">, type (home row = white keys, Z / X = octave)</span> or play a MIDI keyboard.</div>' +
       '</div>' +
       '<div id="pn-lessons"></div>';
 
@@ -1637,7 +1671,7 @@
       if (state.orient !== 'h' || !els.stage || !r) return;
       var x0 = whiteIndex(Math.max(LO, r.lo)) * W, x1 = whiteIndex(Math.min(HI, r.hi)) * W + W;
       var st = els.stage, sl = st.scrollLeft, vw = st.clientWidth;
-      if (x0 < sl || x1 > sl + vw) st.scrollLeft = Math.max(0, x0 - 8);
+      if (x0 < sl || x1 > sl + vw) st.scrollLeft = Math.max(0, x0); // x0 is a key edge
     });
     App.on('midi:state', function () { render(); });
     App.on('jam:stopped', function () { jamLast = null; jamPaint(null); });

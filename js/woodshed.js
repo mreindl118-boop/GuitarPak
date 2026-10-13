@@ -700,7 +700,7 @@
     var b = document.getElementById('ws-mic');
     if (!b) return;
     b.classList.toggle('active', mic.on);
-    b.textContent = mic.on ? '🎤 Listening' : '🎤 Mic';
+    b.innerHTML = micIcon() + (mic.on ? ' Listening' : ' Mic');
     var m = document.getElementById('ws-micmsg');
     if (m) m.textContent = mic.err;
   }
@@ -742,9 +742,23 @@
 
   var rafId = 0;
 
+  // canvas inks, re-read from the theme tokens every frame (a canvas can't use
+  // CSS variables): INK = --text, RULE = --muted, BUBBLE = --card, ACC = --accent
+  var INK = '#ede8e0', RULE = '#a29889', BUBBLE = '#1e191c', ACC = '#ffab47';
+  function lightTheme() { return document.documentElement.getAttribute('data-theme') === 'light'; }
   function noteColor(j) {
+    if (lightTheme()) { // deeper inks so judged notes (and the HUD counts) read on the pale card
+      return j === 'perfect' ? '#12806b' : j === 'great' ? '#4b8a1c' : j === 'good' ? '#a87a00'
+        : j === 'miss' ? '#c23434' : j === 'grace' ? 'rgba(110,99,85,0.45)' : INK;
+    }
     return j === 'perfect' ? '#4cc9b0' : j === 'great' ? '#8bd450' : j === 'good' ? '#ffd166'
-      : j === 'miss' ? '#d9484a' : j === 'grace' ? 'rgba(180,175,165,0.5)' : '#e8e2d6';
+      : j === 'miss' ? '#d9484a' : j === 'grace' ? 'rgba(180,175,165,0.5)' : INK;
+  }
+  function micIcon() {
+    return App.icon('mic', 14) || // Lucide 'mic', until the shared icon set carries one
+      '<svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+      'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' +
+      '<path d="M12 19v3"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><rect x="9" y="2" width="6" height="13" rx="3"/></svg>';
   }
 
   function draw() {
@@ -752,7 +766,21 @@
     if (!S || view !== 'session') return;
     var cv = els.canvas;
     var g = cv.getContext('2d');
-    var W = cv.width, H = cv.height;
+    // draw in CSS pixels at the canvas' real size (crisp on phones, not a
+    // 1100px drawing squeezed to 30%); height follows the width, 220..360
+    var dpr = Math.min(2, window.devicePixelRatio || 1);
+    var W = cv.clientWidth || 1100;
+    var H = Math.round(Math.max(220, Math.min(360, W * 0.36)));
+    if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) {
+      cv.width = Math.round(W * dpr);
+      cv.height = Math.round(H * dpr);
+    }
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    var cs = getComputedStyle(document.documentElement);
+    INK = cs.getPropertyValue('--text').trim() || INK;
+    RULE = cs.getPropertyValue('--muted').trim() || RULE;
+    BUBBLE = cs.getPropertyValue('--card').trim() || BUBBLE;
+    ACC = cs.getPropertyValue('--accent').trim() || ACC;
     g.clearRect(0, 0, W, H);
     var ctx = App.getAudio();
     var now = S.mode === 'wait'
@@ -795,23 +823,24 @@
       g.fill();
       g.globalAlpha = 1;
       if (isDrums && tg.n.s) {
-        g.fillStyle = '#141216';
+        g.fillStyle = BUBBLE;
         g.font = 'bold 10px sans-serif';
         g.textAlign = 'center';
         g.fillText(tg.n.s, x, y - h / 2 + 3);
       }
-      if (tg.n.v > 110) { g.strokeStyle = '#fff'; g.lineWidth = 1.5; g.strokeRect(x - 11, y - h - 2, 22, h + 4); }
+      if (tg.n.v > 110) { g.strokeStyle = INK; g.lineWidth = 1.5; g.strokeRect(x - 11, y - h - 2, 22, h + 4); }
     });
     // mini keyboard strip for pitch reference
     if (!isDrums) {
       for (var m = lo + 2; m <= hi - 2; m++) {
         var x2 = xForPitch(m, lo, hi, W);
         var black = [1, 3, 6, 8, 10].indexOf(Theory.mod12(m)) !== -1;
-        g.fillStyle = black ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.25)';
+        g.fillStyle = lightTheme() ? (black ? 'rgba(43,36,29,0.72)' : 'rgba(43,36,29,0.1)')
+          : (black ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.25)');
         g.fillRect(x2 - 7, H - 36, 14, 28);
       }
     } else {
-      g.fillStyle = 'rgba(255,255,255,0.6)';
+      g.fillStyle = RULE;
       g.font = 'bold 13px sans-serif';
       g.textAlign = 'center';
       g.fillText('L', W / 2 - 90, H - 16);
@@ -850,7 +879,8 @@
 
   function drawTab(g, W, H, now, y0, hgt) {
     var top = y0 + 18, gap = (hgt - 40) / 5;
-    g.strokeStyle = 'rgba(200,195,185,0.4)';
+    g.strokeStyle = RULE;
+    g.globalAlpha = 0.6;
     g.lineWidth = 1;
     for (var s = 0; s < 6; s++) {
       g.beginPath();
@@ -858,8 +888,9 @@
       g.lineTo(W - 20, top + s * gap);
       g.stroke();
     }
+    g.globalAlpha = 1;
     var hitX = 110, pxPerBeat = 46;
-    g.fillStyle = 'rgba(255,171,71,0.9)';
+    g.fillStyle = ACC;
     g.fillRect(hitX, top - 8, 2, 5 * gap + 16);
     S.targets.forEach(function (tg) {
       var dx = (tg.at - now) / spb() * pxPerBeat;
@@ -871,7 +902,7 @@
       var y = top + p.s * gap;
       g.beginPath();
       g.arc(hitX + dx, y, 8.5, 0, Math.PI * 2);
-      g.fillStyle = 'rgba(19,17,20,0.9)';
+      g.fillStyle = BUBBLE;
       g.fill();
       g.fillStyle = noteColor(tg.judged);
       g.fillText(String(p.f), hitX + dx, y + 4);
@@ -881,7 +912,8 @@
   var SHEET_STEP = [0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6];
   function drawSheet(g, W, H, now) {
     var midY = H / 2;
-    g.strokeStyle = 'rgba(200,195,185,0.55)';
+    g.strokeStyle = RULE;
+    g.globalAlpha = 0.75;
     g.lineWidth = 1;
     for (var l = -2; l <= 2; l++) {
       g.beginPath();
@@ -889,10 +921,10 @@
       g.lineTo(W - 20, midY + l * 12);
       g.stroke();
     }
+    g.globalAlpha = 1;
     var hitX = 110;
     var pxPerBeat = 46;
-    g.fillStyle = 'var(--accent)';
-    g.fillStyle = 'rgba(255,171,71,0.9)';
+    g.fillStyle = ACC;
     g.fillRect(hitX, midY - 46, 2, 92);
     // E4 (midi 64) sits on the bottom line
     function yFor(m) {
@@ -911,13 +943,13 @@
       g.ellipse(x, y, 6.5, 5, -0.3, 0, Math.PI * 2);
       g.fill();
       if (y < midY - 30 || y > midY + 30) {
-        g.strokeStyle = 'rgba(200,195,185,0.55)';
+        g.strokeStyle = RULE;
         g.beginPath();
         g.moveTo(x - 10, y + (y > midY ? 0 : 0));
         g.lineTo(x + 10, y);
         g.stroke();
       }
-      g.strokeStyle = 'rgba(200,195,185,0.8)';
+      g.strokeStyle = INK;
       g.beginPath();
       g.moveTo(x + 6, y - 2);
       g.lineTo(x + 6, y - 26);
@@ -1000,8 +1032,11 @@
     if (!el || !S) return;
     el.innerHTML =
       '<span class="ws-combo">' + S.combo + '×</span>' +
-      '<span class="muted small">acc ' + accuracy() + '% · P' + S.counts.perfect + ' G' + S.counts.great +
-      ' g' + S.counts.good + ' <span style="color:#d9484a">M' + S.counts.miss + '</span></span>' +
+      '<span class="small"><b>' + accuracy() + '%</b> <span class="muted">accuracy</span></span>' +
+      // the judgement counts, in the canvas colours — doubles as its legend
+      '<span class="small ws-judges">' + [['perfect', 'Perfect'], ['great', 'Great'], ['good', 'Good'], ['miss', 'Miss']].map(function (k) {
+        return '<span class="ws-j" style="color:' + noteColor(k[0]) + '">' + k[1] + ' ' + S.counts[k[0]] + '</span>';
+      }).join('') + '</span>' +
       (S.mode === 'phrase' ? '<span class="muted small">phrase ' + (S.phrase + 1) + '/' + phraseCount(S.sc) +
         ' · clean ' + S.cleanPasses + '/2</span>' : '') +
       (S.mode === 'ladder' || S.tempoScale !== 1 ? '<span class="muted small">' + Math.round(S.tempoScale * 100) + '% tempo</span>' : '');
@@ -1033,13 +1068,13 @@
           '<button type="button" class="btn sm" id="ws-gen-scale">+ Scale (your key)</button>' +
           '<button type="button" class="btn sm" id="ws-gen-hanon">+ Hanon</button>' +
           '<button type="button" class="btn sm" id="ws-gen-pent">+ Pentatonic fours</button>' +
-          '<label class="btn sm">+ MIDI file<input type="file" id="ws-midi" accept=".mid,.midi" style="display:none"></label>' +
+          '<label class="btn sm ws-filebtn">+ MIDI file<input type="file" id="ws-midi" accept=".mid,.midi" style="display:none"></label>' +
           '<button type="button" class="btn sm" id="ws-ascii-btn">+ Paste tab</button>' +
           '<button type="button" class="btn sm" id="ws-track">+ From Studio track</button>' +
           '<button type="button" class="btn sm" id="ws-cal-btn">Calibrate timing</button>' +
         '</div>' +
         '<div id="ws-ascii-box" style="display:none;margin-top:10px">' +
-          '<textarea id="ws-ascii" rows="7" style="width:100%" placeholder="Paste six-line ASCII tab here"></textarea>' +
+          '<textarea id="ws-ascii" rows="7" wrap="off" spellcheck="false" placeholder="Paste six-line ASCII tab here"></textarea>' +
           '<div class="row tight" style="margin-top:6px"><button type="button" class="btn sm primary" id="ws-ascii-go">Import</button>' +
           '<span class="muted small">ASCII tab has no reliable rhythm — imports as pitches, Wait mode ready; scored modes assume even eighths.</span></div>' +
         '</div>' +
@@ -1048,11 +1083,14 @@
       (weak.length ? '<div class="card"><h2>Weak spots</h2><div class="row tight">' + weak.slice(0, 5).map(function (w, i) {
         return '<button type="button" class="chip fb-chip" data-wsweak="' + i + '">' + esc(w.title.slice(0, 18)) + ' · phrase ' + (w.phrase + 1) + ' · ' + w.acc + '%</button>';
       }).join('') + '</div><div class="muted small" style="margin-top:6px">Your lowest-scoring phrases — clear them and they leave the queue.</div></div>' : '') +
-      '<div class="card"><h2>Rudiments</h2><div class="row tight">' + RUDIMENTS.map(function (r) {
-        var best = App.store.get('ws.ladder.' + r.name.replace(/\W+/g, '_'), null);
-        return '<button type="button" class="chip fb-chip" data-wsrud="' + r.id + '">' + r.name +
-          (best ? ' <span class="muted">' + Math.round(best * 100) + '%</span>' : '') + '</button>';
-      }).join('') + '</div><div class="muted small" style="margin-top:6px">8 of the 40 PAS rudiments with sticking + accent targets — the ladder raises tempo as you pass.</div></div>' +
+      // the 40 PAS rudiments (RUDIMENTS is in PAS order) in their four families
+      '<div class="card"><h2>Rudiments</h2>' + [['Rolls', 0, 15], ['Diddles', 15, 19], ['Flams', 19, 30], ['Drags', 30, 40]].map(function (gr) {
+        return '<h3 class="ws-rudh">' + gr[0] + '</h3><div class="row tight">' + RUDIMENTS.slice(gr[1], gr[2]).map(function (r) {
+          var best = App.store.get('ws.ladder.' + r.name.replace(/\W+/g, '_'), null);
+          return '<button type="button" class="chip fb-chip" data-wsrud="' + r.id + '">' + r.name +
+            (best ? ' <span class="muted">' + Math.round(best * 100) + '%</span>' : '') + '</button>';
+        }).join('') + '</div>';
+      }).join('') + '<div class="muted small" style="margin-top:12px">All 40 PAS rudiments with sticking + accent targets — the ladder raises tempo as you pass.</div></div>' +
       '<div class="card"><h2>Library</h2><div id="ws-lib">' + (lib().length ? lib().slice().reverse().map(function (sc) {
         var best = parseInt(App.store.get(bestKey(sc, 'run'), 0), 10);
         return '<div class="row spread ws-row" data-wsid="' + sc.id + '">' +
@@ -1087,7 +1125,7 @@
                 .map(function (d) { return '<button type="button" data-wsd="' + d[0] + '">' + d[1] + '</button>'; }).join('') +
             '</div>' +
             (S.sc.instrument !== 'piano'
-              ? '<button type="button" class="chip fb-chip" id="ws-mic" title="Score from your instrument through the mic / audio interface (guitar: pitch detection · drums: onset detection)">🎤 Mic</button>'
+              ? '<button type="button" class="chip fb-chip" id="ws-mic" title="Score from your instrument through the mic / audio interface (guitar: pitch detection · drums: onset detection)">' + micIcon() + ' Mic</button>'
               : '') +
             '<button type="button" class="chip fb-chip' + (S.guide ? ' active' : '') + '" id="ws-guide" title="Play the target notes as a guide">Guide</button>' +
             '<button type="button" class="btn sm primary" id="ws-go">' + App.icon('restart', 14) + ' ' + (S.mode === 'wait' ? 'Start' : 'Count-in') + '</button>' +
@@ -1095,7 +1133,7 @@
         '</div>' +
         '<div id="ws-hud" class="row tight" style="margin-top:8px;min-height:26px"></div>' +
         '<div class="muted small" id="ws-micmsg"></div>' +
-        '<canvas id="ws-cv" width="1100" height="360" style="width:100%;background:var(--card2);border:1px solid var(--line);border-radius:10px;margin-top:6px"></canvas>' +
+        '<canvas id="ws-cv" width="1100" height="360" style="display:block;width:100%;background:var(--card2);border:1px solid var(--line);border-radius:10px;margin-top:6px"></canvas>' +
         '<div class="muted small" style="margin-top:8px">Play with your MIDI keys anywhere, the typing keys or touch keys on the Piano page' +
           (S.sc.instrument === 'drums' ? ', or the Pads' : '') + '. Switch the view live — same clock underneath.</div>' +
       '</div>';
@@ -1314,7 +1352,20 @@
   function init(rootEl) {
     App.injectCSS('woodshed',
       '.ws-row{padding:8px 0;border-bottom:1px solid var(--line)}' +
-      '.ws-combo{font-family:var(--font-condensed,var(--font-display));font-size:26px;font-weight:700;color:var(--accent);min-width:52px}' +
+      '.card h3.ws-rudh{margin:16px 0 8px}' +
+      '.card h3.ws-rudh:first-of-type{margin-top:0}' +
+      '.ws-j{font-weight:600;margin-right:10px}' +
+      '.ws-j:last-child{margin-right:0}' +
+      // a <label> file picker sized and centred like its .btn.sm neighbours
+      '.ws-filebtn{display:inline-flex;align-items:center;line-height:normal;cursor:pointer}' +
+      '#ws-ascii{width:100%;white-space:pre;overflow-x:auto;overflow-wrap:normal;' +
+        'font-family:ui-monospace,Consolas,Menlo,monospace;font-size:12.5px;line-height:1.5;color:var(--text);' +
+        'background-color:var(--card2);border:1px solid var(--ctl-border);border-radius:10px;padding:10px 12px}' +
+      '#ws-ascii:focus{outline:none;border-color:var(--accent-line)}' +
+      '#ws-mic .ic{flex:none}' +
+      // phones: the five-view switch fills the row instead of running past the card
+      '@media (max-width:520px){#ws-disp{display:flex;width:100%}#ws-disp button{flex:1 1 auto;padding:4px 6px}}' +
+      '.ws-combo{font-family:var(--font-condensed,var(--font-display));font-size:26px;font-weight:700;color:var(--accent-ink);min-width:52px}' +
       '.ws-pbar{display:flex;flex-direction:column;align-items:center;gap:2px;width:22px}' +
       '.ws-pbar div{width:14px;border-radius:3px 3px 0 0;align-self:center}' +
       '.ws-pbar span{font-size:9px;color:var(--muted)}' +

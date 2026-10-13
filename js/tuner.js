@@ -53,19 +53,28 @@
   var PXC = 2.9;          // gauge pixels per cent (center x = 160)
 
   var CSS = '' +
-    '#tun-gauge { max-width: 440px; width: 100%; margin: 8px 0 2px; }' +
+    '#tun-gauge { display: block; max-width: 440px; width: 100%; margin: 8px auto 2px; }' +
     '.tun-note { min-height: 68px; }' +
+    /* the readout, gauge and string chips share one centre line (the gauge 0) */
+    '.tun-readout { text-align: center; }' +
+    '#tun-chips { justify-content: center; }' +
+    /* idle: a quiet placeholder dash, not a glowing white bar */
+    '.tun-note.tun-idle { color: var(--ctl-border); text-shadow: none; }' +
+    '.tun-row { align-items: flex-end; }' +
+    '.tun-row .tun-strlabel { min-height: var(--h-ctl); }' +
+    '.tun-stat { font-size: 11.5px; font-weight: 600; letter-spacing: 1.4px; text-transform: uppercase; color: var(--label); }' +
+    '#tun-streak, #tun-best { color: var(--text); margin-left: 6px; letter-spacing: 1px; }' +
     '#tun-freq { font-variant-numeric: tabular-nums; margin-bottom: 2px; }' +
     '#tun-chips { margin: 10px 0; }' +
     '.tun-chip { cursor: pointer; }' +
     '.tun-chip .tun-check { color: var(--green); display: none; }' +
-    '.tun-chip.tun-near { border-color: var(--accent); color: var(--accent); }' +
+    '.tun-chip.tun-near { border-color: var(--accent); color: var(--accent-ink); }' +
     '.tun-chip.tun-ok { border-color: var(--green); color: var(--green); }' +
     '.tun-chip.tun-ok .tun-check { display: inline; }' +
     '#tun-err { margin: 10px 0; }' +
     '.tun-readout { margin-top: 10px; }' +
     '.tun-target-line { font-size: 23px; font-weight: 700; margin: 12px 0; min-height: 33px; }' +
-    '#tun-answer { color: var(--accent); }' +
+    '#tun-answer { color: var(--accent-ink); }' +
     '.tun-hint { border: 1px dashed var(--line); border-radius: 8px; padding: 10px 12px;' +
     '  color: var(--muted); margin-bottom: 10px; font-size: 13.5px; }' +
     '.tun-stats { margin: 14px 0; }' +
@@ -133,7 +142,7 @@
 
       '<div class="card">' +
       '<h2>Tuner</h2>' +
-      '<div class="row">' +
+      '<div class="row tun-row">' +
       '<button type="button" class="btn primary" id="tun-toggle">Start listening</button>' +
       '<label class="field">A4 (Hz)' +
       '<input type="number" id="tun-a4" min="415" max="466" step="1"></label>' +
@@ -142,7 +151,7 @@
       '</div>' +
       '<div id="tun-err" class="error" hidden></div>' +
       '<div class="tun-readout">' +
-      '<div class="big-display tun-note" id="tun-note">—</div>' +
+      '<div class="big-display tun-note tun-idle" id="tun-note">—</div>' +
       '<div class="muted" id="tun-freq">mic off — press Start listening</div>' +
       '</div>' +
       gaugeSVG() +
@@ -164,17 +173,17 @@
       '<span class="muted small" id="tun-status"></span>' +
       '</div>' +
       '<div class="row tun-stats">' +
-      '<div class="muted small">STREAK&nbsp; <span class="mid-display" id="tun-streak">0</span></div>' +
-      '<div class="muted small">BEST&nbsp; <span class="mid-display" id="tun-best">0</span></div>' +
+      '<div class="tun-stat">Streak <span class="mid-display" id="tun-streak">0</span></div>' +
+      '<div class="tun-stat">Best <span class="mid-display" id="tun-best">0</span></div>' +
       '</div>' +
       '<h3>Settings</h3>' +
       '<div class="row tight" id="tun-strings"></div>' +
-      '<div class="row tight" style="margin-top:10px">' +
+      '<div class="row tight tun-row" style="margin-top:10px">' +
       '<label class="field">Fret from' +
       '<input type="number" id="tun-fret-min" min="0" max="21" step="1"></label>' +
       '<label class="field">Fret to' +
       '<input type="number" id="tun-fret-max" min="0" max="21" step="1"></label>' +
-      '<label class="tun-strlabel"><input type="checkbox" id="tun-anyoct"> accept any octave</label>' +
+      '<label class="tun-strlabel"><input type="checkbox" id="tun-anyoct"> Accept any octave</label>' +
       '</div>' +
       '<div class="muted small tun-keys">Keys: H hear &middot; R reveal &middot; S skip</div>' +
       '</div>' +
@@ -291,6 +300,7 @@
     if (!note) {
       els.note.textContent = '—';
       els.note.style.color = '';
+      els.note.classList.add('tun-idle');
       els.freq.textContent = 'listening…';
       setNeedle(0, 'var(--muted)');
       els.cents.textContent = '— ¢';
@@ -299,6 +309,7 @@
       return;
     }
     els.note.textContent = note.name + note.octave;
+    els.note.classList.remove('tun-idle');
     els.freq.textContent = freq.toFixed(1) + ' Hz';
     var abs = Math.abs(note.cents);
     var col = abs <= 5 ? 'var(--green)' : (abs >= 25 ? 'var(--red)' : 'var(--accent)');
@@ -312,6 +323,7 @@
   function renderIdle() {
     els.note.textContent = '—';
     els.note.style.color = '';
+    els.note.classList.add('tun-idle');
     els.freq.textContent = 'mic off — press Start listening';
     setNeedle(0, 'var(--muted)');
     els.cents.textContent = '— ¢';

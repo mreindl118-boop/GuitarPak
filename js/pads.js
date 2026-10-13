@@ -205,7 +205,7 @@
     els.baseSel.value = String(base());
     els.leds.checked = ledsOn();
     els.recbtn.classList.toggle('active', rec);
-    els.recbtn.innerHTML = (rec ? App.icon('stop', 14) : App.icon('play', 14)) + (rec ? ' Recording' : ' Record hits');
+    els.recbtn.innerHTML = (rec ? App.icon('stop', 14) : App.icon('record', 14)) + (rec ? ' Recording' : ' Record hits');
     els.play.innerHTML = DAW.engine.playing ? App.icon('stop', 15) + ' Stop' : App.icon('play', 15) + ' Play loop';
     var ck = document.getElementById('pd-click');
     if (ck) ck.classList.toggle('active', App.store.get('app.click', false) === true);
@@ -214,8 +214,10 @@
   function init(rootEl) {
     App.injectCSS('pads',
       '.pd-pad.pd-learn{outline:3px dashed var(--accent);outline-offset:2px}' +
-      '.pd-grid{display:grid;grid-template-columns:repeat(4,minmax(84px,1fr));gap:12px;max-width:640px}' +
+      // minmax(0,1fr): four pads always fit the card (390px phone = 77px pads)
+      '.pd-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;max-width:720px}' +
       '.pd-pad{position:relative;aspect-ratio:1.15;border-radius:16px;border:1px solid var(--line);cursor:pointer;' +
+        'font-family:var(--font-body);color:var(--text);' +
         'background:linear-gradient(180deg,rgba(255,255,255,0.05),rgba(0,0,0,0.18)),var(--card2);' +
         'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;' +
         'box-shadow:inset 0 -3px 0 rgba(0,0,0,0.25);touch-action:manipulation;padding:6px}' +
@@ -223,9 +225,24 @@
         'background:var(--pd);opacity:0.8}' +
       '.pd-pad.pd-hit{background:var(--pd);box-shadow:0 0 18px var(--pd);border-color:var(--pd)}' +
       '.pd-pad.pd-hit .pd-name,.pd-pad.pd-hit .pd-sub{color:#141216}' +
-      '.pd-name{font-weight:700;font-size:14px;color:var(--text)}' +
-      '.pd-sub{font-size:11px;color:var(--muted)}' +
-      '#pd-rec.active{border-color:#d9484a;color:#ffd7d7;background:rgba(217,72,74,0.14)}'
+      '.pd-name{font-weight:700;font-size:15px;line-height:1.15;text-align:center;color:var(--text)}' +
+      '.pd-sub{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}' +
+      // light theme: a clean raised pad (the dark gradient stop turned it
+      // muddy); :not(.pd-hit) keeps the hit flash winning
+      ':root[data-theme="light"] .pd-pad:not(.pd-hit){background:linear-gradient(180deg,#fff,var(--card2));' +
+        'box-shadow:inset 0 -3px 0 rgba(0,0,0,0.08)}' +
+      // transport: Play loop and Record share one height, icons centred
+      '#pd-play,#pd-rec{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:48px;padding-top:0;padding-bottom:0}' +
+      // recording = solid record red with white text (readable in both themes)
+      '#pd-rec.active{border-color:#c93b3e;color:#fff;background:#c93b3e}' +
+      '#pd-rec .ic{flex:none}#pd-rec:not(.active) .ic{color:var(--red)}' +
+      // 'Pads follow' reads like the 'From key' field label beside it
+      '.pd-lbl{display:inline-flex;flex-direction:column;gap:5px;font-size:11.5px;font-weight:600;letter-spacing:1.4px;' +
+        'text-transform:uppercase;color:var(--label)}' +
+      // phones: square pads with room under the color bar, so a two-word
+      // name ('Open hat' at 360px) wraps without running into it
+      '@media (max-width:640px){.pd-grid{gap:8px}.pd-pad{aspect-ratio:1;padding:17px 4px 6px;gap:3px}' +
+        '.pd-name{font-size:14px;line-height:1.1}}'
     );
 
     rootEl.innerHTML =
@@ -253,7 +270,7 @@
       '<div class="card">' +
         '<h2>MIDI &amp; ROLI</h2>' +
         '<div class="row">' +
-          '<div class="fb-field">Pads follow<div class="seg" id="pd-mode">' +
+          '<div class="pd-lbl">Pads follow<div class="seg" id="pd-mode">' +
             '<button type="button" data-pdm="roli">ROLI octave</button>' +
             '<button type="button" data-pdm="gm">GM drums</button></div></div>' +
           '<label class="field" id="pd-basewrap">From key<select id="pd-base">' +
@@ -262,9 +279,10 @@
               for (var m = 36; m <= 72; m += 12) h += '<option value="' + m + '">' + Theory.midiName(m) + '</option>';
               return h;
             })() + '</select></label>' +
-          '<label class="row tight small muted" style="gap:6px"><input type="checkbox" id="pd-leds">Key lights: keep the eight pad keys lit on the ROLI and flash them with every hit — including the loop&rsquo;s own beat</label>' +
+          '<label class="row tight small" style="gap:6px"><input type="checkbox" id="pd-leds">Key lights</label>' +
         '</div>' +
-        '<div class="muted small" style="margin-top:10px">ROLI octave = eight keys up from the base note, one pad each, full velocity. ' +
+        '<div class="muted small" style="margin-top:10px">Key lights keep the eight pad keys lit on the ROLI and flash them with every hit — including the loop&rsquo;s own beat. ' +
+          'ROLI octave = eight keys up from the base note, one pad each, full velocity. ' +
           'GM drums = the standard drum map (kick 36, snare 38&hellip;) for hardware pad controllers. ' +
           'Arm the drum track <b>Live</b> on the Tracks page and your MIDI pads work from anywhere in the Studio.</div>' +
       '</div>';

@@ -348,7 +348,7 @@
   }
 
   function card(inner) {
-    return '<div class="card kl-card"><div class="kl-head"><h3>Scale lessons</h3>' +
+    return '<div class="card kl-card"><div class="kl-head"><h2>Scale lessons</h2>' +
       '<span class="muted small">Play along with the click. Right notes on the beat level you up.</span></div>' + inner + '</div>';
   }
 
@@ -577,10 +577,11 @@
 
   var CSS =
     '.kl-card{margin-top:14px}' +
-    '.kl-head{display:grid;gap:2px;margin-bottom:12px}.kl-head h3{margin:0;font:400 22px/1 var(--font-display);letter-spacing:1px;text-transform:uppercase}' +
+    '.kl-head{display:grid;gap:4px;margin-bottom:12px}.kl-card .kl-head h2{margin:0}' + // the global .card h2 (Bebas + amber dot)
     '.kl-sel,.kl-run,.kl-done{display:grid;gap:12px;padding:14px;border-radius:12px;background:var(--card2)}' +
     '.kl-title,.kl-runtop{display:grid;gap:2px}.kl-title b,.kl-runtop b{font-size:16px}' +
-    '.kl-level{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px}.kl-level span{font-size:14px}' +
+        // '- Level n of 10 +' stays ONE control (no full-width gap on desktop)
+    '.kl-level{display:grid;grid-template-columns:auto minmax(0,max-content) auto;justify-content:start;align-items:center;gap:10px}.kl-level span{font-size:14px}' +
     // focus mode while a run plays: keyboard + run panel only
     '.kl-running #panel-piano .row.spread>span.row,.kl-running #pn-perf,.kl-running #pn-qwpanel,.kl-running .pn-practice,' +
       '.kl-running #pn-legend,.kl-running .pn-foot,.kl-running .kl-head{display:none!important}' +
@@ -588,10 +589,11 @@
     '.kl-mastery{display:grid;gap:4px}.kl-mbar{display:block;height:6px;border-radius:3px;background:var(--line);overflow:hidden}.kl-mbar i{display:block;height:100%;background:var(--accent);border-radius:3px}' +
     '.kl-opts{display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap}' +
     '.kl-acts{display:flex;gap:8px;flex-wrap:wrap}' +
-    '.kl-tiers{display:flex;width:100%;margin:14px 0 8px}.kl-tiers button{flex:1}' +
+    '.kl-tiers{display:flex;width:100%;max-width:560px;margin:14px 0 8px}.kl-tiers button{flex:1}' +
     '.kl-list{display:grid;gap:6px}' +
+    '@media (min-width:900px){.kl-list{grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px}}' +
     '.kl-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:transparent;color:var(--text);font:inherit;text-align:left;cursor:pointer}' +
-    '.kl-row.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent)}' +
+    '.kl-row.on{border-color:var(--accent);background:var(--accent-soft)}' +
     '.kl-rname{display:grid;font-weight:600;font-size:14.5px}.kl-rname small{font-weight:500;color:var(--muted);font-size:12.5px}' +
     '.kl-rlv{font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}.kl-rstars{color:var(--accent);letter-spacing:1px;min-width:3.2em;text-align:right}' +
     '.kl-badge{font-size:11px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;padding:2px 7px;border-radius:6px;background:var(--accent);color:#221302}' +
@@ -602,7 +604,9 @@
     '.kl-beats{display:flex;gap:10px;justify-content:center}.kl-beats i{width:14px;height:14px;border-radius:50%;background:var(--line);transition:background .06s}' +
     '.kl-beats i.on{background:var(--accent)}.kl-beats i.on.acc{box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 35%,transparent)}' +
     '.kl-call{text-align:center;font:400 34px/1.1 var(--font-display);letter-spacing:1px;min-height:38px;text-transform:uppercase}' +
-    '.kl-call.cd{font-size:52px;color:var(--accent)}.kl-call.perfect,.kl-call.great{color:#4cc9b0}.kl-call.good,.kl-call.off{color:#ffd166}.kl-call.wrong,.kl-call.miss{color:#ff6b6b}' +
+    '.kl-call.cd{font-size:52px;color:var(--accent)}.kl-call.perfect,.kl-call.great{color:var(--teal)}.kl-call.good,.kl-call.off{color:#ffd166}.kl-call.wrong,.kl-call.miss{color:var(--red)}' +
+    // light theme: the pale yellow call is unreadable on a light card
+    ':root[data-theme="light"] .kl-call.good,:root[data-theme="light"] .kl-call.off{color:var(--warn)}' +
     '.kl-needle{position:relative;height:30px;border-radius:8px;background:var(--card);border:1px solid var(--line)}' +
     '.kl-zone{position:absolute;top:0;bottom:0;left:calc(50% - 11.7%);width:23.4%;background:color-mix(in srgb,#4cc9b0 18%,transparent)}' +
     '.kl-mid{position:absolute;top:0;bottom:0;left:50%;width:2px;margin-left:-1px;background:var(--muted)}' +
