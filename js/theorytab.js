@@ -17,7 +17,7 @@
 
   // order of fifths, clockwise from C at 12 o'clock; inner ring = relative minors
   var FIFTHS = [0, 7, 2, 9, 4, 11, 6, 1, 8, 3, 10, 5];
-  var KEYSIG = ['', '1♯', '2♯', '3♯', '4♯', '5♯', '6♯', '5♭', '4♭', '3♭', '2♭', '1♭'];
+  var KEYSIG = ['', '1♯', '2♯', '3♯', '4♯', '5♯', '6♭', '5♭', '4♭', '3♭', '2♭', '1♭'];
 
   var FUNC_SHORT = ['tonic', 'supertonic', 'mediant', 'subdominant', 'dominant', 'submediant', 'leading tone'];
 
@@ -80,7 +80,9 @@
     var isMajor = scale === 'major';
     var isMinor = scale === 'aeolian';
     var C = 170, R2 = 160, R1 = 116, R0 = 74;
-    var s = '<svg viewBox="0 0 340 340" class="th-circle" role="img" aria-label="Circle of fifths">';
+    // the key-signature ring sits outside R2: the viewBox pads every side so
+    // the 3♯ / 3♭ / 6♭ labels are never clipped
+    var s = '<svg viewBox="-18 -18 376 376" class="th-circle" role="img" aria-label="Circle of fifths">';
     for (var i = 0; i < 12; i++) {
       var a0 = i * 30 - 15, a1 = i * 30 + 15;
       var majPc = FIFTHS[i];
@@ -88,8 +90,9 @@
       var majOn = isMajor && majPc === root;
       var minOn = isMinor && minPc === root;
       var otherOn = !isMajor && !isMinor && majPc === root;
+      var majLit = majOn || otherOn;
       s += '<path d="' + wedge(C, C, R1, R2, a0, a1) + '" class="th-wg th-wg-maj' +
-        (majOn || otherOn ? ' th-on' : '') + '" data-th-maj="' + majPc + '"></path>';
+        (majLit ? ' th-on' : '') + '" data-th-maj="' + majPc + '"></path>';
       s += '<path d="' + wedge(C, C, R0, R1, a0, a1) + '" class="th-wg th-wg-min' +
         (minOn ? ' th-on' : '') + '" data-th-min="' + minPc + '"></path>';
       var pM = polar(C, C, (R1 + R2) / 2, i * 30);
@@ -97,9 +100,11 @@
       var pS = polar(C, C, R2 + 11, i * 30);
       var pfM = Theory.FLAT_KEYS.has(majPc);
       s += '<text x="' + pM[0].toFixed(1) + '" y="' + (pM[1] + 6).toFixed(1) +
-        '" class="th-lb th-lb-maj">' + esc(Theory.pcName(majPc, pfM)) + '</text>';
+        '" class="th-lb th-lb-maj' + (majLit ? ' th-lb-on' : '') + '">' + esc(Theory.pcName(majPc, pfM)) + '</text>';
+      // a relative minor shares its major's signature, so it takes the
+      // major's spelling: F♯m under A (not Gbm), E♭m under G♭
       s += '<text x="' + pm[0].toFixed(1) + '" y="' + (pm[1] + 4).toFixed(1) +
-        '" class="th-lb th-lb-min">' + esc(Theory.pcName(minPc, Theory.FLAT_KEYS.has(minPc))) + 'm</text>';
+        '" class="th-lb th-lb-min' + (minOn ? ' th-lb-on' : '') + '">' + esc(Theory.pcName(minPc, pfM)) + 'm</text>';
       if (KEYSIG[i]) {
         s += '<text x="' + pS[0].toFixed(1) + '" y="' + (pS[1] + 4).toFixed(1) +
           '" class="th-lb th-lb-sig">' + KEYSIG[i] + '</text>';
@@ -345,17 +350,19 @@
 
   var CSS = '' +
     '.th-circlewrap{display:flex;justify-content:center;margin-top:6px;}' +
-    '.th-circle{width:100%;max-width:380px;height:auto;}' +
-    '.th-wg{cursor:pointer;stroke:var(--bg);stroke-width:1.5;transition:opacity 100ms ease;}' +
+    '.th-circle{width:100%;max-width:400px;height:auto;}' +
+    // separators in the card color; inner ring sunk (inset) so the two rings
+    // stay distinct in the light theme too
+    '.th-wg{cursor:pointer;stroke:var(--card);stroke-width:2;transition:opacity 100ms ease;}' +
     '.th-wg-maj{fill:var(--card2);}' +
-    '.th-wg-min{fill:var(--panel);}' +
+    '.th-wg-min{fill:var(--inset);}' +
     '.th-wg:hover{opacity:0.8;}' +
     '.th-wg.th-on{fill:var(--accent);}' +
     '.th-lb{fill:var(--text);font-family:var(--font-body);font-weight:600;text-anchor:middle;pointer-events:none;}' +
     '.th-lb-maj{font-size:17px;}' +
     '.th-lb-min{font-size:12px;fill:var(--muted);}' +
-    '.th-lb-sig{font-size:10px;fill:var(--muted);}' +
-    '.th-wg.th-on + .th-wg-min{}' +
+    '.th-lb-sig{font-size:11px;fill:var(--label);}' +
+    '.th-lb-on{fill:#221302;}' +
     '.th-center{fill:var(--accent);font-family:var(--font-display);font-size:44px;text-anchor:middle;pointer-events:none;}' +
     '.th-center-sub{fill:var(--muted);font-size:13px;font-weight:600;text-anchor:middle;pointer-events:none;}' +
     '.th-noterow,.th-chordrow{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}' +
@@ -371,7 +378,17 @@
     '.th-qbtn[disabled]{opacity:0.55;cursor:default;}' +
     '.th-qbtn.th-q-right{background:var(--deg-c);color:#1c1206;opacity:1;}' +
     '.th-qbtn.th-q-wrong{border-style:dashed;opacity:0.8;}' +
-    '.th-mt{margin-top:14px;}';
+    '.th-mt{margin-top:14px;}' +
+    // beats the global '.card h3{margin:0 0 10px}' so sub-sections breathe
+    '.card h3.th-mt{margin-top:18px;}' +
+    // buttons line up with the labeled selects beside them (bottom edges)
+    '#th-cp-go,#th-cp-dir{align-self:flex-end;}' +
+    // light theme: the bright degree palette is unreadable as TEXT on white —
+    // deepen it (borders keep the pure color)
+    ':root[data-theme="light"] .th-note b,:root[data-theme="light"] .th-chord b,' +
+      ':root[data-theme="light"] .th-qbtn{color:color-mix(in srgb,var(--deg-c,var(--text)) 55%,#000);}' +
+    ':root[data-theme="light"] .th-qbtn[disabled]{opacity:.75;}' +
+    ':root[data-theme="light"] .th-qbtn.th-q-right{color:#1c1206;opacity:1;}';
 
   function init(rootEl) {
     App.injectCSS('theorytab', CSS);
