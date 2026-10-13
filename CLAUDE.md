@@ -156,6 +156,17 @@ js/quiz.js        EXERCISES ('quiz', the practice HOME since v0.69.0): Musicca-
                   ENDLESS STREAK (v0.76.0: the sprint path with
                   cur.sprint.endless — no clock, ends on the first miss or
                   End run, record in xp.sprint['end:'+nodeId]).
+                  ANSWER CLOCK (v0.77.0, qz.clock 0/8/5/3, default 5):
+                  per-question countdown for Endless + drills only (levels,
+                  jumps, sprints untimed); clockExtra +3 s ear/play, +5 s
+                  set; ear clocks start after playQ; endless takes 0.1 s
+                  off per right answer (floor base/2); time out = a miss
+                  ('Time’s up'); covered() = app hidden / another page /
+                  a sheet / a help tour: nothing starts or ticks, and
+                  resumeQ() gives a fresh clock (+ the unplayed ear sound)
+                  on return — app.js emits 'sheet' {name, open}, help.js
+                  'tour' {open}; timed endless records 'end:'+node+'@'+secs
+                  (recKey parses).
                   Progress = tiles, week strip, goal picker, SVG charts built
                   at container width (XP/day + goal line, minutes/day, weekly
                   answer speed; hover tips + table views) and topic speed
@@ -167,8 +178,8 @@ js/quiz.js        EXERCISES ('quiz', the practice HOME since v0.69.0): Musicca-
                   qz.prog); applyFor(unit) links lessons to the Fretboard
                   (fb:practice with the scale), Chords or the Circle.
                   window.SLQuiz = test hook (levels, gen, start, pick, q,
-                  view, cur, nodes, node(i), current, sprint, finishSprint,
-                  tab, theory).
+                  view, cur, nodes, node(i), current, sprint, endless,
+                  clock, finishSprint, tab, theory).
 js/xp.js          XP / streak service under the course (App.xp = window.SLXP,
                   no DOM except html.goal-due = the Learn-tab dot): 2 XP per
                   right answer, +1 under PAR ms, +1 at a run of 5; level

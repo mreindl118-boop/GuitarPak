@@ -65,7 +65,7 @@
       { t: 'Exercises', x: 'A course in short levels of 10 questions: Notes, Intervals, Chords, Scales and Key signatures. Every right answer earns XP; quick answers and runs of 5 earn more.' },
       { sel: '.qz-strip', t: 'Your day', x: 'Your streak grows each day you finish a level or play for 5 minutes on any page. The ring fills toward your daily XP goal, and XP raises your level. Seven days in a row earns a streak freeze that covers a missed day.' },
       { sel: '.qz-hometabs', t: 'Path, Topics, Progress', x: 'The Path walks you through the course step by step, and each step opens the next. Topics lets you practice anything. Progress shows your XP, practice time and how your answer speed improves.' },
-      { t: 'Sprints, streaks and jumps', x: 'Tap a step on the path for its levels, a 60-second sprint (as many right answers as you can) and an Endless streak (questions until your first miss), each against your own record. Already know it? Tap a locked step and Jump here: 9 out of 10 opens the path up to there.' }
+      { t: 'Sprints, streaks and jumps', x: 'Tap a step on the path for its levels, a 60-second sprint (as many right answers as you can) and an Endless streak (questions until your first miss), each against your own record. The answer clock (Off, 8, 5 or 3 s) times every Endless and drill question: answer on instinct before it runs out. Already know it? Tap a locked step and Jump here: 9 out of 10 opens the path up to there.' }
     ],
     theory: [
       { t: 'Theory', x: 'The circle of fifths, a guide to what chords live in every key, and an ear quiz for scale degrees. Tap around the circle — the app’s key follows.' }
@@ -113,7 +113,7 @@
   function store() { return App.store; }
 
   function close() {
-    if (ov) { ov.remove(); ov = null; }
+    if (ov) { ov.remove(); ov = null; App.emit('tour', { open: false }); }
     document.removeEventListener('keydown', onEsc, true);
   }
 
@@ -198,6 +198,7 @@
     ov.innerHTML = '<div class="hp-ring"></div><div class="hp-card card"></div>' +
       '<button type="button" class="hp-close btn sm" aria-label="Close help">' + App.icon('close', 14) + '</button>';
     document.body.appendChild(ov);
+    App.emit('tour', { open: true });
     ov.addEventListener('click', function (e) {
       if (e.target === ov) close();
     });

@@ -1282,9 +1282,10 @@
   // The run view is a fixed shell (header, progress, card, footer); only the
   // question inside the card is swapped, with a short fade — no full redraw.
   function renderRun() {
-    var l = cur.lvl, shell = el('qz-runshell'), sid = (cur.sprint ? (cur.sprint.endless ? 'endless:' : 'sprint:') : cur.jump != null ? 'jump:' : cur.drill ? 'drill:' : '') + l.id;
+    var l = cur.lvl, shell = el('qz-runshell'), sid = (cur.sprint ? (cur.sprint.endless ? 'endless:' : 'sprint:') : cur.jump != null ? 'jump:' : cur.drill ? 'drill:' : '') + l.id + (cur.clock ? '@' + cur.clock.base : '');
     if (!shell || shell.getAttribute('data-lvl') !== sid) {
-      var tag = cur.sprint ? (cur.sprint.endless ? 'Endless streak · ' : '60-second sprint · ') + MODE_NAME[l.mode] : cur.jump != null ? 'Jump test · ' + MODE_NAME[l.mode] : cur.drill ? 'Drill · your misses' : MODE_NAME[l.mode] + ' · Level ' + l.n;
+      var tag = (cur.sprint ? (cur.sprint.endless ? 'Endless streak · ' : '60-second sprint · ') + MODE_NAME[l.mode] : cur.jump != null ? 'Jump test · ' + MODE_NAME[l.mode] : cur.drill ? 'Drill · your misses' : MODE_NAME[l.mode] + ' · Level ' + l.n) +
+        (cur.clock ? ' · ' + cur.clock.base + ' s clock' : '');
       root.innerHTML =
         '<div class="qz-view qz-run" id="qz-runshell" data-lvl="' + esc(sid) + '">' +
           '<div class="qz-runhead"><button type="button" class="qz-backlink" id="qz-back">' + App.icon('left', 14) + ' ' + esc(cur.sprint ? (cur.sprint.endless ? 'End run' : 'End sprint') : l.unit.name) + '</button>' +
@@ -1293,6 +1294,7 @@
             '<span class="qz-count" id="qz-count"></span></div>' +
           (cur.sprint ? (cur.sprint.endless ? '' : '<div class="qz-timebar" aria-hidden="true"><i id="qz-timefill"></i></div>')
             : '<div class="qz-prog" id="qz-prog" aria-hidden="true"></div>') +
+          (cur.clock ? '<div class="qz-timebar qz-clock" aria-hidden="true"><i id="qz-clockfill"></i></div>' : '') +
           '<div class="card qz-stage">' +
             '<div class="qz-q" id="qz-q"></div>' +
             '<div class="qz-foot"><div class="qz-fb" id="qz-fb" role="status" aria-live="polite"></div>' +
@@ -1412,11 +1414,13 @@
     var l = cur.lvl, nd = l.node, html;
     if (cur.sprint) {
       var rec = cur.rec || { best: cur.score, old: 0, isBest: false }, endless = cur.sprint.endless;
-      html = '<div class="qz-lvltag">' + esc((endless ? 'Endless streak · ' : '60-second sprint · ') + l.unit.name + ' · ' + MODE_NAME[l.mode]) + '</div>' +
+      var ck = endless ? cur.sprint.clock : 0;
+      html = '<div class="qz-lvltag">' + esc((endless ? 'Endless streak · ' + (ck ? ck + ' s clock · ' : '') : '60-second sprint · ') + l.unit.name + ' · ' + MODE_NAME[l.mode]) + '</div>' +
         '<div class="qz-big">' + cur.score + '<span>' + (endless ? ' in a row' : ' right') + '</span></div>' +
-        '<div class="qz-verdict">' + (rec.isBest && cur.score ? (rec.old ? 'New record! Your best was ' + rec.old + '.' : 'First record set.') : 'Your record: ' + rec.best + '.') + '</div>' +
+        '<div class="qz-verdict">' + (rec.isBest && cur.score ? (rec.old ? 'New record! Your best was ' + rec.old + '.' : 'First record set.') : 'Your record' + (ck ? ' with the ' + ck + ' s clock' : '') + ': ' + rec.best + '.') + '</div>' +
         doneStats() + doneNotes() +
         (endless && cur.endQ ? '<div class="qz-miss"><span class="muted">Ended on: </span>' + esc(cur.endQ) + '</div>' : '') +
+        (endless ? clockPicker() : '') +
         '<div class="qz-acts">' + (endless ? '<button type="button" class="btn primary" data-qzendless="' + nd.i + '"><span class="qz-inf" aria-hidden="true">∞</span> Go again</button>'
           : '<button type="button" class="btn primary" data-qzsprint="' + nd.i + '">' + ico('bolt', 15) + ' Sprint again</button>') +
           '<button type="button" class="btn" id="qz-tohome">Back to the path</button></div>';
@@ -1461,6 +1465,7 @@
     if (!l) return;
     clearTimeout(advT);
     stopSprint();
+    stopClock();
     opt = opt || {};
     var from = view === 'topic' ? 'topic' : view === 'home' ? 'path' : (cur && cur.from) || 'path';
     cur = { lvl: l, n: 10, res: [], miss: {}, q: null, answered: false, tap: {}, got: {}, played: null, playedPos: null, lastSig: null,
@@ -1469,10 +1474,13 @@
     if (cur.drill) cur.n = Math.min(10, Math.max(5, cur.drill.length * 2));
     if (opt.sprint != null) {
       cur.n = 1e9;
-      var skey = (opt.endless ? 'end:' : '') + NODES[opt.sprint].id;
-      cur.sprint = { i: opt.sprint, key: skey, endless: !!opt.endless, best: XP().sprintBest(skey),
+      var ck = opt.endless ? clockSetting() : 0, skey = opt.endless ? endKey(NODES[opt.sprint].id, ck) : NODES[opt.sprint].id;
+      cur.sprint = { i: opt.sprint, key: skey, endless: !!opt.endless, clock: ck, best: XP().sprintBest(skey),
         end: opt.endless ? Infinity : Date.now() + 60000, timer: 0, done: false };
     }
+    // the answer clock: Endless streaks and drills (levels and jump tests stay untimed)
+    var cs = clockSetting();
+    if (cs && ((cur.sprint && cur.sprint.endless) || cur.drill)) cur.clock = { base: cs, now: cs, timer: 0, end: 0, len: 0, q: null };
     view = 'run';
     newQ();
     if (cur.sprint && !cur.sprint.endless) cur.sprint.timer = setInterval(tickSprint, 100);
@@ -1491,10 +1499,12 @@
     cur.got = {};
     cur.played = null;
     cur.playedPos = null;
+    cur.timedOut = false;
     render();
     cur.t0 = (window.performance || Date).now();
     if (again) { var qb = el('qz-q'); if (qb && qb.getBoundingClientRect().top < 0) reveal(el('qz-runshell')); }
-    if (q.auto) setTimeout(function () { whenVoiceReady(function () { if (cur && cur.q === q && view === 'run') playQ(q); }); }, 280);
+    if (q.auto) setTimeout(function () { whenVoiceReady(function () { if (cur && cur.q === q && view === 'run' && !covered()) { cur.autoPlayed = q; playQ(q); startClock(); } }); }, 280);
+    else startClock();
   }
 
   function nextQ() {
@@ -1507,8 +1517,11 @@
   function resolve(ok, picked, note) {
     var q = cur.q;
     if (cur.answered) return;
+    stopClock();
     cur.answered = true;
     cur.lastOk = ok;
+    // endless + clock: every right answer takes 0.1 s off the clock, down to half
+    if (ok && cur.clock && cur.sprint && cur.sprint.endless) cur.clock.now = Math.max(cur.clock.base / 2, Math.round(cur.clock.now * 10 - 1) / 10);
     cur.res.push(ok);
     recordItem(q.item, ok);
     var ms = Math.max(0, (window.performance || Date).now() - (cur.t0 || 0));
@@ -1536,7 +1549,7 @@
     if (fb) {
       fb.className = 'qz-fb ' + (ok ? 'ok' : 'bad');
       var pk = !ok && picked && q.choices ? q.choices.filter(function (c) { return c.id === picked; })[0] : null;
-      fb.innerHTML = '<b>' + (ok ? 'Correct.' : note != null ? 'You played ' + esc(PC_LABEL[mod(note, 12)]) + '.' : pk ? 'You chose ' + esc(pk.label) + '.' : 'Not quite.') + '</b> ' + esc(q.explain || '');
+      fb.innerHTML = '<b>' + (ok ? 'Correct.' : cur.timedOut ? 'Time’s up.' : note != null ? 'You played ' + esc(PC_LABEL[mod(note, 12)]) + '.' : pk ? 'You chose ' + esc(pk.label) + '.' : 'Not quite.') + '</b> ' + esc(q.explain || '');
     }
     paintFoot();
     paintProg();
@@ -1544,7 +1557,7 @@
     xpPop(xr);
     var nb = el('qz-act');
     if (cur.sprint) { // keep the pace: right answers move on fast, misses show the answer briefly
-      if (!ok && cur.sprint.endless) cur.endQ = q.explain || q.prompt;
+      if (!ok && cur.sprint.endless) cur.endQ = (cur.timedOut ? 'Time’s up. ' : '') + (q.explain || q.prompt);
       advT = setTimeout(function () { if (cur && cur.q === q) nextQ(); }, ok ? 380 : cur.sprint.endless ? 1800 : 1100);
       return;
     }
@@ -1629,6 +1642,7 @@
 
   function back() {
     clearTimeout(advT);
+    stopClock();
     if (view === 'run' && cur && cur.sprint && cur.sprint.endless && !cur.sprint.done) { finishSprint(); return; } // End run keeps the streak
     stopSprint();
     if ((view === 'run' || view === 'done') && cur && cur.from !== 'topic') { toPath(cur.lvl.node.i); return; }
@@ -1762,7 +1776,7 @@
   }
 
   function nodePop(nd, i, p) {
-    var open = unlocked(i, p), nl = nodeLevel(nd, p), best = XP().sprintBest(nd.id), eb = XP().sprintBest('end:' + nd.id);
+    var open = unlocked(i, p), nl = nodeLevel(nd, p), best = XP().sprintBest(nd.id);
     var rows = nd.levels.map(function (l) {
       var s = p[l.id];
       return '<button type="button" class="qz-lvl" data-qzl="' + l.id + '">' +
@@ -1773,10 +1787,11 @@
     var acts = open
       ? '<button type="button" class="btn primary" data-qzl="' + nl.id + '">' + App.icon('play', 13) + ' ' + (nodeDone(nd, p) ? 'Level ' + nl.n : 'Start') + '</button>' +
         '<button type="button" class="btn" data-qzsprint="' + i + '">' + ico('bolt', 15) + ' 60-second sprint' + (best ? ' · best ' + best : '') + '</button>' +
-        '<button type="button" class="btn" data-qzendless="' + i + '" title="Questions until your first miss"><span class="qz-inf" aria-hidden="true">∞</span> Endless streak' + (eb ? ' · best ' + eb : '') + '</button>'
+        '<button type="button" class="btn" data-qzendless="' + i + '" title="Questions until your first miss">' + endlessLabel(nd) + '</button>'
       : '<button type="button" class="btn primary" data-qzjump="' + i + '">Jump here</button>';
     var ap = applyFor(nd.unit.id);
     if (open && ap) acts += '<button type="button" class="btn" data-qzapply="' + nd.unit.id + '">' + esc(ap.label) + '</button>';
+    if (open) acts += clockPicker();
     return '<div class="card qz-npop qz-in" role="region" aria-label="' + esc(nd.unit.name + ', ' + MODE_NAME[nd.mode]) + '">' +
       '<div class="qz-npophead"><b>' + esc(nd.unit.name) + '</b><span>' + esc(nd.topic.name + ' · ' + MODE_NAME[nd.mode]) + '</span></div>' +
       (open && nd.unit.learn ? '<details class="qz-nlearn"' + (nodeDone(nd, p) ? '' : ' open') + '><summary>Lesson</summary><div class="qz-learn">' + nd.unit.learn + '</div></details>' : '') +
@@ -1890,8 +1905,8 @@
 
   function progressHTML() {
     var X = XP(), lv = X.level(), st = X.streak(), tot = X.totals(), g = X.goal(), t = X.today();
-    var sprints = X.sprints(), sk = Object.keys(sprints).filter(function (k) { return NODE_BY_ID[k.replace(/^end:/, '')]; });
-    sk.sort(function (a, b) { return NODE_BY_ID[a.replace(/^end:/, '')].i - NODE_BY_ID[b.replace(/^end:/, '')].i || (a < b ? 1 : -1); });
+    var sprints = X.sprints(), sk = Object.keys(sprints).filter(function (k) { return recKey(k).node; });
+    sk.sort(function (a, b) { return recKey(a).node.i - recKey(b).node.i || (a < b ? -1 : 1); });
     var goalSeg = X.GOALS.map(function (v) {
       return '<button type="button" data-qzgoal="' + v + '" class="' + (v === g ? 'active' : '') + '" aria-pressed="' + (v === g) + '">' + X.GOAL_NAMES[v] + ' <small>' + v + '</small></button>';
     }).join('');
@@ -1914,8 +1929,8 @@
       keysLessonsHTML() +
       '<section class="card qz-pcard"><div class="qz-pchead"><h3>Records</h3><span class="muted small">Most right answers in a 60-second sprint, and in a row on an endless streak</span></div>' +
         (sk.length ? '<ul class="qz-recs">' + sk.map(function (k) {
-          var end = k.indexOf('end:') === 0, nd = NODE_BY_ID[end ? k.slice(4) : k];
-          return '<li><button type="button" class="qz-rec" data-' + (end ? 'qzendless' : 'qzsprint') + '="' + nd.i + '"><span>' + esc(nd.unit.name) + '<small>' + esc(MODE_NAME[nd.mode]) + ' · ' + (end ? 'endless streak' : 'sprint') + '</small></span><b>' + sprints[k] + '</b>' +
+          var rk = recKey(k), end = rk.end, nd = rk.node;
+          return '<li><button type="button" class="qz-rec" data-' + (end ? 'qzendless' : 'qzsprint') + '="' + nd.i + '"' + (end ? ' data-qzclk="' + rk.clock + '"' : '') + '><span>' + esc(nd.unit.name) + '<small>' + esc(MODE_NAME[nd.mode]) + ' · ' + (end ? 'endless streak' + (rk.clock ? ' · ' + rk.clock + ' s clock' : '') : 'sprint') + '</small></span><b>' + sprints[k] + '</b>' +
             (end ? '<span class="qz-inf" aria-hidden="true">∞</span>' : ico('bolt', 15)) + '</button></li>';
         }).join('') + '</ul>'
           : '<p class="muted small">No records yet. Open any step on the path and choose 60-second sprint or Endless streak.</p>') + '</section>' +
@@ -2095,7 +2110,7 @@
     if (!cur || !cur.sprint || cur.sprint.done) return;
     if (cur.sprint.endless) {
       var n = cur.res.filter(Boolean).length, ce = el('qz-count'), b = cur.sprint.best;
-      if (ce) ce.textContent = 'Streak ' + n + (b ? (n > b ? ' · new record' : ' · best ' + b) : '');
+      if (ce) ce.textContent = 'Streak ' + n + (b ? (n > b ? ' · new record' : ' · best ' + b) : '') + (cur.clock ? ' · ' + cur.clock.now.toFixed(1) + ' s' : '');
       return;
     }
     var left = Math.max(0, cur.sprint.end - Date.now()), f = el('qz-timefill');
@@ -2109,11 +2124,63 @@
     if (cur && cur.sprint) { clearInterval(cur.sprint.timer); cur.sprint.timer = 0; }
   }
 
+  // ---- the answer clock: a countdown per question (Endless streaks, drills) ----
+  // trains instant recognition: no time to count lines or hunt for the key
+  var CLOCKS = [0, 8, 5, 3];
+  function clockSetting() { var c = +App.store.get('qz.clock', 5); return CLOCKS.indexOf(c) >= 0 ? c : 5; }
+  function endKey(nodeId, clock) { return 'end:' + nodeId + (clock ? '@' + clock : ''); }
+  function recKey(k) { // 'node' = sprint, 'end:node' / 'end:node@5' = endless (untimed / 5 s clock)
+    var m = /^(end:)?(.*?)(?:@(\d+))?$/.exec(k);
+    return { end: !!m[1], node: NODE_BY_ID[m[2]], clock: +m[3] || 0 };
+  }
+  // more time where the question takes longer to take in: listening, finding notes
+  function clockExtra(q) { return q.ear ? 3 : q.kind === 'set' ? 5 : q.kind === 'choice' ? 0 : 3; }
+  // nothing ticks while the question is out of sight: another page, the app
+  // in the background, a sheet (Lights & help, metronome) or a help tour on top
+  function covered() { return document.hidden || App.active !== 'quiz' || !!App.sheet || !!(window.Help && Help.isOpen && Help.isOpen()); }
+  function startClock() {
+    stopClock();
+    var c = cur && cur.clock;
+    if (!c || cur.answered || view !== 'run' || covered()) return;
+    c.len = (c.now + clockExtra(cur.q)) * 1000;
+    c.end = Date.now() + c.len;
+    c.q = cur.q;
+    c.timer = setInterval(tickClock, 100);
+    tickClock();
+  }
+  function stopClock() { if (cur && cur.clock && cur.clock.timer) { clearInterval(cur.clock.timer); cur.clock.timer = 0; } }
+  function tickClock() {
+    var c = cur && cur.clock;
+    if (!c || !c.timer) return;
+    if (cur.answered || cur.q !== c.q || view !== 'run' || covered()) { stopClock(); return; }
+    var left = Math.max(0, c.end - Date.now()), f = el('qz-clockfill');
+    if (f) { f.style.width = (100 * left / c.len).toFixed(2) + '%'; f.classList.toggle('low', left < 1500); }
+    if (left <= 0) { stopClock(); cur.timedOut = true; resolve(false, null); }
+  }
+  // back in sight: a fresh clock (and the sound, if it never got to play)
+  function resumeQ() {
+    if (!cur || view !== 'run' || cur.answered || covered()) return;
+    if (cur.q.auto && cur.autoPlayed !== cur.q) { cur.autoPlayed = cur.q; playQ(cur.q); }
+    startClock();
+  }
+  function endlessLabel(nd) {
+    var eb = XP().sprintBest(endKey(nd.id, clockSetting()));
+    return '<span class="qz-inf" aria-hidden="true">∞</span> Endless streak' + (eb ? ' · best ' + eb : '');
+  }
+  function clockPicker() {
+    var c = clockSetting();
+    return '<div class="qz-clockrow"><span class="qz-clocklab">Answer clock<small>Endless streak and drills · a miss when time runs out</small></span>' +
+      '<div class="seg qz-clockseg" role="group" aria-label="Answer clock">' + CLOCKS.map(function (v) {
+        return '<button type="button" data-qzclock="' + v + '" class="' + (v === c ? 'active' : '') + '" aria-pressed="' + (v === c) + '">' + (v ? v + ' s' : 'Off') + '</button>';
+      }).join('') + '</div></div>';
+  }
+
   function finishSprint() {
     if (!cur || !cur.sprint || cur.sprint.done) return;
     var sp = cur.sprint;
     sp.done = true;
     stopSprint();
+    stopClock();
     clearTimeout(advT);
     var score = cur.res.filter(Boolean).length, rec = XP().sprintRecord(sp.key, score);
     cur.rec = rec;
@@ -2139,7 +2206,7 @@
   function paintRunXP() {
     var e = el('qz-xpp');
     if (!e || !cur) return;
-    e.innerHTML = (cur.combo >= 3 ? '<span class="qz-combo">' + ico('flame', 14) + cur.combo + ' in a row</span>' : '') +
+    e.innerHTML = (cur.combo >= 3 && !(cur.sprint && cur.sprint.endless) ? '<span class="qz-combo">' + ico('flame', 14) + cur.combo + ' in a row</span>' : '') +
       '<span class="qz-xpn">' + ico('bolt', 14) + cur.xp + ' XP</span>';
   }
 
@@ -2183,7 +2250,14 @@
     if ((a = t.getAttribute('data-qzh'))) { setHomeTab(a); return; }
     if ((a = t.getAttribute('data-qzn'))) { selectNode(+a); return; }
     if ((a = t.getAttribute('data-qzsprint'))) { startSprint(+a); return; }
-    if ((a = t.getAttribute('data-qzendless'))) { startSprint(+a, true); return; }
+    if ((a = t.getAttribute('data-qzendless'))) { var ck = t.getAttribute('data-qzclk'); if (ck != null) App.store.set('qz.clock', +ck); startSprint(+a, true); return; }
+    if ((a = t.getAttribute('data-qzclock'))) {
+      App.store.set('qz.clock', +a);
+      root.querySelectorAll('[data-qzclock]').forEach(function (b) { var on = b === t; b.classList.toggle('active', on); b.setAttribute('aria-pressed', String(on)); });
+      var eb = root.querySelector('.qz-npop [data-qzendless]');
+      if (eb) eb.innerHTML = endlessLabel(NODES[+eb.getAttribute('data-qzendless')]); // its best is per clock
+      return;
+    }
     if ((a = t.getAttribute('data-qzkeys'))) { App.switchTo('piano'); if (App.keysLessons) App.keysLessons.open(a); var kc = document.querySelector('.kl-card'); if (kc) kc.scrollIntoView({ block: 'start' }); return; }
     if ((a = t.getAttribute('data-qzapply'))) { var ap = applyFor(a); if (ap) ap.go(); return; }
     if ((a = t.getAttribute('data-qzjump'))) { startLevel(NODES[+a].levels[0].id, { jump: +a }); return; }
@@ -2420,6 +2494,9 @@
     '@keyframes qz-pop{0%{opacity:0;transform:translateY(6px)}15%{opacity:1}100%{opacity:0;transform:translateY(-22px)}}' +
     '.qz-timebar{height:8px;margin:8px 0 12px;border-radius:4px;background:var(--card2);overflow:hidden}' +
     '.qz-timebar i{display:block;height:100%;width:100%;background:var(--accent);border-radius:4px;transition:width .1s linear}' +
+    '.qz-clock{height:6px;margin:6px 0 10px}.qz-clock i.low{background:var(--red)}' +
+    '.qz-clockrow{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;width:100%;margin-top:4px}.qz-clocklab{display:grid;font-size:13.5px;font-weight:600}' +
+    '.qz-clocklab small{font-weight:500;color:var(--muted);font-size:12px}.qz-done .qz-clockrow{justify-content:center;text-align:center}' +
     '.qz-dstats,.qz-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(150px,45%),1fr));gap:10px;width:100%;max-width:560px}' +
     '.qz-tiles{max-width:none;margin-bottom:12px}' +
     '.qz-tile{display:grid;gap:2px;padding:12px 14px;border-radius:12px;background:var(--card2);text-align:left;position:relative}' +
@@ -2492,6 +2569,9 @@
       e._t = setTimeout(function () { if (e.parentNode) e.parentNode.removeChild(e); }, 4000);
     });
     root.addEventListener('click', onClick);
+    document.addEventListener('visibilitychange', function () { if (document.hidden) stopClock(); else resumeQ(); });
+    App.on('sheet', function (d) { if (d && d.open) stopClock(); else resumeQ(); });
+    App.on('tour', function (d) { if (d && d.open) stopClock(); else resumeQ(); });
     root.addEventListener('pointerdown', onPointer);
     // decode the piano bank on the first touch here, ahead of the first question
     root.addEventListener('pointerdown', function () { if (App.keys && App.keys.warm) App.keys.warm(); }, true);
@@ -2528,6 +2608,7 @@
     current: function () { return currentNode(prog()); },
     sprint: startSprint,
     endless: function (i) { startSprint(i, true); },
+    clock: function (s) { if (s != null) App.store.set('qz.clock', s); return clockSetting(); },
     tab: setHomeTab,
     finishSprint: finishSprint,
     theory: { nt: nt, midiOf: midiOf, nm: nm, addIv: addIv, IV: IV, buildChord: buildChord, buildScale: buildScale, keyChords: keyChords, KEYS: KEYS }
@@ -2542,10 +2623,11 @@
       if (view !== 'run') {
         render();
         if (view === 'home' && homeTab === 'path' && window.pageYOffset < 60) showCurrentNode();
-      }
+      } else resumeQ(); // a fresh clock for the question you left
     },
     onHide: function () {
       clearTimeout(advT);
+      stopClock();
       if (cur && cur.sprint && !cur.sprint.done && view === 'run') finishSprint();
       if (App.midi && App.midi.hideLayout) App.midi.hideLayout('quiz', false);
     },

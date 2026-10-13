@@ -89,7 +89,7 @@ window.App = (function () {
   //            when an APK is actually built. Older APKs read nothing else, so
   //            this must never run ahead of the real file: when it did, the
   //            Android app kept downloading the same old APK in a loop.
-  var APP_VERSION = '0.76.0';
+  var APP_VERSION = '0.77.0';
   var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
 
   function verNum(v) {
@@ -846,6 +846,7 @@ window.App = (function () {
     }
     var x = el.querySelector('[data-sheet-close]');
     if (x) { try { x.focus({ preventScroll: true }); } catch (e) { /* old engines */ } }
+    emit('sheet', { name: name, open: true }); // the page underneath can pause (quiz answer clock)
   }
 
   function closeSheet() {
@@ -862,6 +863,7 @@ window.App = (function () {
     var r = sheetReturn;
     sheetReturn = null;
     if (r && r.focus && document.body.contains(r)) { try { r.focus({ preventScroll: true }); } catch (e) { /* ok */ } }
+    emit('sheet', { name: name, open: false });
   }
 
   function toggleSheet(name) { if (sheet === name) closeSheet(); else openSheet(name); }
