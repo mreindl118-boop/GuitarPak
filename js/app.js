@@ -1168,17 +1168,21 @@ window.App = (function () {
     var met = document.getElementById('cx-met');
     if (met) {
       var metRuns = false;
-      met.innerHTML = icon('play', 14);
       function anyRunning() {
         var eng = window.DAW && DAW.engine;
         return metRuns || !!(eng && (eng.playing || eng.songPlaying));
       }
+      // Practice: metronome glyph + play/stop, so it never reads as the
+      // page's own Play (which plays the scale). Studio: plain play/stop —
+      // there it runs the loop or the song.
       function paintCx() {
         var runs = anyRunning();
         met.classList.toggle('on', runs);
-        met.innerHTML = runs ? icon('stop', 14) : icon('play', 14);
+        met.innerHTML = (space === 'practice' ? icon('metronome', 16) : '') + icon(runs ? 'stop' : 'play', 12);
+        met.setAttribute('aria-pressed', String(runs));
         if (!runs) met.classList.remove('tick');
       }
+      paintCx();
       met.addEventListener('click', function () {
         var eng = window.DAW && DAW.engine;
         if (space === 'studio' && eng) {
@@ -1194,6 +1198,7 @@ window.App = (function () {
       on('met:state', function (d) { metRuns = !!(d && d.running); paintCx(); });
       on('st:state', paintCx);
       on('st:tr', paintCx);
+      on('space', paintCx);
       var tickTimer = null;
       function cxTick() {
         met.classList.add('tick');

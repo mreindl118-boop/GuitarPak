@@ -124,7 +124,9 @@
     var root = curRoot(), scale = curScale();
     var pal = degPalette();
     var info = Theory.scaleInfo(root, scale, Theory.FLAT_KEYS.has(root));
-    els.guideTitle.textContent = keyName();
+    // the heading face is caps-only ("Bb" would read "BB"): typographic
+    // accidentals keep the key name right
+    els.guideTitle.textContent = keyName().replace(/^([A-G])b/, '$1♭').replace(/^([A-G])#/, '$1♯');
 
     // notes with interval names
     var h = '';
@@ -363,7 +365,9 @@
     '.th-lb-min{font-size:12px;fill:var(--muted);}' +
     '.th-lb-sig{font-size:11px;fill:var(--label);}' +
     '.th-lb-on{fill:#221302;}' +
-    '.th-center{fill:var(--accent);font-family:var(--font-display);font-size:44px;text-anchor:middle;pointer-events:none;}' +
+    // key names are mixed-case ("Bb") — the caps-only display face would
+    // print "BB", so the center uses the condensed face like chord names
+    '.th-center{fill:var(--accent);font-family:var(--font-condensed);font-weight:700;font-size:44px;text-anchor:middle;pointer-events:none;}' +
     '.th-center-sub{fill:var(--muted);font-size:13px;font-weight:600;text-anchor:middle;pointer-events:none;}' +
     '.th-noterow,.th-chordrow{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}' +
     '.th-note{border-color:var(--deg-c,var(--line));gap:7px;}' +

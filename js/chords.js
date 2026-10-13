@@ -1067,7 +1067,8 @@
     '#ch-clear[hidden]{display:none;}' +
     // rows mixing label-above selects with buttons: line up the bottom edges
     '.ch-exrow,.ch-playrow{align-items:flex-end;}' +
-    '.ch-check{min-height:40px;}' +
+    '.ch-check,.ch-playrow>.muted{min-height:40px;}' +
+    '.ch-playrow>.muted{display:inline-flex;align-items:center;}' +
     // light theme: the bright degree palette is unreadable as TEXT on white —
     // deepen it (borders keep the pure color)
     ':root[data-theme="light"] .ch-inkeychip b,:root[data-theme="light"] .ch-tonechip b,' +

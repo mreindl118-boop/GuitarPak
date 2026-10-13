@@ -124,7 +124,8 @@
       root = el;
       App.injectCSS('lights',
         '.lc-sec{display:grid;gap:10px;padding:4px 0 16px}.lc-sec+.lc-sec{border-top:1px solid var(--line);padding-top:16px}' +
-        '.lc-sec h3{margin:0;font:400 20px/1 var(--font-display);letter-spacing:1px;text-transform:uppercase}' +
+        '.lc-sec h3{margin:0;font:600 11.5px/1.3 var(--font-body);letter-spacing:1.6px;text-transform:uppercase;color:var(--muted)}' +
+        '.lc-sec>.btn{justify-self:start}' +
         '.lc-help{display:flex;width:100%}.lc-help button{flex:1;min-width:0}' +
         '.lc-desc{margin:0;font-size:14.5px}.lc-sec p{margin:0}' +
         '.lc-status{font-weight:600;font-size:14.5px}.lc-status.none,.lc-status.noout{font-weight:500;color:var(--muted)}' +
@@ -133,7 +134,7 @@
         '.lc-deg i+i{border-radius:3px}.lc-deg b{font-size:11px;color:var(--muted);font-weight:600}' +
         '#lc-bright{flex:1;min-width:120px}.lc-val{font-variant-numeric:tabular-nums;font-size:13px;min-width:3em}' +
         '.lc-chk{display:flex;gap:8px;align-items:center;font-size:13.5px}' +
-        '.lc-warn{font-size:13.5px;color:#ffb36b}.lc-acts{display:flex;gap:8px}');
+        '.lc-warn{font-size:13.5px;color:var(--warn)}.lc-acts{display:flex;gap:8px;flex-wrap:wrap}');
       el.addEventListener('click', onClick);
       el.addEventListener('input', onInput);
       el.addEventListener('change', onInput);

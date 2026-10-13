@@ -293,7 +293,6 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
   background: var(--accent);
   box-shadow: 0 0 0 2px var(--bg);
 }
-.goal-due .tabbar-bottom .tabbar-btn[data-group="gtheory"]::after { right: calc(50% - 18px); }
 
 /* corner tools: workspace, help, settings, lights, metronome — the four
    icons are quiet borderless squares (one size, one icon size), so the
@@ -508,6 +507,35 @@ main {
 .muted { color: var(--muted); }
 .small { font-size: 12.5px; }
 
+/* page tips tucked behind a quiet disclosure: one line until asked for */
+details.tips { margin-top: 10px; font-size: 12.5px; color: var(--muted); }
+details.tips > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  cursor: pointer;
+  list-style: none;
+  font-weight: 600;
+  color: var(--label);
+}
+details.tips > summary::-webkit-details-marker { display: none; }
+details.tips > summary::before {
+  content: '?';
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+  font-size: 10.5px;
+  line-height: 1;
+}
+@media (hover: hover) { details.tips > summary:hover { color: var(--text); } }
+details.tips[open] > summary { color: var(--accent-ink); }
+details.tips > :not(summary) { margin-top: 4px; line-height: 1.55; }
+
 .big-display {
   font-family: var(--font-display);
   font-size: 78px;
@@ -593,6 +621,18 @@ label.field {
   color: var(--label);
 }
 
+/* the one small control label for inline toolbars ('Position', 'Perform',
+   'Energy'…) — same voice as label.field, without the column layout.
+   Casing rule: caps only for Bebas headings and these small field labels;
+   nav, pills, buttons and chips are title case. */
+.ctl-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--label);
+}
+
 select, input[type="number"], input[type="text"] {
   background-color: var(--card2);
   color: var(--text);
@@ -628,7 +668,8 @@ select option { background: var(--card); color: var(--text); font-weight: 500; }
 
 /* typing fields + dropdowns: an accent halo instead of the outline; every
    other control (sliders, checkboxes, buttons) keeps the global ring */
-select:focus, input[type="number"]:focus, input[type="text"]:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+select:focus, input[type="number"]:focus, input[type="text"]:focus { outline: none; border-color: var(--accent-line); }
+select:focus-visible, input[type="number"]:focus-visible, input[type="text"]:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 input[type="range"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
@@ -866,26 +907,45 @@ button .ic, .chip .ic { display: inline-block; }
     flex: 1 1 0;
     min-width: 0;
     flex-direction: column;
-    gap: 3px;
+    gap: 2px;
     padding: 6px 2px 4px;
     border: 0;
     border-radius: 10px;
-    font-size: 10.5px;
-    letter-spacing: 0.7px;
+    font-size: 11px;
+    letter-spacing: 0.3px;
   }
   .tabbar-bottom .tabbar-btn.active { background: transparent; }
-  .tabbar-bottom .tabbar-btn .ic { width: 22px; height: 22px; }
+  /* the active section gets a soft pill behind its icon, not color alone */
+  .tabbar-bottom .tabbar-btn .ic {
+    box-sizing: content-box;
+    width: 22px;
+    height: 22px;
+    padding: 4px 18px;
+    border-radius: 999px;
+    transition: background 150ms ease;
+  }
+  .tabbar-bottom .tabbar-btn.active .ic { background: var(--accent-soft); }
+  .goal-due .tabbar-bottom .tabbar-btn[data-group="gtheory"]::after { top: 4px; right: calc(50% - 30px); }
   main { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
   .foot { padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
   #snd-hint, #back-hint, #xp-toast, #app-update { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
 }
 
 @media (max-width: 640px) {
-  .topbar { padding: 8px 12px 4px; gap: 10px; }
+  .topbar { padding: 8px 12px 4px; gap: 8px 10px; }
   .brand .tag { display: none; }
   .brand { font-size: 21px; }
   .wordmark { height: 21px; }
-  .tb-tools { gap: 5px; }
+  /* logo + workspace + four icons on ONE row down to 360 px */
+  .tb-tools { gap: 2px; }
+  #space-btn { padding: 0 10px; margin-right: 2px; }
+  /* context bar: always two clean rows — Key | Scale, then BPM | Time | ▶ */
+  .ctxbar { gap: 8px 10px; padding-top: 8px; }
+  .cx-field { gap: 5px; font-size: 10px; letter-spacing: 1px; }
+  .cx-field.cx-scale { flex: 1 1 calc(100% - 120px); min-width: 0; }
+  .cx-field.cx-scale select { flex: 1 1 0; min-width: 0; }
+  .ctxbar input[type="number"] { width: 58px; }
+  #cx-met { margin-left: auto; } /* transport (and the studio ●) on the right */
   /* the metronome becomes a bottom sheet */
   .sheet { align-items: flex-end; padding: 0; }
   .sheet-card {
@@ -900,6 +960,9 @@ button .ic, .chip .ic { display: inline-block; }
   .card { padding: 16px; }
   .big-display { font-size: 60px; }
 }
+
+/* narrowest phones: the workspace button keeps only its word */
+@media (max-width: 400px) { #space-btn .ic { display: none; } }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
