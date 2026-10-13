@@ -225,8 +225,10 @@ const PLAY = async (right) => {
     const txt = s => (document.querySelector(s) || {}).textContent;
     const out = {};
     document.getElementById('qz-tohome').click();
+    SLQuiz.clock(0); // untimed here; the answer clock has its own checks below
     SLQuiz.tab('path');
     if (!document.querySelector('.qz-npop [data-qzendless="0"]')) document.querySelector('[data-qzn="0"]').click();
+    out.picker = [...document.querySelectorAll('.qz-npop [data-qzclock]')].map(b => b.textContent + (b.classList.contains('active') ? '*' : '')).join();
     const btn = document.querySelector('.qz-npop [data-qzendless="0"]');
     out.btn = btn && btn.textContent;
     btn.click();
@@ -254,12 +256,63 @@ const PLAY = async (right) => {
   });
   ok(/Endless streak/.test(en.btn) && en.run.view === 'run' && en.run.endless && !en.run.bar && en.run.act === 'Show answer' && /^Endless streak/.test(en.run.tag) && en.run.back === 'End run',
     'endless: from the step card, no clock, Show answer, End run: ' + JSON.stringify([en.btn, en.run]));
+  ok(en.picker === 'Off*,8 s,5 s,3 s', 'the step card has the answer clock picker: ' + en.picker);
   ok(en.adv0 && en.adv5 && en.count === 'Streak 6', 'right answers keep it going: ' + en.count);
   ok(en.miss.view === 'run' && en.miss.act === 'Finish' && en.done.view === 'done', 'the first miss shows the answer, then ends it: ' + JSON.stringify(en.miss));
   ok(/^6 in a row/.test(en.done.big) && /First record/.test(en.done.verdict) && /Ended on/.test(en.done.ended || '') && en.done.again, 'results: the streak, a first record, what ended it, Go again: ' + JSON.stringify(en.done));
   ok(en.rec === 6 && en.sprintRec === 5 && en.prog === 8, 'its own record; sprint record and level scores untouched: ' + JSON.stringify([en.rec, en.sprintRec, en.prog]));
   ok(en.count2 === 'Streak 2 · best 6' && en.second.view === 'done' && /^2/.test(en.second.big) && /Your record: 6/.test(en.second.verdict) && en.second.rec === 6,
     'End run scores the streak so far; a shorter one keeps the record: ' + JSON.stringify([en.count2, en.second]));
+
+  console.log('# answer clock');
+  const ck = await page.evaluate(async () => {
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+    const txt = s => (document.querySelector(s) || {}).textContent;
+    const node = SLQuiz.nodes()[0], lid = SLQuiz.levels()[0], out = {};
+    // picked on the endless results
+    document.querySelector('.qz-done [data-qzclock="3"]').click();
+    out.pick = [SLQuiz.clock(), txt('.qz-done .qz-clockseg .active')];
+    // levels stay untimed; drills get the clock (no tightening)
+    SLQuiz.start(lid);
+    out.level = { clock: !!SLQuiz.cur.clock, bar: !!document.getElementById('qz-clockfill') };
+    SLQuiz.start(lid, { drill: [SLQuiz.gen(lid).item] });
+    out.drill = { base: SLQuiz.cur.clock && SLQuiz.cur.clock.base, bar: !!document.getElementById('qz-clockfill'), running: !!SLQuiz.cur.clock.timer };
+    await wait(20); SLQuiz.pick(SLQuiz.q.correct);
+    out.drill.now = SLQuiz.cur.clock.now; out.drill.stopped = !SLQuiz.cur.clock.timer;
+    await wait(1500);
+    // leaving the page pauses it; coming back gives a fresh clock
+    App.switchTo('chords'); await wait(50);
+    out.hide = { timer: SLQuiz.cur.clock.timer, q: SLQuiz.q && !SLQuiz.cur.answered };
+    await wait(3200);
+    App.switchTo('quiz'); await wait(150);
+    out.show = { timer: !!SLQuiz.cur.clock.timer, answered: SLQuiz.cur.answered, left: SLQuiz.cur.clock.end - Date.now() };
+    // timed endless: the clock tightens 0.1 s per right answer; running out ends it
+    SLQuiz.endless(0);
+    out.run = { bar: !!document.getElementById('qz-clockfill'), tag: txt('.qz-lvltag'), count: txt('#qz-count') };
+    for (let i = 0; i < 3; i++) { await wait(20); SLQuiz.pick(SLQuiz.q.correct); await wait(450); }
+    out.count = txt('#qz-count');
+    out.now = SLQuiz.cur.clock.now;
+    const w0 = parseFloat(document.getElementById('qz-clockfill').style.width);
+    await wait(1200);
+    out.drain = [w0, parseFloat(document.getElementById('qz-clockfill').style.width)];
+    await wait(1700);
+    out.timeout = { view: SLQuiz.view, fb: txt('#qz-fb'), answered: SLQuiz.cur.answered };
+    await wait(1900);
+    out.done = { view: SLQuiz.view, big: txt('.qz-big'), verdict: txt('.qz-verdict'), ended: txt('.qz-miss'), tag: txt('.qz-lvltag') };
+    out.rec = SLXP.sprintBest('end:' + node + '@3');
+    out.untimed = SLXP.sprintBest('end:' + node);
+    return out;
+  });
+  ok(ck.pick[0] === 3 && ck.pick[1] === '3 s', 'pick the clock on the results: ' + JSON.stringify(ck.pick));
+  ok(!ck.level.clock && !ck.level.bar, 'levels stay untimed');
+  ok(ck.drill.base === 3 && ck.drill.bar && ck.drill.running && ck.drill.now === 3 && ck.drill.stopped, 'drills get the clock, it stops on an answer, no tightening: ' + JSON.stringify(ck.drill));
+  ok(ck.hide.timer === 0 && ck.hide.q && ck.show.timer && !ck.show.answered && ck.show.left > 2500, 'leaving the page pauses it; coming back gives a fresh clock: ' + JSON.stringify([ck.hide, ck.show]));
+  ok(ck.run.bar && /3 s clock/.test(ck.run.tag) && /3\.0 s/.test(ck.run.count), 'timed endless: a clock bar, the clock in the tag + counter: ' + JSON.stringify(ck.run));
+  ok(ck.now === 2.7 && /Streak 3 · 2\.7 s/.test(ck.count), 'each right answer takes 0.1 s off: ' + ck.count);
+  ok(ck.drain[0] > 85 && ck.drain[1] < ck.drain[0] - 30, 'the bar drains: ' + JSON.stringify(ck.drain));
+  ok(ck.timeout.view === 'run' && ck.timeout.answered && /Time’s up/.test(ck.timeout.fb), 'time running out is a miss: ' + JSON.stringify(ck.timeout));
+  ok(ck.done.view === 'done' && /^3 in a row/.test(ck.done.big) && /First record/.test(ck.done.verdict) && /Time’s up/.test(ck.done.ended) && /3 s clock/.test(ck.done.tag), 'then the run ends: ' + JSON.stringify(ck.done));
+  ok(ck.rec === 3 && ck.untimed === 6, 'records are kept per clock: ' + JSON.stringify([ck.rec, ck.untimed]));
 
   console.log('# Progress tab');
   const pg = await page.evaluate(() => {
@@ -286,7 +339,7 @@ const PLAY = async (right) => {
   });
   ok(pg.tiles === 4 && pg.week === 7 && /done/.test(pg.today), 'tiles + this-week strip (today practiced): ' + JSON.stringify([pg.tiles, pg.week, pg.today]));
   ok(pg.charts.every(Boolean) && pg.goalLine && pg.tables === 3, 'XP, time and speed charts drawn, goal line, table views: ' + JSON.stringify(pg));
-  ok(pg.topicRows === 5 && pg.recs === 2, 'topic speed table + sprint and streak records: ' + pg.topicRows + ' / ' + pg.recs);
+  ok(pg.topicRows === 5 && pg.recs === 3, 'topic speed table + sprint and streak records (per clock): ' + pg.topicRows + ' / ' + pg.recs);
   ok(pg.goal === 100 && pg.strip && pg.active, 'changing the daily goal updates the strip');
   ok(/^Today: \d+ XP/.test(pg.tip || ''), 'chart hover tooltip: ' + pg.tip);
   ok(errs.length === 0, 'no page errors (path/sprint/progress)' + (errs.length ? ': ' + errs.join(' | ') : ''));
