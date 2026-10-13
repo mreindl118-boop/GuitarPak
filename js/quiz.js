@@ -1282,16 +1282,16 @@
   // The run view is a fixed shell (header, progress, card, footer); only the
   // question inside the card is swapped, with a short fade — no full redraw.
   function renderRun() {
-    var l = cur.lvl, shell = el('qz-runshell'), sid = (cur.sprint ? 'sprint:' : cur.jump != null ? 'jump:' : cur.drill ? 'drill:' : '') + l.id;
+    var l = cur.lvl, shell = el('qz-runshell'), sid = (cur.sprint ? (cur.sprint.endless ? 'endless:' : 'sprint:') : cur.jump != null ? 'jump:' : cur.drill ? 'drill:' : '') + l.id;
     if (!shell || shell.getAttribute('data-lvl') !== sid) {
-      var tag = cur.sprint ? '60-second sprint · ' + MODE_NAME[l.mode] : cur.jump != null ? 'Jump test · ' + MODE_NAME[l.mode] : cur.drill ? 'Drill · your misses' : MODE_NAME[l.mode] + ' · Level ' + l.n;
+      var tag = cur.sprint ? (cur.sprint.endless ? 'Endless streak · ' : '60-second sprint · ') + MODE_NAME[l.mode] : cur.jump != null ? 'Jump test · ' + MODE_NAME[l.mode] : cur.drill ? 'Drill · your misses' : MODE_NAME[l.mode] + ' · Level ' + l.n;
       root.innerHTML =
         '<div class="qz-view qz-run" id="qz-runshell" data-lvl="' + esc(sid) + '">' +
-          '<div class="qz-runhead"><button type="button" class="qz-backlink" id="qz-back">' + App.icon('left', 14) + ' ' + esc(cur.sprint ? 'End sprint' : l.unit.name) + '</button>' +
+          '<div class="qz-runhead"><button type="button" class="qz-backlink" id="qz-back">' + App.icon('left', 14) + ' ' + esc(cur.sprint ? (cur.sprint.endless ? 'End run' : 'End sprint') : l.unit.name) + '</button>' +
             '<span class="qz-lvltag">' + esc(tag) + '</span>' +
             '<span class="qz-xpp" id="qz-xpp" aria-live="polite"></span>' +
             '<span class="qz-count" id="qz-count"></span></div>' +
-          (cur.sprint ? '<div class="qz-timebar" aria-hidden="true"><i id="qz-timefill"></i></div>'
+          (cur.sprint ? (cur.sprint.endless ? '' : '<div class="qz-timebar" aria-hidden="true"><i id="qz-timefill"></i></div>')
             : '<div class="qz-prog" id="qz-prog" aria-hidden="true"></div>') +
           '<div class="card qz-stage">' +
             '<div class="qz-q" id="qz-q"></div>' +
@@ -1400,10 +1400,10 @@
     if (!b) return;
     if (cur.answered) {
       b.className = 'btn primary qz-act';
-      b.innerHTML = (cur.res.length >= cur.n ? 'Finish' : 'Next') + ' ' + App.icon('right', 14);
+      b.innerHTML = (cur.res.length >= cur.n || (cur.sprint && cur.sprint.endless && !cur.lastOk) ? 'Finish' : 'Next') + ' ' + App.icon('right', 14);
     } else {
       b.className = 'btn qz-act qz-quiet';
-      b.textContent = cur.sprint ? 'Skip' : 'Show answer';
+      b.textContent = cur.sprint && !cur.sprint.endless ? 'Skip' : 'Show answer';
       if (fb) { fb.className = 'qz-fb'; fb.textContent = ''; }
     }
   }
@@ -1411,12 +1411,14 @@
   function renderDone() {
     var l = cur.lvl, nd = l.node, html;
     if (cur.sprint) {
-      var rec = cur.rec || { best: cur.score, old: 0, isBest: false };
-      html = '<div class="qz-lvltag">' + esc('60-second sprint · ' + l.unit.name + ' · ' + MODE_NAME[l.mode]) + '</div>' +
-        '<div class="qz-big">' + cur.score + '<span> right</span></div>' +
+      var rec = cur.rec || { best: cur.score, old: 0, isBest: false }, endless = cur.sprint.endless;
+      html = '<div class="qz-lvltag">' + esc((endless ? 'Endless streak · ' : '60-second sprint · ') + l.unit.name + ' · ' + MODE_NAME[l.mode]) + '</div>' +
+        '<div class="qz-big">' + cur.score + '<span>' + (endless ? ' in a row' : ' right') + '</span></div>' +
         '<div class="qz-verdict">' + (rec.isBest && cur.score ? (rec.old ? 'New record! Your best was ' + rec.old + '.' : 'First record set.') : 'Your record: ' + rec.best + '.') + '</div>' +
         doneStats() + doneNotes() +
-        '<div class="qz-acts"><button type="button" class="btn primary" data-qzsprint="' + nd.i + '">' + ico('bolt', 15) + ' Sprint again</button>' +
+        (endless && cur.endQ ? '<div class="qz-miss"><span class="muted">Ended on: </span>' + esc(cur.endQ) + '</div>' : '') +
+        '<div class="qz-acts">' + (endless ? '<button type="button" class="btn primary" data-qzendless="' + nd.i + '"><span class="qz-inf" aria-hidden="true">∞</span> Go again</button>'
+          : '<button type="button" class="btn primary" data-qzsprint="' + nd.i + '">' + ico('bolt', 15) + ' Sprint again</button>') +
           '<button type="button" class="btn" id="qz-tohome">Back to the path</button></div>';
     } else {
       var pass = cur.stars > 0, best = prog()[l.id], jump = cur.jump != null, jumped = jump && cur.score >= 9;
@@ -1452,7 +1454,8 @@
 
   // ================= flow =================
 
-  // opt: { sprint: nodeIndex } for a 60-second sprint, { jump: nodeIndex } for a jump test
+  // opt: { sprint: nodeIndex } for a 60-second sprint (+ endless: true = until
+  // the first miss), { jump: nodeIndex } for a jump test
   function startLevel(lid, opt) {
     var l = BY_ID[lid];
     if (!l) return;
@@ -1466,11 +1469,13 @@
     if (cur.drill) cur.n = Math.min(10, Math.max(5, cur.drill.length * 2));
     if (opt.sprint != null) {
       cur.n = 1e9;
-      cur.sprint = { i: opt.sprint, key: NODES[opt.sprint].id, end: Date.now() + 60000, timer: 0, done: false };
+      var skey = (opt.endless ? 'end:' : '') + NODES[opt.sprint].id;
+      cur.sprint = { i: opt.sprint, key: skey, endless: !!opt.endless, best: XP().sprintBest(skey),
+        end: opt.endless ? Infinity : Date.now() + 60000, timer: 0, done: false };
     }
     view = 'run';
     newQ();
-    if (cur.sprint) cur.sprint.timer = setInterval(tickSprint, 100);
+    if (cur.sprint && !cur.sprint.endless) cur.sprint.timer = setInterval(tickSprint, 100);
     reveal(root);
   }
 
@@ -1495,7 +1500,7 @@
   function nextQ() {
     clearTimeout(advT);
     if (!cur) return;
-    if (cur.sprint) { if (Date.now() >= cur.sprint.end) finishSprint(); else newQ(); return; }
+    if (cur.sprint) { if (Date.now() >= cur.sprint.end || (cur.sprint.endless && !cur.lastOk)) finishSprint(); else newQ(); return; }
     if (cur.res.length >= cur.n) finish(); else newQ();
   }
 
@@ -1539,7 +1544,8 @@
     xpPop(xr);
     var nb = el('qz-act');
     if (cur.sprint) { // keep the pace: right answers move on fast, misses show the answer briefly
-      advT = setTimeout(function () { if (cur && cur.q === q) nextQ(); }, ok ? 380 : 1100);
+      if (!ok && cur.sprint.endless) cur.endQ = q.explain || q.prompt;
+      advT = setTimeout(function () { if (cur && cur.q === q) nextQ(); }, ok ? 380 : cur.sprint.endless ? 1800 : 1100);
       return;
     }
     if (nb && !ok) { try { nb.focus({ preventScroll: true }); } catch (e) { /* ok */ } }
@@ -1623,6 +1629,7 @@
 
   function back() {
     clearTimeout(advT);
+    if (view === 'run' && cur && cur.sprint && cur.sprint.endless && !cur.sprint.done) { finishSprint(); return; } // End run keeps the streak
     stopSprint();
     if ((view === 'run' || view === 'done') && cur && cur.from !== 'topic') { toPath(cur.lvl.node.i); return; }
     if (view === 'run' || view === 'done') {
@@ -1755,7 +1762,7 @@
   }
 
   function nodePop(nd, i, p) {
-    var open = unlocked(i, p), nl = nodeLevel(nd, p), best = XP().sprintBest(nd.id);
+    var open = unlocked(i, p), nl = nodeLevel(nd, p), best = XP().sprintBest(nd.id), eb = XP().sprintBest('end:' + nd.id);
     var rows = nd.levels.map(function (l) {
       var s = p[l.id];
       return '<button type="button" class="qz-lvl" data-qzl="' + l.id + '">' +
@@ -1765,7 +1772,8 @@
     }).join('');
     var acts = open
       ? '<button type="button" class="btn primary" data-qzl="' + nl.id + '">' + App.icon('play', 13) + ' ' + (nodeDone(nd, p) ? 'Level ' + nl.n : 'Start') + '</button>' +
-        '<button type="button" class="btn" data-qzsprint="' + i + '">' + ico('bolt', 15) + ' 60-second sprint' + (best ? ' · best ' + best : '') + '</button>'
+        '<button type="button" class="btn" data-qzsprint="' + i + '">' + ico('bolt', 15) + ' 60-second sprint' + (best ? ' · best ' + best : '') + '</button>' +
+        '<button type="button" class="btn" data-qzendless="' + i + '" title="Questions until your first miss"><span class="qz-inf" aria-hidden="true">∞</span> Endless streak' + (eb ? ' · best ' + eb : '') + '</button>'
       : '<button type="button" class="btn primary" data-qzjump="' + i + '">Jump here</button>';
     var ap = applyFor(nd.unit.id);
     if (open && ap) acts += '<button type="button" class="btn" data-qzapply="' + nd.unit.id + '">' + esc(ap.label) + '</button>';
@@ -1873,7 +1881,7 @@
     var kl = App.keysLessons && App.keysLessons.summary ? App.keysLessons.summary() : [];
     var body = kl.length ? '<ul class="qz-recs">' + kl.map(function (x) {
       return '<li><button type="button" class="qz-rec" data-qzkeys="' + x.id + '"><span>' + esc(x.name) + '<small>' + esc(x.hand) + ' · level ' + x.level + ' of ' + x.levels +
-        ' · last timing ±' + x.timing + ' ms' + (x.mastered ? ' · mastered' : '') + '</small></span><span class="qz-klbar" title="' + x.passed + ' of ' + x.levels + ' levels passed"><i style="width:' +
+        ' · last timing ±' + x.timing + ' ms' + (x.streak ? ' · ∞ streak ' + x.streak : '') + (x.mastered ? ' · mastered' : '') + '</small></span><span class="qz-klbar" title="' + x.passed + ' of ' + x.levels + ' levels passed"><i style="width:' +
         Math.round(100 * x.passed / x.levels) + '%"></i></span><b>' + x.best + '</b></button></li>';
     }).join('') + '</ul>'
       : '<p class="muted small">No lessons yet. On the Keys page, pick a scale lesson and play it with the click.</p>';
@@ -1882,8 +1890,8 @@
 
   function progressHTML() {
     var X = XP(), lv = X.level(), st = X.streak(), tot = X.totals(), g = X.goal(), t = X.today();
-    var sprints = X.sprints(), sk = Object.keys(sprints).filter(function (k) { return NODE_BY_ID[k]; });
-    sk.sort(function (a, b) { return NODE_BY_ID[a].i - NODE_BY_ID[b].i; });
+    var sprints = X.sprints(), sk = Object.keys(sprints).filter(function (k) { return NODE_BY_ID[k.replace(/^end:/, '')]; });
+    sk.sort(function (a, b) { return NODE_BY_ID[a.replace(/^end:/, '')].i - NODE_BY_ID[b.replace(/^end:/, '')].i || (a < b ? 1 : -1); });
     var goalSeg = X.GOALS.map(function (v) {
       return '<button type="button" data-qzgoal="' + v + '" class="' + (v === g ? 'active' : '') + '" aria-pressed="' + (v === g) + '">' + X.GOAL_NAMES[v] + ' <small>' + v + '</small></button>';
     }).join('');
@@ -1904,12 +1912,13 @@
         '<div class="qz-tblwrap"><table class="qz-table qz-ttopic"><thead><tr><th scope="col">Topic</th><th scope="col">Answers</th><th scope="col">Right</th><th scope="col">Speed</th><th scope="col">Change</th></tr></thead><tbody>' +
         topicSpeedRows() + '</tbody></table></div><p class="muted small qz-tnote">Speed is your average over the last 7 days. Change compares it with the 4 weeks before: up means faster.</p></section>' +
       keysLessonsHTML() +
-      '<section class="card qz-pcard"><div class="qz-pchead"><h3>Sprint records</h3><span class="muted small">Most right answers in 60 seconds</span></div>' +
+      '<section class="card qz-pcard"><div class="qz-pchead"><h3>Records</h3><span class="muted small">Most right answers in a 60-second sprint, and in a row on an endless streak</span></div>' +
         (sk.length ? '<ul class="qz-recs">' + sk.map(function (k) {
-          var nd = NODE_BY_ID[k];
-          return '<li><button type="button" class="qz-rec" data-qzsprint="' + nd.i + '"><span>' + esc(nd.unit.name) + '<small>' + esc(MODE_NAME[nd.mode]) + '</small></span><b>' + sprints[k] + '</b>' + ico('bolt', 15) + '</button></li>';
+          var end = k.indexOf('end:') === 0, nd = NODE_BY_ID[end ? k.slice(4) : k];
+          return '<li><button type="button" class="qz-rec" data-' + (end ? 'qzendless' : 'qzsprint') + '="' + nd.i + '"><span>' + esc(nd.unit.name) + '<small>' + esc(MODE_NAME[nd.mode]) + ' · ' + (end ? 'endless streak' : 'sprint') + '</small></span><b>' + sprints[k] + '</b>' +
+            (end ? '<span class="qz-inf" aria-hidden="true">∞</span>' : ico('bolt', 15)) + '</button></li>';
         }).join('') + '</ul>'
-          : '<p class="muted small">No sprints yet. Open any step on the path and choose 60-second sprint.</p>') + '</section>' +
+          : '<p class="muted small">No records yet. Open any step on the path and choose 60-second sprint or Endless streak.</p>') + '</section>' +
       '<section class="card qz-pcard"><div class="qz-pchead"><h3>Lesson sound</h3></div>' +
         '<div class="seg qz-sound" role="group" aria-label="Exercise sound"><button type="button" data-qzs="piano">Piano</button><button type="button" data-qzs="guitar">Guitar</button></div></section>' +
     '</div>';
@@ -2075,14 +2084,20 @@
   }
 
   // ---- sprints: 60 seconds, as many right answers as you can ----
-  function startSprint(i) {
+  // endless: the same pick of level, questions until the first miss
+  function startSprint(i, endless) {
     var nd = NODES[i], p = prog(), lvl = nd.levels[0];
     nd.levels.forEach(function (l) { if (passed(p, l)) lvl = l; });
-    startLevel(lvl.id, { sprint: i });
+    startLevel(lvl.id, { sprint: i, endless: !!endless });
   }
 
   function tickSprint() {
     if (!cur || !cur.sprint || cur.sprint.done) return;
+    if (cur.sprint.endless) {
+      var n = cur.res.filter(Boolean).length, ce = el('qz-count'), b = cur.sprint.best;
+      if (ce) ce.textContent = 'Streak ' + n + (b ? (n > b ? ' · new record' : ' · best ' + b) : '');
+      return;
+    }
     var left = Math.max(0, cur.sprint.end - Date.now()), f = el('qz-timefill');
     if (f) f.style.width = (100 * left / 60000).toFixed(2) + '%';
     var c = el('qz-count');
@@ -2168,6 +2183,7 @@
     if ((a = t.getAttribute('data-qzh'))) { setHomeTab(a); return; }
     if ((a = t.getAttribute('data-qzn'))) { selectNode(+a); return; }
     if ((a = t.getAttribute('data-qzsprint'))) { startSprint(+a); return; }
+    if ((a = t.getAttribute('data-qzendless'))) { startSprint(+a, true); return; }
     if ((a = t.getAttribute('data-qzkeys'))) { App.switchTo('piano'); if (App.keysLessons) App.keysLessons.open(a); var kc = document.querySelector('.kl-card'); if (kc) kc.scrollIntoView({ block: 'start' }); return; }
     if ((a = t.getAttribute('data-qzapply'))) { var ap = applyFor(a); if (ap) ap.go(); return; }
     if ((a = t.getAttribute('data-qzjump'))) { startLevel(NODES[+a].levels[0].id, { jump: +a }); return; }
@@ -2448,6 +2464,7 @@
     '.qz-rec{display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:1px solid transparent;border-radius:10px;background:var(--card2);color:var(--text);font:inherit;text-align:left;cursor:pointer}' +
     '.qz-rec:hover,.qz-rec:focus-visible{border-color:var(--accent)}' +
     '.qz-rec span{flex:1;display:grid}.qz-rec small{color:var(--muted)}.qz-rec b{font-size:18px;font-variant-numeric:tabular-nums}.qz-rec .ic{color:var(--accent)}' +
+    '.qz-inf{font-weight:700;font-size:17px;line-height:1}.qz-rec .qz-inf{flex:none;display:inline;width:15px;text-align:center;color:var(--accent)}' +
     '@media (max-width:640px){' +
       '.qz-strip{grid-template-columns:auto minmax(0,1fr);gap:12px 14px;padding:14px}.qz-lvstat{grid-column:1/-1}.qz-strip .qz-go{grid-column:1/-1;justify-self:stretch}' +
       '.qz-ndisc{width:62px;height:62px}.qz-nface{width:50px;height:50px}' +
@@ -2510,6 +2527,7 @@
     node: function (i) { var n = NODES[i], p = prog(); return n ? { id: n.id, first: n.levels[0].id, open: unlocked(i, p), done: nodeDone(n, p), levels: n.levels.length } : null; },
     current: function () { return currentNode(prog()); },
     sprint: startSprint,
+    endless: function (i) { startSprint(i, true); },
     tab: setHomeTab,
     finishSprint: finishSprint,
     theory: { nt: nt, midiOf: midiOf, nm: nm, addIv: addIv, IV: IV, buildChord: buildChord, buildScale: buildScale, keyChords: keyChords, KEYS: KEYS }

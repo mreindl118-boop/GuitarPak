@@ -11,9 +11,17 @@
  * Score = notes right × timing quality; 85+ levels the lesson up, 70+ passes.
  * How much the keyboard helps is the Keys page's Help level (pn.assist).
  *
+ * INFINITE MODE (kl.reps 0, "∞"): the pattern loops with the click until you
+ * stop; a STREAK counts clean notes in a row (right key within the 'good'
+ * window) and any wrong / late / missed note breaks it. Targets are generated
+ * on the fly, so with Speed up (kl.speedup) every clean loop adds 4 bpm. The
+ * best streak per lesson level is the record (prog.inf[step]).
+ *
  * Stores: kl.prog { lessonId: { step, passed, best: {step: score},
- *           fails, mastered, runs: [{d, st, h, acc, t, m, sd, sc}] (last 40) } }
- *         kl.sel (lesson id) · kl.tier · kl.reps (1 | 2 | 4)
+ *           fails, mastered, inf: {step: best streak},
+ *           runs: [{d, st, h, acc, t, m, sd, sc | inf, bpm}] (last 40) } }
+ *         kl.sel (lesson id) · kl.tier · kl.reps (1 | 2 | 4 | 0 = infinite)
+ *         kl.speedup (infinite: +4 bpm per clean loop, default on)
  * Bus: emits transport:claim {owner:'keys'}; stops on any other claim.
  */
 (function () {
@@ -64,11 +72,12 @@
     var p = progAll()[id] || {};
     return { step: p.step >= 0 && p.step < STEPS.length ? p.step : 0, passed: typeof p.passed === 'number' ? p.passed : -1,
       best: p.best && typeof p.best === 'object' ? p.best : {}, fails: p.fails || 0, mastered: !!p.mastered,
-      runs: Array.isArray(p.runs) ? p.runs : [] };
+      inf: p.inf && typeof p.inf === 'object' ? p.inf : {}, runs: Array.isArray(p.runs) ? p.runs : [] };
   }
   function saveProg(id, p) { var all = progAll(); all[id] = p; App.store.set('kl.prog', all); }
   function sel() { var id = App.store.get('kl.sel', 'c-r'); return BY_ID[id] || LESSONS[0]; }
-  function reps() { var r = +App.store.get('kl.reps', 2); return r === 1 || r === 4 ? r : 2; }
+  function reps() { var r = +App.store.get('kl.reps', 2); return r === 1 || r === 4 || r === 0 ? r : 2; }
+  function speedup() { return App.store.get('kl.speedup', true) !== false; }
   function cal(src) { var c = App.store.get('ws.cal', {}); return c && typeof c[src] === 'number' ? c[src] : 0; }
 
   // ---------------- the run ----------------
@@ -93,17 +102,21 @@
     k.render();
     k.scrollTo(true);
     var path = k.path(l.oct), fing = k.fingering(path);
-    var one = Theory.exerciseSeq(path, l.pat, 'updown'), seq = [];
-    for (var r = 0; r < nReps; r++) seq = seq.concat(one);
-    seq.push(one[0]); // close on the tonic
+    var one = Theory.exerciseSeq(path, l.pat, 'updown'), seq = [], inf = !isDemo && nReps === 0;
+    if (!inf) {
+      for (var r = 0; r < nReps; r++) seq = seq.concat(one);
+      seq.push(one[0]); // close on the tonic
+    }
     var ctx = App.getAudio(), bpm = STEPS[step][0], rate = STEPS[step][1];
     var beat = 60 / bpm, spn = beat / rate, t0 = ctx.currentTime + 0.25, first = t0 + 4 * beat;
     return {
       l: l, step: step, demo: !!isDemo, ctx: ctx, bpm: bpm, rate: rate, beat: beat, spn: spn, t0: t0, first: first,
-      lat: ctx.outputLatency || ctx.baseLatency || 0, help: k.assist(),
+      lat: ctx.outputLatency || ctx.baseLatency || 0, help: k.assist(), one: one, path: path, fing: fing,
       targets: seq.map(function (pi, i) {
         return { i: i, midi: path[pi].midi, pc: Theory.mod12(path[pi].midi), f: fing[pi] || 0, at: first + i * spn, j: null, err: 0 };
       }),
+      inf: inf ? { k: 0, nextAt: first, loop: 0, bpm0: bpm, bpm: bpm, speedup: speedup(), dirty: {}, streak: 0, best: 0,
+        hits: 0, miss: 0, errs: [], lastInput: first, beats: [], broke: 0 } : null,
       clickT: t0, beatN: 0, wrong: 0, shown: -1, timer: 0, raf: 0, lastHit: null
     };
   }
@@ -136,17 +149,69 @@
     try { window.scrollTo({ top: Math.max(0, y) }); } catch (e) { window.scrollTo(0, Math.max(0, y)); }
   }
 
+  // infinite mode: the next note of the endless loop (tempo can rise per loop)
+  function genTarget() {
+    var I = R.inf, pos = I.k % R.one.length;
+    if (pos === 0 && I.k > 0) {
+      I.loop++;
+      if (I.speedup && !I.dirty[I.loop - 1] && I.bpm < I.bpm0 + 60) {
+        I.bpm += 4;
+        R.beat = 60 / I.bpm;
+        R.spn = R.beat / R.rate;
+      }
+    }
+    var pi = R.one[pos], tg = { i: I.k, midi: R.path[pi].midi, pc: Theory.mod12(R.path[pi].midi), f: R.fing[pi] || 0,
+      at: I.nextAt, j: null, err: 0, loop: I.loop };
+    R.targets.push(tg);
+    if (I.k % R.rate === 0) { // on the beat: the click, accented every 4
+      var bn = I.k / R.rate;
+      click(R.ctx, tg.at, bn % 4 === 0);
+      I.beats.push({ at: tg.at, n: 4 + bn });
+      if (I.beats.length > 8) I.beats.shift();
+    }
+    I.k++;
+    I.nextAt += R.spn;
+  }
+
+  function breakStreak(loop) {
+    var I = R.inf;
+    if (I.streak >= 5) I.broke = I.streak;
+    I.streak = 0;
+    I.dirty[loop] = true;
+  }
+
   function tick() {
     if (!R) return;
-    var now = R.ctx.currentTime, heard = now - R.lat;
-    // the click: every beat from the count-in to the last note; never past-dated
-    while (R.clickT < now - 0.01) { R.clickT += R.beat; R.beatN++; }
-    var lastAt = R.targets[R.targets.length - 1].at;
-    while (R.clickT < now + 0.12 && R.clickT <= lastAt + 0.001) { click(R.ctx, R.clickT, R.beatN % 4 === 0); R.clickT += R.beat; R.beatN++; }
+    var now = R.ctx.currentTime, heard = now - R.lat, lastAt;
+    if (R.inf) {
+      var I = R.inf;
+      while (R.clickT < now + 0.12 && R.beatN < 4) { // the count-in bar
+        if (R.clickT >= now - 0.01) click(R.ctx, R.clickT, R.beatN === 0);
+        R.clickT += R.beat;
+        R.beatN++;
+      }
+      if (I.nextAt < now - 0.05) I.nextAt = now + 0.05; // a stall: pick up again, never past-dated
+      while (I.nextAt < now + 0.6) genTarget();
+      lastAt = Infinity;
+      // done targets fall away so the list stays short
+      if (R.targets.length > 64) R.targets = R.targets.filter(function (t) { return !t.j || t.at > heard - 2; });
+      // nobody playing for a while ends the run
+      if (heard > Math.max(I.lastInput, R.first) + Math.max(8, R.one.length * R.spn * 2)) { finish(); return; }
+    } else {
+      // the click: every beat from the count-in to the last note; never past-dated
+      while (R.clickT < now - 0.01) { R.clickT += R.beat; R.beatN++; }
+      lastAt = R.targets[R.targets.length - 1].at;
+      while (R.clickT < now + 0.12 && R.clickT <= lastAt + 0.001) { click(R.ctx, R.clickT, R.beatN % 4 === 0); R.clickT += R.beat; R.beatN++; }
+    }
     // misses: the beat went by without the note
     if (!R.demo) {
       R.targets.forEach(function (tg) {
-        if (!tg.j && heard > tg.at + accept() + 0.02) { tg.j = 'miss'; R.lastHit = { j: 'miss', i: tg.i }; paintHud(); }
+        if (!tg.j && heard > tg.at + accept() + 0.02) {
+          tg.j = 'miss';
+          R.lastHit = { j: 'miss', i: tg.i };
+          if (R.inf) { R.inf.miss++; breakStreak(tg.loop); }
+          paintHud();
+        }
       });
     }
     // the note to play now (ring + LEDs follow the Help level)
@@ -165,7 +230,7 @@
       paintHud();
     }
     paintBeat(now);
-    if (heard > lastAt + accept() + 0.3) finish();
+    if (!R.inf && heard > lastAt + accept() + 0.3) finish();
   }
 
   // a note counts for a target within this much of its beat (tighter at speed)
@@ -187,10 +252,20 @@
       best.j = am <= WIN.perfect ? 'perfect' : am <= WIN.great ? 'great' : am <= WIN.good ? 'good' : 'off';
       R.lastHit = { j: best.j, ms: ms, i: best.i };
       K().flash(midi, am <= WIN.great ? 'ok' : 'meh');
+      if (R.inf) {
+        var I = R.inf;
+        I.hits++;
+        I.lastInput = t;
+        I.errs.push(ms);
+        if (I.errs.length > 600) I.errs.shift();
+        if (best.j === 'off') breakStreak(best.loop);
+        else { I.streak++; if (I.streak > I.best) I.best = I.streak; }
+      }
     } else {
       R.wrong++;
       R.lastHit = { j: 'wrong', midi: midi };
       K().flash(midi, 'bad');
+      if (R.inf) { var c = R.targets[R.shown]; R.inf.lastInput = t; breakStreak(c ? c.loop : R.inf.loop); }
     }
     paintHud();
   }
@@ -211,6 +286,7 @@
     var r = R;
     stopAll(true);
     if (r.demo) { view = 'list'; paint(); return; }
+    if (r.inf) { finishInfinite(r); return; }
     var st = stats(r), p = prog(r.l.id), stars = starsFor(st.score), pass = st.score >= 70;
     p.best[r.step] = Math.max(p.best[r.step] || 0, st.score);
     if (pass && r.step > p.passed) p.passed = r.step;
@@ -225,6 +301,25 @@
     saveProg(r.l.id, p);
     var fin = App.xp ? App.xp.finishLevel({ passed: pass, perfect: stars === 3 }) : null;
     last = { r: r, st: st, stars: stars, pass: pass, up: up, mastered: mastered, fin: fin, p: p };
+    view = 'done';
+    paint();
+  }
+
+  function finishInfinite(r) {
+    var I = r.inf, errs = I.errs, n = errs.length, p = prog(r.l.id), key = String(r.step);
+    var mean = n ? errs.reduce(function (a, b) { return a + b; }, 0) / n : 0;
+    var meanAbs = n ? errs.reduce(function (a, b) { return a + Math.abs(b); }, 0) / n : 0;
+    var sd = n > 1 ? Math.sqrt(errs.reduce(function (a, b) { return a + (b - mean) * (b - mean); }, 0) / (n - 1)) : 0;
+    var judged = I.hits + I.miss, acc = judged + r.wrong ? I.hits / (judged + r.wrong) : 0;
+    var old = p.inf[key] || 0, isBest = I.best > old;
+    if (isBest) p.inf[key] = I.best;
+    p.runs.push({ d: App.xp ? App.xp.dayKey() : '', st: r.step, h: r.help, acc: Math.round(acc * 100), t: Math.round(meanAbs),
+      m: Math.round(mean), sd: Math.round(sd), inf: I.best, bpm: I.bpm });
+    if (p.runs.length > 40) p.runs = p.runs.slice(-40);
+    saveProg(r.l.id, p);
+    var fin = judged && App.xp ? App.xp.finishLevel({ passed: I.best >= r.one.length, record: isBest && I.best > 0 }) : null;
+    last = { r: r, inf: { best: I.best, old: old, isBest: isBest, acc: acc, meanAbs: meanAbs, mean: mean, sd: sd, bpm: I.bpm,
+      loops: Math.floor(I.hits / r.one.length), notes: judged, wrong: r.wrong }, fin: fin, p: p };
     view = 'done';
     paint();
   }
@@ -281,13 +376,18 @@
         '<div class="kl-mastery" title="Levels passed"><span class="kl-mbar"><i style="width:' + Math.round(100 * (p.passed + 1) / STEPS.length) + '%"></i></span>' +
           '<span class="muted small">' + (p.passed + 1) + ' of ' + STEPS.length + ' levels passed' + (p.mastered ? ' · mastered' : '') + '</span></div>' +
         '<div class="kl-opts"><div class="seg" role="group" aria-label="Times through">' +
-          [1, 2, 4].map(function (n) { return '<button type="button" data-klreps="' + n + '" class="' + (reps() === n ? 'active' : '') + '">' + n + '×</button>'; }).join('') +
-          '</div><button type="button" class="kl-helpbtn" id="kl-help">Help: ' + K().ASSIST_NAMES[help] + '</button></div>' +
+          [1, 2, 4, 0].map(function (n) {
+            return '<button type="button" data-klreps="' + n + '" class="' + (reps() === n ? 'active' : '') + '"' + (n ? '' : ' aria-label="Infinite" title="Infinite: loop until you stop, go for a streak"') + '>' + (n ? n + '×' : '∞') + '</button>';
+          }).join('') +
+          '</div>' + (reps() === 0 ? '<button type="button" class="chip fb-chip' + (speedup() ? ' active' : '') + '" id="kl-speedup" aria-pressed="' + speedup() + '" title="Every loop without a mistake adds 4 bpm">Speed up</button>' : '') +
+          '<button type="button" class="kl-helpbtn" id="kl-help">Help: ' + K().ASSIST_NAMES[help] + '</button></div>' +
+        (reps() === 0 ? '<p class="kl-infnote">Infinite: the scale loops until you stop. Right notes on the beat build your streak; a wrong, late or missed note starts it over.' +
+          (p.inf[p.step] ? ' <b>Best streak at this level: ' + p.inf[p.step] + '</b>' : '') + '</p>' : '') +
         '<div class="kl-acts"><button type="button" class="btn primary" id="kl-start">' + App.icon('play', 13) + ' Start</button>' +
           '<button type="button" class="btn" id="kl-listen">Listen first</button></div>' +
         (recent.length ? '<details class="kl-hist"><summary>Your runs (' + p.runs.length + ')</summary><div class="kl-tblwrap"><table class="kl-table"><thead><tr><th>Day</th><th>Level</th><th>Help</th><th>Notes</th><th>Timing</th><th>Score</th></tr></thead><tbody>' +
           recent.map(function (u) {
-            return '<tr><td>' + esc((u.d || '').slice(5)) + '</td><td>' + (u.st + 1) + '</td><td>' + K().ASSIST_NAMES[u.h] + '</td><td>' + u.acc + '%</td><td>±' + u.t + ' ms</td><td>' + u.sc + '</td></tr>';
+            return '<tr><td>' + esc((u.d || '').slice(5)) + '</td><td>' + (u.st + 1) + '</td><td>' + K().ASSIST_NAMES[u.h] + '</td><td>' + u.acc + '%</td><td>±' + u.t + ' ms</td><td>' + (u.inf != null ? '∞ streak ' + u.inf : u.sc) + '</td></tr>';
           }).join('') + '</tbody></table></div></details>' : '') +
       '</div>' +
       '<div class="seg kl-tiers" role="tablist">' + TIERS.map(function (t) {
@@ -298,14 +398,14 @@
 
   function runHTML() {
     return '<div class="kl-run">' +
-      '<div class="kl-runrow"><div class="kl-runtop"><b>' + esc(R.l.name) + ' · ' + handName(R.l.hand) + '</b><span class="muted small">' + (R.demo ? 'Listening · ' : 'Level ' + (R.step + 1) + ' · ') + stepName(R.step) + '</span></div>' +
-        '<button type="button" class="btn sm" id="kl-stop">Stop</button></div>' +
+      '<div class="kl-runrow"><div class="kl-runtop"><b>' + esc(R.l.name) + ' · ' + handName(R.l.hand) + '</b><span class="muted small">' + (R.demo ? 'Listening · ' : 'Level ' + (R.step + 1) + ' · ') + stepName(R.step) + (R.inf ? ' · Infinite' : '') + '</span></div>' +
+        '<button type="button" class="btn sm" id="kl-stop">' + (R.inf ? 'End run' : 'Stop') + '</button></div>' +
       '<div class="kl-beats" aria-hidden="true"><i></i><i></i><i></i><i></i></div>' +
       '<div class="kl-call" id="kl-call" aria-live="polite"></div>' +
       '<div class="kl-needle" aria-hidden="true"><span class="kl-zone"></span><span class="kl-mid"></span><i id="kl-mark"></i>' +
         '<em class="l">early</em><em class="r">late</em></div>' +
-      '<div class="kl-bar" aria-hidden="true"><i id="kl-prog"></i></div>' +
-      '<div class="kl-count muted small" id="kl-count"></div></div>';
+      (R.inf ? '<div class="kl-streak"><b id="kl-streakn">0</b><span class="kl-inftx"><span id="kl-streakl">streak</span><span id="kl-count"></span></span></div></div>'
+        : '<div class="kl-bar" aria-hidden="true"><i id="kl-prog"></i></div><div class="kl-count muted small" id="kl-count"></div></div>');
   }
 
   function paintHud() {
@@ -329,6 +429,14 @@
       call.className = 'kl-call';
       call.textContent = 'Play';
     }
+    if (R.inf) {
+      var I = R.inf, sn = el('kl-streakn'), sl = el('kl-streakl'), rec = prog(R.l.id).inf[R.step] || 0;
+      if (sn) { sn.textContent = I.streak; sn.parentNode.classList.toggle('rec', I.streak > rec && I.streak > 0); }
+      if (sl) sl.textContent = I.streak > rec && rec > 0 ? 'streak · new record!' : 'streak · best ' + Math.max(rec, I.best);
+      if (h && (h.j === 'wrong' || h.j === 'miss' || h.j === 'off') && I.broke) { call.textContent = 'Streak broken at ' + I.broke; I.broke = 0; }
+      if (cnt) cnt.textContent = 'Loop ' + (I.loop + 1) + ' · ' + I.bpm + ' bpm' + (R.wrong ? ' · ' + R.wrong + ' wrong' : '');
+      return;
+    }
     var done = R.targets.filter(function (x) { return x.j; }).length;
     if (bar) bar.style.width = (100 * (R.demo ? Math.max(0, R.shown) : done) / R.targets.length) + '%';
     if (cnt && !R.demo) cnt.textContent = R.targets.filter(function (x) { return x.j && x.j !== 'miss'; }).length + ' of ' + R.targets.length + ' notes' + (R.wrong ? ' · ' + R.wrong + ' wrong' : '');
@@ -337,12 +445,19 @@
   function paintBeat(now) {
     var dots = root && root.querySelectorAll('.kl-beats i');
     if (!dots || !dots.length) return;
-    var heard = now - R.lat, n = Math.floor((heard - R.t0) / R.beat);
-    var on = heard >= R.t0 && heard - (R.t0 + n * R.beat) < Math.min(0.12, R.beat * 0.5);
+    var heard = now - R.lat, n = Math.floor((heard - R.t0) / R.beat), at = R.t0 + n * R.beat;
+    if (R.inf && heard >= R.first - 0.01) {
+      var bt = null;
+      R.inf.beats.forEach(function (b) { if (b.at <= heard) bt = b; });
+      n = bt ? bt.n : -1;
+      at = bt ? bt.at : -1;
+    }
+    var on = n >= 0 && heard >= R.t0 && heard - at < Math.min(0.12, R.beat * 0.5);
     for (var i = 0; i < 4; i++) dots[i].className = on && ((n % 4) + 4) % 4 === i ? (i === 0 ? 'on acc' : 'on') : '';
   }
 
   function doneHTML() {
+    if (last.inf) return doneInfHTML();
     var s = last.st, r = last.r, p = last.p, f = last.fin || {};
     var tend = Math.abs(s.mean) < 10 ? 'Centered' : s.mean < 0 ? 'Rushing' : 'Dragging';
     var notes = [];
@@ -370,6 +485,30 @@
       '<div class="kl-acts"><button type="button" class="btn primary" id="kl-start">' + (last.up ? 'Next level' : 'Again') + '</button>' +
         (r.step > 0 && !last.pass ? '<button type="button" class="btn" data-klstep="-1">Easier</button>' : '') +
         (last.stars === 3 && r.help > 0 ? '<button type="button" class="btn" id="kl-lesshelp">Less help</button>' : '') +
+        '<button type="button" class="btn" id="kl-back">Lessons</button></div>' +
+      '</div>';
+  }
+
+  function doneInfHTML() {
+    var x = last.inf, r = last.r, f = last.fin || {};
+    var tend = Math.abs(x.mean) < 10 ? 'Centered' : x.mean < 0 ? 'Rushing' : 'Dragging';
+    var notes = [];
+    if (x.loops) notes.push(x.loops + ' full loop' + (x.loops > 1 ? 's' : '') + ' of right notes' + (x.bpm > r.inf.bpm0 ? ', sped up to ' + x.bpm + ' bpm' : '') + '.');
+    if (x.wrong) notes.push(x.wrong + ' wrong note' + (x.wrong > 1 ? 's' : '') + '.');
+    if (Math.abs(x.mean) >= 15) notes.push(x.mean < 0 ? 'You ran ahead of the click by ' + Math.round(-x.mean) + ' ms on average.' : 'You trailed the click by ' + Math.round(x.mean) + ' ms on average.');
+    if (f.extended && f.streak) notes.push(f.streak === 1 ? 'Day 1 of a new streak.' : f.streak + '-day streak.');
+    return '<div class="kl-done">' +
+      '<div class="kl-runtop"><b>' + esc(r.l.name) + ' · ' + handName(r.l.hand) + '</b><span class="muted small">Infinite · Level ' + (r.step + 1) + ' · ' + stepName(r.step) + ' · Help: ' + K().ASSIST_NAMES[r.help] + '</span></div>' +
+      '<div class="kl-score"><span class="kl-big">' + x.best + '</span><span class="kl-inflab">in a row</span></div>' +
+      '<div class="kl-verdict">' + (x.isBest ? (x.old ? 'New record! Your best was ' + x.old + '.' : 'First record set.') : 'Your record at this level: ' + x.old + '.') + '</div>' +
+      '<div class="kl-tiles">' +
+        tile('Notes', Math.round(x.acc * 100) + '%', x.notes + ' played') +
+        tile('Timing', '±' + Math.round(x.meanAbs) + ' ms', 'average from the beat') +
+        tile('Steadiness', '±' + Math.round(x.sd) + ' ms', tend.toLowerCase()) +
+        tile('Top tempo', x.bpm + ' bpm', RATE_NAME[r.rate].toLowerCase()) +
+      '</div>' +
+      '<ul class="kl-notes">' + notes.map(function (n) { return '<li>' + esc(n) + '</li>'; }).join('') + '</ul>' +
+      '<div class="kl-acts"><button type="button" class="btn primary" id="kl-start">Go again</button>' +
         '<button type="button" class="btn" id="kl-back">Lessons</button></div>' +
       '</div>';
   }
@@ -428,7 +567,8 @@
     switch (b.id) {
       case 'kl-start': start(false); break;
       case 'kl-listen': start(true); break;
-      case 'kl-stop': stopAll(false); break;
+      case 'kl-stop': if (R && R.inf) finish(); else stopAll(false); break;
+      case 'kl-speedup': App.store.set('kl.speedup', !speedup()); paint(); break;
       case 'kl-back': view = 'list'; paint(); break;
       case 'kl-help': App.switchTo('lights'); break;
       case 'kl-lesshelp': K().setAssist(Math.max(0, K().assist() - 1)); view = 'list'; paint(); break;
@@ -476,8 +616,12 @@
     '.kl-strip svg{display:block}.kl-band{fill:color-mix(in srgb,#4cc9b0 16%,transparent)}.kl-axis0{stroke:var(--muted);stroke-width:1}' +
     '.kl-ax{font:500 11px var(--font-body);fill:var(--muted)}.kl-dot{fill:var(--accent);stroke:var(--card2);stroke-width:2}.kl-miss{fill:none;stroke:var(--muted);stroke-width:1.5}' +
     '.kl-notes{margin:0;padding-left:18px;display:grid;gap:4px;font-size:14px}' +
+    '.kl-infnote{margin:0;font-size:13.5px;color:var(--muted)}.kl-infnote b{color:var(--text);font-weight:600}' +
+    '.kl-streak{display:flex;align-items:center;justify-content:center;gap:12px}.kl-inftx{display:grid;gap:2px}.kl-streak b{font:400 56px/1 var(--font-display);font-variant-numeric:tabular-nums}' +
+    '.kl-streak span{font-size:14px;color:var(--muted)}.kl-streak.rec b{color:var(--accent)}' +
+    '.kl-inflab{font:400 24px/1 var(--font-display);letter-spacing:1px;text-transform:uppercase;color:var(--muted)}.kl-verdict{font-weight:600}' +
     '@media (max-width:640px){.kl-row{grid-template-columns:minmax(0,1fr) auto auto}.kl-rlv{display:none}.kl-big{font-size:52px}' +
-      '.kl-run{gap:8px;padding:12px}.kl-call{font-size:28px;min-height:32px}.kl-call.cd{font-size:40px}.kl-bar{margin-top:10px}}';
+      '.kl-run{gap:8px;padding:12px}.kl-streak b{font-size:44px}.kl-call{font-size:28px;min-height:32px}.kl-call.cd{font-size:40px}.kl-bar{margin-top:10px}}';
 
   App.keysLessons = {
     init: function (box) {
@@ -499,7 +643,8 @@
         if (!p.runs.length) return null;
         var lastRun = p.runs[p.runs.length - 1];
         return { id: l.id, name: l.name, hand: handName(l.hand), level: p.step + 1, levels: STEPS.length, passed: p.passed + 1,
-          mastered: p.mastered, best: Math.max.apply(null, p.runs.map(function (u) { return u.sc; })), runs: p.runs.length, last: lastRun.d, timing: lastRun.t };
+          mastered: p.mastered, best: Math.max.apply(null, p.runs.map(function (u) { return u.sc || 0; })), runs: p.runs.length, last: lastRun.d, timing: lastRun.t,
+          streak: Math.max.apply(null, [0].concat(Object.keys(p.inf).map(function (k) { return p.inf[k] || 0; }))) };
       }).filter(Boolean).sort(function (a, b) { return a.last < b.last ? 1 : -1; });
     },
     open: function (id) { if (BY_ID[id]) { App.store.set('kl.sel', id); App.store.set('kl.tier', BY_ID[id].tier); view = 'list'; paint(); } },

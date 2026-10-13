@@ -92,6 +92,12 @@ js/keylessons.js  │ SCALE LESSONS on the Keys page (mounted into #pn-lessons
                   │  WIN 35/70/120 ms. Score = acc x (0.6 + 0.4 timing);
                   │  85 levels up, 70 passes; App.xp.finishLevel counts it.
                   │  Focus mode html.kl-running folds the page controls.
+                  │  INFINITE (v0.76.0, kl.reps 0 = the ∞ seg): targets are
+                  │  generated on the fly (genTarget, click per beat), the
+                  │  pattern loops until End run / 8 s idle; a streak counts
+                  │  clean notes ('off'/miss/wrong break it); kl.speedup
+                  │  adds +4 bpm per clean loop (max +60); best streak per
+                  │  level in kl.prog[id].inf[step] (runs get inf + bpm).
                   │  Stores kl.prog/kl.sel/kl.tier/kl.reps; wake tag kl-run
                   │  (ledger area Keys); stops on transport:claim, page
                   │  hide, app hide; summary() feeds Exercises Progress.
@@ -146,7 +152,10 @@ js/quiz.js        EXERCISES ('quiz', the practice HOME since v0.69.0): Musicca-
                   by a JUMP TEST (its level 1, 9/10 -> xp.jump; a failed jump
                   saves nothing); currentNode skips jumped-over nodes. Node
                   card = levels + 60-SECOND SPRINT (highest passed level,
-                  auto-advance, never writes qz.prog; record per node).
+                  auto-advance, never writes qz.prog; record per node) +
+                  ENDLESS STREAK (v0.76.0: the sprint path with
+                  cur.sprint.endless — no clock, ends on the first miss or
+                  End run, record in xp.sprint['end:'+nodeId]).
                   Progress = tiles, week strip, goal picker, SVG charts built
                   at container width (XP/day + goal line, minutes/day, weekly
                   answer speed; hover tips + table views) and topic speed

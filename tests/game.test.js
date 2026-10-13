@@ -219,6 +219,48 @@ const PLAY = async (right) => {
   ok(sp.second.rec === 5 && /Your record: 5/.test(sp.second.verdict), 'a lower score keeps the record: ' + sp.second.verdict);
   ok(sp.left.done && !sp.left.timer, 'leaving the page ends a running sprint: ' + JSON.stringify(sp.left));
 
+  console.log('# endless streak');
+  const en = await page.evaluate(async () => {
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+    const txt = s => (document.querySelector(s) || {}).textContent;
+    const out = {};
+    document.getElementById('qz-tohome').click();
+    SLQuiz.tab('path');
+    if (!document.querySelector('.qz-npop [data-qzendless="0"]')) document.querySelector('[data-qzn="0"]').click();
+    const btn = document.querySelector('.qz-npop [data-qzendless="0"]');
+    out.btn = btn && btn.textContent;
+    btn.click();
+    out.run = { view: SLQuiz.view, bar: !!document.getElementById('qz-timefill'), act: document.getElementById('qz-act').textContent.trim(),
+      tag: txt('.qz-lvltag'), back: txt('#qz-back').trim(), endless: SLQuiz.cur.sprint.endless };
+    for (let i = 0; i < 6; i++) { await wait(20); const q1 = SLQuiz.q; SLQuiz.pick(q1.correct); await wait(450); out['adv' + i] = SLQuiz.q !== q1; }
+    out.count = txt('#qz-count');
+    // the first miss ends it
+    const q = SLQuiz.q;
+    SLQuiz.pick(q.choices.find(c => c.id !== q.correct).id);
+    await wait(100);
+    out.miss = { view: SLQuiz.view, act: document.getElementById('qz-act').textContent.trim() };
+    await wait(1900);
+    out.done = { view: SLQuiz.view, big: txt('.qz-big'), verdict: txt('.qz-verdict'), ended: txt('.qz-miss'), again: !!document.querySelector('.qz-done [data-qzendless="0"]') };
+    out.rec = SLXP.sprintBest('end:' + SLQuiz.nodes()[0]);
+    out.sprintRec = SLXP.sprintBest(SLQuiz.nodes()[0]);
+    out.prog = JSON.parse(localStorage.getItem('guitarlab.qz.prog'))['notes/nat/treble/1'].b;
+    // End run keeps a shorter streak, not as the record
+    document.querySelector('.qz-done [data-qzendless="0"]').click();
+    for (let i = 0; i < 2; i++) { await wait(20); SLQuiz.pick(SLQuiz.q.correct); await wait(450); }
+    out.count2 = txt('#qz-count');
+    document.getElementById('qz-back').click();
+    out.second = { view: SLQuiz.view, big: txt('.qz-big'), verdict: txt('.qz-verdict'), rec: SLXP.sprintBest('end:' + SLQuiz.nodes()[0]) };
+    return out;
+  });
+  ok(/Endless streak/.test(en.btn) && en.run.view === 'run' && en.run.endless && !en.run.bar && en.run.act === 'Show answer' && /^Endless streak/.test(en.run.tag) && en.run.back === 'End run',
+    'endless: from the step card, no clock, Show answer, End run: ' + JSON.stringify([en.btn, en.run]));
+  ok(en.adv0 && en.adv5 && en.count === 'Streak 6', 'right answers keep it going: ' + en.count);
+  ok(en.miss.view === 'run' && en.miss.act === 'Finish' && en.done.view === 'done', 'the first miss shows the answer, then ends it: ' + JSON.stringify(en.miss));
+  ok(/^6 in a row/.test(en.done.big) && /First record/.test(en.done.verdict) && /Ended on/.test(en.done.ended || '') && en.done.again, 'results: the streak, a first record, what ended it, Go again: ' + JSON.stringify(en.done));
+  ok(en.rec === 6 && en.sprintRec === 5 && en.prog === 8, 'its own record; sprint record and level scores untouched: ' + JSON.stringify([en.rec, en.sprintRec, en.prog]));
+  ok(en.count2 === 'Streak 2 · best 6' && en.second.view === 'done' && /^2/.test(en.second.big) && /Your record: 6/.test(en.second.verdict) && en.second.rec === 6,
+    'End run scores the streak so far; a shorter one keeps the record: ' + JSON.stringify([en.count2, en.second]));
+
   console.log('# Progress tab');
   const pg = await page.evaluate(() => {
     App.switchTo('quiz');
@@ -244,7 +286,7 @@ const PLAY = async (right) => {
   });
   ok(pg.tiles === 4 && pg.week === 7 && /done/.test(pg.today), 'tiles + this-week strip (today practiced): ' + JSON.stringify([pg.tiles, pg.week, pg.today]));
   ok(pg.charts.every(Boolean) && pg.goalLine && pg.tables === 3, 'XP, time and speed charts drawn, goal line, table views: ' + JSON.stringify(pg));
-  ok(pg.topicRows === 5 && pg.recs === 1, 'topic speed table + sprint records: ' + pg.topicRows + ' / ' + pg.recs);
+  ok(pg.topicRows === 5 && pg.recs === 2, 'topic speed table + sprint and streak records: ' + pg.topicRows + ' / ' + pg.recs);
   ok(pg.goal === 100 && pg.strip && pg.active, 'changing the daily goal updates the strip');
   ok(/^Today: \d+ XP/.test(pg.tip || ''), 'chart hover tooltip: ' + pg.tip);
   ok(errs.length === 0, 'no page errors (path/sprint/progress)' + (errs.length ? ': ' + errs.join(' | ') : ''));

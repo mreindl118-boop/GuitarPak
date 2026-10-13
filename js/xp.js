@@ -21,7 +21,7 @@
  *   xp.goal    daily XP goal: 20 | 50 | 100 | 150
  *   xp.freeze  streak freezes banked (0..2) · xp.frozen [day keys they covered]
  *   xp.fzAt    day a freeze was last earned · xp.best best streak
- *   xp.sprint  { key: best correct answers in 60 s }
+ *   xp.sprint  { key: best correct answers in 60 s; 'end:'+key = best endless streak }
  *   xp.jump    furthest path node opened by a jump test (-1 = none)
  *
  * Bus: emits 'xp' {total, today, goal, gained} after every change.
