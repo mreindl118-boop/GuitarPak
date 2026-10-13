@@ -1421,7 +1421,7 @@
         doneStats() + doneNotes() +
         (endless && cur.endQ ? '<div class="qz-miss"><span class="muted">Ended on: </span>' + esc(cur.endQ) + '</div>' : '') +
         (endless ? clockPicker() : '') +
-        '<div class="qz-acts">' + (endless ? '<button type="button" class="btn primary" data-qzendless="' + nd.i + '"><span class="qz-inf" aria-hidden="true">∞</span> Go again</button>'
+        '<div class="qz-acts">' + (endless ? '<button type="button" class="btn primary" data-qzendless="' + nd.i + '">' + ico('infinity', 16, 'qz-inf') + ' Go again</button>'
           : '<button type="button" class="btn primary" data-qzsprint="' + nd.i + '">' + ico('bolt', 15) + ' Sprint again</button>') +
           '<button type="button" class="btn" id="qz-tohome">Back to the path</button></div>';
     } else {
@@ -1666,22 +1666,10 @@
 
   function XP() { return window.SLXP; }
 
-  var ICO = {
-    flame: '<path d="M12 2.5c.7 3 4.6 4.9 4.6 9.6a4.6 4.6 0 0 1-9.2 0c0-2.1.9-3.5 2-4.4.2 1.7.9 2.6 1.8 2.9-.4-2.7-.1-5.6.8-8.1z"/>',
-    bolt: '<path d="M13 2.5 4.5 13.5H11L10 21.5l8.5-11H12z"/>',
-    snow: '<path d="M12 2.5v19M3.8 7.2l16.4 9.6M3.8 16.8l16.4-9.6"/><path d="m9.2 4.3 2.8 1.9 2.8-1.9M9.2 19.7l2.8-1.9 2.8 1.9"/>',
-    lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
-    check: '<polyline points="5 12.5 10 17.5 19 7"/>',
-    clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
-    ear: '<path d="M7.5 9.5a4.5 4.5 0 0 1 9 0c0 2.6-2.5 3.6-2.5 6.5a3 3 0 0 1-6 .5"/><path d="M10.5 9.5a1.5 1.5 0 0 1 3 0c0 1.2-1.5 1.5-1.5 3"/>',
-    star: '<path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>',
-    faster: '<path d="M12 19V5"/><polyline points="5 12 12 5 19 12"/>',
-    slower: '<path d="M12 5v14"/><polyline points="19 12 12 19 5 12"/>'
-  };
+  // the app's Lucide set (app.js ICONS) — plus an optional class
   function ico(n, s, cls) {
-    if (!ICO[n]) return App.icon(n, s);
-    return '<svg class="ic' + (cls ? ' ' + cls : '') + '" width="' + s + '" height="' + s + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
-      'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' + ICO[n] + '</svg>';
+    var h = App.icon(n, s);
+    return cls ? h.replace('class="ic"', 'class="ic ' + cls + '"') : h;
   }
   var MODE_ICON = { treble: 'note', bass: 'note', staff: 'note', piano: 'keys', neck: 'guitar', ear: 'ear', theory: 'learn' };
 
@@ -1931,7 +1919,7 @@
         (sk.length ? '<ul class="qz-recs">' + sk.map(function (k) {
           var rk = recKey(k), end = rk.end, nd = rk.node;
           return '<li><button type="button" class="qz-rec" data-' + (end ? 'qzendless' : 'qzsprint') + '="' + nd.i + '"' + (end ? ' data-qzclk="' + rk.clock + '"' : '') + '><span>' + esc(nd.unit.name) + '<small>' + esc(MODE_NAME[nd.mode]) + ' · ' + (end ? 'endless streak' + (rk.clock ? ' · ' + rk.clock + ' s clock' : '') : 'sprint') + '</small></span><b>' + sprints[k] + '</b>' +
-            (end ? '<span class="qz-inf" aria-hidden="true">∞</span>' : ico('bolt', 15)) + '</button></li>';
+            (end ? ico('infinity', 16, 'qz-inf') : ico('bolt', 15)) + '</button></li>';
         }).join('') + '</ul>'
           : '<p class="muted small">No records yet. Open any step on the path and choose 60-second sprint or Endless streak.</p>') + '</section>' +
       '<section class="card qz-pcard"><div class="qz-pchead"><h3>Lesson sound</h3></div>' +
@@ -2165,7 +2153,7 @@
   }
   function endlessLabel(nd) {
     var eb = XP().sprintBest(endKey(nd.id, clockSetting()));
-    return '<span class="qz-inf" aria-hidden="true">∞</span> Endless streak' + (eb ? ' · best ' + eb : '');
+    return ico('infinity', 16, 'qz-inf') + ' Endless streak' + (eb ? ' · best ' + eb : '');
   }
   function clockPicker() {
     var c = clockSetting();
@@ -2541,7 +2529,7 @@
     '.qz-rec{display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:1px solid transparent;border-radius:10px;background:var(--card2);color:var(--text);font:inherit;text-align:left;cursor:pointer}' +
     '.qz-rec:hover,.qz-rec:focus-visible{border-color:var(--accent)}' +
     '.qz-rec span{flex:1;display:grid}.qz-rec small{color:var(--muted)}.qz-rec b{font-size:18px;font-variant-numeric:tabular-nums}.qz-rec .ic{color:var(--accent)}' +
-    '.qz-inf{font-weight:700;font-size:17px;line-height:1}.qz-rec .qz-inf{flex:none;display:inline;width:15px;text-align:center;color:var(--accent)}' +
+    '.qz-inf{flex:none}.qz-rec .qz-inf{color:var(--accent)}' +
     '@media (max-width:640px){' +
       '.qz-strip{grid-template-columns:auto minmax(0,1fr);gap:12px 14px;padding:14px}.qz-lvstat{grid-column:1/-1}.qz-strip .qz-go{grid-column:1/-1;justify-self:stretch}' +
       '.qz-ndisc{width:62px;height:62px}.qz-nface{width:50px;height:50px}' +

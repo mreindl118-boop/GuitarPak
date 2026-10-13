@@ -1,4 +1,4 @@
-# Static server for the test suites: the repo root on 127.0.0.1:4573, quiet,
+# Static server for the test suites: the repo root on 127.0.0.1:$SL_PORT (4573), quiet,
 # with JS/woff2 content types set (python's defaults vary by platform).
 import functools, http.server, os, socketserver
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -9,4 +9,4 @@ class S(socketserver.ThreadingTCPServer):
     allow_reuse_address = True
     daemon_threads = True
     def handle_error(self, request, client_address): pass  # a closed browser mid-download is fine
-S(('127.0.0.1', 4573), functools.partial(Q, directory=ROOT)).serve_forever()
+S(('127.0.0.1', int(os.environ.get('SL_PORT', '4573'))), functools.partial(Q, directory=ROOT)).serve_forever()
