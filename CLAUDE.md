@@ -161,8 +161,11 @@ js/quiz.js        EXERCISES ('quiz', the practice HOME since v0.69.0): Musicca-
                   jumps, sprints untimed); clockExtra +3 s ear/play, +5 s
                   set; ear clocks start after playQ; endless takes 0.1 s
                   off per right answer (floor base/2); time out = a miss
-                  ('Time’s up'); paused on page hide / app hidden, fresh on
-                  return; timed endless records 'end:'+node+'@'+secs
+                  ('Time’s up'); covered() = app hidden / another page /
+                  a sheet / a help tour: nothing starts or ticks, and
+                  resumeQ() gives a fresh clock (+ the unplayed ear sound)
+                  on return — app.js emits 'sheet' {name, open}, help.js
+                  'tour' {open}; timed endless records 'end:'+node+'@'+secs
                   (recKey parses).
                   Progress = tiles, week strip, goal picker, SVG charts built
                   at container width (XP/day + goal line, minutes/day, weekly

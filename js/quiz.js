@@ -1503,7 +1503,7 @@
     render();
     cur.t0 = (window.performance || Date).now();
     if (again) { var qb = el('qz-q'); if (qb && qb.getBoundingClientRect().top < 0) reveal(el('qz-runshell')); }
-    if (q.auto) setTimeout(function () { whenVoiceReady(function () { if (cur && cur.q === q && view === 'run') { playQ(q); startClock(); } }); }, 280);
+    if (q.auto) setTimeout(function () { whenVoiceReady(function () { if (cur && cur.q === q && view === 'run' && !covered()) { cur.autoPlayed = q; playQ(q); startClock(); } }); }, 280);
     else startClock();
   }
 
@@ -1776,7 +1776,7 @@
   }
 
   function nodePop(nd, i, p) {
-    var open = unlocked(i, p), nl = nodeLevel(nd, p), best = XP().sprintBest(nd.id), eb = XP().sprintBest(endKey(nd.id, clockSetting()));
+    var open = unlocked(i, p), nl = nodeLevel(nd, p), best = XP().sprintBest(nd.id);
     var rows = nd.levels.map(function (l) {
       var s = p[l.id];
       return '<button type="button" class="qz-lvl" data-qzl="' + l.id + '">' +
@@ -1787,7 +1787,7 @@
     var acts = open
       ? '<button type="button" class="btn primary" data-qzl="' + nl.id + '">' + App.icon('play', 13) + ' ' + (nodeDone(nd, p) ? 'Level ' + nl.n : 'Start') + '</button>' +
         '<button type="button" class="btn" data-qzsprint="' + i + '">' + ico('bolt', 15) + ' 60-second sprint' + (best ? ' · best ' + best : '') + '</button>' +
-        '<button type="button" class="btn" data-qzendless="' + i + '" title="Questions until your first miss"><span class="qz-inf" aria-hidden="true">∞</span> Endless streak' + (eb ? ' · best ' + eb : '') + '</button>'
+        '<button type="button" class="btn" data-qzendless="' + i + '" title="Questions until your first miss">' + endlessLabel(nd) + '</button>'
       : '<button type="button" class="btn primary" data-qzjump="' + i + '">Jump here</button>';
     var ap = applyFor(nd.unit.id);
     if (open && ap) acts += '<button type="button" class="btn" data-qzapply="' + nd.unit.id + '">' + esc(ap.label) + '</button>';
@@ -2135,10 +2135,13 @@
   }
   // more time where the question takes longer to take in: listening, finding notes
   function clockExtra(q) { return q.ear ? 3 : q.kind === 'set' ? 5 : q.kind === 'choice' ? 0 : 3; }
+  // nothing ticks while the question is out of sight: another page, the app
+  // in the background, a sheet (Lights & help, metronome) or a help tour on top
+  function covered() { return document.hidden || App.active !== 'quiz' || !!App.sheet || !!(window.Help && Help.isOpen && Help.isOpen()); }
   function startClock() {
     stopClock();
     var c = cur && cur.clock;
-    if (!c || cur.answered || view !== 'run') return;
+    if (!c || cur.answered || view !== 'run' || covered()) return;
     c.len = (c.now + clockExtra(cur.q)) * 1000;
     c.end = Date.now() + c.len;
     c.q = cur.q;
@@ -2149,10 +2152,20 @@
   function tickClock() {
     var c = cur && cur.clock;
     if (!c || !c.timer) return;
-    if (cur.answered || cur.q !== c.q || view !== 'run') { stopClock(); return; }
+    if (cur.answered || cur.q !== c.q || view !== 'run' || covered()) { stopClock(); return; }
     var left = Math.max(0, c.end - Date.now()), f = el('qz-clockfill');
     if (f) { f.style.width = (100 * left / c.len).toFixed(2) + '%'; f.classList.toggle('low', left < 1500); }
     if (left <= 0) { stopClock(); cur.timedOut = true; resolve(false, null); }
+  }
+  // back in sight: a fresh clock (and the sound, if it never got to play)
+  function resumeQ() {
+    if (!cur || view !== 'run' || cur.answered || covered()) return;
+    if (cur.q.auto && cur.autoPlayed !== cur.q) { cur.autoPlayed = cur.q; playQ(cur.q); }
+    startClock();
+  }
+  function endlessLabel(nd) {
+    var eb = XP().sprintBest(endKey(nd.id, clockSetting()));
+    return '<span class="qz-inf" aria-hidden="true">∞</span> Endless streak' + (eb ? ' · best ' + eb : '');
   }
   function clockPicker() {
     var c = clockSetting();
@@ -2240,7 +2253,9 @@
     if ((a = t.getAttribute('data-qzendless'))) { var ck = t.getAttribute('data-qzclk'); if (ck != null) App.store.set('qz.clock', +ck); startSprint(+a, true); return; }
     if ((a = t.getAttribute('data-qzclock'))) {
       App.store.set('qz.clock', +a);
-      if (view === 'done') render(); else paintHomeBody();
+      root.querySelectorAll('[data-qzclock]').forEach(function (b) { var on = b === t; b.classList.toggle('active', on); b.setAttribute('aria-pressed', String(on)); });
+      var eb = root.querySelector('.qz-npop [data-qzendless]');
+      if (eb) eb.innerHTML = endlessLabel(NODES[+eb.getAttribute('data-qzendless')]); // its best is per clock
       return;
     }
     if ((a = t.getAttribute('data-qzkeys'))) { App.switchTo('piano'); if (App.keysLessons) App.keysLessons.open(a); var kc = document.querySelector('.kl-card'); if (kc) kc.scrollIntoView({ block: 'start' }); return; }
@@ -2554,10 +2569,9 @@
       e._t = setTimeout(function () { if (e.parentNode) e.parentNode.removeChild(e); }, 4000);
     });
     root.addEventListener('click', onClick);
-    document.addEventListener('visibilitychange', function () {
-      if (document.hidden) stopClock();
-      else if (App.active === 'quiz') startClock();
-    });
+    document.addEventListener('visibilitychange', function () { if (document.hidden) stopClock(); else resumeQ(); });
+    App.on('sheet', function (d) { if (d && d.open) stopClock(); else resumeQ(); });
+    App.on('tour', function (d) { if (d && d.open) stopClock(); else resumeQ(); });
     root.addEventListener('pointerdown', onPointer);
     // decode the piano bank on the first touch here, ahead of the first question
     root.addEventListener('pointerdown', function () { if (App.keys && App.keys.warm) App.keys.warm(); }, true);
@@ -2609,7 +2623,7 @@
       if (view !== 'run') {
         render();
         if (view === 'home' && homeTab === 'path' && window.pageYOffset < 60) showCurrentNode();
-      } else startClock(); // a fresh clock for the question you left
+      } else resumeQ(); // a fresh clock for the question you left
     },
     onHide: function () {
       clearTimeout(advT);

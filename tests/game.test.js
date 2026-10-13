@@ -229,6 +229,10 @@ const PLAY = async (right) => {
     SLQuiz.tab('path');
     if (!document.querySelector('.qz-npop [data-qzendless="0"]')) document.querySelector('[data-qzn="0"]').click();
     out.picker = [...document.querySelectorAll('.qz-npop [data-qzclock]')].map(b => b.textContent + (b.classList.contains('active') ? '*' : '')).join();
+    const pop = document.querySelector('.qz-npop');
+    document.querySelector('.qz-npop [data-qzclock="8"]').click();
+    out.inplace = document.querySelector('.qz-npop') === pop && SLQuiz.clock() === 8 && document.querySelector('.qz-npop .qz-clockseg .active').textContent === '8 s';
+    document.querySelector('.qz-npop [data-qzclock="0"]').click();
     const btn = document.querySelector('.qz-npop [data-qzendless="0"]');
     out.btn = btn && btn.textContent;
     btn.click();
@@ -256,7 +260,7 @@ const PLAY = async (right) => {
   });
   ok(/Endless streak/.test(en.btn) && en.run.view === 'run' && en.run.endless && !en.run.bar && en.run.act === 'Show answer' && /^Endless streak/.test(en.run.tag) && en.run.back === 'End run',
     'endless: from the step card, no clock, Show answer, End run: ' + JSON.stringify([en.btn, en.run]));
-  ok(en.picker === 'Off*,8 s,5 s,3 s', 'the step card has the answer clock picker: ' + en.picker);
+  ok(en.picker === 'Off*,8 s,5 s,3 s' && en.inplace, 'the step card has the answer clock picker; it updates in place: ' + en.picker);
   ok(en.adv0 && en.adv5 && en.count === 'Streak 6', 'right answers keep it going: ' + en.count);
   ok(en.miss.view === 'run' && en.miss.act === 'Finish' && en.done.view === 'done', 'the first miss shows the answer, then ends it: ' + JSON.stringify(en.miss));
   ok(/^6 in a row/.test(en.done.big) && /First record/.test(en.done.verdict) && /Ended on/.test(en.done.ended || '') && en.done.again, 'results: the streak, a first record, what ended it, Go again: ' + JSON.stringify(en.done));
@@ -286,6 +290,31 @@ const PLAY = async (right) => {
     await wait(3200);
     App.switchTo('quiz'); await wait(150);
     out.show = { timer: !!SLQuiz.cur.clock.timer, answered: SLQuiz.cur.answered, left: SLQuiz.cur.clock.end - Date.now() };
+    // a sheet over the question pauses it; closing it gives a fresh clock
+    document.getElementById('lights-btn').click(); await wait(50);
+    out.sheet = { open: App.sheet, timer: SLQuiz.cur.clock.timer };
+    await wait(3300);
+    out.sheet.answered = SLQuiz.cur.answered;
+    document.querySelector('#sheet-lights [data-sheet-close]').click(); await wait(100);
+    out.sheet.after = !!SLQuiz.cur.clock.timer; out.sheet.left = SLQuiz.cur.clock.end - Date.now();
+    // the app hidden right after an answer: the next question waits, unseen
+    let hid = false;
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => hid });
+    SLQuiz.pick(SLQuiz.q.correct);
+    hid = true; document.dispatchEvent(new Event('visibilitychange'));
+    await wait(5000);
+    out.bg = { answered: SLQuiz.cur.answered, timer: SLQuiz.cur.clock.timer, timedOut: !!SLQuiz.cur.timedOut };
+    hid = false; document.dispatchEvent(new Event('visibilitychange')); await wait(100);
+    out.bg.after = !!SLQuiz.cur.clock.timer;
+    delete document.hidden;
+    // an ear question's sound and clock wait until the quiz is on screen
+    const ear = SLQuiz.levels().find(id => /\/ear\//.test(id));
+    SLQuiz.start(ear, { drill: [SLQuiz.gen(ear).item] });
+    App.switchTo('chords');
+    await wait(1800);
+    out.ear = { id: ear, timer: SLQuiz.cur.clock.timer, played: !!SLQuiz.cur.autoPlayed, answered: SLQuiz.cur.answered };
+    App.switchTo('quiz'); await wait(100);
+    out.ear.after = !!SLQuiz.cur.clock.timer; out.ear.played2 = SLQuiz.cur.autoPlayed === SLQuiz.q;
     // timed endless: the clock tightens 0.1 s per right answer; running out ends it
     SLQuiz.endless(0);
     out.run = { bar: !!document.getElementById('qz-clockfill'), tag: txt('.qz-lvltag'), count: txt('#qz-count') };
@@ -307,6 +336,9 @@ const PLAY = async (right) => {
   ok(!ck.level.clock && !ck.level.bar, 'levels stay untimed');
   ok(ck.drill.base === 3 && ck.drill.bar && ck.drill.running && ck.drill.now === 3 && ck.drill.stopped, 'drills get the clock, it stops on an answer, no tightening: ' + JSON.stringify(ck.drill));
   ok(ck.hide.timer === 0 && ck.hide.q && ck.show.timer && !ck.show.answered && ck.show.left > 2500, 'leaving the page pauses it; coming back gives a fresh clock: ' + JSON.stringify([ck.hide, ck.show]));
+  ok(ck.sheet.open === 'lights' && ck.sheet.timer === 0 && !ck.sheet.answered && ck.sheet.after && ck.sheet.left > 2500, 'a sheet on top pauses it; closing gives a fresh clock: ' + JSON.stringify(ck.sheet));
+  ok(!ck.bg.answered && ck.bg.timer === 0 && !ck.bg.timedOut && ck.bg.after, 'a question that comes up while the app is hidden waits for you: ' + JSON.stringify(ck.bg));
+  ok(ck.ear.id && ck.ear.timer === 0 && !ck.ear.played && !ck.ear.answered && ck.ear.after && ck.ear.played2, 'an ear question plays and starts its clock only on the quiz page: ' + JSON.stringify(ck.ear));
   ok(ck.run.bar && /3 s clock/.test(ck.run.tag) && /3\.0 s/.test(ck.run.count), 'timed endless: a clock bar, the clock in the tag + counter: ' + JSON.stringify(ck.run));
   ok(ck.now === 2.7 && /Streak 3 · 2\.7 s/.test(ck.count), 'each right answer takes 0.1 s off: ' + ck.count);
   ok(ck.drain[0] > 85 && ck.drain[1] < ck.drain[0] - 30, 'the bar drains: ' + JSON.stringify(ck.drain));

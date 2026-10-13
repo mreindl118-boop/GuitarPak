@@ -113,7 +113,7 @@
   function store() { return App.store; }
 
   function close() {
-    if (ov) { ov.remove(); ov = null; }
+    if (ov) { ov.remove(); ov = null; App.emit('tour', { open: false }); }
     document.removeEventListener('keydown', onEsc, true);
   }
 
@@ -198,6 +198,7 @@
     ov.innerHTML = '<div class="hp-ring"></div><div class="hp-card card"></div>' +
       '<button type="button" class="hp-close btn sm" aria-label="Close help">' + App.icon('close', 14) + '</button>';
     document.body.appendChild(ov);
+    App.emit('tour', { open: true });
     ov.addEventListener('click', function (e) {
       if (e.target === ov) close();
     });

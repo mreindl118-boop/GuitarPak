@@ -846,6 +846,7 @@ window.App = (function () {
     }
     var x = el.querySelector('[data-sheet-close]');
     if (x) { try { x.focus({ preventScroll: true }); } catch (e) { /* old engines */ } }
+    emit('sheet', { name: name, open: true }); // the page underneath can pause (quiz answer clock)
   }
 
   function closeSheet() {
@@ -862,6 +863,7 @@ window.App = (function () {
     var r = sheetReturn;
     sheetReturn = null;
     if (r && r.focus && document.body.contains(r)) { try { r.focus({ preventScroll: true }); } catch (e) { /* ok */ } }
+    emit('sheet', { name: name, open: false });
   }
 
   function toggleSheet(name) { if (sheet === name) closeSheet(); else openSheet(name); }
