@@ -197,11 +197,12 @@
   // All open source (samples/CREDITS.md): grand = Salamander Grand (real
   // recording, via tonejs-instruments), bright = FluidR3 piano, electric =
   // MusyngKite EP, organ = MusyngKite drawbar. Same anchor notes per set,
-  // nearest-anchor pitch shift, synth fallback until decoded. trim = RMS-
-  // measured loudness compensation per set. Chosen in Settings
+  // nearest-anchor pitch shift, synth fallback until decoded. Grand is
+  // already leveled by sampleNorm; the other sets keep their existing trims.
+  // Chosen in Settings
   // (app.pianoTone, App.setPianoTone).
   var PIANO_SETS = {
-    grand: { dir: 'samples/piano2/', trim: 0.21 },
+    grand: { dir: 'samples/piano2/', trim: 1.0 }, // sampleNorm already levels this bank
     bright: { dir: 'samples/keys/', trim: 1.0 },
     electric: { dir: 'samples/epiano/', trim: 1.57 },
     organ: { dir: 'samples/organ/', trim: 1.17 }
