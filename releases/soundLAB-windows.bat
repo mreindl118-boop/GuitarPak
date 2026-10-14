@@ -45,8 +45,10 @@ echo.
 echo Installed. soundLAB is now on your Desktop and in the Start Menu.
 echo.
 echo First run tips:
-echo   - Plug in (or Bluetooth-pair in Windows Settings) your MIDI keyboard,
-echo     then allow the MIDI permission prompt in soundLAB's Settings.
+echo   - On Windows, connect your MIDI keyboard by USB for browser MIDI.
+echo     Bluetooth pairing alone may not expose a MIDI port to the browser.
+echo   - Select the keyboard's LED output in soundLAB's Settings and allow MIDI.
+echo     For a LUMI with a generic port name, select Keyboard type LUMI.
 echo   - The app keeps working offline after the first visit.
 echo.
 choice /c YN /m "Launch soundLAB now"
