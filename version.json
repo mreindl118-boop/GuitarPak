@@ -1,6 +1,6 @@
 {
   "version": "0.75.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/soundLAB-alpha.apk",
-  "web": "0.77.0",
-  "notes": "Answer on instinct. Endless streaks and drills in Exercises now have an answer clock: a bar drains while you think, and running out counts as a miss. Pick Off, 8, 5 or 3 seconds on any path step (5 s to start). In an Endless streak the clock gets 0.1 s shorter with every right answer, and records are kept per clock. Also in 0.76: ∞ scale lessons on the Keys page and Endless streaks in Exercises."
+  "web": "0.77.1",
+  "notes": "Grand piano now plays at its intended level alongside the other keyboard tones. Its touch dynamics and clipping protection are preserved."
 }
