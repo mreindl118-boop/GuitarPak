@@ -53,7 +53,8 @@
     try {
       if (iosMidi) window.webkit.messageHandlers.midi.postMessage(msg);
       else if (androidMidi) window.SoundLabMidi.post(JSON.stringify(msg));
-    } catch (e) { /* bridge gone */ }
+      return true;
+    } catch (e) { return false; }
   }
 
   function supported() { return native || (typeof navigator !== 'undefined' && !!navigator.requestMIDIAccess); }
@@ -144,9 +145,18 @@
   }
 
   function pickWebOutput(id) {
-    output = null;
-    if (access && id) access.outputs.forEach(function (p) { if (p.id === id) output = p; });
-    if (!output && access) access.outputs.forEach(function (p) { if (!output) output = p; });
+    var nextOutput = null;
+    if (access && id) access.outputs.forEach(function (port) {
+      if (port.id === id && port.state !== 'disconnected') nextOutput = port;
+    });
+    if (!nextOutput && access && !id) access.outputs.forEach(function (port) {
+      if (!nextOutput && port.state !== 'disconnected') nextOutput = port;
+    });
+    if (nextOutput !== output) {
+      allDark();
+      resetOutputLights();
+    }
+    output = nextOutput;
     if (output) App.store.set('midi.outputId', output.id);
     announce();
   }
@@ -163,8 +173,13 @@
       nativeInId = portName(nativePorts.inputs, storedIn) !== null ? storedIn
         : (nativePorts.inputs.length ? nativePorts.inputs[0].id : null);
       var storedOut = App.store.get('midi.outputId', null);
-      nativeOutId = portName(nativePorts.outputs, storedOut) !== null ? storedOut
-        : (nativePorts.outputs.length ? nativePorts.outputs[0].id : null);
+      var nextOutputId = portName(nativePorts.outputs, storedOut) !== null ? storedOut
+        : (storedOut == null && nativePorts.outputs.length ? nativePorts.outputs[0].id : null);
+      if (nextOutputId !== nativeOutId) {
+        allDark();
+        resetOutputLights();
+      }
+      nativeOutId = nextOutputId;
       if (nativeOutId !== null) post({ cmd: 'setOutput', id: nativeOutId });
       announce();
     },
@@ -214,9 +229,15 @@
 
   function setOutput(id) {
     if (native) {
-      nativeOutId = typeof id === 'string' ? parseInt(id, 10) : id;
-      if (isNaN(nativeOutId)) nativeOutId = null;
-      App.store.set('midi.outputId', nativeOutId);
+      var requestedOutputId = typeof id === 'string' ? parseInt(id, 10) : id;
+      if (isNaN(requestedOutputId)) requestedOutputId = null;
+      var nextOutputId = portName(nativePorts.outputs, requestedOutputId) !== null ? requestedOutputId : null;
+      if (nextOutputId !== nativeOutId) {
+        allDark();
+        resetOutputLights();
+      }
+      nativeOutId = nextOutputId;
+      App.store.set('midi.outputId', requestedOutputId);
       if (nativeOutId !== null) post({ cmd: 'setOutput', id: nativeOutId });
       announce();
       return;
@@ -225,32 +246,35 @@
   }
 
   function hasOutput() {
-    return native ? nativeOutId !== null : !!output;
+    return native ? nativeOutId !== null : !!(output && output.state !== 'disconnected');
   }
 
   function sendBytes(bytes) {
-    if (native) { post({ cmd: 'send', data: bytes }); return; }
-    if (!output) return;
-    try { output.send(bytes); } catch (e) { /* port gone */ }
+    if (!hasOutput()) return false;
+    if (native) return post({ cmd: 'send', data: bytes });
+    try { output.send(bytes); return true; } catch (e) { return false; }
   }
 
   // ---- LED output (generic: devices light incoming notes) ----
 
   var lit = {};
 
+  function resetOutputLights() {
+    lit = {};
+    lumiShown = null;
+  }
+
   function light(midi, vel) {
     if (!hasOutput()) return;
     midi = Math.max(0, Math.min(127, Math.round(midi)));
     var v = Math.max(1, Math.min(127, Math.round(vel == null ? 100 : vel)));
-    sendBytes([0x90, midi, v]);
-    lit[midi] = v;
+    if (sendBytes([0x90, midi, v])) lit[midi] = v;
   }
 
   function dark(midi) {
     if (!hasOutput()) return;
     midi = Math.max(0, Math.min(127, Math.round(midi)));
-    sendBytes([0x80, midi, 0]);
-    delete lit[midi];
+    if (sendBytes([0x80, midi, 0])) delete lit[midi];
   }
 
   function allDark() {
@@ -278,14 +302,15 @@
   }
 
   function lumiCmd(cmd) {
-    if (!hasOutput()) return;
+    if (!hasOutput() || !sysexOk()) return false;
     while (cmd.length < 8) cmd.push(0);
     // device id is topology-dependent (0x37 on the documented unit, 0x00 =
     // broadcast per the same doc's own uncertainty) — send BOTH; the config
     // frames are idempotent, so whichever id this LUMI answers to wins
     var tail = cmd.concat([lumiChecksum(cmd), 0xf7]);
-    sendBytes([0xf0, 0x00, 0x21, 0x10, 0x77, 0x37].concat(tail));
-    sendBytes([0xf0, 0x00, 0x21, 0x10, 0x77, 0x00].concat(tail));
+    var sentSpecific = sendBytes([0xf0, 0x00, 0x21, 0x10, 0x77, 0x37].concat(tail));
+    var sentBroadcast = sendBytes([0xf0, 0x00, 0x21, 0x10, 0x77, 0x00].concat(tail));
+    return sentSpecific && sentBroadcast;
   }
 
   function lumiVal(type, v) { // <5-bit type><value> from byte 3 of the command
@@ -489,23 +514,29 @@
   }
 
   // compose + diff: only changed keys are sent
-  function paint() {
+  function paint(force) {
     if (!hasOutput()) return;
-    if (claimedBy) return; // that page drives the lights itself
+    if (claimedBy) {
+      if (force === true) {
+        if (isLumi()) lumiLayout();
+        Object.keys(lit).forEach(function (note) { light(Number(note), lit[note]); });
+      }
+      return;
+    }
     if (!lightsOn()) { allDark(); return; }
     if (isLumi()) lumiLayout();
     var want = wanted(), m;
     for (m in lit) if (!want[m]) dark(Number(m));
-    for (m in want) if (lit[m] !== want[m]) { light(Number(m), want[m]); lit[m] = want[m]; }
+    for (m in want) if (force === true || lit[m] !== want[m]) light(Number(m), want[m]);
   }
 
   // the app paints a LUMI key by key, so its own background goes dark (night
   // mode) — then only the app's colors show; brightness rides along
   function lumiLayout(force) {
     if (lumiShown === 'night' && !force) return;
-    lumiShown = 'night';
-    lumiCmd([0x10, 0x40].concat(lumiVal(0x02, LUMI_MODES.night)));
-    lumiCmd([0x10, 0x40].concat(lumiVal(0x04, brightness())));
+    var sentMode = lumiCmd([0x10, 0x40].concat(lumiVal(0x02, LUMI_MODES.night)));
+    var sentBrightness = lumiCmd([0x10, 0x40].concat(lumiVal(0x04, brightness())));
+    lumiShown = sentMode && sentBrightness ? 'night' : null;
   }
 
   function setGuide(now, next) {
@@ -521,7 +552,7 @@
   App.on('midi:note', function (d) { if (d && d.on && !d.silent) learnRange(d.midi); });
 
   // follow the app's key/scale/colors/help live
-  function repaintAll() { lumiShown = null; paint(); }
+  function repaintAll(force) { lumiShown = null; paint(force === true); }
   App.on('fb:set', repaintAll);
   App.on('fb:scale', repaintAll);
   App.on('midi:state', repaintAll);
@@ -574,8 +605,8 @@
     lumiColor: function (hex) { return '#' + ('00000' + LUMI_TABLE[lumiVel(hex)].toString(16)).slice(-6); }, // what a LUMI shows for a screen color
     get platform() { return iosMidi ? 'ios' : androidMidi ? 'android' : 'web'; },
     release: function (owner) { if (claimedBy === owner) { allDark(); claimedBy = null; repaintAll(); } },
-    repaint: repaintAll,
-    lumiSync: repaintAll, // (old name)
+    repaint: function () { repaintAll(true); },
+    lumiSync: function () { repaintAll(true); },
     range: range,
     fold: fold,
     get lumi() { return isLumi(); },
