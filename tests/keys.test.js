@@ -67,8 +67,14 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
     App.emit('midi:note', { on: true, midi: 72, vel: 80 });                 // count-in noodling: ignored
     for (const tg of R.targets) {
       const off = (opts.offset || 0) + ((opts.late || {})[tg.i] || 0);
-      const due = (tg.at + R.lat + off / 1000 - R.ctx.currentTime) * 1000;
-      if (due > 0) await wait(due);
+      // A newly running audio clock can lag the wall clock while output starts.
+      // Recheck its absolute target; keep judging windows and assertions exact.
+      const at = tg.at + R.lat + off / 1000;
+      const deadline = performance.now() + Math.max(0, (at - R.ctx.currentTime) * 1000) + 5000;
+      while (R.ctx.currentTime < at) {
+        if (performance.now() > deadline) throw new Error('Audio clock stalled before scheduled Keys test input');
+        await wait(Math.min(20, Math.max(1, (at - R.ctx.currentTime) * 1000)));
+      }
       if ((opts.skip || []).includes(tg.i)) continue;
       const m = (opts.wrong || []).includes(tg.i) ? tg.midi + 1 : tg.midi;
       App.emit('midi:note', { on: true, midi: m, vel: 90 });
@@ -139,8 +145,12 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
     for (let i = 0; i < opts.n; i++) {
       let tg;
       while (!(tg = R.targets.find(t => t.i === i))) await wait(20);
-      const due = (tg.at + R.lat - R.ctx.currentTime) * 1000;
-      if (due > 0) await wait(due);
+      const at = tg.at + R.lat;
+      const deadline = performance.now() + Math.max(0, (at - R.ctx.currentTime) * 1000) + 5000;
+      while (R.ctx.currentTime < at) {
+        if (performance.now() > deadline) throw new Error('Audio clock stalled before scheduled Keys test input');
+        await wait(Math.min(20, Math.max(1, (at - R.ctx.currentTime) * 1000)));
+      }
       const m = i === opts.wrongAt ? 61 : tg.midi;
       App.emit('midi:note', { on: true, midi: m, vel: 90 });
       App.emit('midi:note', { on: false, midi: m });
