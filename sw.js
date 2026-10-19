@@ -1,5 +1,5 @@
 /* GuitarLab service worker — cache-first so the app works fully offline once visited. */
-var CACHE = 'guitarlab-v110';
+var CACHE = 'guitarlab-v112';
 var ASSETS = [
   '.',
   'index.html',
@@ -32,6 +32,14 @@ var ASSETS = [
   'js/arrange.js',
   'js/woodshed.js',
   'js/pads.js',
+  'js/midihub.js',
+  'js/lumi-practice.js',
+  'js/helix-stadium.js',
+  'js/score.js',
+  'js/release-notes.js',
+  'css/lumi-practice.css',
+  'css/helix-stadium.css',
+  'css/score.css',
   'js/xp.js',
   'js/quiz.js',
   'js/help.js',
@@ -84,7 +92,7 @@ self.addEventListener('install', function (e) {
 self.addEventListener('activate', function (e) {
   e.waitUntil(
     caches.keys().then(function (keys) {
-      return Promise.all(keys.filter(function (k) { return k !== CACHE; }).map(function (k) { return caches.delete(k); }));
+      return Promise.all(keys.filter(function (k) { return k.indexOf('guitarlab-') === 0 && k !== CACHE; }).map(function (k) { return caches.delete(k); }));
     }).then(function () { return self.clients.claim(); })
   );
 });
@@ -94,7 +102,7 @@ self.addEventListener('fetch', function (e) {
   // never intercept cross-origin requests (e.g. the version.json update check)
   if (e.request.url.indexOf(self.location.origin) !== 0) return;
   e.respondWith(
-    caches.match(e.request, { ignoreSearch: true }).then(function (hit) {
+    caches.open(CACHE).then(function (c) { return c.match(e.request, { ignoreSearch: true }); }).then(function (hit) {
       return hit || fetch(e.request).then(function (res) {
         var copy = res.clone();
         caches.open(CACHE).then(function (c) { c.put(e.request, copy); });

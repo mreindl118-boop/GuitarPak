@@ -1,0 +1,44 @@
+/* Score uses the app palette; engraving is a deliberately limited SVG preview. */
+@font-face{font-family:SLMusic;src:url('../fonts/slmusic.woff2') format('woff2');font-display:block}
+#panel-score{max-width:1100px;margin-inline:auto}
+#panel-score [hidden]{display:none!important}
+#panel-score p{line-height:1.5}
+#panel-score h2,.sc-status,.sc-measure h4{overflow-wrap:anywhere}
+.sc-intro h2{margin-bottom:8px}
+.sc-filelabel{position:relative;overflow:hidden;cursor:pointer}
+.sc-filelabel input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.sc-filelabel:focus-within{outline:2px solid var(--accent);outline-offset:3px}
+.sc-status{min-height:24px;margin-bottom:0;font-weight:500}
+.sc-details{margin-top:14px}
+.sc-details summary{cursor:pointer;font-weight:600;min-height:38px;display:list-item;padding:8px 2px}
+.sc-details label{display:block;margin:10px 0 5px}
+.sc-input{display:block;width:100%;max-width:100%;background:var(--card2);color:var(--text);border:1px solid var(--ctl-border);border-radius:8px;padding:10px 12px;box-sizing:border-box;font:inherit}
+textarea.sc-input{min-height:100px;font-family:ui-monospace,Consolas,monospace;font-size:14px;resize:vertical;margin-bottom:10px}
+.sc-input:focus{outline:2px solid var(--accent);outline-offset:2px}
+.sc-fields,.sc-controls{display:flex;flex-wrap:wrap;gap:10px;align-items:end}
+.sc-fields label,.sc-controls label{display:flex;flex-direction:column;gap:6px;font-size:13px;margin:0}
+.sc-fields input{width:108px}
+.sc-fields input,.sc-fields select,.sc-controls select{min-height:42px}
+.sc-controls{margin:14px 0}
+#panel-score .btn{min-height:42px;white-space:normal}
+.sc-notice{padding:12px 14px;background:var(--card2);border-left:3px solid var(--accent);border-radius:6px;color:var(--muted)}
+.sc-measure{margin:14px 0;padding:9px 10px;border:1px solid var(--line);border-radius:10px;transition:border-color .1s,background .1s}
+.sc-measure h4{font-size:13px;margin:0 0 4px;color:var(--muted)}
+.sc-measure.sc-now{border-color:var(--accent);background:var(--card2)}
+.sc-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%}
+.sc-scroll svg{display:block;color:var(--text)}
+.sc-staffline{stroke:currentColor;stroke-width:1;opacity:.55}
+.sc-ledger{stroke:currentColor;stroke-width:1.5}
+.sc-note{fill:currentColor;stroke:currentColor;stroke-width:1.4}
+.sc-note.sc-open{fill:var(--card)}
+.sc-flag{fill:none;stroke:currentColor;stroke-width:1.6}
+.sc-acc{font:16px Georgia,serif;fill:currentColor}
+.sc-rest{font:italic 13px var(--font-body);fill:currentColor;text-anchor:middle}
+.sc-duration{font:12px var(--font-body);fill:var(--muted);text-anchor:middle}
+.sc-music{font:40px SLMusic;fill:currentColor}
+.sc-meter{font:600 20px var(--font-body);fill:currentColor}
+.sc-table{width:100%;border-collapse:collapse;font-size:14px;text-align:left}
+.sc-table th,.sc-table td{padding:9px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+.sc-table th{color:var(--muted);font-weight:500}
+@media(max-width:540px){.sc-controls{gap:8px}.sc-controls .btn{flex:1 1 44%}.sc-controls label{flex:1 1 100%}.sc-controls select{max-width:130px}.sc-fields{gap:8px}.sc-fields .btn{flex:1 1 100%}.sc-notice{padding:10px}.sc-measure{padding:8px 4px}}
+@media(prefers-reduced-motion:reduce){.sc-measure{transition:none}}

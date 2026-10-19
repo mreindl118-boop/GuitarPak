@@ -20,7 +20,7 @@ to try the pipeline, then copy it as your starting point.
 | `SoundLab.registerPage(id, label, space, module)` | Add a whole page. `space` is `'practice'` or `'studio'`; `module` is `{init(rootEl), onShow?, onHide?, onKey?}` — the same contract every built-in page uses. It appears in that workspace's page menu immediately. |
 | `SoundLab.registerFx(id, {name, build(ctx, fx)})` | Add a Studio FX type. It appears in every track's FX picker. `build` gets a `BaseAudioContext` (live **or** offline render!) and `{type, mix: 0..1}`; return `{input, output, dispose()}` AudioNodes. |
 | `SoundLab.registerSynthPreset({id, name, params})` | Add a synth voice to the Tracks editor. Start from `SoundLab.daw.defaultSynth()` and tweak (oscillators, envelopes, filter, unison, glide, LFO). |
-| `SoundLab.on(event, fn)` / `SoundLab.emit(event, data)` | The app-wide event bus: `tempo`, `fb:scale`, `jam:chord`, `midi:note`, `note:input`, `st:step`, `space`… |
+| `SoundLab.on(event, fn)` / `SoundLab.emit(event, data)` | The app-wide event bus: `tempo`, `fb:scale`, `jam:chord`, `midi:note`, `midi:raw` (every incoming MIDI message, `{bytes}`), `midi:out` (every message sent), `note:input`, `st:step`, `space`… |
 | `SoundLab.app` | The application shell (`App`): `store.get/set`, `getAudio()`, `pluck()`, `switchTo()`, `icon()`, `injectCSS()`… |
 | `SoundLab.daw` | The Studio engine (`DAW`): `engine` (tracks/loop/render), `createSynth`, `createSampler`, `createDrums`, `samples`… |
 | `SoundLab.theory` | The music-theory core (`Theory`): scales, chords, diatonic harmony, note names. |
