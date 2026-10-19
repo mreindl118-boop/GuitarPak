@@ -12,6 +12,8 @@
  *   'midi:note'     {on, midi, vel, chan}      note on/off (vel 0-127)
  *   'midi:bend'     {chan, semis}              pitch bend in semitones
  *   'midi:pressure' {chan, val}                channel pressure 0-127
+ *   'midi:raw'      {bytes}                    every incoming message, untouched
+ *   'midi:out'      {bytes}                    every message sent to the output
  *
  * MPE-style per-note expression works out of the box because bend/pressure
  * are reported per channel and consumers apply them to the notes held on
@@ -39,10 +41,12 @@
 
   var access = null;                    // Web MIDI backend
   var input = null, output = null;
+  var removeInputListener = null;
   var nativeReady = false;              // CoreMIDI bridge backend
   var nativePorts = { inputs: [], outputs: [] };
   var nativeInId = null, nativeOutId = null;
   var held = {};                        // midi -> vel (currently held notes)
+  var heldChannels = {};                // channel:note -> vel, for exact releases
   var bendRange = App.store.get('midi.bendRange', 2);
   if ([2, 12, 48].indexOf(bendRange) === -1) bendRange = 2;
   // pitch bend is OFF unless switched on in Settings (midi.bendOn): a LUMI's
@@ -79,7 +83,7 @@
   function listPorts(map) {
     if (native) return nativePorts[map].slice();
     var out = [];
-    if (access) access[map].forEach(function (p) { out.push({ id: p.id, name: p.name || p.id }); });
+    if (access) access[map].forEach(function (p) { if (p.state !== 'disconnected') out.push({ id: p.id, name: p.name || p.id }); });
     return out;
   }
 
@@ -89,9 +93,11 @@
     var st = d[0] & 0xf0, chan = d[0] & 0x0f;
     if (st === 0x90 && d[2] > 0) {
       held[d[1]] = d[2];
+      heldChannels[chan + ':' + d[1]] = d[2];
       App.emit('midi:note', { on: true, midi: d[1], vel: d[2], chan: chan });
     } else if (st === 0x80 || (st === 0x90 && d[2] === 0)) {
-      delete held[d[1]];
+      delete heldChannels[chan + ':' + d[1]];
+      if (!Object.keys(heldChannels).some(function (key) { return +key.split(':')[1] === d[1]; })) delete held[d[1]];
       App.emit('midi:note', { on: false, midi: d[1], vel: 0, chan: chan });
     } else if (st === 0xe0) {
       var raw = ((d[2] << 7) | d[1]) - 8192;
@@ -103,7 +109,30 @@
     }
   }
 
-  function onMsg(e) { dispatch(e.data); }
+  function releaseInputNotes() {
+    Object.keys(heldChannels).forEach(function (key) {
+      var parts = key.split(':');
+      dispatch([0x80 | (+parts[0]), +parts[1], 0]);
+    });
+    held = {}; heldChannels = {};
+  }
+
+  // RAW TAP + INPUT FILTER (the MIDI Hub page, js/midihub.js): every incoming
+  // message — channel, SysEx and realtime alike — is broadcast as 'midi:raw'
+  // {bytes} before anything else happens, and a registered input filter
+  // (App.midi.setInputFilter) may rewrite or drop a channel message before
+  // the app hears it (the Hub's rules: transpose, remap, block…).
+  var inputFilter = null;
+  function hear(bytes, portId) {
+    App.emit('midi:raw', { bytes: bytes.slice(), portId: portId });
+    if (!inputFilter) return bytes;
+    try { return inputFilter(bytes) || null; } catch (e) { return bytes; }
+  }
+
+  function onMsg(e) {
+    var d = hear(Array.prototype.slice.call(e.data), input ? input.id : null);
+    if (d) dispatch(d);
+  }
 
   // CoreMIDI packets can pack several messages (and use running status) in
   // one byte string — split into complete messages before dispatching
@@ -113,12 +142,14 @@
     var i = 0, lastStatus = 0;
     while (i < bytes.length) {
       var b = bytes[i];
-      if (b === 0xf0) {              // sysex: skip to F7 (we don't consume it)
-        while (i < bytes.length && bytes[i] !== 0xf7) i++;
-        i++;
+      if (b === 0xf0) {              // sysex: tapped for the Hub, never dispatched
+        var sx = [];
+        while (i < bytes.length && bytes[i] !== 0xf7) sx.push(bytes[i++]);
+        if (i < bytes.length) sx.push(bytes[i++]);
+        App.emit('midi:raw', { bytes: sx });
         continue;
       }
-      if (b >= 0xf8) { i++; continue; }        // realtime
+      if (b >= 0xf8) { App.emit('midi:raw', { bytes: [b] }); i++; continue; } // realtime
       var status = b >= 0x80 ? b : lastStatus; // running status
       if (b >= 0x80) i++;
       var len = MSG_LEN[status & 0xf0];
@@ -126,19 +157,65 @@
       lastStatus = status;
       var msg = [status];
       for (var k = 1; k < len && i < bytes.length; k++, i++) msg.push(bytes[i]);
-      if (msg.length === len) dispatch(msg);
+      if (msg.length === len) { msg = hear(msg); if (msg) dispatch(msg); }
     }
   }
 
   // ---- Web MIDI backend ----
 
+  function webPort(kind, id) {
+    if (native || !access || id == null || id === '') return null;
+    var found = null;
+    access[kind].forEach(function (p) { if (p.id === id && p.state !== 'disconnected') found = p; });
+    return found;
+  }
+
+  // Independent tools can observe an exact Web MIDI input without taking
+  // over the practice input or changing any saved selection. A native bridge
+  // has only one selected route and cannot safely emulate independent ports.
+  function subscribeInput(portId, fn) {
+    var port = webPort('inputs', portId);
+    if (!port || typeof fn !== 'function' || !port.addEventListener || !port.removeEventListener) return null;
+    var active = true;
+    var listener = function (e) {
+      if (!active || webPort('inputs', portId) !== port || !e || !e.data) return;
+      fn({ bytes: Array.prototype.slice.call(e.data), portId: port.id });
+    };
+    try { port.addEventListener('midimessage', listener); } catch (e) { return null; }
+    return function () { if (!active) return; active = false; port.removeEventListener('midimessage', listener); };
+  }
+
+  function sendToOutput(portId, bytes) {
+    var port = webPort('outputs', portId);
+    if (!port || !bytes || !bytes.length) return false;
+    var copy = Array.prototype.slice.call(bytes);
+    try { port.send(copy); } catch (e) { return false; }
+    App.emit('midi:out', { bytes: copy, portId: port.id });
+    return true;
+  }
+
   function pickWebInput(id) {
-    if (input) { try { input.onmidimessage = null; } catch (e) {} }
+    var nextInput = webPort('inputs', id);
+    if (!nextInput && access && id == null) access.inputs.forEach(function (p) { if (!nextInput && p.state !== 'disconnected') nextInput = p; });
+    if (nextInput === input) { announce(); return; }
+    App.emit('midi:beforeinput', {});
+    releaseInputNotes();
+    if (removeInputListener) { removeInputListener(); removeInputListener = null; }
     input = null;
-    if (access && id) access.inputs.forEach(function (p) { if (p.id === id) input = p; });
-    if (!input && access) access.inputs.forEach(function (p) { if (!input) input = p; });
+    input = nextInput;
     if (input) {
-      input.onmidimessage = onMsg;
+      var port = input;
+      if (port.addEventListener && port.removeEventListener) {
+        port.addEventListener('midimessage', onMsg);
+        removeInputListener = function () { port.removeEventListener('midimessage', onMsg); };
+      } else {
+        // Compatibility with older wrappers/test doubles; never discard a
+        // pre-existing handler. Independent subscriptions require EventTarget.
+        var previous = port.onmidimessage;
+        var listener = function (e) { if (typeof previous === 'function') previous.call(port, e); onMsg(e); };
+        port.onmidimessage = listener;
+        removeInputListener = function () { if (port.onmidimessage === listener) port.onmidimessage = previous; };
+      }
       App.store.set('midi.inputId', input.id);
     }
     announce();
@@ -149,10 +226,11 @@
     if (access && id) access.outputs.forEach(function (port) {
       if (port.id === id && port.state !== 'disconnected') nextOutput = port;
     });
-    if (!nextOutput && access && !id) access.outputs.forEach(function (port) {
+    if (!nextOutput && access && id == null) access.outputs.forEach(function (port) {
       if (!nextOutput && port.state !== 'disconnected') nextOutput = port;
     });
     if (nextOutput !== output) {
+      App.emit('midi:beforeoutput', {});
       allDark();
       resetOutputLights();
     }
@@ -170,12 +248,15 @@
       nativePorts.outputs = (p.outputs || []).map(function (x) { return { id: x.id, name: x.name }; });
       // restore / default picks
       var storedIn = App.store.get('midi.inputId', null);
-      nativeInId = portName(nativePorts.inputs, storedIn) !== null ? storedIn
-        : (nativePorts.inputs.length ? nativePorts.inputs[0].id : null);
+      var nextInputId = portName(nativePorts.inputs, storedIn) !== null ? storedIn
+        : (storedIn == null && nativePorts.inputs.length ? nativePorts.inputs[0].id : null);
+      if (nextInputId !== nativeInId) { App.emit('midi:beforeinput', {}); releaseInputNotes(); }
+      nativeInId = nextInputId;
       var storedOut = App.store.get('midi.outputId', null);
       var nextOutputId = portName(nativePorts.outputs, storedOut) !== null ? storedOut
         : (storedOut == null && nativePorts.outputs.length ? nativePorts.outputs[0].id : null);
       if (nextOutputId !== nativeOutId) {
+        App.emit('midi:beforeoutput', {});
         allDark();
         resetOutputLights();
       }
@@ -184,7 +265,7 @@
       announce();
     },
     onmidi: function (srcId, bytes) {
-      if (!nativeReady || !bytes) return;
+      if (!nativeReady || nativeInId === null || !bytes) return;
       if (nativeInId !== null && srcId !== 0 && srcId !== nativeInId) return;
       splitAndDispatch(bytes);
     },
@@ -195,7 +276,10 @@
   function enable() {
     if (native) {
       nativeReady = true;
-      post({ cmd: 'init' });
+      if (!post({ cmd: 'init' })) {
+        nativeReady = false; announce();
+        return Promise.reject(new Error('native MIDI initialization failed'));
+      }
       announce();
       return Promise.resolve();
     }
@@ -218,13 +302,17 @@
 
   function setInput(id) {
     if (native) {
-      nativeInId = typeof id === 'string' ? parseInt(id, 10) : id;
-      if (isNaN(nativeInId)) nativeInId = null;
-      App.store.set('midi.inputId', nativeInId);
+      var requestedInputId = typeof id === 'string' ? parseInt(id, 10) : id;
+      if (isNaN(requestedInputId)) requestedInputId = null;
+      var nextInputId = portName(nativePorts.inputs, requestedInputId) !== null ? requestedInputId : null;
+      if (nextInputId !== nativeInId) { App.emit('midi:beforeinput', {}); releaseInputNotes(); }
+      nativeInId = nextInputId;
+      App.store.set('midi.inputId', requestedInputId === null ? '' : requestedInputId);
       announce();
       return;
     }
-    pickWebInput(id);
+    App.store.set('midi.inputId', id == null ? '' : id);
+    pickWebInput(id == null ? '' : id);
   }
 
   function setOutput(id) {
@@ -233,26 +321,32 @@
       if (isNaN(requestedOutputId)) requestedOutputId = null;
       var nextOutputId = portName(nativePorts.outputs, requestedOutputId) !== null ? requestedOutputId : null;
       if (nextOutputId !== nativeOutId) {
+        App.emit('midi:beforeoutput', {});
         allDark();
         resetOutputLights();
       }
       nativeOutId = nextOutputId;
-      App.store.set('midi.outputId', requestedOutputId);
+      App.store.set('midi.outputId', requestedOutputId === null ? '' : requestedOutputId);
       if (nativeOutId !== null) post({ cmd: 'setOutput', id: nativeOutId });
       announce();
       return;
     }
-    pickWebOutput(id);
+    App.store.set('midi.outputId', id == null ? '' : id);
+    pickWebOutput(id == null ? '' : id);
   }
 
   function hasOutput() {
-    return native ? nativeOutId !== null : !!(output && output.state !== 'disconnected');
+    return ready() && (native ? nativeOutId !== null : !!(output && output.state !== 'disconnected'));
   }
 
   function sendBytes(bytes) {
     if (!hasOutput()) return false;
-    if (native) return post({ cmd: 'send', data: bytes });
-    try { output.send(bytes); return true; } catch (e) { return false; }
+    // Report successful API/bridge calls to the monitor; neither backend can
+    // confirm that an instrument received the message on the physical cable.
+    if (native) { var r = post({ cmd: 'send', data: bytes }); if (r) App.emit('midi:out', { bytes: bytes, portId: nativeOutId }); return r; }
+    try { output.send(bytes); } catch (e) { return false; }
+    App.emit('midi:out', { bytes: bytes, portId: output.id });
+    return true;
   }
 
   // ---- LED output (generic: devices light incoming notes) ----
@@ -443,7 +537,9 @@
   function isLumi() {
     var m = App.store.get('midi.lumi', null);
     if (m === true || m === false) return m;
-    return /lumi/i.test(outName()) || /lumi/i.test(native ? (portName(nativePorts.inputs, nativeInId) || '') : (input ? input.name || '' : ''));
+    // An input controller says nothing about the selected output: a LUMI
+    // input may sit beside a synth/Helix output that must not receive lights.
+    return /lumi/i.test(outName());
   }
 
   // ---- the playing range (a LUMI = 24 keys; its octave buttons move it) ----
@@ -573,6 +669,9 @@
     get inputId() { return native ? nativeInId : (input ? input.id : null); },
     get outputId() { return native ? nativeOutId : (output ? output.id : null); },
     get hasOutput() { return hasOutput(); },
+    get explicitPortsSupported() { return !native && !!access; },
+    subscribeInput: subscribeInput,
+    sendToOutput: sendToOutput,
     get held() { return Object.keys(held).map(Number); },
     get bendRange() { return bendRange; },
     get bendOn() { return bendOn(); },
@@ -586,6 +685,12 @@
       App.store.set('midi.bendRange', bendRange);
     },
     enable: function () { App.store.set('midi.wanted', true); return enable(); },
+    // raw access for the MIDI Hub page: send any bytes to the output (channel
+    // messages, SysEx, realtime) and install ONE input filter fn(bytes) ->
+    // bytes | null that runs before dispatch (null drops the message)
+    send: function (bytes) { return sendBytes(bytes); },
+    setInputFilter: function (fn) { inputFilter = typeof fn === 'function' ? fn : null; },
+    get inputFilter() { return inputFilter; },
     setInput: setInput,
     setOutput: setOutput,
     bluetooth: function () { if (native) post({ cmd: 'bluetooth' }); },

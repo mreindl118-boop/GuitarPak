@@ -6,6 +6,8 @@ A guitar practice tool that runs entirely in your browser. No install, no accoun
 
 ## Get it
 
+Current work: **0.78.0 integration is pending contributor review and CI.** [Owned task and evidence](tasks/20261019-midi-hub-release-codex.md). The published app remains the source of truth until that gate passes.
+
 - **Web (recommended):** https://mreindl118-boop.github.io/GuitarPak/ — installable as a PWA (browser menu → *Add to Home screen*), works offline after first visit, microphone tuner fully functional.
 - **Android APK:** [Download soundLAB-alpha.apk](https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/soundLAB-alpha.apk) — installs as **soundLAB** (allow "install unknown apps" when prompted). The app runs the live soundLAB inside it, so it updates itself with every release and keeps working offline; it only asks for a new APK if the Android wrapper itself changes. Since v0.70.2 it is a new app (`com.mreindl.soundlab`, new signing key): if you have the older soundLAB/GuitarLab APK, install this one and then delete the old app.
 - **Windows desktop:** [Download soundLAB-windows.zip](https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/soundLAB-windows.zip), unzip, and double-click `soundLAB-windows.bat` — creates Desktop + Start Menu shortcuts that open soundLAB in its own app window (Edge/Chrome app mode). **MIDI keyboards work out of the box**: Chromium's native Web MIDI is the bridge — plug in (or Bluetooth-pair in Windows Settings) and allow the MIDI prompt. Offline after first visit, auto-updates, a few KB.
@@ -14,7 +16,7 @@ A guitar practice tool that runs entirely in your browser. No install, no accoun
 
 Sound starts after your first click anywhere (browser autoplay policy). The Tuner tab will ask for microphone permission.
 
-## The five tools
+## Practice tools
 
 | Tab | What it does |
 |---|---|
@@ -23,7 +25,14 @@ Sound starts after your first click anywhere (browser autoplay policy). The Tune
 | **Chords** | Chord diagram library (open + movable barre shapes for 11 qualities) plus a progression builder: pick a key and scale, get the diatonic chords with roman numerals, build or load preset progressions (12-bar blues, ii–V–I, Axis, Andalusian…), and play them back strummed in tempo with the active chord highlighted. |
 | **Jam** | Backing track builder: pick a key, build or load a progression, choose a vibe (rock, pop, blues shuffle, funk, ballad, latin) and instruments — synthesized drums, bass, and guitar/pad/keys comping. Tracks are savable, tempo is shared app-wide, and it keeps playing while you use other tabs. On the Fretboard, the current chord's tones glow with smooth transitions and each chord suggests a mode to solo with (tap to apply, or auto-switch). |
 | **Tuner** | Microphone tuner with autocorrelation pitch detection: note + cents needle + Hz, adjustable A4 calibration, per-string guide. Includes a **note finder game** — it names a string and fret, you play it, real pitch detection scores your streak. |
+| **MIDI Hub** (Keys › MIDI) | Read, write and reshape MIDI for any device on the cable — a hardware synth (Yamaha MODX, Roland…), a controller, a DAW port. On-screen keys and expression, bank/program select, a wall of CC sliders, transport + MIDI clock at the app tempo, **rules** (remap, transpose, force channel, convert, block — on Thru, on what soundLAB hears, with MIDI Learn), SysEx builders per device profile plus raw hex, and a live decoded monitor of everything in and out. Generic profile works with anything; profiles add names and templates. |
 | **Trainer** | Practice session timer with a persistent log, random practice prompt generator, the classic one-minute chord-change drill with best scores, and an interval ear trainer. |
+| **LUMI Practice** (Keys > LUMI) | Clearly labeled simulation and an experimental hardware mode with a selected MODX answer input and a separate LUMI-named display output. Output starts off and requires a transient test and arm. [Scope and safeguards](docs/LUMI-PRACTICE.md). |
+| **Helix Stadium XL** (Keys > Helix) | Deliberately armed, firmware-labeled preset/snapshot controls for the documented v1.4 command subset. No patch uploads or audio routing changes. [Supported commands and limits](docs/HELIX-STADIUM.md). |
+| **Score Preview** (Play > Score) | Import a bounded single-part MusicXML subset or create a melody, preview and play locally, preserve imported original bytes, and export MIDI. Unsupported notation is rejected. PDF/photo/audio recognition is unavailable. [Supported notation](docs/SCORE.md). |
+| **Music Library** (Play > Library) | Keep original PDF/images/MusicXML/MXL/MIDI and explicit metadata in this browser. Supported XML can produce versioned MIDI; integrity-checked ZIP packages back up originals and available outputs. Original previews are not recognition, and browser storage can be cleared or evicted. [Storage, status and backup limits](docs/MUSIC-LIBRARY.md). |
+
+The new MIDI tools have mock-browser coverage; physical-device compatibility, lights, latency and native wrapper behavior still need hardware validation. Read [MIDI Hub instructions](docs/MIDI-HUB.md). What's New/history is available in Settings; the minor-update notice is nonblocking. This web release retains the existing Android APK version.
 
 ## The prompt that defines this app (refined spec)
 

@@ -12,7 +12,11 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="soundLAB">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
-<link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/lumi-practice.css">
+  <link rel="stylesheet" href="css/helix-stadium.css">
+  <link rel="stylesheet" href="css/score.css">
+  <link rel="stylesheet" href="css/music-library.css">
 </head>
 <body>
 <header class="topbar">
@@ -98,6 +102,11 @@
   <section class="panel" id="panel-arrange"></section>
   <section class="panel" id="panel-tracks"></section>
   <section class="panel" id="panel-pads"></section>
+  <section class="panel" id="panel-midihub"></section>
+  <section class="panel" id="panel-lumipractice"></section>
+  <section class="panel" id="panel-helix-stadium"></section>
+  <section class="panel" id="panel-score"></section>
+  <section class="panel" id="panel-musiclibrary"></section>
   <section class="panel" id="panel-ideas"></section>
 </main>
 <footer class="foot">
@@ -123,14 +132,21 @@
 <script src="js/woodshed.js"></script>
 <script src="js/arrange.js"></script>
 <script src="js/pads.js"></script>
+<script src="js/midihub.js"></script>
+<script src="js/lumi-practice.js"></script>
+<script src="js/helix-stadium.js"></script>
+<script src="js/score.js"></script>
+<script src="js/music-library.js"></script>
 <script src="js/xp.js"></script>
 <script src="js/quiz.js"></script>
 <script src="js/help.js"></script>
 <script src="js/plugins.js"></script>
 <script src="js/settings.js"></script>
 <script src="js/lights.js"></script>
+<script src="js/release-notes.js"></script>
 <script>
 App.boot();
+SLReleaseNotes.init();
 // Offline support — only meaningful when served over http(s); file:// and
 // sandboxed embeds skip it silently.
 if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {

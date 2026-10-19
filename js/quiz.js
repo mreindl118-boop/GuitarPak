@@ -2137,7 +2137,7 @@
   function clockExtra(q) { return q.ear ? 3 : q.kind === 'set' ? 5 : q.kind === 'choice' ? 0 : 3; }
   // nothing ticks while the question is out of sight: another page, the app
   // in the background, a sheet (Lights & help, metronome) or a help tour on top
-  function covered() { return document.hidden || App.active !== 'quiz' || !!App.sheet || !!(window.Help && Help.isOpen && Help.isOpen()); }
+  function covered() { return document.hidden || App.active !== 'quiz' || !!App.sheet || !!document.querySelector('dialog[open]') || !!(window.Help && Help.isOpen && Help.isOpen()); }
   function startClock() {
     stopClock();
     var c = cur && cur.clock;
@@ -2571,6 +2571,7 @@
     root.addEventListener('click', onClick);
     document.addEventListener('visibilitychange', function () { if (document.hidden) stopClock(); else resumeQ(); });
     App.on('sheet', function (d) { if (d && d.open) stopClock(); else resumeQ(); });
+    App.on('modal', function (d) { if (d && d.open) stopClock(); else resumeQ(); });
     App.on('tour', function (d) { if (d && d.open) stopClock(); else resumeQ(); });
     root.addEventListener('pointerdown', onPointer);
     // decode the piano bank on the first touch here, ahead of the first question
