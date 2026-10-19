@@ -7,6 +7,7 @@
       'MIDI output selection, Thru and held-note cleanup have additional safeguards.',
       'LUMI Practice separates a MODX answer input from the experimental LUMI display output. Try the clearly labeled simulation before connecting hardware.',
       'Score Preview reads a documented single-part MusicXML subset, plays it locally, preserves the original and exports MIDI. Unsupported notation is refused rather than simplified silently.',
+      'Music Library keeps immutable originals and explicit metadata in this browser, with versioned MIDI from supported XML and integrity-checked backup packages. PDF/image previews are not recognition; back up local files yourself.',
       'Helix Stadium XL provides explicit, armed preset/snapshot controls for documented firmware 1.4. Hardware behavior still needs validation.'
     ]},
     {version:'0.77.2',date:'2026-10-14',notes:[

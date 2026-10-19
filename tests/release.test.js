@@ -14,7 +14,7 @@ function ok(c,m){assert.ok(c,m);passed++;console.log('  PASS '+m);}
  events.fetch({request:{method:'GET',url:'http://127.0.0.1/index.html'},respondWith:p=>waiting=p});
  ok(await waiting==='current-soundlab-response'&&lookups.join('|')==='guitarlab-v112','fetch uses current soundLAB cache even when another app preserves the same URL');
  const assets=cached.map(x=>x.url);
- for(const file of ['js/midihub.js','js/lumi-practice.js','js/helix-stadium.js','js/score.js','js/release-notes.js','css/lumi-practice.css','css/helix-stadium.css','css/score.css']){
+ for(const file of ['js/midihub.js','js/lumi-practice.js','js/helix-stadium.js','js/score.js','js/music-library.js','js/release-notes.js','css/lumi-practice.css','css/helix-stadium.css','css/score.css','css/music-library.css']){
   ok(assets.includes(file)&&fs.existsSync(path.join(env.ROOT,file)),'offline install contains '+file);
  }
  const feed=JSON.parse(fs.readFileSync(path.join(env.ROOT,'version.json'),'utf8'));
@@ -41,7 +41,7 @@ function ok(c,m){assert.ok(c,m);passed++;console.log('  PASS '+m);}
   ok(await page.evaluate(()=>SLQuiz.view==='run'&&!SLQuiz.cur.answered&&!SLQuiz.cur.clock.timer),'release history pauses an obscured timed question beyond its deadline');
   await page.keyboard.press('Escape');await page.waitForFunction(()=>!!SLQuiz.cur.clock.timer);
   ok(await page.evaluate(()=>!document.querySelector('#sl-release-history').open&&SLQuiz.cur.clock.end>Date.now()),'Escape closes history and gives the visible question a fresh clock');
-  for(const id of ['midihub','lumipractice','helix-stadium','score']){
+  for(const id of ['midihub','lumipractice','helix-stadium','score','musiclibrary']){
    await page.evaluate(id=>App.switchTo(id),id);
    ok(await page.evaluate(id=>App.active===id&&!document.querySelector('#panel-'+id+' .error'),id),'integrated page loads '+id);
    ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'360px page has no horizontal overflow: '+id);

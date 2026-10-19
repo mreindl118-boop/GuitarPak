@@ -2,5 +2,5 @@
   "version": "0.75.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/soundLAB-alpha.apk",
   "web": "0.78.0",
-  "notes": "MIDI Hub adds explicit routing, CC controls, rules and monitoring. New experimental LUMI/MODX practice and firmware-labeled Helix Stadium controls require deliberate output arming; Score Preview supports a bounded MusicXML subset with original preservation and MIDI export. Web update only; hardware validation remains pending."
+  "notes": "MIDI Hub adds explicit routing, CC controls, rules and monitoring. Experimental LUMI/MODX practice and firmware-labeled Helix controls require deliberate output arming. Score Preview supports bounded MusicXML and MIDI export; Music Library stores private browser-local originals/metadata with ZIP backups. PDF/image preview is not recognition. Web update only; hardware validation remains pending."
 }
