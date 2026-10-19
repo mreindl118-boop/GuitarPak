@@ -57,7 +57,14 @@ js/midi.js        MIDI service (App.midi: in/out ports, note/bend/pressure
                   (midi.lumi null|true|false); lights.on default on for a
                   LUMI, off for other outputs (a synth would play note-ons).
                   LUMI SysEx per benob/LUMI-lights (dev-id 0x37 + 0x00, values
-                  <5-bit type><value>). Loaded right after app.js
+                  <5-bit type><value>). Loaded right after app.js.
+                  v0.78.0 RAW TAP for the MIDI Hub: 'midi:raw' {bytes} for
+                  EVERY incoming message (channel, SysEx, realtime; both
+                  backends) before dispatch, 'midi:out' {bytes} after every
+                  successful send, App.midi.send(bytes) (any bytes to the
+                  output) and App.midi.setInputFilter(fn) — ONE fn(bytes) ->
+                  bytes|null run before dispatch (null drops it); the Hub
+                  installs its rules there when midihub.rulesIn is on.
 js/tonein.js      1/4"/audio-in TONE-IN: pitch-detects the selected audio
                   input (audio.inId; toggle audio.tonein in Settings) and
                   emits midi:note {silent:true} — instrument pages show the
@@ -211,6 +218,33 @@ js/plugins.js     window.SoundLab plugin API v1: registerPage (App.addPage),
                   cap, per-plugin enable/error) run right after boot; loaded
                   from Settings > Plugins. Docs PLUGINS.md; sample plugin
                   plugins/sample-lofi.js (Lo-fi fx + Glass bell voice).
+js/midihub.js     MIDI HUB page ('midihub', Keys group, pill "MIDI", v0.78.0;
+                  prefix mh-): read / write / reshape plain MIDI for ANY
+                  device on App.midi's ports — device-AGNOSTIC by design,
+                  PROFILES (generic default / yamaha MODX-MONTAGE / roland)
+                  only add CC names, bank hints, SysEx builders and notes.
+                  Views (seg, midihub.view): Play (2-octave keys touch +
+                  QWERTY via onKey/keyup, velocity, bend/mod/pressure, bank
+                  MSB/LSB + program), Controls (CC slider list midihub.ccs,
+                  switch CCs, FA/FB/FC + MIDI clock at met.bpm, 5 ms ticker
+                  with stall guard), Rules (midihub.rules: match type/ch/
+                  number range -> block / convert / set ch / set number /
+                  add / value %; applyRules(bytes) -> [bytes]; always on
+                  Thru (midihub.thru: 'midi:raw' -> rules -> App.midi.send,
+                  never 0xFE), optionally on what the app hears (rulesIn ->
+                  App.midi.setInputFilter) and on the Hub's own controls
+                  (rulesApp); Learn = next incoming message fills a match),
+                  SysEx (identity request + reply decode, profile builders:
+                  Yamaha F0 43 1n 7F 1C mm addr(3) data F7 / 2n bulk,
+                  Roland DT1/RQ1 with checksum; raw hex; last received),
+                  Monitor ('midi:raw' + 'midi:out' rows, rAF-batched, 800
+                  cap, clock/active-sensing filters, export), Learn (cheat
+                  sheet + profile notes, export/import/reset). Keys played
+                  here emit note:input {src:'midihub'} (capture). Warns when
+                  key lights are on for a non-LUMI output (a synth would
+                  play the "lights"). Panic = 123/120/64/bend on 16 chans.
+                  window.SLMidiHub = test hook (decode, applyRules,
+                  PROFILES, parseHex, hex, rules). Suite tests/midihub.test.js.
 js/pads.js        drum-pad controller page ('pads', PRACTICE Instrument group
                   since v0.64.0; still records to st.tracks + studio-armed
                   MIDI works): 8 velocity pads on the pad drum track's live
@@ -297,7 +331,7 @@ version.json      auto-update feed (source of truth for latest version)
 - SECTION TAB BAR (v0.70.0; app.js GROUPS + populateNav): the main nav is a
   tab bar of GROUPS (icon + label), not a drop-down — practice: Learn
   (quiz=Exercises HOME/chords/theory), Guitar (fretboard/tab/notation), Keys
-  (piano/synth/pads), Play (songs/jam), Practice (shed/trainer/tuner);
+  (piano/synth/pads/midihub), Play (songs/jam), Practice (shed/trainer/tuner);
   studio: Studio (arrange=Timeline HOME / tracks=Editor), Sketch (song/ideas).
   Rendered twice: #tabbar inside the top bar (> 900px) and #tabbar-m fixed
   along the bottom (<= 900px) — #tabbar-m sits OUTSIDE <header> because the
@@ -408,8 +442,13 @@ version.json      auto-update feed (source of truth for latest version)
   /opt/node22/lib/node_modules, Chromium at /opt/pw-browsers; env.js reads
   SL_URL / CHROMIUM / AAPT). Suites: fingering (pure Node), lights (a fake
   LUMI via a stubbed requestMIDIAccess), keys, practice,
-  game, quiz, nav, smoke, taps, update. Run them before every release and add a
-  suite or checks for new features.
+  game, quiz, nav, smoke, taps, update, midihub (a fake synth port: raw tap,
+  rules on Thru / input filter, profiles + SysEx builders, clock). Run them
+  before every release and add a suite or checks for new features.
+  PC (2026-10-19): Node 24 IS on this machine now; install playwright into a
+  scratch folder (`npm i playwright@1.49.1 && npx playwright install chromium`)
+  and run suites with NODE_PATH=<that>/node_modules SL_URL=http://127.0.0.1:4573/index.html
+  against the preview server (tests/run.sh expects python3 + a free 4573).
 - The service worker is cache-first: after editing, bump `CACHE` in sw.js and,
   in the preview, unregister SW + clear caches + reload twice — otherwise you
   WILL verify stale files (this has bitten repeatedly).

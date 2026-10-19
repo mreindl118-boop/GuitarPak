@@ -32,7 +32,7 @@ window.App = (function () {
   // Settings is deliberately in NEITHER list: it's an overlay page opened by
   // the ever-present gear in the header, from any page in either space.
   var SPACES = {
-    practice: ['quiz', 'fretboard', 'tab', 'notation', 'chords', 'piano', 'synth', 'pads', 'songs', 'jam', 'shed', 'tuner', 'trainer', 'theory'],
+    practice: ['quiz', 'fretboard', 'tab', 'notation', 'chords', 'piano', 'synth', 'pads', 'midihub', 'songs', 'jam', 'shed', 'tuner', 'trainer', 'theory'],
     studio: ['arrange', 'tracks', 'song', 'ideas']
   };
   var SPACE_LABELS = {
@@ -40,7 +40,7 @@ window.App = (function () {
     chords: 'Chords', piano: 'Piano', songs: 'Songs', jam: 'Jam', tuner: 'Tuner',
     trainer: 'Trainer', theory: 'Theory', settings: 'Settings', shed: 'Shed', synth: 'Synth',
     song: 'Song', arrange: 'Arrange', tracks: 'Tracks', pads: 'Pads', ideas: 'Ideas',
-    quiz: 'Exercises'
+    quiz: 'Exercises', midihub: 'MIDI Hub'
   };
   // overlays live outside both page sets: the metronome opens as a SHEET over
   // whatever page you're on (corner icon), settings toggles in place (gear)
@@ -53,7 +53,7 @@ window.App = (function () {
     practice: [
       { id: 'gtheory', label: 'Learn', icon: 'learn', pages: ['quiz', 'chords', 'theory'] }, // Exercises = the home
       { id: 'ginst', label: 'Guitar', icon: 'guitar', pages: ['fretboard', 'tab', 'notation'] },
-      { id: 'gkeys', label: 'Keys', icon: 'keys', pages: ['piano', 'synth', 'pads'] },
+      { id: 'gkeys', label: 'Keys', icon: 'keys', pages: ['piano', 'synth', 'pads', 'midihub'] }, // midihub = the MIDI Hub (js/midihub.js)
       { id: 'gplay', label: 'Play', icon: 'note', pages: ['songs', 'jam'] },
       { id: 'gprac', label: 'Practice', icon: 'target', pages: ['shed', 'trainer', 'tuner'] } // the game first
     ],
@@ -68,7 +68,7 @@ window.App = (function () {
     chords: 'Chords', theory: 'Circle', songs: 'Songs', jam: 'Jam',
     trainer: 'Trainer', shed: 'Woodshed', metronome: 'Metronome', tuner: 'Tuner',
     song: 'Song', ideas: 'Ideas', tracks: 'Editor', arrange: 'Timeline', pads: 'Pads', synth: 'Synth',
-    quiz: 'Exercises'
+    quiz: 'Exercises', midihub: 'MIDI'
   };
 
   function groupOf(name) {
@@ -89,7 +89,7 @@ window.App = (function () {
   //            when an APK is actually built. Older APKs read nothing else, so
   //            this must never run ahead of the real file: when it did, the
   //            Android app kept downloading the same old APK in a loop.
-  var APP_VERSION = '0.77.2';
+  var APP_VERSION = '0.78.0';
   var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
 
   function verNum(v) {

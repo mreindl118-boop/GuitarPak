@@ -12,6 +12,8 @@
  *   'midi:note'     {on, midi, vel, chan}      note on/off (vel 0-127)
  *   'midi:bend'     {chan, semis}              pitch bend in semitones
  *   'midi:pressure' {chan, val}                channel pressure 0-127
+ *   'midi:raw'      {bytes}                    every incoming message, untouched
+ *   'midi:out'      {bytes}                    every message sent to the output
  *
  * MPE-style per-note expression works out of the box because bend/pressure
  * are reported per channel and consumers apply them to the notes held on
@@ -103,7 +105,22 @@
     }
   }
 
-  function onMsg(e) { dispatch(e.data); }
+  // RAW TAP + INPUT FILTER (the MIDI Hub page, js/midihub.js): every incoming
+  // message — channel, SysEx and realtime alike — is broadcast as 'midi:raw'
+  // {bytes} before anything else happens, and a registered input filter
+  // (App.midi.setInputFilter) may rewrite or drop a channel message before
+  // the app hears it (the Hub's rules: transpose, remap, block…).
+  var inputFilter = null;
+  function hear(bytes) {
+    App.emit('midi:raw', { bytes: bytes });
+    if (!inputFilter) return bytes;
+    try { return inputFilter(bytes) || null; } catch (e) { return bytes; }
+  }
+
+  function onMsg(e) {
+    var d = hear(Array.prototype.slice.call(e.data));
+    if (d) dispatch(d);
+  }
 
   // CoreMIDI packets can pack several messages (and use running status) in
   // one byte string — split into complete messages before dispatching
@@ -113,12 +130,14 @@
     var i = 0, lastStatus = 0;
     while (i < bytes.length) {
       var b = bytes[i];
-      if (b === 0xf0) {              // sysex: skip to F7 (we don't consume it)
-        while (i < bytes.length && bytes[i] !== 0xf7) i++;
-        i++;
+      if (b === 0xf0) {              // sysex: tapped for the Hub, never dispatched
+        var sx = [];
+        while (i < bytes.length && bytes[i] !== 0xf7) sx.push(bytes[i++]);
+        if (i < bytes.length) sx.push(bytes[i++]);
+        App.emit('midi:raw', { bytes: sx });
         continue;
       }
-      if (b >= 0xf8) { i++; continue; }        // realtime
+      if (b >= 0xf8) { App.emit('midi:raw', { bytes: [b] }); i++; continue; } // realtime
       var status = b >= 0x80 ? b : lastStatus; // running status
       if (b >= 0x80) i++;
       var len = MSG_LEN[status & 0xf0];
@@ -126,7 +145,7 @@
       lastStatus = status;
       var msg = [status];
       for (var k = 1; k < len && i < bytes.length; k++, i++) msg.push(bytes[i]);
-      if (msg.length === len) dispatch(msg);
+      if (msg.length === len) { msg = hear(msg); if (msg) dispatch(msg); }
     }
   }
 
@@ -251,8 +270,12 @@
 
   function sendBytes(bytes) {
     if (!hasOutput()) return false;
-    if (native) return post({ cmd: 'send', data: bytes });
-    try { output.send(bytes); return true; } catch (e) { return false; }
+    // the Hub's monitor sees every outgoing byte ('midi:out'); the bridge's
+    // post() swallows errors, so there it is reported as sent
+    if (native) { var r = post({ cmd: 'send', data: bytes }); App.emit('midi:out', { bytes: bytes }); return r; }
+    try { output.send(bytes); } catch (e) { return false; }
+    App.emit('midi:out', { bytes: bytes });
+    return true;
   }
 
   // ---- LED output (generic: devices light incoming notes) ----
@@ -586,6 +609,12 @@
       App.store.set('midi.bendRange', bendRange);
     },
     enable: function () { App.store.set('midi.wanted', true); return enable(); },
+    // raw access for the MIDI Hub page: send any bytes to the output (channel
+    // messages, SysEx, realtime) and install ONE input filter fn(bytes) ->
+    // bytes | null that runs before dispatch (null drops the message)
+    send: function (bytes) { return sendBytes(bytes); },
+    setInputFilter: function (fn) { inputFilter = typeof fn === 'function' ? fn : null; },
+    get inputFilter() { return inputFilter; },
     setInput: setInput,
     setOutput: setOutput,
     bluetooth: function () { if (native) post({ cmd: 'bluetooth' }); },

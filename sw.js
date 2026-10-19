@@ -1,5 +1,5 @@
 /* GuitarLab service worker — cache-first so the app works fully offline once visited. */
-var CACHE = 'guitarlab-v110';
+var CACHE = 'guitarlab-v111';
 var ASSETS = [
   '.',
   'index.html',
@@ -32,6 +32,7 @@ var ASSETS = [
   'js/arrange.js',
   'js/woodshed.js',
   'js/pads.js',
+  'js/midihub.js',
   'js/xp.js',
   'js/quiz.js',
   'js/help.js',
