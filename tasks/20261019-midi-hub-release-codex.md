@@ -12,3 +12,19 @@
 - Release flow: preserve .github/workflows/pages.yml and existing update behavior; focused mock browser suites plus required existing regressions; explicitly no claim of real MIDI hardware success. Do not merge/publish until exact review gate is met.
 - Hardware: earlier enumeration exposed no LUMI/MODX ports. Matt will connect them at home. Do not poll. Hardware validation is separate and pending, and does not itself block a safe generic MIDI Hub release.
 - Next: verify published claim, isolate clean source branch, review existing MIDI safeguards/fallback, run existing tests, publish a reviewable PR with exact evidence, obtain Claude review, then release to the existing channel only if gates permit. No self-check-in scheduled.
+
+## Deadline lanes — 2026-10-19T19:03:10.195Z
+
+Matt explicitly authorizes parallel local workers and final integration for the 20:30 UTC deadline. Root Codex is sole final integrator/release writer; no worker publishes remotely. These scopes are additive to the release claim and remain separate reviewable commits:
+
+| Lane | Worktree / local branch | Sole writable source paths |
+| --- | --- | --- |
+| MIDI safety/UI | soundlab-midi-release/safety / codex/sl-safety-0780-20261019 | js/midi.js; js/midihub.js; tests/midihub.test.js; new tests/midi-ports.test.js |
+| LUMI practice scaffold | soundlab-midi-release/lumi / codex/sl-lumi-0780-20261019 | new js/lumi-practice.js; css/lumi-practice.css; tests/lumi-practice.test.js; docs/LUMI-PRACTICE.md |
+| Score MVP | soundlab-midi-release/score / codex/sl-score-0780-20261019 | new js/score.js; css/score.css; tests/score.test.js; docs/SCORE.md; tests/fixtures/score/ |
+| Helix Stadium XL | soundlab-midi-release/helix / codex/sl-helix-0780-20261019 | new js/helix-stadium.js; css/helix-stadium.css; tests/helix-stadium.test.js; docs/HELIX-STADIUM.md |
+| Final integration | soundlab-midi-release/integration / codex/sl-integration-0780-20261019 | shared app navigation/index/service-worker/version/What's New, own README/task/release docs; merge reviewed lane commits, resolve integration only |
+
+All worktrees use the independently retained Claude source commit bf55d2819ef2cd1bb2c8d6d6f0b2c8db50b74a80. Original active checkout and dirty script mode state remain untouched. Independent Web MIDI port APIs are owned by the safety lane; other lanes use that agreed contract without editing shared MIDI source. Hardware actions are forbidden during development/tests. Score import limitations must reject unsupported constructs explicitly and preserve originals; PDF/photo/audio transcription is not part of this deadline slice. Helix profile is firmware-labeled, explicit output arm only, documented commands, no Showcase/patch/audio routing changes. LUMI is experimental with output off until explicit test/arm, isolated Yamaha answer input, and transient note cleanup; no SysEx/custom programs.
+
+Pi pitendo64 is not authorized for tasks and will not be accessed. This does not block the independent SoundLab lanes. Contributor review and CI remain release gates; the deadline does not replace them. A smaller safe slice can ship while incomplete lanes remain staged separately.
