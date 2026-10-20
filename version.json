@@ -1,6 +1,6 @@
 {
   "version": "0.75.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/soundLAB-alpha.apk",
-  "web": "0.77.2",
-  "notes": "Keyboard lights restore after reconnecting, and Re-send restores every intended key. Missing selected outputs stay disconnected instead of switching to a synth. Grand piano's corrected level is preserved."
+  "web": "0.77.3",
+  "notes": "After a wrong note answer, your first fresh correct press moves to the next question. The explanation and recorded miss are preserved. Held keys and layered MIDI duplicates cannot skip questions."
 }

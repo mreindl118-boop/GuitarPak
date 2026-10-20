@@ -66,6 +66,12 @@ android/            WebView wrapper APK project (no Gradle — build.ps1 runs
 releases/           built, signed APK
 ```
 
+## Current work
+
+| Owner | Branch | Scope | Status |
+| --- | --- | --- | --- |
+| Codex | codex/natural-notes-autonext-20261020 | [Natural Notes correction hotfix](docs/tasks/20261020-natural-notes-autonext-codex.md), web 0.77.3 | First fresh correct MIDI press after a miss advances once; focused validation and contributor review in progress. Based on published main; PR84 remains separate. |
+
 ## Roadmap ideas (beyond alpha)
 
 - Chord detection from the mic (polyphonic — needs FFT chroma analysis)
