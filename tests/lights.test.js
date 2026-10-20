@@ -12,6 +12,9 @@ async function newPage(browser, name, seed) {
   const ctx = await browser.newContext({ viewport: { width: 1200, height: 900 } });
   await ctx.addInitScript(([name, seed]) => {
     ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
+    // these checks pin the CLASSIC look (scale lit + white note to play);
+    // LUMI Display (the v0.79 default) has its own suite: lumidisplay
+    localStorage.setItem('guitarlab.lights.display', 'false');
     for (const k in seed) localStorage.setItem('guitarlab.' + k, JSON.stringify(seed[k]));
     window.__sent = [];
     const inp = { id: 'in1', name, onmidimessage: null };

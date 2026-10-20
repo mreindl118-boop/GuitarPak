@@ -493,6 +493,21 @@
     return step === undefined ? 0 : noteVel(pc, step);
   }
   var LUMI_WHITE = 127, LUMI_GREEN = 60;
+  // LUMI DISPLAY (v0.79.0, lights.display, default on): while a lesson /
+  // runner / guide is showing what to play, the keybed shows ONLY that -
+  // the note to play now steady in ITS color, the next one blinking in its
+  // color (App.colors: Interval = scale degree, Note = pitch class) - and
+  // the scale layout steps aside so the keys read as "play this". With no
+  // guide the normal layout is back. Off = the classic look (layout + the
+  // note to play in white).
+  function displayOn() { return App.store.get('lights.display', true) !== false; }
+  function guideColorVel(n) {
+    var root = App.store.get('fb.root', 9), rootPc = Theory.mod12(typeof root === 'number' ? root : 9);
+    var info = Theory.scaleInfo(rootPc, App.store.get('fb.scale', 'minorPent'));
+    var pc = Theory.mod12(n), step = info.pcToStep.get(pc);
+    var col = App.colors.forNote(pc, step === undefined ? undefined : step) || App.colors.forNote(rootPc, 0);
+    return lumiVel(col);
+  }
   var guideNow = [], guideNext = [], blinkOn = false, blinkT = null;
   var revealSet = [], revealT = null, hidden = {}, claimedBy = null;
   var lumiShown = null; // last LUMI mode pushed: 'scale' | 'night'
@@ -573,6 +588,8 @@
   function wanted() {
     var want = {}, kind = layoutKind(), r = range(), lumi = isLumi();
     var lo = Math.max(LIGHT_LO, r.lo), hi = Math.min(LIGHT_HI, r.hi), m, v;
+    var h0 = helpLvl(), guiding = displayOn() && h0 >= 2 && (list(guideNow).length > 0 || (h0 >= 3 && list(guideNext).length > 0));
+    if (guiding) kind = 'none'; // Display: only the notes to play
     var root = App.store.get('fb.root', 9), rootPc = Theory.mod12(typeof root === 'number' ? root : 9);
     if (kind === 'scale') {
       for (m = lo; m <= hi; m++) { v = lumi ? lumiKeyVel(m) : degVel(m); if (v) want[m] = v; }
@@ -581,12 +598,12 @@
     }
     revealSet.forEach(function (pc) { for (var x = lo; x <= hi; x++) if (Theory.mod12(x) === pc) want[x] = lumi ? LUMI_GREEN : 127; });
     var h = helpLvl();
-    if (h >= 2) list(guideNow).forEach(function (n) { want[fold(n)] = lumi ? LUMI_WHITE : 127; });
+    if (h >= 2) list(guideNow).forEach(function (n) { want[fold(n)] = lumi ? (guiding ? guideColorVel(n) : LUMI_WHITE) : 127; });
     if (h >= 3) list(guideNext).forEach(function (n) {
       var f = fold(n);
-      if (want[f] === LUMI_WHITE || want[f] === 127) return; // it's also the note to play now
+      if (list(guideNow).some(function (x) { return fold(x) === f; })) return; // it's also the note to play now
       if (!blinkOn) delete want[f];                          // the next note blinks
-      else want[f] = lumi ? (lumiKeyVel(f) || noteVel(Theory.mod12(f), 0)) : 45; // off-scale: root color / its note color
+      else want[f] = lumi ? (guiding ? guideColorVel(f) : (lumiKeyVel(f) || noteVel(Theory.mod12(f), 0))) : 45; // off-scale: root color / its note color
     });
     return want;
   }
@@ -721,6 +738,9 @@
     get lumi() { return isLumi(); },
     get outputName() { return outName(); },
     get lightsOn() { return lightsOn(); },
+    // LUMI Display (lessons light only the keys to play, in their colors)
+    get display() { return displayOn(); },
+    setDisplay: function (on) { App.store.set('lights.display', on !== false); App.emit('lights:display', { on: on !== false }); paint(); },
     setLightsOn: function (on) {
       App.store.set('lights.on', !!on);
       if (!on) { allDark(); if (isLumi() && hasOutput()) { lumiShown = null; lumiNative(); } }

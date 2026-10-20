@@ -69,6 +69,7 @@
     var lumiPref = App.store.get('midi.lumi', null);
     var octHand = App.store.get('lights.octHand', true) !== false;
     var lumiRows = st.kind === 'ok' && lumi, byNote = App.colors.mode() === 'note';
+    var disp = m && m.display;
     root.innerHTML =
       '<div class="lc-sec">' +
         '<h3>Help level</h3>' +
@@ -105,6 +106,11 @@
             '<div class="lc-row"><span class="lc-lab">Octave keys</span><div class="seg" role="group" aria-label="What the LUMI octave buttons do">' +
               '<button type="button" data-lcoct="1" class="' + (octHand ? 'active' : '') + '">Switch hands</button><button type="button" data-lcoct="0" class="' + (!octHand ? 'active' : '') + '">Octave only</button></div></div>' +
             '<p class="muted small">Press octave down below C3 for the left-hand view, back up for the right hand. The keys still play as normal. The switch happens on the first note you play after pressing.</p>' +
+            '<div class="lc-row"><span class="lc-lab">LUMI Display</span><div class="seg" role="group" aria-label="LUMI Display in lessons">' +
+              '<button type="button" data-lcdisp="1" class="' + (disp ? 'active' : '') + '" aria-pressed="' + !!disp + '">On</button><button type="button" data-lcdisp="0" class="' + (!disp ? 'active' : '') + '" aria-pressed="' + !disp + '">Off</button></div></div>' +
+            '<p class="muted small">' + (disp
+              ? 'In lessons and practice runs the LUMI shows only what to play: the note to play now in its ' + (byNote ? 'note' : 'interval') + ' color, the next one blinking. The full scale comes back when the run ends.'
+              : 'Lessons keep the scale lit and show the note to play in white.') + '</p>' +
             (m.sysexOk ? '' : '<p class="lc-warn">Brightness and the dark background need the MIDI permission the browser blocked (SysEx); colors still work. Reload and allow the MIDI prompt.</p>')
             : '<p class="muted small">Your keyboard lights the scale keys (home key brightest) and the keys to play.</p>') +
           '<div class="lc-row"><span class="lc-lab">Keyboard</span><div class="seg" role="group" aria-label="Keyboard type">' +
@@ -123,6 +129,7 @@
     var a, m = M();
     if ((a = b.getAttribute('data-lchelp')) != null) { App.help.set(+a); return; }
     if ((a = b.getAttribute('data-lcon')) != null) { if (m) m.setLightsOn(a === '1'); paint(); return; }
+    if ((a = b.getAttribute('data-lcdisp')) != null) { if (m) m.setDisplay(a === '1'); paint(); return; }
     if ((a = b.getAttribute('data-lcoct')) != null) { App.store.set('lights.octHand', a === '1'); paint(); return; }
     if ((a = b.getAttribute('data-lccolmode')) != null) { App.colors.setMode(a); paint(); return; } // 'colors' repaints the pages + keybed
     if ((a = b.getAttribute('data-lctype')) != null) {
@@ -171,7 +178,7 @@
       el.addEventListener('click', onClick);
       el.addEventListener('input', onInput);
       el.addEventListener('change', onInput);
-      ['help:level', 'midi:state', 'midi:range', 'colors'].forEach(function (ev) { App.on(ev, function () { if (App.sheet === 'lights') paint(); }); });
+      ['help:level', 'midi:state', 'midi:range', 'colors', 'lights:display'].forEach(function (ev) { App.on(ev, function () { if (App.sheet === 'lights') paint(); }); });
       App.on('midi:status', function (d) { btMsg = d && d.text || ''; if (App.sheet === 'lights') paint(); });
       paint();
     },

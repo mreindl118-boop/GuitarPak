@@ -1,6 +1,6 @@
 {
   "version": "0.75.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/soundLAB-alpha.apk",
-  "web": "0.78.1",
-  "notes": "A synth is no longer doubled by soundLAB's piano: the MIDI Hub mutes the app voice while open (tick App voice to hear both), and Settings > MIDI keyboard has the same switch for every page."
+  "web": "0.79.0",
+  "notes": "LUMI Display: in lessons the LUMI lights only the notes to play, in their Interval or Note colors. Double-tap your keyboard's lowest key (or the lesson card) to start and stop a lesson. Color notes by Interval or Note, and All keyboards: play a MODX while a LUMI shows the way."
 }

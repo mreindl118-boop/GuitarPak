@@ -23,6 +23,7 @@ async function newPage(browser) {
   const ctx = await browser.newContext({ viewport: { width: 1200, height: 900 } });
   await ctx.addInitScript(() => {
     ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
+    localStorage.setItem('guitarlab.lights.display', 'false'); // classic look; LUMI Display: tests/lumidisplay
     window.__sent = [];
     const inp = { id: 'in1', name: 'LUMI Keys BLOCK', onmidimessage: null };
     const out = { id: 'out1', name: 'LUMI Keys BLOCK', state: 'connected', send: b => window.__sent.push(Array.from(b)) };

@@ -23,6 +23,15 @@
  *         kl.sel (lesson id) · kl.tier · kl.reps (1 | 2 | 4 | 0 = infinite)
  *         kl.speedup (infinite: +4 bpm per clean loop, default on)
  * Bus: emits transport:claim {owner:'keys'}; stops on any other claim.
+ *
+ * DOUBLE-TAP CONTROL (v0.79.0, kl.dbltap, default on): hands stay on the
+ * keys. Two strikes of the CONTROL KEY (the lowest key of the lit keyboard
+ * range - a LUMI's leftmost key) within 350 ms start the selected lesson
+ * (or Again / Next level / Go again); during a run they stop it, unless the
+ * second strike was a right note of the lesson (a turnaround that repeats
+ * that note never stops a run). Double-tapping empty space on the lesson
+ * card does the same on a touchscreen. The LUMI DISPLAY chip mirrors
+ * Lights & help (App.midi.display).
  */
 (function () {
   'use strict';
@@ -78,6 +87,26 @@
   function sel() { var id = App.store.get('kl.sel', 'c-r'); return BY_ID[id] || LESSONS[0]; }
   function reps() { var r = +App.store.get('kl.reps', 2); return r === 1 || r === 4 || r === 0 ? r : 2; }
   function speedup() { return App.store.get('kl.speedup', true) !== false; }
+  function dblOn() { return App.store.get('kl.dbltap', true) !== false; }
+  function ctrlKey() { var r = App.midi && App.midi.range ? App.midi.range() : null; return r && typeof r.lo === 'number' ? r.lo : 48; }
+  function ctrlName() { return Theory.midiName(ctrlKey(), false); }
+  var lastTap = { midi: -1, at: 0 };
+  // the second strike of the control key inside 350 ms = a double-tap
+  function isDoubleTap(midi) {
+    if (!dblOn() || midi !== ctrlKey()) { lastTap.midi = -1; return false; }
+    var now = performance.now();
+    if (lastTap.midi === midi && now - lastTap.at <= 350) { lastTap.midi = -1; return true; }
+    lastTap = { midi: midi, at: now };
+    return false;
+  }
+  function onKeysPage() { return App.active === 'piano' || App.active === 'synth'; }
+  // start from the list / results view, stop a run
+  function tapControl() {
+    if (R) { if (R.inf && !R.demo) finish(); else stopAll(false); return true; }
+    if (view === 'list' || view === 'done') { start(false); return true; }
+    return false;
+  }
+  function lumiDisplay() { return !!(App.midi && App.midi.display); }
   function cal(src) { var c = App.store.get('ws.cal', {}); return c && typeof c[src] === 'number' ? c[src] : 0; }
 
   // ---------------- the run ----------------
@@ -385,6 +414,11 @@
           (p.inf[p.step] ? ' <b>Best streak at this level: ' + p.inf[p.step] + '</b>' : '') + '</p>' : '') +
         '<div class="kl-acts"><button type="button" class="btn primary" id="kl-start">' + App.icon('play', 13) + ' Start</button>' +
           '<button type="button" class="btn" id="kl-listen">Listen first</button></div>' +
+        '<div class="kl-ctl">' +
+          '<button type="button" class="chip fb-chip' + (lumiDisplay() ? ' active' : '') + '" id="kl-disp" aria-pressed="' + lumiDisplay() + '" title="The LUMI lights only the keys to play, in their colors">LUMI Display</button>' +
+          '<button type="button" class="chip fb-chip' + (dblOn() ? ' active' : '') + '" id="kl-dbltap" aria-pressed="' + dblOn() + '" title="Start and stop with a double-tap">Double-tap</button>' +
+          (dblOn() ? '<span class="muted small">Double-tap <b>' + ctrlName() + '</b> (your keyboard’s lowest key) or this card to start; again to stop.</span>' : '') +
+        '</div>' +
         (recent.length ? '<details class="kl-hist"><summary>Your runs (' + p.runs.length + ')</summary><div class="kl-tblwrap"><table class="kl-table"><thead><tr><th>Day</th><th>Level</th><th>Help</th><th>Notes</th><th>Timing</th><th>Score</th></tr></thead><tbody>' +
           recent.map(function (u) {
             return '<tr><td>' + esc((u.d || '').slice(5)) + '</td><td>' + (u.st + 1) + '</td><td>' + K().ASSIST_NAMES[u.h] + '</td><td>' + u.acc + '%</td><td>±' + u.t + ' ms</td><td>' + (u.inf != null ? '∞ streak ' + u.inf : u.sc) + '</td></tr>';
@@ -400,6 +434,7 @@
     return '<div class="kl-run">' +
       '<div class="kl-runrow"><div class="kl-runtop"><b>' + esc(R.l.name) + ' · ' + handName(R.l.hand) + '</b><span class="muted small">' + (R.demo ? 'Listening · ' : 'Level ' + (R.step + 1) + ' · ') + stepName(R.step) + (R.inf ? ' · Infinite' : '') + '</span></div>' +
         '<button type="button" class="btn sm" id="kl-stop">' + (R.inf ? 'End run' : 'Stop') + '</button></div>' +
+      (dblOn() ? '<div class="kl-taphint muted small">Double-tap ' + ctrlName() + ' to ' + (R.inf ? 'end the run' : 'stop') + '</div>' : '') +
       '<div class="kl-beats" aria-hidden="true"><i></i><i></i><i></i><i></i></div>' +
       '<div class="kl-call" id="kl-call" aria-live="polite"></div>' +
       '<div class="kl-needle" aria-hidden="true"><span class="kl-zone"></span><span class="kl-mid"></span><i id="kl-mark"></i>' +
@@ -569,6 +604,8 @@
       case 'kl-listen': start(true); break;
       case 'kl-stop': if (R && R.inf) finish(); else stopAll(false); break;
       case 'kl-speedup': App.store.set('kl.speedup', !speedup()); paint(); break;
+      case 'kl-dbltap': App.store.set('kl.dbltap', !dblOn()); paint(); break;
+      case 'kl-disp': if (App.midi && App.midi.setDisplay) App.midi.setDisplay(!lumiDisplay()); paint(); break;
       case 'kl-back': view = 'list'; paint(); break;
       case 'kl-help': App.switchTo('lights'); break;
       case 'kl-lesshelp': K().setAssist(Math.max(0, K().assist() - 1)); view = 'list'; paint(); break;
@@ -619,6 +656,7 @@
     '.kl-infnote{margin:0;font-size:13.5px;color:var(--muted)}.kl-infnote b{color:var(--text);font-weight:600}' +
     '.kl-streak{display:flex;align-items:center;justify-content:center;gap:12px}.kl-inftx{display:grid;gap:2px}.kl-streak b{font:400 56px/1 var(--font-display);font-variant-numeric:tabular-nums}' +
     '.kl-streak span{font-size:14px;color:var(--muted)}.kl-streak.rec b{color:var(--accent)}' +
+    '.kl-ctl{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:10px}.kl-taphint{text-align:center;margin:-4px 0 4px}' +
     '.kl-inflab{font:400 24px/1 var(--font-display);letter-spacing:1px;text-transform:uppercase;color:var(--muted)}.kl-verdict{font-weight:600}' +
     '@media (max-width:640px){.kl-row{grid-template-columns:minmax(0,1fr) auto auto}.kl-rlv{display:none}.kl-big{font-size:52px}' +
       '.kl-run{gap:8px;padding:12px}.kl-streak b{font-size:44px}.kl-call{font-size:28px;min-height:32px}.kl-call.cd{font-size:40px}.kl-bar{margin-top:10px}}';
@@ -628,7 +666,30 @@
       root = box;
       App.injectCSS('keylessons', CSS);
       box.addEventListener('click', onClick);
-      App.on('midi:note', function (d) { if (d && d.on && R) judge(d.midi, d.silent ? 'audio' : 'midi'); });
+      App.on('midi:note', function (d) {
+        if (!d || !d.on) return;
+        var dbl = !d.silent && isDoubleTap(d.midi);
+        if (R) {
+          if (R.demo) { if (dbl) stopAll(false); return; }
+          var wrong0 = R.wrong, hit0 = R.lastHit;
+          judge(d.midi, d.silent ? 'audio' : 'midi');
+          // stop only when the 2nd strike wasn't a right note of the lesson
+          if (dbl && R && (R.wrong > wrong0 || R.lastHit === hit0)) tapControl();
+          return;
+        }
+        if (dbl && onKeysPage() && root) tapControl();
+      });
+      // touch: double-tap empty space on the lesson card
+      var lastPt = { at: 0, x: 0, y: 0 };
+      box.addEventListener('pointerup', function (e) {
+        if (!dblOn()) return;
+        if (e.target.closest && e.target.closest('button,input,select,textarea,a,label,summary,details,table')) { lastPt.at = 0; return; }
+        var now = performance.now();
+        if (now - lastPt.at <= 350 && Math.abs(e.clientX - lastPt.x) < 30 && Math.abs(e.clientY - lastPt.y) < 30) { lastPt.at = 0; tapControl(); }
+        else lastPt = { at: now, x: e.clientX, y: e.clientY };
+      });
+      App.on('lights:display', function () { if (view === 'list') paint(); });
+      App.on('midi:range', function () { if (view === 'list') paint(); });
       App.on('note:input', function (d) { if (d && d.on && R) judge(d.midi, d.src === 'touch' ? 'touch' : 'qwerty'); });
       App.on('transport:claim', function (d) { if (R && d && d.owner !== 'keys') stopAll(false); });
       App.on('help:level', function () { if (view === 'list') paint(); });
@@ -653,6 +714,7 @@
     get view() { return view; },
     get last() { return last; },
     LESSONS: LESSONS, STEPS: STEPS, WIN: WIN,
-    start: start, finish: function () { if (R) finish(); }, tick: tick
+    start: start, finish: function () { if (R) finish(); }, tick: tick,
+    get controlKey() { return ctrlKey(); }, tapControl: tapControl
   };
 })();

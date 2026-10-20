@@ -73,6 +73,15 @@ js/midi.js        MIDI service (App.midi: in/out ports, note/bend/pressure
                   quiz, range learning and lights still react (unlike
                   tone-in's silent:true). A synth that sounds itself is
                   never doubled.
+                  v0.79.0 LUMI DISPLAY (lights.display, default on;
+                  App.midi.display / setDisplay, 'lights:display'): while a
+                  guide is up (help >= 2) wanted() drops the scale/tonic
+                  layout and lights only guideNow steady + guideNext
+                  blinking, each in its App.colors color (guideColorVel:
+                  degree in Interval mode, pitch class in Note mode; off-
+                  scale = root color) instead of white. No guide = normal
+                  layout. Off = classic (layout + white now-note). Switch
+                  in Lights & help (LUMI rows) and the lesson card chip.
 js/tonein.js      1/4"/audio-in TONE-IN: pitch-detects the selected audio
                   input (audio.inId; toggle audio.tonein in Settings) and
                   emits midi:note {silent:true} — instrument pages show the
@@ -154,6 +163,15 @@ js/keylessons.js  │ SCALE LESSONS on the Keys page (mounted into #pn-lessons
                   │  clean notes ('off'/miss/wrong break it); kl.speedup
                   │  adds +4 bpm per clean loop (max +60); best streak per
                   │  level in kl.prog[id].inf[step] (runs get inf + bpm).
+                  │  DOUBLE-TAP CONTROL (v0.79.0, kl.dbltap default on):
+                  │  two strikes of the CONTROL KEY (App.midi.range().lo,
+                  │  a LUMI's leftmost key) within 350 ms start the lesson
+                  │  from list/done, and stop a run unless the 2nd strike
+                  │  was a right note (R.wrong / R.lastHit unchanged-or-
+                  │  wrong check, so turnarounds never stop); demo runs
+                  │  stop on any double-tap; pointerup x2 on empty card
+                  │  space does the same. Chips kl-disp / kl-dbltap.
+                  │  Suite tests/lumidisplay.test.js.
                   │  Stores kl.prog/kl.sel/kl.tier/kl.reps; wake tag kl-run
                   │  (ledger area Keys); stops on transport:claim, page
                   │  hide, app hide; summary() feeds Exercises Progress.
