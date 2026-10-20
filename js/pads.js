@@ -28,12 +28,10 @@
   var KEY_HINTS = ['Z', 'X', 'C', 'V', 'A', 'S', 'D', 'F'];
   var GM_MAP = { 36: 0, 35: 0, 38: 1, 40: 1, 39: 2, 42: 3, 44: 3, 46: 4, 45: 5, 41: 5, 47: 6, 48: 6, 50: 6, 49: 7, 51: 7, 57: 7 };
 
+  // lane tints: the 7 degree colors (App.colors — a lane is a drum, not a
+  // pitch, so Interval | Note doesn't apply) + a neutral 8th for the crash
   function padColors() {
-    var c = App.store.get('fb.colors', null);
-    if (Object.prototype.toString.call(c) !== '[object Array]' || c.length !== 7) {
-      c = ['#ffab47', '#ffd166', '#8bd450', '#4cc9b0', '#5aa9ff', '#b18cff', '#ff6b9d'];
-    }
-    return c.concat(['#c8c2b8']);
+    return App.colors.degrees().concat(['#c8c2b8']);
   }
 
   function mode() { return App.store.get('pads.mode', 'roli') === 'gm' ? 'gm' : 'roli'; }
@@ -439,6 +437,7 @@
     });
     App.on('st:state', paintControls);
     App.on('midi:state', function () { if (App.active === 'pads') lightBase(); });
+    App.on('colors', function (d) { if (d && d.what === 'degrees') render(); }); // lane tints = degree colors
   }
 
   App.register('pads', {

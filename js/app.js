@@ -889,6 +889,90 @@ window.App = (function () {
     }
   };
 
+  // ---- NOTE COLORS: the one palette behind every page and the LUMI keybed.
+  // Mode 'interval' (default): a note is colored by its SCALE DEGREE — 7
+  // colors (fb.colors), what the note does in the key. Mode 'note': by its
+  // PITCH CLASS — 12 colors (fb.noteColors), every C the same color in every
+  // key. Store fb.colorMode; 'colors' {mode, what} on every change. Pages ask
+  // forNote(pc, step) per note (step = its index in the current scale, or
+  // undefined when it's not in it) and repaint on 'colors'.
+  var HEX6 = /^#[0-9a-fA-F]{6}$/;
+  // one bright color per degree, all light enough for dark label text
+  var DEGREE_DEFAULTS = ['#ffab47', '#e8d44d', '#7ad97a', '#4cc9b0', '#6ea8fe', '#b48ef0', '#ff85b3'];
+  // C..B: a hue wheel red -> violet, light enough for the same dark labels
+  // (contrast >= 7:1 on #1c1206, like the degree colors), and 12 DIFFERENT
+  // colors on a LUMI (each lands on its own entry of its color table: hues
+  // 2, 20, 38, 51, 76, 111, 151, 179, 204, 221, 247, 269)
+  var NOTE_DEFAULTS = ['#ff7583', '#ee9468', '#edb75a', '#f2de5f', '#c6f047', '#82ef6c',
+    '#6cefad', '#39efef', '#6cb8ef', '#849bf5', '#a392f6', '#d27efc'];
+  function validCols(c, n) {
+    return Object.prototype.toString.call(c) === '[object Array]' && c.length === n &&
+      c.every(function (x) { return typeof x === 'string' && HEX6.test(x); });
+  }
+  // forNote runs per key / dot on every repaint: parse a stored value only
+  // when its raw string changed
+  var colCache = {};
+  // what a setter wrote when storage refused it (private window, blocked
+  // site data, full quota): the choice still holds for this session
+  var colMem = {};
+  function colWrite(key, value) {
+    store.set(key, value);
+    var kept = false;
+    try { kept = localStorage.getItem('guitarlab.' + key) === JSON.stringify(value); } catch (e) { /* no storage */ }
+    if (kept) delete colMem[key]; else colMem[key] = { v: value };
+  }
+  function colRead(key, parse) {
+    var m = colMem[key];
+    if (m) { if (!('p' in m)) m.p = parse(m.v); return m.p; }
+    var raw = null;
+    try { raw = localStorage.getItem('guitarlab.' + key); } catch (e) { /* no storage */ }
+    var c = colCache[key];
+    if (c && c.raw === raw) return c.val;
+    var v = null;
+    try { v = raw == null ? null : JSON.parse(raw); } catch (e) { v = null; }
+    v = parse(v);
+    colCache[key] = { raw: raw, val: v };
+    return v;
+  }
+  function colMode() { return colRead('fb.colorMode', function (v) { return v === 'note' ? 'note' : 'interval'; }); }
+  function degCols() { return colRead('fb.colors', function (v) { return validCols(v, 7) ? v.slice() : DEGREE_DEFAULTS.slice(); }); }
+  function noteCols() { return colRead('fb.noteColors', function (v) { return validCols(v, 12) ? v.slice() : NOTE_DEFAULTS.slice(); }); }
+  function colorsChanged(what) { emit('colors', { mode: colMode(), what: what }); }
+  var colors = {
+    DEGREE_DEFAULTS: DEGREE_DEFAULTS.slice(),
+    NOTE_DEFAULTS: NOTE_DEFAULTS.slice(),
+    mode: colMode,
+    degrees: function () { return degCols().slice(); },
+    notes: function () { return noteCols().slice(); },
+    // the color of one note: by pitch class in 'note' mode, by scale step
+    // in 'interval' mode (null there when the note is out of the scale, so
+    // callers keep their own out-of-scale look)
+    forNote: function (pc, step) {
+      if (colMode() === 'note') {
+        pc = Math.round(Number(pc));
+        if (!isFinite(pc)) return null;
+        return noteCols()[((pc % 12) + 12) % 12];
+      }
+      if (typeof step !== 'number' || !(step >= 0) || !isFinite(step)) return null;
+      return degCols()[Math.floor(step) % 7];
+    },
+    setMode: function (m) {
+      m = m === 'note' ? 'note' : 'interval';
+      if (m === colMode()) return;
+      colWrite('fb.colorMode', m);
+      colorsChanged('mode');
+    },
+    // an array of 12 (C..B) / 7 (degree 1..7) hex colors, or null = defaults
+    setNotes: function (arr) {
+      colWrite('fb.noteColors', validCols(arr, 12) ? arr.slice() : null);
+      colorsChanged('notes');
+    },
+    setDegrees: function (arr) {
+      colWrite('fb.colors', validCols(arr, 7) ? arr.slice() : null);
+      colorsChanged('degrees');
+    }
+  };
+
   // ---- Back: Android's back gesture (and the browser's) walks back through
   // the app instead of leaving it: help tour, sheet, settings, the page's own
   // back (module.onBack() -> true when it handled it, e.g. a quiz run -> the
@@ -971,6 +1055,7 @@ window.App = (function () {
 
   // ---- workspace wipe ----
   var wiping = false;
+  var wipeId = 0; // each wipe's safety timers only ever touch their own wipe
 
   function applySpace(sp, tab) {
     space = sp;
@@ -995,6 +1080,7 @@ window.App = (function () {
     var wipe = document.getElementById('wipe');
     if (!wipe) { applySpace(sp, tab); return; }
     wiping = true;
+    var my = ++wipeId;
     var toStudio = sp === 'studio';
     // sweep in from the side we're heading toward, swap under cover, sweep on
     wipe.style.transition = 'none';
@@ -1019,9 +1105,12 @@ window.App = (function () {
     }
     wipe.addEventListener('transitionend', onEnd);
     // safety: never leave the curtain stuck if transitionend is swallowed
+    // (a quick second switch starts a new wipe: this one's timers stand down)
     setTimeout(function () {
+      if (my !== wipeId) return;
       if (wiping && !swapped) onEnd();
       setTimeout(function () {
+        if (my !== wipeId) return;
         if (wiping) { wipe.removeEventListener('transitionend', onEnd); wipe.style.display = 'none'; wiping = false; }
       }, 400);
     }, 400);
@@ -1379,6 +1468,7 @@ window.App = (function () {
     injectCSS: injectCSS,
     showBar: showBar,
     help: help,
+    colors: colors,
     openSheet: openSheet,
     closeSheet: closeSheet,
     get sheet() { return sheet; },

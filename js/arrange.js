@@ -60,12 +60,10 @@
     return Math.max(4, Math.ceil(end / 4) * 4);
   }
 
+  // lane i's tint: the 7 degree colors in turn (App.colors — a lane is a
+  // track, not a pitch, so Interval | Note doesn't apply)
   function laneColor(i) {
-    var cs = App.store.get('fb.colors', null);
-    if (Object.prototype.toString.call(cs) !== '[object Array]' || cs.length !== 7) {
-      cs = ['#ffab47', '#ffd166', '#8bd450', '#4cc9b0', '#5aa9ff', '#b18cff', '#ff6b9d'];
-    }
-    return cs[i % 7];
+    return App.colors.degrees()[i % 7];
   }
 
   // ---------------- waveform peaks (cached per track buffer) ----------------

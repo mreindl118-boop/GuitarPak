@@ -21,12 +21,11 @@
 
   var FUNC_SHORT = ['tonic', 'supertonic', 'mediant', 'subdominant', 'dominant', 'submediant', 'leading tone'];
 
-  var DEG_DEFAULTS = ['#ffab47', '#e8d44d', '#7ad97a', '#4cc9b0', '#6ea8fe', '#b48ef0', '#ff85b3'];
-
-  function degPalette() {
-    var c = App.store.get('fb.colors', null);
-    return (Array.isArray(c) && c.length === 7 &&
-      c.every(function (x) { return /^#[0-9a-fA-F]{6}$/.test(x); })) ? c : DEG_DEFAULTS;
+  // the color degree i of the current key gets (App.colors: its degree
+  // color, or the note color of its pitch class in note mode)
+  function degColor(i) {
+    var steps = Theory.SCALES[curScale()].steps;
+    return App.colors.forNote(curRoot() + (steps[i] || 0), i);
   }
 
   function esc(s) {
@@ -117,14 +116,13 @@
 
   function renderGuide() {
     var root = curRoot(), scale = curScale();
-    var pal = degPalette();
     var info = Theory.scaleInfo(root, scale, Theory.FLAT_KEYS.has(root));
     els.guideTitle.textContent = keyName();
 
-    // notes with interval names
+    // notes with interval names, each in the color it gets everywhere
     var h = '';
     info.names.forEach(function (n, i) {
-      h += '<span class="chip th-note" style="--deg-c:' + pal[i % 7] + '">' +
+      h += '<span class="chip th-note" style="--deg-c:' + App.colors.forNote(info.pcs[i], i) + '">' +
         '<b>' + (i + 1) + '</b>' + esc(n) +
         '<span class="th-iv">' + esc(info.intervals[i] || '') + '</span></span>';
     });
@@ -137,7 +135,7 @@
       h = '';
       dia.forEach(function (d, i) {
         h += '<button type="button" class="chip th-chord" data-th-ch="' + i + '" ' +
-          'style="--deg-c:' + pal[i % 7] + '" title="' + esc(d.name) + ' — ' +
+          'style="--deg-c:' + App.colors.forNote(d.rootPc, i) + '" title="' + esc(d.name) + ' — ' +
           esc(FUNC_SHORT[i] || '') + '. Tap to hear.">' +
           '<b>' + esc(d.roman) + '</b>' + esc(d.name) + '</button>';
       });
@@ -321,7 +319,6 @@
 
   function renderQuizButtons(enabled, picked, answer) {
     var steps = quizSteps();
-    var pal = degPalette();
     var h = '';
     for (var i = 0; i < steps.length; i++) {
       var cls = 'th-qbtn';
@@ -330,7 +327,7 @@
         else if (i === picked) cls += ' th-q-wrong';
       }
       h += '<button type="button" class="' + cls + '" data-th-q="' + i + '" ' +
-        (enabled ? '' : 'disabled ') + 'style="--deg-c:' + pal[i % 7] + '">' + (i + 1) + '</button>';
+        (enabled ? '' : 'disabled ') + 'style="--deg-c:' + degColor(i) + '">' + (i + 1) + '</button>';
     }
     els.qBtns.innerHTML = h;
   }
@@ -341,6 +338,16 @@
     renderCircle();
     renderGuide();
     if (!quiz.active) renderQuizButtons(false);
+  }
+
+  // Interval | Note / palette edits: recolor in place (a quiz question in
+  // progress keeps its buttons' state)
+  function recolor() {
+    renderGuide();
+    if (!quiz.active) renderQuizButtons(false);
+    else els.qBtns.querySelectorAll('.th-qbtn').forEach(function (b) {
+      b.style.setProperty('--deg-c', degColor(parseInt(b.getAttribute('data-th-q'), 10) || 0));
+    });
   }
 
   var CSS = '' +
@@ -520,6 +527,7 @@
     // stay in lockstep with the shared key, however it changes
     App.on('fb:set', function (d) { if (!d || d.source !== 'th') render(); });
     App.on('fb:scale', function () { render(); });
+    App.on('colors', recolor);
 
     render();
   }

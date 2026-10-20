@@ -82,15 +82,22 @@ const keys = o => Object.keys(o).map(Number).sort((a, b) => a - b);
     let ev = null; App.on('midi:range', r => { ev = r; });
     App.help.set(2);
     App.switchTo('piano');
+    App.keys.setHand('right');
     __play(30);                      // LUMI octave-down twice, then a key: the app follows
     App.midi.guide(64, null);
-    const o = { ev, lit: Object.keys(__lit()).map(Number).sort((a, b) => a - b), label: (document.querySelector('.pn-rangel') || {}).textContent };
+    const o = { ev, lit: Object.keys(__lit()).map(Number).sort((a, b) => a - b), label: (document.querySelector('.pn-rangel') || {}).textContent, handDown: App.keys.hand() };
     __play(70);                      // back up
     o.back = App.midi.range();
+    o.handUp = App.keys.hand();
     o.stored = JSON.parse(localStorage.getItem('guitarlab.midi.rangeLo'));
+    App.store.set('lights.octHand', false); // 'Octave only': the hand stays put
+    __play(30); o.handOff = App.keys.hand(); o.offLo = App.midi.range().lo;
+    __play(70); App.store.set('lights.octHand', true);
     App.midi.guide(null, null);
     return o;
   });
+  ok(oc.handDown === 'left' && oc.handUp === 'right', 'LUMI octave buttons switch the hand: below C3 = left, back up = right: ' + oc.handDown + '/' + oc.handUp);
+  ok(oc.handOff === 'right' && oc.offLo === 24, 'Octave only: the range still follows, the hand does not: ' + oc.handOff + ' @' + oc.offLo);
   ok(oc.ev && oc.ev.lo === 24 && oc.ev.hi === 47, 'playing below the range shifts it by octaves: ' + JSON.stringify(oc.ev));
   ok(oc.lit.join() === '24,36,40', 'tonic + guide lights move to the new octave (E4 guide -> E2): ' + oc.lit);
   ok(/LUMI C1–B2/.test(oc.label || ''), 'the Keys page marks the keys the LUMI covers: ' + oc.label);
@@ -154,8 +161,14 @@ const keys = o => Object.keys(o).map(Number).sort((a, b) => a - b);
     o.other = App.midi.lumi;
     document.querySelector('[data-lctype=""]').click();
     o.auto = App.midi.lumi;
+    o.octDef = (document.querySelector('[data-lcoct].active') || {}).textContent;
+    document.querySelector('[data-lcoct="0"]').click();
+    o.octOff = App.store.get('lights.octHand', true);
+    document.querySelector('[data-lcoct="1"]').click();
+    o.octOn = App.store.get('lights.octHand', false);
     return o;
   });
+  ok(cc.octDef === 'Switch hands' && cc.octOff === false && cc.octOn === true, 'octave keys: Switch hands by default, Octave only turns it off');
   ok(cc.open && /ROLI LUMI · playing C3–B4/.test(cc.status), 'Lights & help opens over the page with the keyboard status: ' + cc.status);
   ok(cc.level === 3 && cc.keysSeg === 'Colors' && /scale in color/.test(cc.desc), 'one Help level: set in the sheet, the Keys page follows');
   ok(cc.mirror === 'None', 'and set on the Keys page, the sheet follows');

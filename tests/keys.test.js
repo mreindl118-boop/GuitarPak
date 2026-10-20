@@ -156,9 +156,12 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
       App.emit('midi:note', { on: false, midi: m });
       if (i === opts.wrongAt - 1) o.mid = { streak: R.inf.streak, hud: document.getElementById('kl-streakn').textContent };
     }
-    await wait(300);
+    // read the run right after the last note: the NEXT target is due one
+    // 16th later (~190 ms at 80 bpm) and is a miss ~130 ms after that, which
+    // breaks the streak — a 300 ms wait raced it (Windows timers overshoot)
     o.live = { streak: R.inf.streak, best: R.inf.best, bpm: R.inf.bpm, label: document.getElementById('kl-streakl').textContent,
       count: (document.getElementById('kl-count') || {}).textContent };
+    await wait(300);
     document.getElementById('kl-stop').click();
     const L = App.keysLessons.last;
     o.view = App.keysLessons.view; o.run = !!App.keysLessons.run;

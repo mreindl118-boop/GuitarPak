@@ -36,12 +36,11 @@
   var GAP = 30;       // string spacing
   var NUM_H = 34;     // room for fret numbers under the board
 
-  // one bright, unique color per SCALE DEGREE (index = step in the scale) —
-  // all light enough for dark label text, none of them dark/black. DEG_COLORS
-  // is the live palette; users can recolor each degree in the settings panel
-  // (persisted as fb.colors, reset restores DEG_DEFAULTS).
-  var DEG_DEFAULTS = ['#ffab47', '#e8d44d', '#7ad97a', '#4cc9b0', '#6ea8fe', '#b48ef0', '#ff85b3'];
-  var DEG_COLORS = DEG_DEFAULTS.slice();
+  // note colors come from App.colors (app.js): one bright color per SCALE
+  // DEGREE (fb.colors, the default 'interval' mode) or per NOTE (12 pitch-
+  // class colors, fb.noteColors, 'note' mode) — all light enough for the dark
+  // label text. Both palettes + the mode are edited in the settings panel.
+  function noteFill(pc, step) { return App.colors.forNote(pc, step); }
   var DEG_TEXT = '#1c1206';
 
   var STRING_WIDTHS = [2.6, 2.3, 2.0, 1.5, 1.2, 1.0]; // index = stringIdx (0 = low E, wound = thicker)
@@ -82,11 +81,6 @@
     if (vs === 's' || vs === 'm' || vs === 'l') state.vSize = vs;
     var m = App.store.get('fb.mode', 1);
     if (typeof m === 'number' && m >= 1 && m <= 7) state.mode = Math.floor(m);
-    var cols = App.store.get('fb.colors', null);
-    if (Array.isArray(cols) && cols.length === 7 &&
-        cols.every(function (c) { return /^#[0-9a-fA-F]{6}$/.test(c); })) {
-      DEG_COLORS = cols.slice();
-    }
   }
 
   function saveState() {
@@ -223,12 +217,29 @@
     els.posrow.innerHTML = '';
   }
 
+  // the color editor: "Color notes by" Interval (7 degree pickers) | Note
+  // (12 pitch-class pickers, C..B); Reset restores the shown palette
+  var NOTE_LABELS = ['C', 'C#/Db', 'D', 'D#/Eb', 'E', 'F', 'F#/Gb', 'G', 'G#/Ab', 'A', 'A#/Bb', 'B'];
   function renderColorInputs() {
     if (!els.colors) return;
-    var h = '';
-    for (var i = 0; i < 7; i++) {
-      h += '<label class="fb-colpick" title="Color for scale degree ' + (i + 1) + '">' + (i + 1) +
-        '<input type="color" value="' + DEG_COLORS[i] + '" data-fbcol="' + i + '"></label>';
+    var mode = App.colors.mode(), h = '', i;
+    if (els.colMode) els.colMode.querySelectorAll('button[data-fbcolmode]').forEach(function (b) {
+      var on = b.getAttribute('data-fbcolmode') === mode;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-pressed', String(on));
+    });
+    if (mode === 'note') {
+      var nc = App.colors.notes();
+      for (i = 0; i < 12; i++) {
+        h += '<label class="fb-colpick" title="Color for every ' + NOTE_LABELS[i] + '">' + NOTE_LABELS[i] +
+          '<input type="color" value="' + nc[i] + '" data-fbncol="' + i + '"></label>';
+      }
+    } else {
+      var dc = App.colors.degrees();
+      for (i = 0; i < 7; i++) {
+        h += '<label class="fb-colpick" title="Color for scale degree ' + (i + 1) + '">' + (i + 1) +
+          '<input type="color" value="' + dc[i] + '" data-fbcol="' + i + '"></label>';
+      }
     }
     h += '<button type="button" class="chip fb-chip" id="fb-col-reset">Reset</button>';
     els.colors.innerHTML = h;
@@ -368,7 +379,7 @@
         // length is the exercise
         if (win && (f < win[0] || f > win[1]) && !onSS) continue;
         var step = info.pcToStep.get(pc);
-        var fill = DEG_COLORS[step % 7];
+        var fill = noteFill(pc, step);
         var label;
         if (state.display === 'intervals') label = info.intervals[step];
         else if (state.display === 'degrees') label = String(step + 1);
@@ -964,7 +975,7 @@
 
   function noteColor(info, pc) {
     var step = info.pcToStep.get(pc);
-    return DEG_COLORS[(step || 0) % 7];
+    return noteFill(pc, step || 0); // out of the scale: the root color (interval mode)
   }
 
   function tabCellHTML(n, i, info) {
@@ -1490,7 +1501,8 @@
     });
   }
 
-  // legend follows the current scale: one colored chip per degree
+  // legend follows the current scale: one chip per degree, in the color that
+  // note actually gets (its degree color, or its note color in note mode)
   function renderLegend() {
     var pf = preferFlat();
     var info = Theory.scaleInfo(state.root, state.scale, pf);
@@ -1498,7 +1510,7 @@
     var h = '';
     for (var i = 0; i < info.intervals.length; i++) {
       h += '<span class="fb-legend-item"><span class="legend-dot" style="background:' +
-        DEG_COLORS[i % 7] + '"></span>' + info.intervals[i] + ' &middot; ' + info.names[i] + '</span>';
+        noteFill(info.pcs[i], i) + '"></span>' + info.intervals[i] + ' &middot; ' + info.names[i] + '</span>';
     }
     els.legend.innerHTML = h;
   }
@@ -1516,7 +1528,7 @@
     var h = '';
     for (var i = 0; i < info.names.length; i++) {
       h += '<span class="fb-note' + (i === 0 ? ' fb-note-root' : '') +
-        '" style="border-color:' + DEG_COLORS[i % 7] + '"><b>' + info.names[i] +
+        '" style="border-color:' + noteFill(info.pcs[i], i) + '"><b>' + info.names[i] +
         '</b><span>' + info.intervals[i] + '</span></span>';
     }
     els.infoNotes.innerHTML = h;
@@ -1757,7 +1769,11 @@
             '<label class="field">Left-handed<input type="checkbox" id="fb-lefty"' + (state.lefty ? ' checked' : '') + '></label>' +
             '<label class="field">Jam: auto-switch mode<input type="checkbox" id="fb-automode"></label>' +
           '</div>' +
-          '<div class="fb-field" style="margin-top:12px">Degree colors' +
+          '<div class="fb-field" style="margin-top:12px">Color notes by' +
+            '<div class="seg" id="fb-colmode" role="group" aria-label="Color notes by" style="align-self:flex-start">' +
+              '<button type="button" data-fbcolmode="interval" title="Each scale degree has its color: the note’s job in the key">Interval</button>' +
+              '<button type="button" data-fbcolmode="note" title="Each note has its color: every C the same in every key">Note</button>' +
+            '</div>' +
             '<div class="row tight" id="fb-colors"></div>' +
           '</div>' +
           '<div class="row tight fb-legend" id="fb-legend"></div>' +
@@ -1820,25 +1836,34 @@
       renderBoard();
     });
 
+    // color editor -> App.colors (one store for every page + the LUMI, which
+    // all repaint on its 'colors' event)
     els.colors = document.getElementById('fb-colors');
+    els.colMode = document.getElementById('fb-colmode');
     renderColorInputs();
+    var colFromPicker = false; // a picker's own edit: keep its input as is
+    els.colMode.addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-fbcolmode]');
+      if (b) App.colors.setMode(b.getAttribute('data-fbcolmode'));
+    });
     els.colors.addEventListener('change', function (e) {
-      var inp = e.target.closest('input[data-fbcol]');
+      var inp = e.target.closest('input[data-fbcol], input[data-fbncol]');
       if (!inp || !/^#[0-9a-fA-F]{6}$/.test(inp.value)) return;
-      var ci = parseInt(inp.getAttribute('data-fbcol'), 10);
-      if (isNaN(ci) || ci < 0 || ci > 6) return;
-      DEG_COLORS[ci] = inp.value;
-      App.store.set('fb.colors', DEG_COLORS);
-      renderBoard(); renderInfo(); renderLegend();
-      if (App.midi) App.midi.lumiSync(); // LUMI shows these colors live
+      var note = inp.hasAttribute('data-fbncol');
+      var ci = parseInt(inp.getAttribute(note ? 'data-fbncol' : 'data-fbcol'), 10);
+      if (isNaN(ci) || ci < 0 || ci > (note ? 11 : 6)) return;
+      var cols = note ? App.colors.notes() : App.colors.degrees();
+      cols[ci] = inp.value.toLowerCase();
+      colFromPicker = true;
+      try { if (note) App.colors.setNotes(cols); else App.colors.setDegrees(cols); } finally { colFromPicker = false; }
     });
     els.colors.addEventListener('click', function (e) {
       if (!e.target.closest('#fb-col-reset')) return;
-      DEG_COLORS = DEG_DEFAULTS.slice();
-      App.store.set('fb.colors', null);
-      renderColorInputs();
-      renderBoard(); renderInfo(); renderLegend();
-      if (App.midi) App.midi.lumiSync();
+      if (App.colors.mode() === 'note') App.colors.setNotes(null); else App.colors.setDegrees(null);
+    });
+    App.on('colors', function () {
+      if (!colFromPicker) renderColorInputs();
+      renderAll();
     });
 
     window.addEventListener('resize', function () {

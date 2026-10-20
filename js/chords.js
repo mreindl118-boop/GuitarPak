@@ -154,24 +154,20 @@
 
   // ---------------- key-degree coloring (shared language with the fretboard) ----------------
 
-  var DEG_DEFAULTS = ['#ffab47', '#e8d44d', '#7ad97a', '#4cc9b0', '#6ea8fe', '#b48ef0', '#ff85b3'];
+  // colors from App.colors: by degree (interval mode — a chord tone outside
+  // the key stays NON_KEY grey) or by note (every tone in its note color)
   var NON_KEY = '#8f867c';
-
-  function degPalette() {
-    var c = App.store.get('fb.colors', null);
-    return (Array.isArray(c) && c.length === 7 &&
-      c.every(function (x) { return /^#[0-9a-fA-F]{6}$/.test(x); })) ? c : DEG_DEFAULTS;
-  }
 
   function keyInfo() {
     return Theory.scaleInfo(st.keyPc, st.scaleId, Theory.FLAT_KEYS.has(st.keyPc));
   }
 
   // { color, isKeyRoot, deg (1-based or 0 if outside the key) } for a pitch class
-  function keyTone(info, pal, pc) {
+  function keyTone(info, pc) {
     var step = info.pcToStep.get(pc);
-    if (step === undefined) return { color: NON_KEY, isKeyRoot: false, deg: 0 };
-    return { color: pal[step % 7], isKeyRoot: step === 0, deg: step + 1 };
+    var color = App.colors.forNote(pc, step) || NON_KEY;
+    if (step === undefined) return { color: color, isKeyRoot: false, deg: 0 };
+    return { color: color, isKeyRoot: step === 0, deg: step + 1 };
   }
 
   // ---------------- small vertical diagram (the "now playing" box) ----------------
@@ -179,7 +175,6 @@
   function renderShapeSVG(shape) {
     var NS = 'http://www.w3.org/2000/svg';
     var kinfo = keyInfo();
-    var pal = degPalette();
     var pf = Theory.FLAT_KEYS.has(st.keyPc);
     var tunMidi = Theory.TUNINGS.standard.midi;
     var SP_X = 13, SP_Y = 17, LEFT = 24, TOP = 30;
@@ -209,7 +204,7 @@
     }
 
     function noteDot(cx, cy, r, pc) {
-      var tone = keyTone(kinfo, pal, pc);
+      var tone = keyTone(kinfo, pc);
       var c = document.createElementNS(NS, 'circle');
       c.setAttribute('cx', cx); c.setAttribute('cy', cy); c.setAttribute('r', r);
       c.setAttribute('fill', tone.color);
@@ -281,7 +276,6 @@
     }
     var NS = 'http://www.w3.org/2000/svg';
     var kinfo = keyInfo();
-    var pal = degPalette();
     var pf = Theory.FLAT_KEYS.has(st.keyPc);
     var tun = Theory.TUNINGS.standard.midi;
     var LEFT = 74, TOP = 24, ROW = 36, COLW = 100, COLS = 5;
@@ -358,7 +352,7 @@
       }
       var midi = tun[s] + fr;
       var pc = Theory.mod12(midi);
-      var tone = keyTone(kinfo, pal, pc);
+      var tone = keyTone(kinfo, pc);
       var cx = fr === 0 ? 42 : LEFT + (fr - base + 0.5) * COLW;
       var rad = fr === 0 ? 11 : 14;
       var dot = el('circle', { cx: cx, cy: y2, r: rad, fill: tone.color,
@@ -394,7 +388,6 @@
       els.inkey.innerHTML = '<span class="muted small">Pick a 7-note scale in the bar above for in-key chords.</span>';
       return;
     }
-    var pal = degPalette();
     dia.forEach(function (d, i) {
       var b = document.createElement('button');
       b.type = 'button';
@@ -402,7 +395,7 @@
         (d.rootPc === ex.rootPc && d.quality === ex.quality ? ' active' : '');
       b.dataset.root = d.rootPc;
       b.dataset.quality = d.quality;
-      b.style.setProperty('--deg-c', pal[i % 7]);
+      b.style.setProperty('--deg-c', App.colors.forNote(d.rootPc, i)); // the chord root's color
       b.innerHTML = '<b>' + esc(d.roman) + '</b>' + esc(d.name);
       b.title = 'Load ' + d.name + ' onto the neck';
       els.inkey.appendChild(b);
@@ -438,7 +431,6 @@
   function renderTheory() {
     var q = Theory.QUALITIES[ex.quality];
     var kinfo = keyInfo();
-    var pal = degPalette();
     var pf = Theory.FLAT_KEYS.has(st.keyPc);
 
     // spelled tones: interval label + note name, colored by key degree
@@ -448,7 +440,7 @@
       var lbl = IV_LABELS[Theory.mod12(iv)] || String(iv);
       formula.push(lbl);
       var pc = Theory.mod12(ex.rootPc + iv);
-      var tone = keyTone(kinfo, pal, pc);
+      var tone = keyTone(kinfo, pc);
       tones += '<span class="chip ch-tonechip" style="--deg-c:' + tone.color + '">' +
         '<b>' + esc(lbl) + '</b>' + esc(Theory.pcName(pc, pf)) + '</span>';
     });
@@ -495,7 +487,6 @@
     if (!els.tabWrap) return;
     var shape = curShape();
     var kinfo = keyInfo();
-    var pal = degPalette();
     var LABELS = ['E', 'A', 'D', 'G', 'B', 'e']; // string 0 (low) .. 5 (high)
     var tun = Theory.TUNINGS.standard.midi;
     var h = '';
@@ -506,7 +497,7 @@
         cell = '<span class="ch-tabx">x</span>';
       } else {
         var pc = Theory.mod12(tun[li] + f);
-        var tone = keyTone(kinfo, pal, pc);
+        var tone = keyTone(kinfo, pc);
         cell = '<span class="ch-tabn" style="color:' + tone.color + '">' + f + '</span>';
       }
       h += LABELS[li] + ' |--' + cell + '--|\n';
@@ -535,7 +526,6 @@
     if (!shape) { els.sheetWrap.innerHTML = ''; return; }
     var midis = Theory.chordVoicing(shape.frets);
     var kinfo = keyInfo();
-    var pal = degPalette();
     var pf = Theory.FLAT_KEYS.has(st.keyPc);
     var GAP = 10, LEFT = 70, W = 320;
     var topPad = 6 * GAP, staffH = 8 * GAP;
@@ -571,7 +561,7 @@
           '" x2="' + (nx + 12) + '" y2="' + (topPad + staffH - (lp - E4POS) * GAP) +
           '" stroke="var(--muted)" stroke-width="1"/>');
       }
-      var tone = keyTone(kinfo, pal, sn.pc);
+      var tone = keyTone(kinfo, sn.pc);
       var isRoot = sn.pc === Theory.mod12(ex.rootPc);
       svg.push('<ellipse cx="' + nx + '" cy="' + y + '" rx="7.5" ry="5.6" fill="' + tone.color + '"' +
         (isRoot ? ' stroke="#ffffff" stroke-width="1.6"' : '') + '/>');
@@ -605,7 +595,6 @@
     var midis = pianoChordMidis();
     var W = 30, H = 110, BW = 19, BH = 66;
     var kinfo = keyInfo();
-    var pal = degPalette();
     function wIdx(m) {
       var n = 0;
       for (var i = PN_LO; i < m; i++) if (PN_WHITE.indexOf(Theory.mod12(i)) !== -1) n++;
@@ -628,7 +617,7 @@
       var ti = midis.indexOf(m);
       if (ti !== -1) {
         var iv = Theory.QUALITIES[ex.quality].intervals[ti];
-        var tone = keyTone(kinfo, pal, Theory.mod12(m));
+        var tone = keyTone(kinfo, Theory.mod12(m));
         dots += '<circle cx="' + cx + '" cy="' + cy + '" r="8.5" fill="' + tone.color + '"' +
           (iv === 0 ? ' stroke="#ffffff" stroke-width="1.8"' : '') + '/>' +
           '<text class="ch-pnlbl" x="' + cx + '" y="' + (cy + 3) + '" text-anchor="middle">' +
@@ -636,7 +625,7 @@
       } else if (kinfo && kinfo.pcSet.has(pc)) {
         // uniform coloration with the Piano tab: in-scale keys carry their
         // degree color everywhere, sitting back so chord tones pop
-        var stone = keyTone(kinfo, pal, pc);
+        var stone = keyTone(kinfo, pc);
         dots += '<circle cx="' + cx + '" cy="' + cy + '" r="5.5" fill="' + stone.color + '" opacity="0.4"/>';
       }
     }
@@ -1341,6 +1330,7 @@
     App.on('fb:scale', function (d) {
       if (d) applyFbScale(d.root, d.scale, false);
     });
+    App.on('colors', function () { exRender(); }); // Interval | Note, palette edits
 
     // open on the tonic chord of the current key — the explorer starts where
     // the scale in the bar points (stored chord is the fallback)

@@ -355,13 +355,13 @@
     els.ports.hidden = !ready;
     if (!sup) { els.status.textContent = 'MIDI is not available here — use Chrome or Edge (desktop or Android).'; els.status.className = 'mh-status bad'; return; }
     if (!ready) { els.status.textContent = 'Not connected: the browser will ask for permission (allow SysEx too).'; els.status.className = 'mh-status'; return; }
-    var fill = function (sel, list, cur) {
-      sel.innerHTML = '<option value="">— none —</option>';
+    var fill = function (sel, list, cur, all) {
+      sel.innerHTML = all ? '<option value="all">All keyboards</option>' : '<option value="">— none —</option>';
       list.forEach(function (p) { var o = document.createElement('option'); o.value = p.id; o.textContent = p.name; sel.appendChild(o); });
-      sel.value = cur == null ? '' : String(cur);
+      sel.value = cur == null ? (all ? 'all' : '') : String(cur);
     };
-    fill(els.inSel, m.inputs, m.inputId); fill(els.outSel, m.outputs, m.outputId);
-    var inN = m.inputs.filter(function (p) { return String(p.id) === String(m.inputId); })[0], outN = m.outputs.filter(function (p) { return String(p.id) === String(m.outputId); })[0];
+    fill(els.inSel, m.inputs, m.inputId, true); fill(els.outSel, m.outputs, m.outputId);
+    var inN = m.inputId === 'all' ? { name: 'All keyboards' } : m.inputs.filter(function (p) { return String(p.id) === String(m.inputId); })[0], outN = m.outputs.filter(function (p) { return String(p.id) === String(m.outputId); })[0];
     els.status.textContent = (inN ? 'In: ' + inN.name : 'In: none') + ' · ' + (outN ? 'Out: ' + outN.name : 'Out: none');
     els.status.className = 'mh-status ' + (inN || outN ? 'ok' : 'bad');
     var warnLights = outN && m.lightsOn && !m.lumi;
@@ -639,7 +639,11 @@
     // monitor
     els.monhex.addEventListener('change', function () { set('hex', this.checked); });
     els.monpause.addEventListener('change', function () { monPaused = this.checked; });
-    els.monclear.addEventListener('click', function () { els.mon.innerHTML = ''; monCount = 0; els.monCount.textContent = ''; });
+    els.monclear.addEventListener('click', function () {
+      // rows still waiting for the next frame go too (a Panic just before Clear)
+      monQ = []; if (monRaf) { cancelAnimationFrame(monRaf); monRaf = 0; }
+      els.mon.innerHTML = ''; monCount = 0; els.monCount.textContent = '';
+    });
     els.monexport.addEventListener('click', function () {
       var txt = Array.prototype.map.call(els.mon.children, function (r) { return Array.prototype.map.call(r.children, function (c) { return c.textContent; }).join('\t'); }).join('\n');
       var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([txt], { type: 'text/plain' })); a.download = 'midi-log.txt'; a.click();
