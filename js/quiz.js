@@ -1084,6 +1084,9 @@
   // ================= state + persistence =================
 
   var root = null, view = 'home', topicId = null, openMode = {}, cur = null, advT = 0;
+  // Keep physical presses across questions: a held key (including layered MIDI
+  // channels) must be released before it can answer the following question.
+  var inputHeld = {}, inputRoute = null;
 
   function esc(s) {
     return String(s).replace(/[&<>"']/g, function (c) {
@@ -1593,8 +1596,16 @@
   }
 
   function inputNote(midi, src, pos) {
-    if (!cur || view !== 'run' || cur.answered) return;
+    if (!cur || view !== 'run') return;
     var q = cur.q, pc = mod(midi, 12);
+    if (cur.answered) {
+      // A correction moves on without re-grading the miss or awarding XP twice.
+      // Leave the wrong-answer explanation visible until that fresh correct press.
+      if (!cur.lastOk && !cur.sprint &&
+          ((q.kind === 'choice' && q.pcAnswer != null && src !== 'tap' && pc === q.pcAnswer) ||
+           (q.kind === 'single' && pc === q.pc && (q.string == null || !pos || pos.s === q.string)))) nextQ();
+      return;
+    }
     if (q.kind === 'choice') {
       if (q.pcAnswer == null || src === 'tap') return;
       if (pc === q.pcAnswer) resolve(true, q.correct);
@@ -2575,8 +2586,28 @@
     root.addEventListener('pointerdown', onPointer);
     // decode the piano bank on the first touch here, ahead of the first question
     root.addEventListener('pointerdown', function () { if (App.keys && App.keys.warm) App.keys.warm(); }, true);
+    inputRoute = App.midi ? App.midi.inputId : null;
+    App.on('midi:state', function () {
+      var route = App.midi ? App.midi.inputId : null;
+      if (route === inputRoute) return; // output-only changes cannot re-arm a held key
+      inputRoute = route;
+      Object.keys(inputHeld).forEach(function (key) {
+        if (key.indexOf('midi:') === 0) delete inputHeld[key];
+      });
+    });
     App.on('midi:note', function (d) {
-      if (d && d.on && App.active === 'quiz') inputNote(d.midi, d.silent ? 'tone' : 'midi');
+      if (!d || !Number.isInteger(d.midi) || d.midi < 0 || d.midi > 127) return;
+      var src = d.silent ? 'tone' : 'midi';
+      var pitch = src + ':' + d.midi, channel = d.chan == null ? 0 : d.chan;
+      var held = inputHeld[pitch];
+      if (!d.on) {
+        if (held) { delete held[channel]; if (!Object.keys(held).length) delete inputHeld[pitch]; }
+        return; // releases never answer a question
+      }
+      var fresh = !held;
+      if (!held) held = inputHeld[pitch] = {};
+      held[channel] = true; // record before inputNote can advance to another question
+      if (fresh && App.active === 'quiz') inputNote(d.midi, src);
     });
     if (document.fonts && document.fonts.load) {
       document.fonts.load('48px SLMusic').then(function () { if (view === 'run' && cur) paintVis(); }, function () { /* fallback glyphs */ });

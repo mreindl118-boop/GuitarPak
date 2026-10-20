@@ -1,13 +1,19 @@
 # Natural Notes MIDI correction hotfix
 
-Owner: Codex; sole writer. Claimed 2026-10-20. Base: main 64be12efe20e87bc74c79cf7297902f6617bc213; published gh-pages e2012b8ed3a8ec2f132f7c159991c8d91dce46a8 mirrors that main.
+- Owner / sole writer: Codex. Contributor review: Claude, pending.
+- Authorization: Matt requests first correct MIDI answer auto-next, including after a miss, and says to push the update fast through existing gates.
+- Repository / branch: mreindl118-boop/GuitarPak, codex/natural-notes-autonext-20261020.
+- Created: 2026-10-20. Status: ready for focused review; full existing suites in progress.
+- Base: published main 64be12efe20e87bc74c79cf7297902f6617bc213. gh-pages e2012b8ed3a8ec2f132f7c159991c8d91dce46a8 explicitly mirrors that commit; live web feed is 0.77.2. The reported local installation was 0.77.1; both versions use this same answer guard.
+- Claimed paths: js/quiz.js; tests/quiz-correction.test.js; tests/run.sh; .github/workflows/validate.yml; APP_VERSION in js/app.js; web/notes in version.json; CACHE in sw.js; own README Current work row; this task record.
+- Remote coordination: all current branch heads and open PRs checked. Root owns PR84's separate modal-pause change; PR84 remains unmerged. Claude's visual branch 0e4dcf12b3d9c9753ca90bd79d566dd77c0fc4c6 changes quiz icons and other UI; this hotfix is isolated on the published line and does not overwrite or merge that branch. Contributor review of the hotfix is requested before integration.
 
-Scope: js/quiz.js, tests/quiz-correction.test.js, tests/run.sh, .github/workflows/validate.yml, js/app.js APP_VERSION only, version.json web/notes only, sw.js cache only, this task record and own README current-work row. The validation workflow is the already reviewed PR84 web-test workflow, with the existing hotfix-branch suites. No other PR84 feature files are included.
+The first fresh correct note after a wrong single-note or playable-choice answer advances once. The existing explanation remains visible until the correction. The original miss, XP and drill history remain unchanged. Normal correct-answer feedback timing, chord/set answers and sprint behavior retain their existing flow.
 
-Correcting a wrong answer with the first fresh correct MIDI note must advance once while preserving the original miss, XP and explanation. Note Off and held/repeated/multichannel duplicate notes must not advance questions. A genuine input route change clears stale held notes; unrelated output-state changes do not.
+Held notes are tracked by input source, pitch and channel across question transitions. Offs only release that gate. Layered channel duplicates cannot answer the next question. A genuine MIDI input identity change clears stale MIDI-held entries; output-only state changes cannot re-arm them.
 
-Separate hotfix branch codex/natural-notes-autonext-20261020 from published source. Local worktree: soundlab-midi-release/note-hotfix. PR84 (0.78.0) remains separate and unmerged. Root owns both the hotfix and PR84's isolated modal-pause quiz change; no conflicting contributor quiz claim found in current remote work. No native wrapper/signing changes, hardware configuration changes, private music inputs, tags or GitHub Releases. Contributor review and existing release gates remain in force; no force pushes.
+Validation: focused Playwright suite 25/25 PASS on the actual full app with mocked MIDI bus. Existing web/mock suites are running; final result and remote commit will be recorded here. Independent code review passed core logic and identified the reconnect edge, now fixed with a focused regression. No physical device is used by tests.
 
-Authorization: Matt requests first correct MIDI answer auto-next, including after a miss, and explicitly says push the update fast through existing gates.
+Web patch version 0.77.3, cache guitarlab-v111. Actual APK channel remains 0.75.0; no wrapper, signing or native build changes. The validation workflow is the existing PR84 workflow copied without its feature changes.
 
-Status: in progress; claim read back before source edits. Independent core review passed; reconnect edge addressed; focused browser tests running. Review/publication receipt will follow here.
+Publication: owned branch only pending checks and exact-commit contributor review. No main merge, deployment, tag or GitHub Release. Next owner: Claude/source contributor for review; Codex retains task ownership until acknowledgement. No private music inputs or hardware captures are included.
