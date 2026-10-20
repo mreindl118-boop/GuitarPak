@@ -501,10 +501,12 @@
 
   // ---- rendering ----
 
-  function noteColors() {
-    var c = App.store.get('fb.colors', null);
-    if (Object.prototype.toString.call(c) === '[object Array]' && c.length === 7) return c;
-    return ['#ffab47', '#ffd166', '#8bd450', '#4cc9b0', '#5aa9ff', '#b18cff', '#ff6b9d'];
+  // piano-roll note colors: App.colors per note (its pitch is known): by
+  // scale degree (out of the key = grey) or by note (every C one color)
+  var ROLL_OFF_KEY = '#8a8a92';
+  function rollColor(midi, keyPc, steps) {
+    var pc = Theory.mod12(midi), deg = steps.indexOf(Theory.mod12(midi - keyPc));
+    return App.colors.forNote(pc, deg === -1 ? undefined : deg) || ROLL_OFF_KEY;
   }
 
   function renderTransport() {
@@ -623,7 +625,6 @@
     if (!svg) return;
     var cols = stepCols();
     var colW = 22, rowH = 14, x0 = 46;
-    var cs = noteColors();
     var keyPc = (function () { var v = App.store.get('fb.root', 9); return (typeof v === 'number') ? v : 9; })();
     var scale = (function () { var v = App.store.get('fb.scale', 'major'); return Theory.SCALES[v] ? v : 'major'; })();
     var steps = Theory.SCALES[scale].steps;
@@ -636,7 +637,7 @@
       h += '<rect x="' + x0 + '" y="' + y + '" width="' + (cols * colW) + '" height="' + rowH + '" fill="' +
         (inScale ? 'rgba(255,255,255,0.045)' : 'transparent') + '"/>' +
         '<text x="' + (x0 - 6) + '" y="' + (y + 10.5) + '" text-anchor="end" font-size="9" fill="' +
-        (inScale ? (degIdx === 0 ? cs[0] : 'var(--muted)') : 'rgba(128,128,128,0.4)') + '">' + Theory.midiName(m) + '</text>';
+        (inScale ? (degIdx === 0 ? rollColor(m, keyPc, steps) : 'var(--muted)') : 'rgba(128,128,128,0.4)') + '">' + Theory.midiName(m) + '</text>';
     }
     for (var c = 0; c <= cols; c++) {
       h += '<line x1="' + (x0 + c * colW) + '" y1="0" x2="' + (x0 + c * colW) + '" y2="' + ((ROLL_HI - ROLL_LO + 1) * rowH) + '" stroke="rgba(128,128,128,' +
@@ -645,9 +646,7 @@
     (t.notes || []).forEach(function (n, i) {
       if (n.m < ROLL_LO || n.m > ROLL_HI) return;
       var y = (ROLL_HI - n.m) * rowH;
-      var pc = Theory.mod12(n.m - keyPc);
-      var degIdx = steps.indexOf(pc);
-      var fill = degIdx !== -1 ? cs[degIdx % 7] : '#8a8a92';
+      var fill = rollColor(n.m, keyPc, steps);
       h += '<rect class="st-note" data-ni="' + i + '" x="' + (x0 + n.t * 4 * colW + 1) + '" y="' + (y + 1.5) +
         '" width="' + Math.max(8, n.d * 4 * colW - 2) + '" height="' + (rowH - 3) + '" rx="3" fill="' + fill + '"/>';
     });
@@ -1078,6 +1077,7 @@
     });
     App.on('fb:scale', function () { var t = trackById(trk.sel); if (t && t.kind !== 'drums') drawRoll(t); });
     App.on('fb:set', function () { var t = trackById(trk.sel); if (t && t.kind !== 'drums') drawRoll(t); });
+    App.on('colors', function () { var t = trackById(trk.sel); if (t && t.kind !== 'drums') drawRoll(t); });
   }
 
   // live MPE routing: armed track's instrument under your fingers

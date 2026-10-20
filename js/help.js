@@ -19,7 +19,7 @@
       { sel: '#met-trbox', t: 'Tempo trainer', x: 'Speeds you up automatically: +N BPM every M bars until the target. Sounds lets you pick each click’s voice.' }
     ],
     fretboard: [
-      { t: 'Fretboard', x: 'Every dot is a note in your key. Colors mean scale degrees — amber is the root, and the same colors mean the same thing on the Piano and in the Studio’s note editor.' },
+      { t: 'Fretboard', x: 'Every dot is a note in your key. Its color follows Color notes by (in the Fretboard’s settings, or in Lights & help): by Interval each scale degree has its color and amber is the root; by Note every C is one color in every key. The Piano and the Studio’s note editor use the same colors.' },
       { sel: '#cx-root', t: 'Pick your key and scale', x: 'Key, scale and mode live in this bar and follow you everywhere. Change them and the whole neck re-colors.' },
       { t: 'Practice runner', x: 'Below the neck: pick a pattern and press play — it walks the scale in time, shows what to play next, and can pause at turnarounds while you catch up.' }
     ],
@@ -34,11 +34,11 @@
       { t: 'Progressions', x: 'Load a classic progression and play it — the neck follows the sounding chord live so you can watch the changes happen.' }
     ],
     piano: [
-      { t: 'Piano', x: 'The keyboard twin of the fretboard — same key, same degree colors. Play it by touch, with your computer keyboard (A W S E D… Z/X shifts octave), or a MIDI keyboard like a ROLI.' },
+      { t: 'Piano', x: 'The keyboard twin of the fretboard — same key, same note colors. Play it by touch, with your computer keyboard (A W S E D… Z/X shifts octave), or a MIDI keyboard like a ROLI.' },
       { sel: '#pn-chseg', t: 'Perform', x: 'Triads or 7ths turn every in-scale key into its chord (+Bass and Strum appear then). Arp plays what you hold as an arpeggio — its speed, direction, range and Hold appear once it’s on.' },
       { sel: '#pn-play', t: 'Practice runner', x: 'Runs scale exercises on the keys with fingering numbers — pick right or left hand and it moves to where that hand plays.' },
       { sel: '#pn-guide', t: 'Guide mode', x: 'Instead of playing FOR you, Guide waits for you to play each lit note — on screen, or lit up on a LUMI’s own keys.' },
-      { sel: '#pn-assist', t: 'Help level', x: 'How much the keyboard tells you. Full shows the degree colors, note names, fingers and the next note; Colors drops the names; Target only rings the note to play; Tonic marks home; None is a bare keyboard. Pressed keys always flash their color.' },
+      { sel: '#pn-assist', t: 'Help level', x: 'How much the keyboard tells you. Full shows the scale colors, note names, fingers and the next note; Colors drops the names; Target only rings the note to play; Tonic marks home; None is a bare keyboard. Pressed keys always flash their color.' },
       { sel: '.kl-card', t: 'Scale lessons', x: 'Graded scale lessons played with the click. Every note is checked for the right key and how close it lands to the beat. Score 85 to level up to a faster tempo. Pick ∞ to loop the scale until you stop and go for your longest streak of clean notes. Runs, best scores and streaks are saved here and on the Exercises Progress tab.' }
     ],
     songs: [
@@ -82,7 +82,7 @@
       { sel: '#ar-snap', t: 'Snap & zoom', x: 'Snap decides what dragging locks onto — whole bars down to free. Zoom with + and −, and Follow keeps the view chasing the playhead. Space plays and stops.' }
     ],
     tracks: [
-      { t: 'Tracks', x: 'A loop workstation: every track loops in sync at the shared tempo. Drums get a step grid, synths and samplers get a piano roll colored by your key’s scale degrees.' },
+      { t: 'Tracks', x: 'A loop workstation: every track loops in sync at the shared tempo. Drums get a step grid, synths and samplers get a piano roll in the app’s note colors (by scale degree or by note, as set on the Fretboard or in Lights & help).' },
       { sel: '#st-play', t: 'The loop', x: 'Play starts everything together — 1, 2 or 4 bars around. Export WAV renders your loop to a real audio file.' },
       { sel: '#st-list', t: 'Your tracks', x: 'Each row: arm Live (your MIDI/typing keys play its instrument), rename, Mute / Solo, volume, Edit to open its editor, × to delete.' },
       { sel: '#st-editor', t: 'The editor', x: 'Whatever’s selected opens here — drum steps (press and drag to paint), the piano roll (press empty space and DRAG to draw a note; drag notes to move, drag their right edge to stretch, tap to remove), synth voice knobs, or the sampler’s file + root note. Every track also has an FX slot.' }
@@ -106,7 +106,7 @@
     ],
     lights: [
       { t: 'Lights & help', x: 'One place for how much the app helps you. The Help level is the difficulty: Full shows the scale in color with names, fingers and the next note; None is a bare keyboard. It applies to the Keys page, Scale lessons, Exercises and your keyboard’s own lights.' },
-      { t: 'Your keyboard’s lights', x: 'A LUMI lights every key in its scale-degree color, just like the screen, and follows the app’s key on every page. Play a note after pressing its octave buttons and the app follows the new octave too.' }
+      { t: 'Your keyboard’s lights', x: 'A LUMI lights every key of the scale in the same color as the screen (Color notes by: Interval = by scale degree, Note = every C one color), and follows the app’s key on every page. Play a note after pressing its octave buttons and the app follows the new octave too.' }
     ],
     settings: [
       { t: 'Settings', x: 'App-wide preferences, grouped by section: theme and accent color, one master volume for everything, studio capture options, screen wake, MIDI setup, and plugins for advanced workflows.' }

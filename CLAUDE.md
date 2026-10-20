@@ -78,6 +78,47 @@ js/tonein.js      1/4"/audio-in TONE-IN: pitch-detects the selected audio
                   emits midi:note {silent:true} — instrument pages show the
                   visuals (rings/presses/guide) but never re-sound; pauses on
                   'shed' (its own mic) — loaded right after midi.js
+js/audioin.js     SOUND INPUT (App.audioIn): the ONE shared live-input service.
+                  Opens audio.inId RAW (no echo cancel / noise suppression /
+                  AGC, channelCount ideal 2, deviceId exact). HEAR INPUT
+                  (audio.monitor, default off): source -> ONE GainNode
+                  (audio.inGain 0-200 %) -> App.getAudio().destination (master
+                  volume + soft clipper apply), never connected when off — how
+                  a MODX/MONTAGE on USB audio ("Line (MODX)") plays through.
+                  AnalyserNode tap after the gain = level() {peak, rms, clip}.
+                  The stream is open only while needed: Hear input, or
+                  hold(tag)/release(tag) (the Settings meter); tab switches
+                  never close it; app hidden KEEPS Hear input sounding (a mixer
+                  passthrough) but releases anything not heard. HOLDS
+                  (state.held + why + msg, nothing routed, device released when
+                  no meter holds it): 'mic' = a mic-like or loopback label
+                  (isMic: MIC_RE incl. Mikrofon/Micrófono/Stereo Mix, minus
+                  INSTR_RE interfaces like "Microphone (USB Audio CODEC)") that
+                  is not a chosen input the user pressed On for; 'fell' = the
+                  chosen input is missing — Hear input WAITS for it, the system
+                  default stands in only for a meter or after On is pressed
+                  again (ack); 'perm' = launch restore without a granted
+                  permission (permissions.query; 'denied' or a declined prompt
+                  switches audio.monitor off). A busy device (NotReadable) is an
+                  error, never a fallback. devicechange: unplug closes + says
+                  so, the chosen id newly listed re-opens, the mic check re-runs
+                  (a new OS default). A suspended context = state.paused + the
+                  #snd-hint "tap to start". audio.inLabel = the chosen input's
+                  name for "is not connected" notes. Bus 'audioin:state',
+                  'audioin:device' {id} (tone-in re-opens on it; tone-in opens
+                  audio.inId EXACT and retries on devicechange / track end).
+                  No getUserMedia or a frame without the microphone permission
+                  policy = supported false, a message, never a throw. Settings
+                  card "Sound input & output": Input/Output selects once device
+                  names are readable (else List devices; the first Hear input
+                  On only asks + lists), Hear input seg (aria-pressed, .held),
+                  gain, meter (opens the device only while Hear input / tone-in
+                  / a picked input is in use, else a Test input button), MODX/
+                  MONTAGE hint + auto-pick only while no input was ever chosen
+                  (audio.inPicked); a missing chosen input/output is kept, and
+                  audio.outId is re-applied (setSinkId) when it is listed again.
+                  Suite tests/audioin.test.js (Chromium fake media device).
+                  Loaded right after tonein.js.
 js/metronome.js   ┐ feature modules; each registers (metronome = the corner
                   │  sheet, not a page — see OVERLAY SHEETS)
 js/fretboard.js   │ App.register(name, {init, onShow, onHide, onKey})
@@ -309,6 +350,15 @@ android/          APK project — build.ps1 (no Gradle: javac→d8→aapt→zipa
                   MidiManager (USB + any system MIDI device) + Bluetooth LE
                   MIDI scan/connect (BLUETOOTH_SCAN/CONNECT; location <= 11),
                   last BLE device reconnects at launch. Same protocol as iOS.
+                  Settings › MIDI shows the bridge's midi:status text too
+                  (tests/btmidi.test.js fakes the bridge). WINDOWS BLUETOOTH
+                  MIDI: Chromium's default Windows MIDI (WinMM) lists no BLE
+                  ports; --enable-features=MidiManagerWinrt (chrome://flags
+                  use-winrt-midi-api; WebView2 via WEBVIEW2_ADDITIONAL_BROWSER_
+                  ARGUMENTS) does. releases/soundLAB-windows.bat shortcuts pass
+                  it; Settings › MIDI shows a hint until a Bluetooth port is
+                  listed. A BLE keyboard stays connected only while an app
+                  holds its port (a LUMI searches again when soundLAB closes).
                   build.ps1 (PC) and build.sh (Linux/cloud: ANDROID_JAR,
                   BUILD_TOOLS, KEYSTORE, D8_JAR — build-tools-34 d8 crashes on
                   JDK 21, use r8 8.7.x from Google Maven) both write
@@ -451,7 +501,8 @@ version.json      auto-update feed (source of truth for latest version)
   SL_URL / CHROMIUM / AAPT). Suites: fingering (pure Node), lights (a fake
   LUMI via a stubbed requestMIDIAccess), keys, practice,
   game, quiz, nav, smoke, taps, update, midihub (a fake synth port: raw tap,
-  rules on Thru / input filter, profiles + SysEx builders, clock). Run them
+  rules on Thru / input filter, profiles + SysEx builders, clock), audioin
+  (fake media device), btmidi (a fake Android MidiBridge). Run them
   before every release and add a suite or checks for new features.
   PC (2026-10-19): Node 24 IS on this machine now; install playwright into a
   scratch folder (`npm i playwright@1.49.1 && npx playwright install chromium`)

@@ -49,7 +49,8 @@ const J = JSON.stringify;
   });
   ok(nav.active === 'midihub' && nav.group === 'Keys' && nav.pills === 'Piano|Synth|Pads|MIDI', 'MIDI Hub is the fourth Keys pill: ' + nav.pills);
   ok(nav.views === 'play,controls,rules,sysex,monitor,learn', 'six views: ' + nav.views);
-  ok(nav.ports && nav.inSel === 'in1' && nav.outSel === 'out1' && /In: Synth Port 1/.test(nav.status), 'ports picked from the shared MIDI service: ' + nav.status);
+  // the shared service hears All keyboards by default (v0.79 multi-input)
+  ok(nav.ports && nav.inSel === 'all' && nav.outSel === 'out1' && /In: All keyboards · Out: Synth Port 1/.test(nav.status), 'ports picked from the shared MIDI service: ' + nav.status);
   ok(nav.keys === '15/10' && nav.tour, 'two octaves of keys and a help tour');
 
   console.log('# app voice muted on the Hub');
@@ -98,7 +99,9 @@ const J = JSON.stringify;
 
   console.log('# in: raw tap, monitor, decode');
   const inn = await page.evaluate(() => {
-    document.querySelector('#mh-views [data-view="monitor"]').click(); document.getElementById('mh-monclear').click();
+    // Panic then Clear in the same frame: Clear also drops the 64 rows still
+    // waiting for the monitor's next frame (they used to show up after it)
+    document.querySelector('#mh-views [data-view="monitor"]').click(); document.getElementById('mh-panic').click(); document.getElementById('mh-monclear').click();
     const raw = []; App.on('midi:raw', d => raw.push(d.bytes));
     __recv([0xF8]); __recv([0x90, 64, 90]); __recv([0xB0, 74, 12]); __recv([0xF0, 0x43, 0x00, 0xF7]);
     return new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => r({
