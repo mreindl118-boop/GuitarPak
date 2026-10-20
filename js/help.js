@@ -90,6 +90,7 @@
     midihub: [
       { t: 'MIDI Hub', x: 'Everything on the MIDI cable, for any device: a synth, a controller, a DAW port. Connect, pick In and Out, and the Monitor shows every message decoded as you play or turn knobs.' },
       { sel: '#mh-views', t: 'Six views', x: 'Play sends notes, bend, mod and program changes. Controls is a wall of CC sliders plus transport and clock. Rules reshape messages. SysEx talks to the deep settings. Monitor reads everything. Learn explains it all.' },
+      { sel: '#mh-hear', t: 'Only the device sounds', x: 'While this page is open soundLAB keeps its own piano quiet, so a synth is never doubled. Tick App voice to hear both. For every other page the same switch lives in Settings › MIDI keyboard.' },
       { sel: '#mh-thru', t: 'Thru and Rules', x: 'Thru passes In to Out through your Rules — remap a knob, transpose, force a channel, block aftertouch. Rules can also change what soundLAB itself hears, on every page.' },
       { sel: '#mh-profile', t: 'Device profiles', x: 'Generic speaks plain MIDI to anything. A profile adds named knobs and ready-made SysEx builders for that maker (Yamaha MODX/MONTAGE, Roland…) — nothing else changes.' }
     ],

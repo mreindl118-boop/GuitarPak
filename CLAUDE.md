@@ -65,6 +65,14 @@ js/midi.js        MIDI service (App.midi: in/out ports, note/bend/pressure
                   output) and App.midi.setInputFilter(fn) — ONE fn(bytes) ->
                   bytes|null run before dispatch (null drops it); the Hub
                   installs its rules there when midihub.rulesIn is on.
+                  v0.78.1 APP SOUND: midi:note carries mute:true when
+                  midi.appSound is false (Settings > MIDI keyboard switch,
+                  App.midi.setAppSound) or any App.midi.mute(owner, on) is
+                  held (the Hub holds 'midihub' while open unless midihub.
+                  hear) - only piano.js's voice honours it; pads, lessons,
+                  quiz, range learning and lights still react (unlike
+                  tone-in's silent:true). A synth that sounds itself is
+                  never doubled.
 js/tonein.js      1/4"/audio-in TONE-IN: pitch-detects the selected audio
                   input (audio.inId; toggle audio.tonein in Settings) and
                   emits midi:note {silent:true} — instrument pages show the

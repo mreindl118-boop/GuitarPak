@@ -9,7 +9,7 @@
  *
  * Loaded right after app.js so every module can use it. Broadcasts on the bus:
  *   'midi:state'    {supported, ready, inputName, outputName}
- *   'midi:note'     {on, midi, vel, chan}      note on/off (vel 0-127)
+ *   'midi:note'     {on, midi, vel, chan, mute} note on/off (vel 0-127; mute = don't re-sound)
  *   'midi:bend'     {chan, semis}              pitch bend in semitones
  *   'midi:pressure' {chan, val}                channel pressure 0-127
  *   'midi:raw'      {bytes}                    every incoming message, untouched
@@ -85,16 +85,24 @@
     return out;
   }
 
+  // APP SOUND (v0.78.1): a hardware synth makes its own sound, so soundLAB
+  // must not double it. midi.appSound false (Settings), or any mute owner
+  // (the MIDI Hub page while open), tags midi:note with mute:true - the
+  // visuals, pads, lessons and the keybed still react, only the Keys page
+  // voice stays quiet. Distinct from tone-in's silent:true (not a keyboard).
+  var muteOwners = {};
+  function muted() { return App.store.get('midi.appSound', true) === false || Object.keys(muteOwners).length > 0; }
+
   // one complete channel message -> app events
   function dispatch(d) {
     if (!d || d.length < 2) return;
-    var st = d[0] & 0xf0, chan = d[0] & 0x0f;
+    var st = d[0] & 0xf0, chan = d[0] & 0x0f, mute = muted();
     if (st === 0x90 && d[2] > 0) {
       held[d[1]] = d[2];
-      App.emit('midi:note', { on: true, midi: d[1], vel: d[2], chan: chan });
+      App.emit('midi:note', { on: true, midi: d[1], vel: d[2], chan: chan, mute: mute });
     } else if (st === 0x80 || (st === 0x90 && d[2] === 0)) {
       delete held[d[1]];
-      App.emit('midi:note', { on: false, midi: d[1], vel: 0, chan: chan });
+      App.emit('midi:note', { on: false, midi: d[1], vel: 0, chan: chan, mute: mute });
     } else if (st === 0xe0) {
       var raw = ((d[2] << 7) | d[1]) - 8192;
       if (bendOn()) App.emit('midi:bend', { chan: chan, semis: (raw / 8192) * bendRange });
@@ -613,6 +621,11 @@
     // messages, SysEx, realtime) and install ONE input filter fn(bytes) ->
     // bytes | null that runs before dispatch (null drops the message)
     send: function (bytes) { return sendBytes(bytes); },
+    // app sound for MIDI notes: the Settings switch + per-owner mutes (Hub)
+    get appSound() { return App.store.get('midi.appSound', true) !== false; },
+    setAppSound: function (on) { App.store.set('midi.appSound', on !== false); },
+    mute: function (owner, on) { if (on) muteOwners[owner] = true; else delete muteOwners[owner]; },
+    get muted() { return muted(); },
     setInputFilter: function (fn) { inputFilter = typeof fn === 'function' ? fn : null; },
     get inputFilter() { return inputFilter; },
     setInput: setInput,

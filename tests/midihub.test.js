@@ -52,6 +52,27 @@ const J = JSON.stringify;
   ok(nav.ports && nav.inSel === 'in1' && nav.outSel === 'out1' && /In: Synth Port 1/.test(nav.status), 'ports picked from the shared MIDI service: ' + nav.status);
   ok(nav.keys === '15/10' && nav.tour, 'two octaves of keys and a help tour');
 
+  console.log('# app voice muted on the Hub');
+  const mu = await page.evaluate(() => {
+    const notes = []; App.on('midi:note', d => notes.push(!!d.mute));
+    __recv([0x90, 50, 90]); __recv([0x80, 50, 0]);
+    const onHub = notes.slice();
+    document.getElementById('mh-hear').checked = true; document.getElementById('mh-hear').dispatchEvent(new Event('change'));
+    __recv([0x90, 50, 90]); __recv([0x80, 50, 0]);
+    const hear = notes.slice(2);
+    document.getElementById('mh-hear').checked = false; document.getElementById('mh-hear').dispatchEvent(new Event('change'));
+    App.switchTo('piano');
+    __recv([0x90, 50, 90]); __recv([0x80, 50, 0]);
+    const piano = notes.slice(4);
+    App.midi.setAppSound(false);
+    __recv([0x90, 50, 90]); __recv([0x80, 50, 0]);
+    const off = notes.slice(6);
+    App.midi.setAppSound(true); App.switchTo('midihub');
+    return { onHub, hear, piano, off, muted: App.midi.muted, info: document.getElementById('mh-thruinfo').textContent };
+  });
+  ok(mu.onHub.join() === 'true,true' && mu.hear.join() === 'false,false', 'Hub open: incoming notes carry mute, App voice ticked clears it: ' + J(mu));
+  ok(mu.piano.join() === 'false,false' && mu.off.join() === 'true,true' && mu.muted && /muted here/.test(mu.info), 'other pages follow the Settings switch; back on the Hub it is muted again');
+
   console.log('# out: keys, controls, program, panic');
   const out1 = await page.evaluate(() => {
     App.store.set('midihub.ch', 2); document.getElementById('mh-ch').value = '2'; document.getElementById('mh-ch').dispatchEvent(new Event('change'));

@@ -143,6 +143,9 @@
             '<button type="button" data-bend="48">&plusmn;48 (ROLI)</button>' +
           '</div>' +
         '</div>' +
+        '<label class="row tight small muted" style="gap:6px;margin-top:14px">' +
+          '<input type="checkbox" id="set-midi-appsound">Play soundLAB&rsquo;s voice for the notes my keyboard sends. Turn it OFF for a synth or stage piano that makes its own sound (a MODX, a Nord&hellip;) so nothing is doubled; a silent controller like a LUMI needs it ON. The MIDI Hub page mutes the voice by itself while open.' +
+        '</label>' +
         '<div class="row tight" style="margin-top:14px">' +
           '<button type="button" class="btn sm" id="set-open-lights">Lights &amp; help</button>' +
           '<span class="muted small">Key lights (a LUMI shows the scale in your colors), brightness and the Help level live in one place: the keyboard icon at the top of every page.</span>' +
@@ -522,6 +525,10 @@
     if (App.midi) paintBend();
 
     document.getElementById('set-open-lights').addEventListener('click', function () { App.switchTo('lights'); });
+
+    var asChk = document.getElementById('set-midi-appsound');
+    asChk.checked = !App.midi || App.midi.appSound;
+    asChk.addEventListener('change', function () { if (App.midi) App.midi.setAppSound(!!this.checked); });
 
     var toneChk = document.getElementById('set-tonein');
     toneChk.checked = App.store.get('audio.tonein', false) === true;

@@ -1618,11 +1618,11 @@
       var studioArmed = App.space === 'studio' && App.store.get('st.armed', null);
       var padsOwn = App.active === 'pads'; // the pads page owns the keys there
       if (d.on) {
-        if (!studioArmed && !padsOwn && !d.silent) noteOn(d.midi, d.vel, d.chan);
+        if (!studioArmed && !padsOwn && !d.silent && !d.mute) noteOn(d.midi, d.vel, d.chan);
         pressKeyHold(d.midi, true);
         guideCheck(d.midi);
       } else {
-        if (!padsOwn && !d.silent) noteOff(d.midi, d.chan);
+        if (!padsOwn && !d.silent && !d.mute) noteOff(d.midi, d.chan);
         pressKeyHold(d.midi, false);
       }
     }, true); // sound first, visuals after

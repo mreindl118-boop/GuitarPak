@@ -1,6 +1,6 @@
 {
   "version": "0.75.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/soundLAB-alpha.apk",
-  "web": "0.78.0",
-  "notes": "New MIDI Hub under Keys: read, write and reshape MIDI for any device — on-screen keys, CC sliders, rules (remap, transpose, block), SysEx builders, and a live monitor."
+  "web": "0.78.1",
+  "notes": "A synth is no longer doubled by soundLAB's piano: the MIDI Hub mutes the app voice while open (tick App voice to hear both), and Settings > MIDI keyboard has the same switch for every page."
 }

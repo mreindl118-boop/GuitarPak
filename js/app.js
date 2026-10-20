@@ -89,7 +89,7 @@ window.App = (function () {
   //            when an APK is actually built. Older APKs read nothing else, so
   //            this must never run ahead of the real file: when it did, the
   //            Android app kept downloading the same old APK in a loop.
-  var APP_VERSION = '0.78.0';
+  var APP_VERSION = '0.78.1';
   var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
 
   function verNum(v) {
@@ -1223,7 +1223,7 @@ window.App = (function () {
     document.addEventListener('pointerdown', warm, true);
     document.addEventListener('keydown', warm, true);
     on('midi:note', function (d) {
-      if (!d || !d.on || d.silent || unlocked() || hint) return;
+      if (!d || !d.on || d.silent || d.mute || unlocked() || hint) return;
       hint = document.createElement('div');
       hint.id = 'snd-hint';
       hint.setAttribute('role', 'status');

@@ -340,6 +340,11 @@
   }
   function paintClock() { if (els.clockBtn) { els.clockBtn.textContent = clockTimer ? 'Clock out: on · ' + Math.round(bpm()) + ' BPM' : 'Clock out: off'; els.clockBtn.classList.toggle('active', !!clockTimer); } }
 
+  // the app's own piano stays quiet while the Hub is open (a synth already
+  // sounds its notes) unless 'App voice' is ticked; other pages follow the
+  // Settings switch (midi.appSound)
+  function applyMute() { if (midi() && midi().mute) midi().mute('midihub', App.active === 'midihub' && !g('hear', false)); }
+
   // ---- views ----
   function view(name) {
     set('view', name);
@@ -364,9 +369,9 @@
     var inN = m.inputs.filter(function (p) { return String(p.id) === String(m.inputId); })[0], outN = m.outputs.filter(function (p) { return String(p.id) === String(m.outputId); })[0];
     els.status.textContent = (inN ? 'In: ' + inN.name : 'In: none') + ' · ' + (outN ? 'Out: ' + outN.name : 'Out: none');
     els.status.className = 'mh-status ' + (inN || outN ? 'ok' : 'bad');
-    var warnLights = outN && m.lightsOn && !m.lumi;
+    var warnLights = outN && m.lightsOn && !/lumi/i.test(outN.name || ''); // by the OUTPUT's name: a LUMI input + synth output must not paint the synth
     els.lightsWarn.hidden = !warnLights;
-    els.thruInfo.textContent = g('thru', false) ? 'Thru on: In → Rules → Out' : '';
+    els.thruInfo.textContent = (g('thru', false) ? 'Thru on: In → Rules → Out. ' : '') + (g('hear', false) ? '' : 'soundLAB\u2019s voice is muted here: the device makes the sound.');
   }
 
   function render() {
@@ -383,6 +388,7 @@
           '<label class="field">Channel<select id="mh-ch">' + chOpts + '</select></label>' +
           '<label class="field">Device<select id="mh-profile">' + profOpts + '</select></label>' +
           '<label class="mh-chk" title="Pass everything from In to Out, through the Rules"><input type="checkbox" id="mh-thru"' + (g('thru', false) ? ' checked' : '') + '> Thru</label>' +
+          '<label class="mh-chk" title="Also play soundLAB\u2019s own piano for the notes coming in. Off = only the device sounds (no doubled notes)."><input type="checkbox" id="mh-hear"' + (g('hear', false) ? ' checked' : '') + '> App voice</label>' +
           '<button type="button" class="btn sm danger" id="mh-panic" title="All notes off + all sound off on every channel">Panic</button>' +
         '</div>' +
         '<div class="row tight small" style="margin-top:8px"><span id="mh-status" class="mh-status"></span><span class="muted" id="mh-thruinfo"></span></div>' +
@@ -497,6 +503,7 @@
           '<li>Pick its port as <b>In</b> and <b>Out</b>. Many synths show one port per function; the one named after the device (often “-1” or “Port 1”) is the sound engine.</li>' +
           '<li>Open <b>Monitor</b>, play the device and turn its knobs: every message is decoded live. That is the fastest way to learn what anything sends.</li>' +
           '<li>Go to <b>Play</b> and send notes back. If nothing sounds, check the channel (the device listens on specific channels) and that Out is the right port.</li>' +
+          '<li>Hearing two sounds per note on other pages? Your synth plays itself AND soundLAB plays its piano. Here the app voice is muted unless you tick <b>App voice</b>; for every page, turn off \u201cPlay soundLAB\u2019s voice\u201d in Settings \u203a MIDI keyboard.</li>' +
           '<li>Pick a <b>Device</b> profile for named knobs and ready-made SysEx builders; Generic works everywhere.</li>' +
         '</ol>' +
         '<h3>About this device</h3><ul id="mh-devnotes"></ul>' +
@@ -532,7 +539,7 @@
       '</div>' +
       '<div class="mh-toast" id="mh-toast" hidden></div>';
 
-    var ids = ['connect', 'ports', 'in', 'out', 'ch', 'profile', 'thru', 'panic', 'status', 'thruinfo', 'lightswarn', 'ledin', 'ledout', 'lastin', 'lastout',
+    var ids = ['connect', 'ports', 'in', 'out', 'ch', 'profile', 'thru', 'hear', 'panic', 'status', 'thruinfo', 'lightswarn', 'ledin', 'ledout', 'lastin', 'lastout',
       'octdn', 'octup', 'octlabel', 'vel', 'velval', 'sus', 'alloff', 'kb', 'chlabel', 'pb', 'pbv', 'mod', 'modv', 'at', 'atv', 'msb', 'lsb', 'prog', 'sendprog', 'progprev', 'prognext', 'bankhint',
       'newcc', 'newccname', 'addcc', 'resetcc', 'ccgrid', 'switches', 'start', 'cont', 'stop', 'clock',
       'rulesin', 'rulesapp', 'addrule', 'rules', 'idreq', 'idreply', 'sxcard', 'raw', 'rawsend', 'rawerr', 'rx', 'rxcopy', 'rxraw', 'rxinfo',
@@ -562,6 +569,7 @@
       renderCcs(); renderSysex(); renderNotes(); toast('Profile: ' + p.name);
     });
     els.thru.addEventListener('change', function () { set('thru', this.checked); paintPorts(); });
+    els.hear.addEventListener('change', function () { set('hear', this.checked); applyMute(); paintPorts(); });
     els.panic.addEventListener('click', panic);
 
     // play
@@ -831,8 +839,8 @@
 
   App.register('midihub', {
     init: init,
-    onShow: function () { paintPorts(); paintClock(); if (midi() && midi().supported && !midi().ready && App.store.get('midi.wanted', false)) midi().enable().then(paintPorts).catch(function () { }); },
-    onHide: function () { releaseAll(); if (sustain) setSustain(false); },
+    onShow: function () { applyMute(); paintPorts(); paintClock(); if (midi() && midi().supported && !midi().ready && App.store.get('midi.wanted', false)) midi().enable().then(paintPorts).catch(function () { }); },
+    onHide: function () { releaseAll(); if (sustain) setSustain(false); if (midi() && midi().mute) midi().mute('midihub', false); },
     onKey: function (e) {
       if (e.repeat) return;
       if (e.code in KB_KEYS) { press(base() + KB_KEYS[e.code]); e.preventDefault(); }
