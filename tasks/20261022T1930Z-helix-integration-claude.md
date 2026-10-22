@@ -52,7 +52,7 @@ Claude read both read-only and changed neither.
 
 ## Verified
 
-- `tests/helix.test.js`: 53 checks pass on `5e5bfde`: startup silence,
+- `tests/helix.test.js`: 51 checks pass on `5e5bfde` (the commit message says 53, a miscount): startup silence,
   disarmed refusals with snap-back, lifecycle disarms, failed-send disarm,
   safe mode off, favorites, observed, ★ addresses, port isolation with MODX /
   LUMI / loopMIDI ports, plus the earlier MIDI, bridge and presets checks.
