@@ -796,9 +796,16 @@ window.App = (function () {
   // the current key's scale play — from MIDI keyboards (midi.js drops the
   // note-on), the MIDI Hub's thru, the on-screen keys and the neck. Pages
   // that need every note keep it off; note-offs always pass (nothing hangs).
-  var LOCK_FREE = { quiz: true, settings: true, pads: true };
+  // Woodshed and Songs judge their own material (Hanon in C, imported songs),
+  // Pads and armed Studio drum tracks play drums, not pitches
+  var LOCK_FREE = { quiz: true, settings: true, pads: true, shed: true, songs: true };
   function lockOn() { return store.get('scale.lock', false) === true; }
-  function lockActive() { return lockOn() && !LOCK_FREE[active]; }
+  function drumsArmed() {
+    if (space !== 'studio' || !(window.DAW && DAW.engine && DAW.engine.tracks)) return false;
+    var id = store.get('st.armed', null);
+    return DAW.engine.tracks.some(function (t) { return t.id === id && t.kind === 'drums'; });
+  }
+  function lockActive() { return lockOn() && !LOCK_FREE[active] && !drumsArmed(); }
   function lockAllows(midi) {
     if (!lockActive()) return true;
     var r = store.get('fb.root', 9), sc = store.get('fb.scale', 'minorPent');
@@ -829,6 +836,10 @@ window.App = (function () {
       lastY = y;
       var ae = document.activeElement;
       if (dy > 0 && ae && ae.tagName === 'INPUT' && topbar.contains(ae)) return; // typing the BPM
+      // the clef dropdown is open: a re-render after a pick can nudge the page
+      // (scroll anchoring) — never read that as a scroll down; a real scroll
+      // gesture starts with a tap outside, which closes it first
+      if (dy > 0 && ctxIsOpen()) return;
       setBarHidden(dy > 0);
     }, { passive: true });
     topbar.addEventListener('focusin', showBar);

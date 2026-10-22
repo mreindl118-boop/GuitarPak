@@ -173,6 +173,17 @@
   function flashRec(msg) {
     var el = document.getElementById('cx-rec-msg');
     if (!el) return;
+    // the ● and its line live in the clef dropdown: when that is tucked away
+    // (a page button: Keep the last 30s, an idea's key), say it in a toast
+    if (App.ctx && !App.ctx()) {
+      el = document.getElementById('sd-toast');
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'sd-toast';
+        el.setAttribute('role', 'status');
+        document.body.appendChild(el);
+      }
+    }
     el.textContent = msg;
     el.style.display = '';
     if (flashT) clearTimeout(flashT);

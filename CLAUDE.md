@@ -495,8 +495,10 @@ version.json      auto-update feed (source of truth for latest version)
   sheet's On/Off resets to 'auto') and SCALE LOCK (#cx-lock -> App.scaleLock
   {on, active, set, allows(midi)}, store scale.lock, 'scale:lock' event):
   out-of-scale note-ONs are dropped in midi.js dispatch, the Hub's thru, the
-  Keys page touch/QWERTY and fretboard taps (note-offs always pass); paused on
-  LOCK_FREE pages (quiz, settings, pads); html.scale-locked dims the
+  Keys page touch/QWERTY and fretboard taps (note-offs always pass); the Hub
+  checks it AFTER its rules; paused on LOCK_FREE pages (quiz, settings, pads,
+  shed, songs: they judge their own material) and while a Studio drum track
+  is armed; html.scale-locked dims the
   unplayable on-screen keys. It reads the
   shared stores (fb.root/fb.scale/fb.mode, met.bpm, met.sig) and pushes changes
   over the bus; pages must NOT grow their own duplicate selects for these.

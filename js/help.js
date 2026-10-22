@@ -76,8 +76,8 @@
       { t: 'Theory', x: 'The circle of fifths, a guide to what chords live in every key, and an ear quiz for scale degrees. Tap around the circle — the app’s key follows.' }
     ],
     song: [
-      { t: 'Your song', x: 'The Studio’s home. There’s always a current song — its key and tempo are whatever the top bar says, and everything you capture or build lands in it.' },
-      { sel: '#cx-rec', t: 'The capture button', x: 'This red dot works on EVERY page, both sides of the app. Tap it, play anything — ROLI, typing keys, touch piano — tap again, and it’s saved in Ideas with the key and tempo you played it in.' },
+      { t: 'Your song', x: 'The Studio’s home. There’s always a current song — its key and tempo are whatever the clef at the top says, and everything you capture or build lands in it.' },
+      { sel: '#ctx-btn', t: 'The capture button', x: 'Tap the clef, then the red dot: it works on every Studio page. Tap it, play anything — ROLI, typing keys, touch piano — tap again, and it’s saved in Ideas with the key and tempo you played it in. While it records, the clef shows a red dot.' },
       { sel: '#sd-gotracks', t: 'Build it in Tracks', x: 'Tracks is the loop workstation: drums, synths and samplers all looping in sync. Ideas can be sent there with one tap.' }
     ],
     arrange: [

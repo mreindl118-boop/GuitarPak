@@ -100,6 +100,10 @@ const keys = o => Object.keys(o).map(Number).sort((a, b) => a - b);
     k.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
     document.querySelector('#pn-svg .pn-key[data-midi="62"]').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
     o.touch = inputs; o.dim = getComputedStyle(k).filter;
+    App.switchTo('shed'); seen.length = 0; __play(61);
+    o.shed = seen.join(); seen.length = 0;
+    App.switchTo('songs'); o.songs = App.scaleLock.active;
+    App.switchTo('piano');
     document.getElementById('cx-lock').click();
     __play(61); o.after = seen.join(); o.off = !App.scaleLock.on && !document.documentElement.classList.contains('scale-locked');
     return o;
@@ -109,6 +113,28 @@ const keys = o => Object.keys(o).map(Number).sort((a, b) => a - b);
   ok(lock.quiz === '+61,-61' && !lock.quizActive, 'Exercises need every note: the lock pauses there: ' + lock.quiz);
   ok(lock.touch === 1 && /brightness/.test(lock.dim), 'on-screen keys outside the scale are dimmed and do not play: ' + JSON.stringify([lock.touch, lock.dim]));
   ok(lock.off && lock.after.endsWith('+61,-61'), 'unlocked: every note plays again: ' + lock.after);
+  ok(lock.shed === '+61,-61' && lock.songs === false, 'Woodshed and Songs judge their own material: the lock pauses there: ' + JSON.stringify([lock.shed, lock.songs]));
+  const studio = await page.evaluate(async () => {
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+    App.scaleLock.set(true);
+    App.switchTo('tracks'); await wait(900); // the studio wipe
+    const o = { space: App.space, melodic: App.scaleLock.active };
+    let drums = DAW.engine.tracks.find(t => t.kind === 'drums'), temp = false;
+    if (!drums) { drums = { id: 'test-drums', kind: 'drums' }; DAW.engine.tracks.push(drums); temp = true; }
+    App.store.set('st.armed', drums.id); o.drums = App.scaleLock.active; App.store.set('st.armed', null);
+    if (temp) DAW.engine.tracks.splice(DAW.engine.tracks.indexOf(drums), 1);
+    App.scaleLock.set(false);
+    App.switchTo('ideas'); await wait(150);
+    const b = document.getElementById('sd-retro');
+    if (b) b.click();
+    await wait(50);
+    const t = document.getElementById('sd-toast');
+    o.toast = t ? t.textContent : null; o.toastShown = !!t && t.getBoundingClientRect().height > 0;
+    App.switchTo('quiz'); await wait(900);
+    return o;
+  });
+  ok(studio.space === 'studio' && studio.melodic && studio.drums === false, 'Studio: the lock holds for melodic tracks, not an armed drum track: ' + JSON.stringify(studio));
+  ok(studio.toast && studio.toastShown, 'Ideas page messages show in a toast while the clef dropdown is tucked away: ' + studio.toast);
   const col = await page.evaluate(() => {
     App.help.set(4); const from = __sent.length; App.store.set('lights.bright', 40); App.midi.repaint();
     const sx = __sent.slice(from).filter(b => b[0] === 0xf0 && b[6] === 0x10);

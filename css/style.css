@@ -876,7 +876,7 @@ button .ic, .chip .ic { display: inline-block; }
 ::-webkit-scrollbar-thumb:hover { background: var(--ctl-border); }
 
 /* update banner */
-#snd-hint, #back-hint, #xp-toast {
+#snd-hint, #back-hint, #xp-toast, #sd-toast {
   position: fixed;
   left: 50%;
   bottom: calc(18px + env(safe-area-inset-bottom, 0px));
@@ -893,7 +893,7 @@ button .ic, .chip .ic { display: inline-block; }
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
 }
 
-#back-hint, #xp-toast { width: auto; max-width: calc(100vw - 32px); text-align: center; }
+#back-hint, #xp-toast, #sd-toast { width: auto; max-width: calc(100vw - 32px); text-align: center; }
 
 #app-update {
   position: fixed;
@@ -959,7 +959,7 @@ button .ic, .chip .ic { display: inline-block; }
   .goal-due .tabbar-bottom .tabbar-btn[data-group="gtheory"]::after { top: 4px; right: calc(50% - 30px); }
   main { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
   .foot { padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
-  #snd-hint, #back-hint, #xp-toast, #app-update { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+  #snd-hint, #back-hint, #xp-toast, #sd-toast, #app-update { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
 }
 
 @media (max-width: 640px) {
