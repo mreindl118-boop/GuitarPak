@@ -37,6 +37,7 @@ var ASSETS = [
   'js/xp.js',
   'js/quiz.js',
   'js/practiceplan.js',
+  'js/helix.js',
   'js/help.js',
   'js/plugins.js',
   'manifest.webmanifest',

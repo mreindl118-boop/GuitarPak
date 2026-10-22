@@ -42,12 +42,20 @@
     }
   }
 
+  // the Helix Stadium plugin became a built-in page (js/helix.js, 0.82.0): a
+  // stored copy would add a second set of listeners and a second MIDI route,
+  // so it is skipped and flagged for removal instead of run
+  function supersededBy(p) {
+    return window.SLHelix && SLHelix.builtIn && /window\.SLHelix\s*=/.test(p.code || '') ? 'Helix' : '';
+  }
+
   function runStored() {
     var l = list();
     var dirty = false;
     l.forEach(function (p) {
       if (p.on === false) return;
-      var hadErr = p.error;
+      var hadErr = p.error, by = supersededBy(p);
+      if (by) { p.error = 'Built in now: open Guitar › ' + by + '. Remove this plugin.'; if (p.error !== hadErr) dirty = true; return; }
       runOne(p);
       if (p.error !== hadErr) dirty = true;
     });
