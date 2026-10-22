@@ -16,11 +16,12 @@ Line 6 added USB editing in app/firmware 1.4 (release notes dated 2026-10-13;
 hardware firmware 1.4.1 on 2026-10-20); this pedal runs 1.1.0, and whether 1.4
 carries the same protocol over that bulk interface is unexplored.
 
-**Windows needs no Line 6 driver for MIDI.** null's device inventory on this PC
-(2026-10-22) found the Stadium's MIDI on Microsoft's class driver
-(`wdma_usb.inf`) and audio on `usbaudio2.inf`, with no Line 6 software
-installed — and MIDI to the pedal worked. The manual still recommends the
-Stadium ASIO driver for low-latency audio.
+**On this PC, MIDI worked without a Line 6 driver.** null's device inventory
+(2026-10-22, Windows 11 build 26200) found the Stadium's MIDI on Microsoft's
+class driver (`wdma_usb.inf`) and audio on `usbaudio2.inf`, with no Line 6
+software installed, and MIDI to the pedal worked. That is one observed
+system, not a rule: the official manual still calls for the Stadium ASIO
+driver on Windows.
 
 ## Running the bridge
 
@@ -61,7 +62,10 @@ Shea), which generated it from the Helix Stadium app's bundled `modeldefs`.
   confirm — unsaved edits on the pedal are lost).
 - **Looper & Song** — CC52–62 and CC10/46–51/63.
 - **Mixer** — the Matrix mixer per output layer (¼" ch 3, XLR ch 4, Phones
-  ch 5): level, pan, mute, solo, clear solos.
+  ch 5): level, pan, mute, solo, clear solos. Per null's reading of Line 6's
+  release notes, Matrix MIDI needs firmware 1.4 (and Showcase commands 1.3);
+  this pedal runs 1.1.0, so the Mixer view is unverified and probably inert
+  on it. Snapshot CC69 works on 1.1.0 (read back over the network).
 - **Monitor** — every MIDI byte and every bridge message in and out, raw MIDI
   hex send, raw OSC send (address + JSON args; the request id is added).
 
