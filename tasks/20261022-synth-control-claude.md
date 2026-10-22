@@ -21,10 +21,10 @@
 - Claimed files: `js/midihub.js`, `js/midi.js` (an additive `sendTo`),
   `tests/midihub.test.js`, `js/help.js` (the `TOURS.midihub` entry only),
   this record.
-- Created / updated: 2026-10-22T16:24:00Z
-- Status: in-progress
+- Created / updated: 2026-10-22T16:24:00Z / 2026-10-22T17:30:00Z
+- Status: ready-for-review (`feat/synth-control` at `3c09036`; not live)
 - Remote confirmation: 2026-10-22T16:23:56Z, `main` = `1dbbb32`; no other
   record claims these paths. PR84 (`codex/midi-hub-release-0.78.0-20261019`)
   also edits `js/midihub.js` but is superseded on `main`; left untouched.
-- Evidence: pending.
-- Next action / next owner: Claude builds and tests; hands off for 0.80.0.
+- Evidence: handoff `tasks/20261022T1730Z-synth-control-claude.md`; 17 suites, 568 checks pass.
+- Next action / next owner: Matt approves going live; Claude then pushes `main`.
