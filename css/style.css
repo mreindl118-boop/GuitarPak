@@ -55,6 +55,13 @@
   --accent: #ffab47;        /* tube amber */
   --accent-dim: #c97f26;
   --accent-glow: rgba(255, 171, 71, 0.35);
+  /* tints derived from the accent, so they follow the light theme and
+     Settings › Accent (App.setAccent sets --accent inline) */
+  --accent-soft: color-mix(in srgb, var(--accent) 13%, transparent);
+  --accent-line: color-mix(in srgb, var(--accent) 60%, transparent);
+  --accent-ink: var(--accent);  /* accent as TEXT (deepened in the light theme) */
+  --warn: #ffb36b;
+  --h-ctl: 34px;          /* one height for toolbar controls (38 on touch) */
   --teal: #4cc9b0;
   --green: #77d98b;
   --red: #ff6f6f;
@@ -81,14 +88,25 @@
   --line: #d8cfc1;
   --line-soft: rgba(0, 0, 0, 0.05);
   --text: #2b241d;
-  --muted: #857b6b;
+  --muted: #756b5c;
   --label: #6e6355;
   --ctl-border: #c2b6a2;
   --accent: #d97e0f;        /* amber, darkened for contrast on light */
   --accent-dim: #b96a10;
   --accent-glow: rgba(217, 126, 15, 0.28);
+  /* accent-colored labels (active tab / pill / seg / chip) need >= 4.5:1 on
+     the pale cards; follows Settings › Accent via the inline --accent */
+  --accent-ink: color-mix(in srgb, var(--accent) 70%, #000);
+  --warn: #9a5a0c;
+  /* status colors re-inked for text on a light card (>= 4.5:1) */
+  --teal: #12806b;
+  --green: #2c7f3e;
+  --red: #c23434;
+  --blue: #2f68c8;
+  --purple: #7449c2;
   --shadow-1: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
+@media (pointer: coarse) { :root { --h-ctl: 38px; } }
 
 :root[data-theme="light"] .topbar {
   background: rgba(250, 247, 242, 0.92);
@@ -111,6 +129,10 @@
    their class rules' higher specificity. */
 * { touch-action: manipulation; }
 
+/* Chrome's UA button/input styles reset the font to Arial — every form
+   control speaks the app face unless a rule says otherwise */
+button, input, select, textarea { font-family: inherit; }
+
 html, body {
   margin: 0;
   padding: 0;
@@ -120,12 +142,12 @@ html, body {
   font-size: 15px;
   line-height: 1.5;
   background:
-    radial-gradient(1100px 520px at 18% -12%, rgba(255, 171, 71, 0.06), transparent 60%),
+    radial-gradient(1100px 520px at 18% -12%, color-mix(in srgb, var(--accent) 6%, transparent), transparent 60%),
     var(--bg);
   background-attachment: fixed;
 }
 
-::selection { background: rgba(255, 171, 71, 0.3); }
+::selection { background: color-mix(in srgb, var(--accent) 30%, transparent); }
 
 /* an app, not a document: taps never select words — which is also what
    triggers Chrome's "Touch to Search" Google panel on Android — and long
@@ -164,7 +186,7 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
 .topbar.bar-hidden { transform: translateY(calc(-100% - 4px)); }
 
 /* pages that don't use the shared key/tempo (app.js NO_CTX) */
-.noctx #ctxbar { display: none; }
+.noctx #ctxbar, .noctx #ctx-btn { display: none; }
 
 .brand {
   display: inline-flex;
@@ -197,14 +219,6 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
   filter: drop-shadow(0 0 10px var(--accent-glow));
 }
 
-#settings-btn { padding: 6px 9px; }
-
-#settings-btn.active {
-  border-color: var(--accent);
-  color: var(--accent);
-  background: var(--accent-glow);
-}
-
 /* workspace wipe — the curtain between Practice and Studio */
 #wipe {
   position: fixed;
@@ -224,9 +238,9 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
   font-weight: 600;
   letter-spacing: 1.8px;
   text-transform: uppercase;
-  color: var(--accent);
-  background: rgba(255, 171, 71, 0.1);
-  border: 1px solid rgba(255, 171, 71, 0.45);
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line);
   border-radius: 999px;
   padding: 3px 9px;
   margin-left: 2px;
@@ -252,19 +266,18 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
   background: transparent;
   color: var(--label);
   font-family: var(--font-body);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
-  letter-spacing: 1.1px;
-  text-transform: uppercase;
+  letter-spacing: 0.2px;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   transition: color 120ms ease, background 120ms ease, border-color 120ms ease;
 }
-.tabbar-btn:hover { color: var(--text); background: var(--card2); }
+@media (hover: hover) { .tabbar-btn:hover { color: var(--text); background: var(--card2); } }
 .tabbar-btn.active {
-  color: var(--accent);
-  background: rgba(255, 171, 71, 0.1);
-  border-color: rgba(255, 171, 71, 0.35);
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
 }
 
 /* accountability: a dot on Learn until today's XP goal is met (js/xp.js) */
@@ -280,14 +293,21 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
   background: var(--accent);
   box-shadow: 0 0 0 2px var(--bg);
 }
-.goal-due .tabbar-bottom .tabbar-btn[data-group="gtheory"]::after { right: calc(50% - 18px); }
 
-/* corner tools: workspace, help, settings, metronome */
+/* corner tools: workspace, help, settings, lights, metronome — the four
+   icons are quiet borderless squares (one size, one icon size), so the
+   corner reads as one toolset instead of five equal-weight boxes */
 .tb-tools { margin-left: auto; display: flex; align-items: center; gap: 6px; }
-.icon-btn { display: inline-flex; align-items: center; justify-content: center; padding: 6px 8px; min-width: 36px; }
-#met-btn.on { color: var(--accent); border-color: rgba(255, 171, 71, 0.7); }
+.tb-tools .btn { height: var(--h-ctl); padding-top: 0; padding-bottom: 0; }
+.icon-btn { display: inline-flex; align-items: center; justify-content: center; }
+.tb-tools .icon-btn, .sheet-head .icon-btn { width: var(--h-ctl); height: var(--h-ctl); min-width: 0; padding: 0; }
+.tb-tools .icon-btn { background: transparent; border-color: transparent; box-shadow: none; color: var(--label); }
+@media (hover: hover) { .tb-tools .icon-btn:hover { background: var(--card2); border-color: var(--ctl-border); color: var(--text); } }
+.tb-tools .icon-btn .ic { width: 20px; height: 20px; } /* one icon size, whatever App.icon was asked for */
+#space-btn { display: inline-flex; align-items: center; gap: 5px; padding: 0 12px; }
+#met-btn.on { color: var(--accent-ink); border-color: var(--accent-line); }
 #met-btn.tick { box-shadow: 0 0 14px var(--accent-glow), inset 0 0 6px var(--accent-glow); }
-#met-btn.active, #settings-btn.active { border-color: var(--accent); }
+#met-btn.active, #settings-btn.active, #lights-btn.active, #ctx-btn.active { color: var(--accent-ink); background: var(--accent-soft); border-color: var(--accent-line); }
 
 /* ---------- overlay sheets (the metronome) ---------- */
 .sheet {
@@ -328,46 +348,88 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
   text-transform: uppercase;
 }
 
-/* ---------- persistent context bar (key / scale / mode / bpm / time) ---------- */
+/* ---------- page pills + persistent context bar (key / scale / bpm / time) ---------- */
 
-/* sub-tab strip: members of the active tab group (nav shows the group) */
+/* sub-tab strip: members of the active tab group (nav shows the group).
+   Ordered right under the tab row / logo row — the section and its pages
+   stay together; the context bar (order 2) follows with its own rule line.
+   Quiet mixed-case pills: only the active one gets a fill and outline. */
 .subnav {
   flex-basis: 100%;
+  order: 1;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   flex-wrap: wrap;
-  padding: 6px 2px 2px;
+  padding: 2px 0 0;
 }
 
 .subnav[hidden] { display: none; }
 
 .subtab {
-  background: var(--card2);
-  border: 1px solid var(--ctl-border);
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 14px;
+  background: transparent;
+  border: 1px solid transparent;
   border-radius: 999px;
-  padding: 5px 14px;
-  font-size: 12px;
+  font-size: 13.5px;
   font-weight: 600;
-  letter-spacing: 1.1px;
-  text-transform: uppercase;
+  letter-spacing: 0.2px;
   color: var(--label);
-  transition: border-color 120ms ease, color 120ms ease;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: color 120ms ease, background 120ms ease, border-color 120ms ease;
 }
+@media (hover: hover) { .subtab:hover { color: var(--text); background: var(--card2); } }
 
 .subtab.active {
-  border-color: rgba(255, 171, 71, 0.7);
-  color: var(--accent);
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
 }
 
+/* key / scale / mode / tempo / time: a dropdown under the clef button
+   (#ctx-btn), tucked away until tapped — app.js setCtx / html.ctx-open */
 .ctxbar {
-  flex-basis: 100%;
+  position: absolute;
+  top: calc(100% + 6px);
+  right: calc(18px + env(safe-area-inset-right, 0px));
+  z-index: 60;
   display: flex;
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
-  padding: 8px 2px 4px;
-  border-top: 1px solid var(--line-soft);
+  width: max-content;
+  max-width: min(720px, calc(100vw - 24px));
+  padding: 14px 16px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+}
+html:not(.ctx-open) .ctxbar { display: none; }
+.ctx-open .ctxbar { animation: ctx-in 140ms ease-out; }
+@keyframes ctx-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+#ctx-btn { position: relative; }
+.cx-toggles { flex-basis: 100%; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-top: 12px; border-top: 1px solid var(--line-soft); }
+.cx-toggles .chip { gap: 6px; }
+.cx-tnote { flex-basis: 100%; font-size: 12.5px; color: var(--muted); }
+.cx-tnote[hidden] { display: none; }
+/* scale lock: out-of-key on-screen keys read as unplayable */
+.scale-locked .pn-key:not([data-dc]) { filter: brightness(0.45); cursor: not-allowed; }
+/* Studio capture running (the ● lives in the dropdown) */
+#ctx-btn.rec::after {
+  content: '';
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--red);
+  box-shadow: 0 0 0 2px var(--bg);
 }
 
 .cx-field {
@@ -390,8 +452,10 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
 .ctxbar select { padding: 6px 30px 6px 10px; background-position: right 10px center; }
 .ctxbar input[type="number"] { width: 68px; }
 
-#cx-met { padding: 6px 14px; }
-#cx-met.on { color: var(--accent); border-color: rgba(255, 171, 71, 0.7); }
+/* the transport: metronome glyph + play/stop in Practice, plain play/stop in
+   the Studio (app.js paintCx) */
+#cx-met { display: inline-flex; align-items: center; gap: 3px; padding: 0 12px; }
+#cx-met.on { color: var(--accent-ink); border-color: var(--accent-line); }
 #cx-met.tick { box-shadow: 0 0 14px var(--accent-glow), inset 0 0 6px var(--accent-glow); }
 
 /* legacy tab contract (modules may still query .tab) — the tab row itself is
@@ -474,6 +538,35 @@ main {
 .muted { color: var(--muted); }
 .small { font-size: 12.5px; }
 
+/* page tips tucked behind a quiet disclosure: one line until asked for */
+details.tips { margin-top: 10px; font-size: 12.5px; color: var(--muted); }
+details.tips > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  cursor: pointer;
+  list-style: none;
+  font-weight: 600;
+  color: var(--label);
+}
+details.tips > summary::-webkit-details-marker { display: none; }
+details.tips > summary::before {
+  content: '?';
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+  font-size: 10.5px;
+  line-height: 1;
+}
+@media (hover: hover) { details.tips > summary:hover { color: var(--text); } }
+details.tips[open] > summary { color: var(--accent-ink); }
+details.tips > :not(summary) { margin-top: 4px; line-height: 1.55; }
+
 .big-display {
   font-family: var(--font-display);
   font-size: 78px;
@@ -481,7 +574,7 @@ main {
   font-variant-numeric: tabular-nums;
   line-height: 1;
   letter-spacing: 1px;
-  text-shadow: 0 0 30px rgba(255, 171, 71, 0.12);
+  text-shadow: 0 0 30px color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
 .mid-display {
@@ -510,7 +603,9 @@ main {
   transition: border-color 120ms ease, background 120ms ease, transform 60ms ease;
 }
 
-.btn:hover { border-color: rgba(255, 171, 71, 0.55); }
+/* hover only where there IS hover — on touch it sticks after a tap and a
+   pressed button looks selected */
+@media (hover: hover) { .btn:hover { border-color: var(--accent-line); } }
 .btn:active { transform: translateY(1px); background: var(--inset); }
 
 .btn.primary {
@@ -520,11 +615,11 @@ main {
   border-color: var(--accent);
 }
 
-.btn.primary:hover { filter: brightness(1.06); }
+@media (hover: hover) { .btn.primary:hover { filter: brightness(1.06); border-color: var(--accent); } }
 .btn.primary:active { filter: brightness(0.94); background: var(--accent); }
 
-.btn.danger { background: transparent; color: var(--red); border-color: rgba(255, 111, 111, 0.55); box-shadow: none; }
-.btn.danger:hover { border-color: var(--red); background: rgba(255, 111, 111, 0.07); }
+.btn.danger { background: transparent; color: var(--red); border-color: color-mix(in srgb, var(--red) 55%, transparent); box-shadow: none; }
+@media (hover: hover) { .btn.danger:hover { border-color: var(--red); background: color-mix(in srgb, var(--red) 7%, transparent); } }
 
 .btn.big {
   font-family: var(--font-display);
@@ -537,6 +632,11 @@ main {
 }
 
 .btn.sm { font-size: 13px; padding: 6px 12px; border-radius: 9px; }
+/* ONE height for toolbar controls (--h-ctl: 34px, 38px on touch) so
+   buttons, chips, segmented controls, selects and inputs line up in a row;
+   .btn (40) and .btn.big stay the larger tiers for primary actions */
+.btn.sm, .chip { min-height: var(--h-ctl); }
+.chip.ar-mini { min-height: 0; } /* Timeline lane M/S/arm mini-chips */
 .btn[disabled] { opacity: 0.4; cursor: default; }
 
 /* ---------- form controls ---------- */
@@ -552,12 +652,25 @@ label.field {
   color: var(--label);
 }
 
+/* the one small control label for inline toolbars ('Position', 'Perform',
+   'Energy'…) — same voice as label.field, without the column layout.
+   Casing rule: caps only for Bebas headings and these small field labels;
+   nav, pills, buttons and chips are title case. */
+.ctl-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--label);
+}
+
 select, input[type="number"], input[type="text"] {
   background-color: var(--card2);
   color: var(--text);
   border: 1px solid var(--ctl-border);
   border-radius: 10px;
-  padding: 9px 12px;
+  padding: 6px 12px;
+  min-height: var(--h-ctl);
   font-size: 15px;
   font-weight: 500;
   font-family: var(--font-body);
@@ -569,7 +682,7 @@ select, input[type="number"], input[type="text"] {
 select {
   appearance: none;
   -webkit-appearance: none;
-  padding: 10px 36px 10px 13px;
+  padding: 6px 36px 6px 13px;
   font-weight: 600;
   cursor: pointer;
   background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='7'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23ffab47' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
@@ -580,13 +693,17 @@ select {
   transition: border-color 120ms ease, background-color 120ms ease;
 }
 
-select:hover { border-color: rgba(255, 171, 71, 0.55); }
+@media (hover: hover) { select:hover { border-color: var(--accent-line); } }
 select:active { background-color: var(--inset); }
 select option { background: var(--card); color: var(--text); font-weight: 500; }
 
-select:focus, input:focus { outline: none; border-color: rgba(255, 171, 71, 0.6); }
+/* typing fields + dropdowns: an accent halo instead of the outline; every
+   other control (sliders, checkboxes, buttons) keeps the global ring */
+select:focus, input[type="number"]:focus, input[type="text"]:focus { outline: none; border-color: var(--accent-line); }
+select:focus-visible, input[type="number"]:focus-visible, input[type="text"]:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+input[type="range"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
 
 input[type="checkbox"] { accent-color: var(--accent); width: 16px; height: 16px; }
 
@@ -639,7 +756,8 @@ input[type="range"]::-moz-range-thumb {
   background: var(--inset);
   border: 1px solid var(--ctl-border);
   border-radius: 10px;
-  padding: 3px;
+  padding: 2px;
+  min-height: var(--h-ctl); /* buttons stretch to fill */
 }
 
 .seg button {
@@ -651,7 +769,7 @@ input[type="range"]::-moz-range-thumb {
   color: var(--label);
   border: none;
   border-radius: 7px;
-  padding: 7px 14px;
+  padding: 4px 13px;
   font-family: var(--font-body);
   font-size: 14px;
   font-weight: 600;
@@ -661,7 +779,7 @@ input[type="range"]::-moz-range-thumb {
 
 .seg button.active {
   background: var(--card2);
-  color: var(--accent);
+  color: var(--accent-ink);
   box-shadow: var(--shadow-1);
 }
 
@@ -674,14 +792,19 @@ input[type="range"]::-moz-range-thumb {
   border: 1px solid var(--ctl-border);
   border-radius: 999px;
   padding: 5px 13px;
+  font-family: inherit;
   font-size: 13.5px;
   font-weight: 500;
-  transition: border-color 120ms ease, color 120ms ease;
+  color: var(--text);
+  transition: border-color 120ms ease, color 120ms ease, background 120ms ease;
 }
+button.chip { cursor: pointer; }
 
+/* on = a tint + outline (not just an outline, which reads as hover) */
 .chip.active {
-  border-color: rgba(255, 171, 71, 0.7);
-  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+  color: var(--accent-ink);
 }
 
 .legend-dot {
@@ -708,8 +831,8 @@ input[type="range"]::-moz-range-thumb {
 .list li:last-child { border-bottom: none; }
 
 .error {
-  background: rgba(255, 111, 111, 0.07);
-  border: 1px solid rgba(255, 111, 111, 0.55);
+  background: color-mix(in srgb, var(--red) 7%, transparent);
+  border: 1px solid color-mix(in srgb, var(--red) 55%, transparent);
   color: var(--red);
   border-radius: var(--radius);
   padding: 14px 16px;
@@ -734,7 +857,7 @@ button .ic, .chip .ic { display: inline-block; }
 }
 
 #panel-metronome .met-dot.met-acc {
-  border-color: rgba(255, 171, 71, 0.75);
+  border-color: var(--accent-line);
 }
 
 #panel-metronome .met-dot.met-mute { opacity: 0.32; border-style: dashed; background: transparent; }
@@ -742,7 +865,7 @@ button .ic, .chip .ic { display: inline-block; }
 #panel-metronome .met-dot.met-on {
   background: var(--accent);
   border-color: var(--accent);
-  box-shadow: 0 0 18px rgba(255, 171, 71, 0.65);
+  box-shadow: 0 0 18px var(--accent-glow);
   transform: scale(1.16);
 }
 
@@ -753,7 +876,7 @@ button .ic, .chip .ic { display: inline-block; }
 ::-webkit-scrollbar-thumb:hover { background: var(--ctl-border); }
 
 /* update banner */
-#snd-hint, #back-hint, #xp-toast {
+#snd-hint, #back-hint, #xp-toast, #sd-toast {
   position: fixed;
   left: 50%;
   bottom: calc(18px + env(safe-area-inset-bottom, 0px));
@@ -770,7 +893,7 @@ button .ic, .chip .ic { display: inline-block; }
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
 }
 
-#back-hint, #xp-toast { width: auto; max-width: calc(100vw - 32px); text-align: center; }
+#back-hint, #xp-toast, #sd-toast { width: auto; max-width: calc(100vw - 32px); text-align: center; }
 
 #app-update {
   position: fixed;
@@ -782,7 +905,7 @@ button .ic, .chip .ic { display: inline-block; }
   align-items: center;
   gap: 12px;
   background: var(--card);
-  border: 1px solid rgba(255, 171, 71, 0.55);
+  border: 1px solid var(--accent-line);
   border-radius: 14px;
   padding: 10px 16px;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
@@ -815,26 +938,52 @@ button .ic, .chip .ic { display: inline-block; }
     flex: 1 1 0;
     min-width: 0;
     flex-direction: column;
-    gap: 3px;
+    gap: 2px;
     padding: 6px 2px 4px;
     border: 0;
     border-radius: 10px;
-    font-size: 10.5px;
-    letter-spacing: 0.7px;
+    font-size: 11px;
+    letter-spacing: 0.3px;
   }
   .tabbar-bottom .tabbar-btn.active { background: transparent; }
-  .tabbar-bottom .tabbar-btn .ic { width: 22px; height: 22px; }
+  /* the active section gets a soft pill behind its icon, not color alone */
+  .tabbar-bottom .tabbar-btn .ic {
+    box-sizing: content-box;
+    width: 22px;
+    height: 22px;
+    padding: 4px 18px;
+    border-radius: 999px;
+    transition: background 150ms ease;
+  }
+  .tabbar-bottom .tabbar-btn.active .ic { background: var(--accent-soft); }
+  .goal-due .tabbar-bottom .tabbar-btn[data-group="gtheory"]::after { top: 4px; right: calc(50% - 30px); }
   main { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
   .foot { padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
-  #snd-hint, #back-hint, #xp-toast, #app-update { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+  #snd-hint, #back-hint, #xp-toast, #sd-toast, #app-update { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
 }
 
 @media (max-width: 640px) {
-  .topbar { padding: 8px 12px 4px; gap: 10px; }
+  .topbar { padding: 8px 12px 4px; gap: 8px 10px; }
   .brand .tag { display: none; }
   .brand { font-size: 21px; }
   .wordmark { height: 21px; }
-  .tb-tools { gap: 5px; }
+  /* logo + workspace + four icons on ONE row down to 360 px */
+  .tb-tools { gap: 2px; }
+  #space-btn { padding: 0 10px; margin-right: 2px; }
+}
+/* 360-380 px phones: six corner controls still share the logo's row */
+@media (max-width: 380px) {
+  .tb-tools .icon-btn { width: 34px; height: 34px; }
+  #space-btn { padding: 0 8px; margin-right: 0; }
+}
+@media (max-width: 640px) {
+  /* the clef dropdown spans the screen: Key | Scale, then BPM | Time | ▶ */
+  .ctxbar { left: 12px; right: 12px; width: auto; max-width: none; gap: 10px; padding: 14px; }
+  .cx-field { gap: 5px; font-size: 10px; letter-spacing: 1px; }
+  .cx-field.cx-scale { flex: 1 1 calc(100% - 120px); min-width: 0; }
+  .cx-field.cx-scale select { flex: 1 1 0; min-width: 0; }
+  .ctxbar input[type="number"] { width: 58px; }
+  #cx-met { margin-left: auto; } /* transport (and the studio ●) on the right */
   /* the metronome becomes a bottom sheet */
   .sheet { align-items: flex-end; padding: 0; }
   .sheet-card {
@@ -849,6 +998,9 @@ button .ic, .chip .ic { display: inline-block; }
   .card { padding: 16px; }
   .big-display { font-size: 60px; }
 }
+
+/* narrowest phones: the workspace button keeps only its word */
+@media (max-width: 400px) { #space-btn .ic { display: none; } }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }

@@ -30,6 +30,19 @@
 
   function tracks() { return DAW.engine.tracks; }
 
+  // App.icon + Lucide 'download', which the shared set doesn't carry (yet)
+  var LOCAL_ICONS = {
+    download: '<path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/>'
+  };
+  function ic(name, size) {
+    var out = App.icon(name, size);
+    if (out || !LOCAL_ICONS[name]) return out;
+    var sz = size || 18;
+    return '<svg class="ic" width="' + sz + '" height="' + sz + '" viewBox="0 0 24 24" fill="none" ' +
+      'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ' +
+      'aria-hidden="true" focusable="false">' + LOCAL_ICONS[name] + '</svg>';
+  }
+
   function save() { App.store.set('st.tracks', tracks()); }
 
   function trackById(id) {
@@ -50,7 +63,9 @@
   function snapFloor(b) { return snapV > 0 ? Math.floor(b / snapV) * snapV : b; }
 
   function totalBeats() {
-    return Math.max(32, Math.ceil((DAW.engine.songEnd() + 8) / 4) * 4);
+    // at least the visible scroller (no dead band past the last bar)
+    var fill = els.scroll && els.scroll.clientWidth ? Math.ceil(els.scroll.clientWidth / zoomX / 4) * 4 + 4 : 0;
+    return Math.max(32, fill, Math.ceil((DAW.engine.songEnd() + 8) / 4) * 4);
   }
 
   function patternLen(t) {
@@ -148,7 +163,7 @@
           (t.kind !== 'drums'
             ? '<button type="button" class="chip fb-chip ar-mini ar-arm' +
               (App.store.get('st.armed', null) === t.id ? ' active' : '') +
-              '" data-ararm="' + t.id + '" title="Arm: your keyboard plays this track live and Record captures into it">&#9679;</button>'
+              '" data-ararm="' + t.id + '" title="Arm: your keyboard plays this track live and Record captures into it" aria-label="Arm ' + esc(t.name) + '">' + App.icon('record', 11) + '</button>'
             : '') +
           '<button type="button" class="chip fb-chip ar-mini' + (t.mix.mute ? ' active' : '') + '" data-armute="' + t.id + '">M</button>' +
           '<button type="button" class="chip fb-chip ar-mini' + (t.mix.solo ? ' active' : '') + '" data-arsolo="' + t.id + '">S</button>' +
@@ -171,12 +186,13 @@
     els.heads.innerHTML = hHeads;
     els.lanes.innerHTML = hLanes;
     els.lanes.style.width = (tb * zoomX) + 'px';
-    // waveforms render once, after the DOM exists
+    // waveforms render once, after the DOM exists (in the theme's text color)
+    var waveInk = getComputedStyle(els.wrap).color || 'rgba(128,128,128,0.8)';
     tracks().forEach(function (t) {
       (t.clips || []).forEach(function (c) {
         if (c.src !== 'audio') return;
         var el = els.lanes.querySelector('[data-arclip="' + c.id + '"] .ar-wave');
-        if (el) drawWave(el, t.id, 'rgba(255,255,255,0.75)');
+        if (el) drawWave(el, t.id, waveInk);
       });
     });
     els.ph.style.height = (tracks().length * LANE_H + RULER_H) + 'px';
@@ -288,8 +304,7 @@
       ? App.icon('stop', 15) + ' Stop' : App.icon('play', 15) + ' Play song';
     if (els.rec) {
       els.rec.classList.toggle('active', recOn);
-      els.rec.innerHTML = recOn ? '&#9632; Stop rec' : '&#9679; Rec';
-      els.rec.style.color = recOn ? '#ff5a5a' : '';
+      els.rec.innerHTML = recOn ? App.icon('stop', 13) + ' Stop rec' : '<span class="ar-recdot">' + App.icon('record', 13) + '</span> Rec';
     }
     els.loopChip.classList.toggle('active', DAW.engine.loopRegion.on);
     els.followChip.classList.toggle('active', follow);
@@ -560,11 +575,21 @@
       '.ar-wrap{display:flex;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--card2)}' +
       '.ar-headcol{flex:0 0 150px;border-right:1px solid var(--line);z-index:2;background:var(--card)}' +
       '.ar-headspacer{height:' + RULER_H + 'px;border-bottom:1px solid var(--line)}' +
-      '.ar-head{height:' + LANE_H + 'px;box-sizing:border-box;padding:6px 8px;border-bottom:1px solid var(--line);overflow:hidden}' +
-      '.ar-hname{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
-      '.ar-mini{padding:2px 7px;font-size:10px}' +
-      '.ar-vol{width:40px}' +
-      '.ar-meter{border-radius:2px;background:rgba(0,0,0,0.3)}' +
+      // lane head: name, then ONE no-wrap row (arm M S volume), and the
+      // level meter as a full-width strip along the bottom edge
+      '.ar-head{position:relative;height:' + LANE_H + 'px;box-sizing:border-box;padding:5px 8px 8px;border-bottom:1px solid var(--line);overflow:hidden}' +
+      '.ar-hname{font-size:12.5px;font-weight:600;line-height:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+      '.ar-head .row.tight{flex-wrap:nowrap;gap:4px;margin-top:3px}' +
+      '.chip.ar-mini{min-width:26px;height:24px;justify-content:center;padding:0 7px;font-size:11px;font-weight:600}' +
+      '.chip.ar-arm.active{border-color:var(--red);color:var(--red);background:color-mix(in srgb,var(--red) 14%,transparent)}' +
+      'input[type=range].ar-vol{flex:1 1 0;min-width:0;width:auto;height:24px}' +
+      'input[type=range].ar-vol::-webkit-slider-thumb{width:14px;height:14px;margin-top:-5px}' +
+      'input[type=range].ar-vol::-moz-range-thumb{width:12px;height:12px}' +
+      '.ar-meter{position:absolute;left:8px;right:8px;bottom:3px;width:calc(100% - 16px);height:3px;border-radius:2px;background:var(--inset)}' +
+      '.ar-recdot{display:inline-flex;color:var(--red)}' +
+      '#ar-rec.active{border-color:var(--red);color:var(--red);background:color-mix(in srgb,var(--red) 14%,transparent)}' +
+      '#ar-play .ic{width:1em;height:1em;vertical-align:-0.14em}' +
+      '@media (max-width:640px){.ar-headcol{flex-basis:112px}.ar-head .ar-vol{display:none}}' +
       '.ar-scroll{overflow:auto;flex:1;position:relative;max-height:64vh;overscroll-behavior:contain}' +
       '.ar-ruler{position:sticky;top:0;height:' + RULER_H + 'px;background:var(--card);border-bottom:1px solid var(--line);' +
         'z-index:3;cursor:pointer;touch-action:none;position:sticky}' +
@@ -585,8 +610,8 @@
         '<div class="row spread">' +
           '<span class="row tight">' +
             '<button type="button" class="btn big primary" id="ar-play"></button>' +
-            '<button type="button" class="btn sm" id="ar-rec" title="Record your keyboard playing into a clip on the armed track (arms one for you if needed)">&#9679; Rec</button>' +
-            '<button type="button" class="btn sm" id="ar-rtz" title="Back to the top">' + App.icon('restart', 14) + '</button>' +
+            '<button type="button" class="btn sm" id="ar-rec" title="Record your keyboard playing into a clip on the armed track (arms one for you if needed)"><span class="ar-recdot">' + App.icon('record', 13) + '</span> Rec</button>' +
+            '<button type="button" class="btn sm" id="ar-rtz" title="Back to the top" aria-label="Back to the top">' + App.icon('restart', 14) + '</button>' +
             '<span class="muted" id="ar-pos" style="min-width:44px;font-variant-numeric:tabular-nums">1.1</span>' +
             '<button type="button" class="chip fb-chip" id="ar-loop" title="Loop the region drawn on the ruler">Loop</button>' +
             '<button type="button" class="chip fb-chip" id="ar-follow" title="Scroll with the playhead">Follow</button>' +
@@ -597,12 +622,14 @@
               '<button type="button" data-arsnap="1">Beat</button>' +
               '<button type="button" data-arsnap="0.25">1/4</button>' +
               '<button type="button" data-arsnap="0">Off</button></div>' +
-            '<button type="button" class="btn sm" id="ar-zo">' + App.icon('minus', 13) + '</button>' +
-            '<button type="button" class="btn sm" id="ar-zi">' + App.icon('plus', 13) + '</button>' +
-            '<button type="button" class="btn sm" id="ar-addsyn" title="Add a synth track">+ Synth</button>' +
-            '<button type="button" class="btn sm" id="ar-adddrm" title="Add a drum track (starter beat included)">+ Drums</button>' +
-            '<button type="button" class="btn sm" id="ar-addsmp" title="Add a sampler track (drop an audio file on the Editor)">+ Sampler</button>' +
-            '<button type="button" class="btn sm" id="ar-export" title="Render the whole arrangement to a WAV file">Export song</button>' +
+            '<button type="button" class="btn sm" id="ar-zo" title="Zoom out" aria-label="Zoom out">' + App.icon('minus', 13) + '</button>' +
+            '<button type="button" class="btn sm" id="ar-zi" title="Zoom in" aria-label="Zoom in">' + App.icon('plus', 13) + '</button>' +
+          '</span>' +
+          '<span class="row tight">' +
+            '<button type="button" class="btn sm" id="ar-adddrm" title="Add a drum track (starter beat included)">' + App.icon('plus', 13) + ' Drums</button>' +
+            '<button type="button" class="btn sm" id="ar-addsyn" title="Add a synth track">' + App.icon('plus', 13) + ' Synth</button>' +
+            '<button type="button" class="btn sm" id="ar-addsmp" title="Add a sampler track (drop an audio file on the Editor)">' + App.icon('plus', 13) + ' Sampler</button>' +
+            '<button type="button" class="btn sm" id="ar-export" title="Render the whole arrangement to a WAV file">' + ic('download', 13) + ' Export song</button>' +
           '</span>' +
         '</div>' +
         '<div class="ar-wrap" style="margin-top:12px">' +
@@ -613,10 +640,11 @@
             '<div class="ar-ph" id="ar-ph"></div>' +
           '</div>' +
         '</div>' +
-        '<div class="muted small" style="margin-top:10px">Tap a lane to place a clip of that track&rsquo;s pattern (sampler lanes with a ' +
-          'sample place the AUDIO with its waveform). <b>Double-tap a clip to open its notes/steps in the editor.</b> Drag clips to ' +
-          'move them — up/down hops lanes of the same kind. Shift-tap multi-selects; right-click or Delete removes. Tap the ruler ' +
-          'to jump the playhead, drag it to draw a loop. Space plays/stops.</div>' +
+        '<div class="muted small" style="margin-top:10px">Tap a lane to add a clip &middot; double-tap a clip to edit it</div>' +
+        '<details class="tips"><summary>Timeline tips</summary><div>Each clip plays that track&rsquo;s pattern (sampler lanes ' +
+          'with a sample place the AUDIO with its waveform). Drag clips to move them — up/down hops lanes of the same kind. ' +
+          'Shift-tap multi-selects; right-click or Delete removes. Tap the ruler to jump the playhead, drag it to draw a loop. ' +
+          'Space plays/stops.</div></details>' +
       '</div>';
 
     els.wrap = rootEl.querySelector('.ar-wrap');
@@ -708,10 +736,10 @@
       DAW.engine.renderSong().then(function (blob) {
         DAW.downloadBlob(blob, (App.store.get('song.name', 'soundLAB') || 'soundLAB').replace(/[^\w\- ]+/g, '') + '-song.wav');
         btn.disabled = false;
-        btn.textContent = 'Export song';
+        btn.innerHTML = ic('download', 13) + ' Export song';
       }).catch(function () {
         btn.disabled = false;
-        btn.textContent = 'Export song';
+        btn.innerHTML = ic('download', 13) + ' Export song';
       });
     });
 

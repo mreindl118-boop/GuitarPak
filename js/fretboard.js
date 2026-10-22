@@ -66,7 +66,7 @@
     var d = App.store.get('fb.display', 'notes');
     if (d === 'notes' || d === 'intervals' || d === 'degrees') state.display = d;
     state.lefty = !!App.store.get('fb.lefty', false);
-    var ori = App.store.get('fb.orient', 'v');
+    var ori = App.store.get('fb.orient', window.innerWidth > 900 ? 'h' : 'v');
     if (ori === 'v' || ori === 'h') state.orient = ori;
     var vw = App.store.get('fb.view', 'board');
     // view is derived from the active PAGE now (Fretboard / Tab / Notation
@@ -204,12 +204,12 @@
     }
     if (isPent()) {
       els.posrow.style.display = '';
-      var h = '<span class="muted small">Position:</span>';
+      var h = '<span class="ctl-label">Box</span><div class="seg">';
       for (var i = 0; i <= 5; i++) {
-        h += '<button type="button" class="chip fb-chip' + (state.pos === i ? ' active' : '') +
-          '" data-fbpos="' + i + '">' + (i === 0 ? 'All' : 'Box ' + i) + '</button>';
+        h += '<button type="button" class="' + (state.pos === i ? 'active' : '') +
+          '" data-fbpos="' + i + '" aria-label="' + (i === 0 ? 'All boxes' : 'Box ' + i) + '">' + (i === 0 ? 'All' : i) + '</button>';
       }
-      els.posrow.innerHTML = h;
+      els.posrow.innerHTML = h + '</div>';
       return;
     }
     state.pos = 0;
@@ -297,6 +297,10 @@
     // down). Horizontal: no rotation — the board reads left to right and every
     // label sits upright. All child coordinates are identical either way.
     var horiz = state.orient === 'h';
+    els.board.classList.toggle('fb-horiz', horiz);
+    // vertical: the group is rotated 90deg cw, so every label is turned back
+    // -90deg about its own visual center and reads upright
+    function up(x, cy) { return horiz ? '' : ' transform="rotate(-90 ' + x + ' ' + cy + ')"'; }
     s.push('<svg id="fb-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' +
       (horiz ? W + ' ' + H : H + ' ' + W) +
       '" role="img" aria-label="Fretboard diagram">');
@@ -344,11 +348,11 @@
     for (f = 1; f <= N; f++) {
       x = fx(nutX + f * FRET_W);
       s.push('<line x1="' + x + '" y1="' + boardTop + '" x2="' + x + '" y2="' + boardBot +
-        '" stroke="var(--line)" stroke-width="2"/>');
+        '" stroke="var(--ctl-border)" stroke-width="2"/>');
     }
     x = fx(nutX);
     s.push('<line x1="' + x + '" y1="' + boardTop + '" x2="' + x + '" y2="' + boardBot +
-      '" stroke="#cfd6e4" stroke-width="6"/>');
+      '" stroke="var(--fb-nut)" stroke-width="6"/>');
 
     // strings (row 0 = high E on top) + open-note labels at the nut
     for (r = 0; r < 6; r++) {
@@ -356,15 +360,16 @@
       var y = rowY(r);
       s.push('<line x1="' + fx(nutX) + '" y1="' + y + '" x2="' + fx(nutX + N * FRET_W) + '" y2="' + y +
         '" stroke="var(--muted)" stroke-width="' + STRING_WIDTHS[sIdx] + '"/>');
-      s.push('<text x="' + fx(LABEL_W / 2) + '" y="' + (y + 4) +
-        '" text-anchor="middle" font-size="11.5" font-weight="700" fill="var(--muted)">' +
+      s.push('<text x="' + fx(LABEL_W / 2) + '" y="' + (y + 4) + '"' + up(fx(LABEL_W / 2), y) +
+        ' text-anchor="middle" font-size="11.5" font-weight="700" fill="var(--muted)">' +
         Theory.pcName(Theory.mod12(tun.midi[sIdx]), pf) + '</text>');
     }
 
     // fret numbers
     for (f = 1; f <= N; f++) {
-      s.push('<text x="' + fx(colCX(f)) + '" y="' + (TOP + 5 * GAP + 27) +
-        '" text-anchor="middle" font-size="10.5" fill="var(--muted)">' + f + '</text>');
+      s.push('<text x="' + fx(colCX(f)) + '" y="' + (TOP + 5 * GAP + 27) + '"' +
+        up(fx(colCX(f)), TOP + 5 * GAP + 23) +
+        ' text-anchor="middle" font-size="11.5" font-weight="600" fill="var(--muted)">' + f + '</text>');
     }
 
     // scale-tone dots
@@ -391,9 +396,9 @@
         if (ssStr >= 0 && !onSS) dim = ' opacity="0.3"';
         else if (mband && (f < mband[0] || f > mband[1])) dim = ' opacity="0.5"';
         s.push('<circle cx="' + cx + '" cy="' + cy + '" r="11.5" fill="' + fill + '"' +
-          (step === 0 ? ' stroke="#ffffff" stroke-width="1.6"' : '') + dim + '/>');
-        s.push('<text x="' + cx + '" y="' + (cy + 3.5) +
-          '" text-anchor="middle" font-size="10.5" font-weight="700" fill="' + DEG_TEXT + '"' +
+          (step === 0 ? ' stroke="var(--text)" stroke-width="1.6"' : '') + dim + '/>');
+        s.push('<text x="' + cx + '" y="' + (cy + 4) + '"' + up(cx, cy) +
+          ' text-anchor="middle" font-size="11.5" font-weight="700" fill="' + DEG_TEXT + '"' +
           dim + '>' + label + '</text>');
       }
     }
@@ -786,7 +791,7 @@
       cur = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
       cur.setAttribute('id', 'fb-pr-ring');
       cur.setAttribute('r', '15.5');
-      cur.setAttribute('fill', 'rgba(255,171,71,0.16)');
+      cur.setAttribute('fill', 'var(--accent-soft)');
       cur.setAttribute('stroke', 'var(--accent)');
       cur.setAttribute('stroke-width', '3');
       cur.setAttribute('pointer-events', 'none');
@@ -981,8 +986,8 @@
   function tabCellHTML(n, i, info) {
     var pc = Theory.mod12(n.midi);
     var root = info.pcToStep.get(pc) === 0;
-    return '<span class="fbv-n' + (root ? ' fbv-root' : '') + '" data-step="' + i +
-      '" style="color:' + noteColor(info, pc) + '">-' + n.f + '-</span>';
+    return '-<span class="fbv-n' + (root ? ' fbv-root' : '') + '" data-step="' + i +
+      '" style="--dc:' + noteColor(info, pc) + '">' + n.f + '</span>-';
   }
 
   function tabSystemHTML(ex, labels, info, from, to) {
@@ -1033,9 +1038,10 @@
           var s2 = order[c2];
           if (s2 === n.s) {
             var pc = Theory.mod12(n.midi);
-            var cell = (String(n.f) + '   ').slice(0, 3);
+            var fs = String(n.f);
             line += '<span class="fbv-n' + (info.pcToStep.get(pc) === 0 ? ' fbv-root' : '') +
-              '" data-step="' + i + '" style="color:' + noteColor(info, pc) + '">' + cell + '</span>';
+              '" data-step="' + i + '" style="--dc:' + noteColor(info, pc) + '">' + fs + '</span>' +
+              '   '.slice(fs.length);
           } else {
             line += '<span class="fbv-l">\u2502  </span>';
           }
@@ -1054,6 +1060,12 @@
     var usable = Math.max(160, out.clientWidth - 34);
     var lw = Math.max.apply(null, labels.map(function (l) { return l.length; }));
     var budget = Math.floor(usable / charW) - lw - 2;
+    // balance the systems: same line count, evenly filled (no 1-note widow)
+    var cells = ex.seq.map(function (q) { return String(ex.path[q].f).length + 2; });
+    var total = cells.reduce(function (a, c) { return a + c; }, 0);
+    var maxCell = Math.max.apply(null, cells);
+    var nLines = Math.ceil(total / budget);
+    if (nLines > 1) budget = Math.min(budget, Math.ceil(total / nLines) + maxCell - 1);
     var htmls = [], i2 = 0;
     while (i2 < ex.seq.length) {
       var used = 0, j = i2;
@@ -1096,30 +1108,43 @@
     var SC = { s: 0.8, m: 1, l: 1.3 }[state.vSize];
     var GAP = 9 * SC;            // half-step between staff positions
     var NOTE_W = 30 * SC;
-    var LEFT = 46 * SC;
-    var topPad = 5 * GAP;        // headroom for ledger lines
+    var LEFT = 66 * SC;          // room for the SMuFL clef (2.7 staff spaces wide)
+    var E4POS = 30;              // bottom staff line
     var staffH = 8 * GAP;        // 5 lines, 4 gaps... (4 gaps * 2 half-gaps)
     var perRow = ex.seq.length;
     if (state.vFit === 'fit') {
       var usable = Math.max(220, wrap.clientWidth - 40);
       perRow = Math.max(4, Math.floor((usable - LEFT) / NOTE_W));
+      perRow = Math.ceil(ex.seq.length / Math.ceil(ex.seq.length / perRow)); // even systems
     }
     var rows = Math.ceil(ex.seq.length / perRow);
-    var rowH = staffH + topPad * 2;
+    // each system gets just the head room its own notes need (ledger lines
+    // above / below), so a high last system doesn't push the first one down
+    var rowOy = [], H = 0;
+    for (var rr = 0; rr < rows; rr++) {
+      var posHi = -1e9, posLo = 1e9;
+      for (var q = rr * perRow; q < Math.min(ex.seq.length, (rr + 1) * perRow); q++) {
+        var sp = sheetNoteInfo(ex.path[ex.seq[q]].midi, pf).pos;
+        if (sp > posHi) posHi = sp;
+        if (sp < posLo) posLo = sp;
+      }
+      var topPad = Math.max(5, posHi - (E4POS + 8) + 4) * GAP; // above the top line
+      var botPad = Math.max(5, E4POS - posLo + 4) * GAP;       // below the bottom line
+      rowOy.push(H + topPad);
+      H += topPad + staffH + botPad;
+    }
     var W = LEFT + Math.min(perRow, ex.seq.length) * NOTE_W + 16;
-    var H = rows * rowH;
-    var E4POS = 30;              // bottom staff line
     var svg = ['<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '">'];
     for (var rIdx = 0; rIdx < rows; rIdx++) {
-      var oy = rIdx * rowH + topPad;
+      var oy = rowOy[rIdx];
       var l;
       for (l = 0; l < 5; l++) {
         var ly = oy + staffH - l * 2 * GAP;
         svg.push('<line x1="8" y1="' + ly + '" x2="' + (W - 8) + '" y2="' + ly +
           '" stroke="var(--muted)" stroke-width="1" opacity="0.75"/>');
       }
-      svg.push('<text x="10" y="' + (oy + staffH - GAP) + '" font-size="' + (staffH * 0.95) +
-        '" fill="var(--text)" font-family="serif">\ud834\udd1e</text>');
+      svg.push('<text x="10" y="' + (oy + staffH - 2 * GAP) + '" font-size="' + staffH +
+        '" fill="var(--text)" font-family="SLMusic">\uE050</text>');
       var from = rIdx * perRow, to = Math.min(ex.seq.length, from + perRow);
       for (var i = from; i < to; i++) {
         var n = ex.path[ex.seq[i]];
@@ -1145,14 +1170,14 @@
         g += '<circle class="fbv-halo" cx="' + x + '" cy="' + y + '" r="' + (10 * SC) +
           '" fill="none" stroke="var(--accent)" stroke-width="3"/>';
         g += '<ellipse cx="' + x + '" cy="' + y + '" rx="' + (6.4 * SC) + '" ry="' + (4.8 * SC) +
-          '" fill="' + col + '"' + (isRoot ? ' stroke="#ffffff" stroke-width="1.5"' : '') + '/>';
+          '" fill="' + col + '"' + (isRoot ? ' stroke="var(--text)" stroke-width="1.5"' : ' stroke="rgba(0,0,0,0.35)" stroke-width="0.8"') + '/>';
         var stemUp = sn.pos < E4POS + 4;
         g += '<line x1="' + (x + (stemUp ? 6 * SC : -6 * SC)) + '" y1="' + y +
           '" x2="' + (x + (stemUp ? 6 * SC : -6 * SC)) + '" y2="' + (y + (stemUp ? -1 : 1) * 26 * SC) +
-          '" stroke="' + col + '" stroke-width="' + (1.4 * SC) + '"/>';
+          '" stroke="var(--text)" stroke-width="' + (1.2 * SC) + '"/>';
         if (sn.acc) {
-          g += '<text x="' + (x - 15 * SC) + '" y="' + (y + 4 * SC) + '" font-size="' + (13 * SC) +
-            '" fill="' + col + '" font-weight="700">' + (sn.acc === '#' ? '\u266f' : '\u266d') + '</text>';
+          g += '<text x="' + (x - (sn.acc === '#' ? 17 : 16) * SC) + '" y="' + y + '" font-size="' + (staffH * 0.55) +
+            '" fill="var(--text)" font-family="SLMusic">' + (sn.acc === '#' ? '\uE262' : '\uE260') + '</text>';
         }
         g += '</g>';
         svg.push(g);
@@ -1523,7 +1548,7 @@
       els.infoNotes.innerHTML = '<div class="error">Unknown scale.</div>';
       return;
     }
-    els.infoTitle.textContent = Theory.pcName(state.root, pf) + ' ' + Theory.SCALES[state.scale].name + ':';
+    els.infoTitle.textContent = Theory.pcName(state.root, pf) + ' ' + Theory.SCALES[state.scale].name;
     if (els.title) els.title.textContent = Theory.pcName(state.root, pf) + ' ' + Theory.SCALES[state.scale].name;
     var h = '';
     for (var i = 0; i < info.names.length; i++) {
@@ -1579,7 +1604,7 @@
 
   function init(rootEl) {
     App.injectCSS('fretboard',
-      '.fb-field{display:inline-flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--muted);font-weight:600}' +
+      '.fb-field{display:inline-flex;flex-direction:column;gap:5px;font-size:11.5px;font-weight:600;letter-spacing:1.4px;text-transform:uppercase;color:var(--label)}' +
       '.fb-board{position:relative;display:flex;flex-direction:column;gap:10px}' +
       '.fb-board.fb-max{position:fixed;inset:0;z-index:200;margin:0;border-radius:0;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}' +
       // truly fullscreen: board only — every control row disappears, one floating
@@ -1614,7 +1639,7 @@
       '.fb-practice{flex:0 0 auto}' +
       // compact strip controls — selects KEEP room for the chevron on the right
       // (an equal-padding reset here once slid option text under the chevron)
-      '.fb-practice select{padding:6px 26px 6px 9px;font-size:13px;background-position:right 8px center}' +
+      '#fb-board .fb-practice select{padding:6px 26px 6px 9px;font-size:13px;background-position:right 8px center}' + // id: beats the light-theme select rule
       '.fb-practice input[type=number]{padding:6px 8px;font-size:13px}' +
       '.fb-title{font-family:var(--font-display);font-size:19px;font-weight:600;letter-spacing:1px;' +
         'text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:42vw}' +
@@ -1623,6 +1648,7 @@
         'touch-action:pan-x pan-y;cursor:grab;scrollbar-width:thin;-webkit-overflow-scrolling:touch;' +
         'height:calc(100vh - 340px);height:calc(100dvh - 340px);min-height:240px}' +
       '.fb-board.fb-max .fb-scroll{height:auto;min-height:0}' +
+      '.fb-board.fb-horiz .fb-scroll{height:auto;min-height:0}' +
       '.fb-scroll:active{cursor:grabbing}' +
       '.fb-scroll{transition:opacity 0.18s ease}' +
       '.fb-scroll.fb-fade{opacity:0.25}' +
@@ -1642,14 +1668,15 @@
         'border-radius:6px;padding:1px;background:var(--card2);cursor:pointer}' +
       '[data-theme=light] .fb-jam-ring{stroke:rgba(0,0,0,0.6)}' +
       '.fb-settings.open{display:block}' +
+      '.fb-settings label.fb-check{flex-direction:row-reverse;justify-content:flex-end;align-items:center;gap:8px;align-self:flex-end;min-height:var(--h-ctl)}' +
       '.fb-settings h3{margin-top:14px}' +
       '.fb-hit{cursor:pointer}' +
       '.fb-hit:hover{fill:rgba(255,255,255,0.05)}' +
       '.fb-flash{animation:fb-flash .4s ease-out forwards;pointer-events:none}' +
       '@keyframes fb-flash{0%{opacity:.95}100%{opacity:0}}' +
-      '.fb-posrow{margin-bottom:12px}' +
+      '.fb-posrow{margin-bottom:4px}' +
       '.fb-strchip{padding:4px 9px;font-size:12px;opacity:0.45}' +
-      '.fb-strchip.active{opacity:1;color:var(--accent);border-color:rgba(255,171,71,0.7)}' +
+      '.fb-strchip.active{opacity:1;color:var(--accent-ink);border-color:var(--accent-line)}' +
       '.fb-tabout{font-family:ui-monospace,Consolas,Menlo,monospace;line-height:1.6;overflow-x:auto;' +
         'background:var(--card2);border:1px solid var(--line);border-radius:10px;' +
         'padding:14px 16px;color:var(--text);white-space:pre;min-height:120px}' +
@@ -1671,7 +1698,25 @@
       '.fb-note b{font-size:16px;line-height:1.2}' +
       '.fb-note span{font-size:11px;color:var(--muted);font-weight:600}' +
       '.fb-note.fb-note-root{border-color:var(--accent)}' +
-      '.fb-note.fb-note-root b{color:var(--accent)}'
+      '.fb-note.fb-note-root b{color:var(--accent)}' +
+      ':root{--fb-nut:#d8cdb8}:root[data-theme=light]{--fb-nut:#9a8c74}' +
+      // notation clef + accidentals use the bundled SMuFL font (quiz.js declares it
+      // too; a repeat @font-face with the same src is harmless)
+      '@font-face{font-family:SLMusic;src:url(fonts/slmusic.woff2) format("woff2");font-display:block}' +
+      '.fbv-n{background:var(--dc);color:#1c1206;border-radius:3px;box-shadow:0 0 0 1px var(--dc);font-weight:700}' +
+      '.fbv-n.fbv-root{text-decoration:none;box-shadow:0 0 0 1px var(--dc),0 0 0 2.5px var(--text)}' +
+      '.fbv-n.now{box-shadow:0 0 0 2px var(--accent),0 0 10px var(--accent-glow)}' +
+      '.fb-tabout{color:var(--muted)}' +
+      '.fb-vo .seg{padding:2px}.fb-vo .seg button{padding:4px 10px;font-size:13px}' +
+      '.fb-practice .seg{padding:2px}.fb-practice .seg button{padding:4px 11px}' +
+      '#fb-board .fb-practice{column-gap:6px}' +
+      // an empty status line takes no slot (no dangling gap after the last control)
+      '#fb-pr-status:empty,.fb-alt-status:empty{display:none}' +
+      '.fb-zseg{padding:2px}.fb-zseg button{padding:4px 9px}' +
+      '#fb-zlabel{min-width:44px;font-size:12.5px;font-variant-numeric:tabular-nums;color:var(--label);text-align:center}' +
+      '.fb-posrow .seg button{padding:4px 11px;font-size:13px}' +
+      '#fb-legend{display:none}' +
+      '@media (max-width:640px){#fb-zlabel{display:none}}'
     );
 
     loadState();
@@ -1689,10 +1734,12 @@
           '</span>' +
           '<span class="row tight">' +
             '<span class="row tight" id="fb-boardctl">' +
-            '<button type="button" class="btn sm" id="fb-zout" aria-label="Zoom out">' + App.icon('minus', 14) + '</button>' +
-            '<span class="chip" id="fb-zlabel">100%</span>' +
-            '<button type="button" class="btn sm" id="fb-zin" aria-label="Zoom in">' + App.icon('plus', 14) + '</button>' +
-            '<button type="button" class="btn sm" id="fb-zfit">Fit</button>' +
+            '<span class="seg fb-zseg">' +
+            '<button type="button" id="fb-zout" aria-label="Zoom out">' + App.icon('minus', 14) + '</button>' +
+            '<span id="fb-zlabel" style="align-self:center">100%</span>' +
+            '<button type="button" id="fb-zin" aria-label="Zoom in">' + App.icon('plus', 14) + '</button>' +
+            '<button type="button" id="fb-zfit">Fit</button>' +
+            '</span>' +
             '<button type="button" class="btn sm" id="fb-rotate" title="Rotate the board (vertical / horizontal neck)" aria-label="Rotate the fretboard">' + App.icon('rotate', 14) + '</button>' +
             '<button type="button" class="btn sm" id="fb-max" title="Fullscreen" aria-label="Fullscreen">' + App.icon('expand', 14) + '</button>' +
             '</span>' +
@@ -1733,7 +1780,7 @@
           '<span class="fb-stroke" id="fb-pr-stroke" style="display:none"></span>' +
           '<input type="number" id="fb-pr-bpm" min="30" max="280" step="1" title="Tempo (BPM) — linked to the metronome" style="width:70px">' +
           '<select id="fb-pr-rate" title="Notes per beat">' +
-            '<option value="1">1 / beat</option>' +
+            '<option value="1">Quarters</option>' +
             '<option value="2">8ths</option>' +
             '<option value="3">Triplets</option>' +
             '<option value="4">16ths</option>' +
@@ -1766,8 +1813,8 @@
                 '<button type="button" data-fbmode="degrees">Degrees</button>' +
               '</div>' +
             '</div>' +
-            '<label class="field">Left-handed<input type="checkbox" id="fb-lefty"' + (state.lefty ? ' checked' : '') + '></label>' +
-            '<label class="field">Jam: auto-switch mode<input type="checkbox" id="fb-automode"></label>' +
+            '<label class="field fb-check">Left-handed<input type="checkbox" id="fb-lefty"' + (state.lefty ? ' checked' : '') + '></label>' +
+            '<label class="field fb-check">Jam: auto-switch mode<input type="checkbox" id="fb-automode"></label>' +
           '</div>' +
           '<div class="fb-field" style="margin-top:12px">Color notes by' +
             '<div class="seg" id="fb-colmode" role="group" aria-label="Color notes by" style="align-self:flex-start">' +
@@ -1779,7 +1826,7 @@
           '<div class="row tight fb-legend" id="fb-legend"></div>' +
           '<h3 id="fb-info-title"></h3>' +
           '<div class="row tight" id="fb-info-notes"></div>' +
-          '<div class="muted small" style="margin-top:12px">Scroll down the neck &middot; pinch or Ctrl+scroll to zoom &middot; the Fit button shows the whole neck</div>' +
+          '<div class="muted small" style="margin-top:12px">Scroll along the neck &middot; pinch or Ctrl+scroll to zoom &middot; the Fit button shows the whole neck</div>' +
         '</div>' +
       '</div>';
 
@@ -1877,7 +1924,7 @@
       state.orient = state.orient === 'h' ? 'v' : 'h';
       App.store.set('fb.orient', state.orient);
       renderAll();
-      setZoom(minZoom(els.scroll)); // zoom means something new — refit
+      setZoom(1); // zoom means something new — back to the readable default
       scrollToFret(isHept() ? modeWindow(state.mode)[0] : 0);
     });
     els.gear.addEventListener('click', function () {
@@ -2008,6 +2055,7 @@
       var sIdx = parseInt(hit.getAttribute('data-fb-s'), 10);
       var f = parseInt(hit.getAttribute('data-fb-f'), 10);
       if (isNaN(sIdx) || sIdx < 0 || sIdx > 5 || isNaN(f) || f < 0) return;
+      if (App.scaleLock && !App.scaleLock.allows(Theory.fretMidi(sIdx, f, state.tuning))) return; // scale lock
       try {
         App.getAudio(); // inside the user gesture
         App.pluck(Theory.fretMidi(sIdx, f, state.tuning));
@@ -2099,8 +2147,8 @@
           '<span class="fb-title" id="fb-' + kind + '-title"></span>' +
           '<div class="row tight fb-vo" data-kind="' + (isTab ? 'tab' : 'sheet') + '">' +
             (isTab ?
-              '<div class="seg"><button type="button" data-fbvori="h">Horizontal</button>' +
-              '<button type="button" data-fbvori="v">Vertical</button></div>' : '') +
+              '<div class="seg"><button type="button" data-fbvori="h" title="Horizontal" aria-label="Horizontal tab">' + App.icon('right', 15) + '</button>' +
+              '<button type="button" data-fbvori="v" title="Vertical" aria-label="Vertical tab">' + App.icon('down', 15) + '</button></div>' : '') +
             '<div class="seg fb-vo-fit"><button type="button" data-fbvfit="fit">Fit</button>' +
             '<button type="button" data-fbvfit="scroll">Scroll</button></div>' +
             '<div class="seg"><button type="button" data-fbvsize="s">S</button>' +
@@ -2112,7 +2160,7 @@
           '<button type="button" class="btn sm primary fb-alt-play">' + App.icon('play', 14) + ' Play</button>' +
           '<button type="button" class="btn sm fb-alt-reset" title="Back to the first note">' + App.icon('restart', 14) + '</button>' +
           '<span class="muted small fb-alt-status"></span>' +
-          '<span class="muted small">Pattern, tempo &amp; pauses live on the Fretboard page &mdash; this follows the same exercise.</span>' +
+          '<button type="button" class="chip fb-chip fb-alt-edit" title="Pattern, tempo &amp; pauses are set on the Neck page">' + App.icon('sliders', 13) + ' Pattern</button>' +
         '</div>' +
         '<div class="' + (isTab ? 'fb-tabout" id="fb-tabout' : 'fb-sheetwrap" id="fb-sheetwrap') + '" style="margin-top:12px"></div>' +
       '</div>';
@@ -2122,6 +2170,7 @@
 
     rootEl.querySelector('.fb-alt-play').addEventListener('click', prToggle);
     rootEl.querySelector('.fb-alt-reset').addEventListener('click', function () { prStop(); });
+    rootEl.querySelector('.fb-alt-edit').addEventListener('click', function () { App.switchTo('fretboard'); });
     rootEl.querySelector('.fb-vo').addEventListener('click', function (e) {
       var b = e.target.closest('button');
       if (!b) return;

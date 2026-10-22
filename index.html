@@ -38,18 +38,24 @@
     <button type="button" class="btn sm" id="space-btn" aria-label="Switch workspace"></button>
     <button type="button" class="btn sm icon-btn" id="help-btn" aria-label="Help for this page" title="What is this page?"></button>
     <button type="button" class="btn sm icon-btn" id="settings-btn" aria-label="Settings" title="Settings"></button>
+    <button type="button" class="btn sm icon-btn" id="ctx-btn" aria-label="Key, scale and tempo" title="Key, scale &amp; tempo" aria-haspopup="true" aria-expanded="false" aria-controls="ctxbar"></button>
     <button type="button" class="btn sm icon-btn" id="lights-btn" aria-label="Lights and help" title="Lights &amp; help" aria-haspopup="dialog" aria-expanded="false" aria-controls="sheet-lights"></button>
     <button type="button" class="btn sm icon-btn" id="met-btn" aria-label="Metronome" title="Metronome" aria-haspopup="dialog" aria-expanded="false" aria-controls="sheet-metronome"></button>
   </div>
   <div class="ctxbar" id="ctxbar">
     <label class="cx-field">Key<select id="cx-root"></select></label>
-    <label class="cx-field">Scale<select id="cx-scale"></select></label>
+    <label class="cx-field cx-scale">Scale<select id="cx-scale"></select></label>
     <label class="cx-field" id="cx-mode-wrap">Mode<select id="cx-mode"></select></label>
     <label class="cx-field">BPM<input id="cx-bpm" type="number" min="30" max="280" step="1"></label>
     <label class="cx-field">Time<select id="cx-sig"></select></label>
     <button type="button" class="btn sm" id="cx-met" title="Start / stop the metronome (works on every tab)" aria-label="Start or stop the metronome"></button>
     <button type="button" class="btn sm" id="cx-rec" aria-label="Capture what you play into the current song"></button>
     <span id="cx-rec-msg" style="display:none" role="status"></span>
+    <div class="cx-toggles">
+      <button type="button" class="chip" id="cx-led" aria-pressed="false" title="Light the selected scale on your keyboard's LEDs (ROLI LUMI and LED keyboards); off = dark"></button>
+      <button type="button" class="chip" id="cx-lock" aria-pressed="false" title="Only notes in the selected scale play, from any keyboard, the on-screen keys and the neck"></button>
+      <span class="cx-tnote" id="cx-tnote" role="status" hidden></span>
+    </div>
   </div>
   <div class="subnav" id="subnav" hidden></div>
 </header>

@@ -115,6 +115,7 @@
     if (!d || d.length < 2) return;
     var st = d[0] & 0xf0, chan = d[0] & 0x0f, mute = muted();
     if (st === 0x90 && d[2] > 0) {
+      if (App.scaleLock && !App.scaleLock.allows(d[1])) return; // scale lock: out-of-key notes never sound
       held[d[1]] = d[2];
       App.emit('midi:note', { on: true, midi: d[1], vel: d[2], chan: chan, port: srcName, mute: mute });
     } else if (st === 0x80 || (st === 0x90 && d[2] === 0)) {
@@ -528,6 +529,9 @@
   // on by default for a LUMI (SysEx scale colors are safe); other outputs stay
   // opt-in — a sound module there would PLAY note-on lights (old midi.lights)
   function lightsOn() {
+    var lm = ledMode();
+    if (lm === 'scale') return true;
+    if (lm === 'off') return false;
     var v = App.store.get('lights.on', null);
     if (v === true || v === false) return v;
     return isLumi() || App.store.get('midi.lights', 'off') !== 'off';
@@ -538,6 +542,11 @@
     App.store.set('lights.v1', true);
   }
   function helpLvl() { return App.help ? App.help.level() : 4; }
+  // LED SCALE (v0.82.0, the clef dropdown's toggle): 'scale' = the keybed
+  // always shows the selected scale (whatever the Help level or Display
+  // aid; notes to play still light white on top), 'off' = dark, 'auto' =
+  // lights.on + the Help level (the Lights & help sheet sets auto)
+  function ledMode() { var v = App.store.get('lights.led', 'auto'); return v === 'scale' || v === 'off' ? v : 'auto'; }
   function outName() {
     return native ? (portName(nativePorts.outputs, nativeOutId) || '') : (output ? (output.name || '') : '');
   }
@@ -591,6 +600,7 @@
   function layoutKind() {
     if (claimedBy) return 'none';
     for (var k in hidden) if (hidden[k]) return 'none';
+    if (ledMode() === 'scale') return 'scale';
     var h = helpLvl();
     return h >= 3 ? 'scale' : h >= 1 ? 'tonic' : 'none';
   }
@@ -601,7 +611,7 @@
   function wanted() {
     var want = {}, kind = layoutKind(), r = range(), lumi = isLumi();
     var lo = Math.max(LIGHT_LO, r.lo), hi = Math.min(LIGHT_HI, r.hi), m, v;
-    var h0 = helpLvl(), guiding = displayOn() && h0 >= 2 && (list(guideNow).length > 0 || (h0 >= 3 && list(guideNext).length > 0));
+    var h0 = helpLvl(), guiding = ledMode() !== 'scale' && displayOn() && h0 >= 2 && (list(guideNow).length > 0 || (h0 >= 3 && list(guideNext).length > 0));
     if (guiding) kind = 'none'; // Display: only the notes to play
     var root = App.store.get('fb.root', 9), rootPc = Theory.mod12(typeof root === 'number' ? root : 9);
     if (kind === 'scale') {
@@ -631,7 +641,7 @@
       }
       return;
     }
-    if (!lightsOn()) { allDark(); return; }
+    if (!lightsOn()) { allDark(); if (ledMode() === 'off' && isLumi()) lumiLayout(); return; } // off: a dark LUMI
     if (isLumi()) lumiLayout();
     var want = wanted(), m;
     for (m in lit) if (!want[m]) dark(Number(m));
@@ -682,7 +692,7 @@
   // owns the keybed (Pads: night mode + its own key lights)
   App.on('colors', function () {
     repaintAll();
-    if (!claimedBy && !lightsOn() && isLumi() && hasOutput()) lumiNative();
+    if (!claimedBy && !lightsOn() && ledMode() !== 'off' && isLumi() && hasOutput()) lumiNative();
   });
 
   // auto-reconnect: once MIDI was enabled and the permission granted, later
@@ -756,9 +766,21 @@
     get display() { return displayOn(); },
     setDisplay: function (on) { App.store.set('lights.display', on !== false); App.emit('lights:display', { on: on !== false }); paint(); },
     setLightsOn: function (on) {
+      App.store.set('lights.led', 'auto'); // the sheet's On/Off: back to the Help level
       App.store.set('lights.on', !!on);
       if (!on) { allDark(); if (isLumi() && hasOutput()) { lumiShown = null; lumiNative(); } }
       repaintAll();
+    },
+    // LED scale (the clef dropdown): 'scale' | 'off' | 'auto'
+    get ledMode() { return ledMode(); },
+    // is the keybed showing the scale right now (what the toggle displays)
+    get ledScale() { var m = ledMode(); return m === 'scale' || (m === 'auto' && lightsOn() && helpLvl() >= 3); },
+    setLedMode: function (m) {
+      App.store.set('lights.led', m === 'scale' || m === 'off' ? m : 'auto');
+      lumiShown = null;
+      if (m === 'off') allDark();
+      repaintAll();
+      App.emit('lights:led', { mode: ledMode() });
     },
     test: function () { // a C major arpeggio across the range, then back to normal
       if (!hasOutput()) return false;

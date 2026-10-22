@@ -78,8 +78,36 @@ const tabs = sel => [...document.querySelectorAll(sel + ' .tabbar-btn')].map(b =
   ok(await page.evaluate(() => App.sheet === 'metronome' && !document.getElementById('sheet-metronome').hidden), 'switchTo("metronome") opens the sheet');
   await page.evaluate(() => App.switchTo('songs')); await page.waitForTimeout(150);
   ok(await page.evaluate(() => App.sheet === null && App.active === 'songs'), 'navigating elsewhere closes the sheet');
-  await page.click('#cx-met'); await page.waitForTimeout(200);
+  await page.click('#ctx-btn'); await page.click('#cx-met'); await page.waitForTimeout(200);
   ok(await page.evaluate(() => !document.getElementById('met-btn').classList.contains('on')), 'stopping from the context bar clears the icon');
+
+  console.log('# clef dropdown (key / scale / tempo)');
+  const shown = () => page.evaluate(() => getComputedStyle(document.getElementById('ctxbar')).display !== 'none');
+  await page.keyboard.press('Escape'); await page.waitForTimeout(100);
+  const cx0 = { open: await shown(), order: await page.evaluate(() => [...document.querySelectorAll('.tb-tools .icon-btn')].map(b => b.id).join(',')),
+    label: await page.evaluate(() => document.getElementById('ctx-btn').getAttribute('aria-label')) };
+  ok(!cx0.open && cx0.order === 'help-btn,settings-btn,ctx-btn,lights-btn,met-btn' && /A Minor Pentatonic · 120 BPM|· \d+ BPM/.test(cx0.label),
+    'key / scale / tempo are tucked away behind the clef, beside the lights and metronome: ' + JSON.stringify(cx0));
+  await page.click('#ctx-btn'); await page.waitForTimeout(150);
+  const cx1 = { open: await shown(), exp: await page.evaluate(() => document.getElementById('ctx-btn').getAttribute('aria-expanded')) };
+  await page.selectOption('#cx-scale', 'dorian'); await page.waitForTimeout(100);
+  cx1.afterPick = await shown();
+  cx1.label = await page.evaluate(() => document.getElementById('ctx-btn').title);
+  await page.mouse.click(640, 600); await page.waitForTimeout(150);
+  cx1.outside = await shown();
+  await page.click('#ctx-btn'); await page.waitForTimeout(100); await page.click('#ctx-btn'); await page.waitForTimeout(100);
+  cx1.toggle = await shown();
+  await page.click('#ctx-btn'); await page.keyboard.press('Escape'); await page.waitForTimeout(100);
+  cx1.esc = await shown();
+  await page.click('#ctx-btn'); await page.evaluate(() => App.switchTo('chords')); await page.waitForTimeout(150);
+  cx1.nav = await shown();
+  await page.evaluate(() => App.switchTo('quiz')); await page.waitForTimeout(150);
+  cx1.quizBtn = await page.evaluate(() => getComputedStyle(document.getElementById('ctx-btn')).display);
+  await page.evaluate(() => App.switchTo('songs')); await page.waitForTimeout(150);
+  ok(cx1.open && cx1.exp === 'true' && cx1.afterPick && /Dorian/.test(cx1.label), 'the clef opens it; picking a scale keeps it open and the button names it: ' + JSON.stringify(cx1));
+  ok(!cx1.outside && !cx1.toggle && !cx1.esc && !cx1.nav, 'tucked away by a tap outside, the clef again, Esc, or changing page: ' + JSON.stringify(cx1));
+  ok(cx1.quizBtn === 'none', 'no clef on Exercises (it does not use the key bar)');
+  await page.evaluate(() => { const s = document.getElementById('cx-scale'); s.value = 'minorPent'; s.dispatchEvent(new Event('change')); });
 
   console.log('# scale menu');
   const sc = await page.evaluate(() => {
@@ -104,6 +132,13 @@ const tabs = sel => [...document.querySelectorAll(sel + ' .tabbar-btn')].map(b =
   });
   ok(m1.botShown && !m1.topShown && m1.barBottom === m1.vh && m1.n === 5, 'phone: tabs fixed along the bottom: ' + JSON.stringify(m1));
   ok(m1.oneRow && m1.metRight < 20, 'phone: logo and corner icons share one row, metronome in the corner: ' + JSON.stringify(m1));
+  await page.evaluate(() => App.switchTo('fretboard')); await page.waitForTimeout(150);
+  await page.tap('#ctx-btn'); await page.waitForTimeout(200);
+  const m3 = await page.evaluate(() => { const c = document.getElementById('ctxbar').getBoundingClientRect(); return { open: App.ctx(), l: Math.round(c.left), r: Math.round(innerWidth - c.right), over: document.documentElement.scrollWidth > innerWidth }; });
+  await page.evaluate(() => history.back()); await page.waitForTimeout(250);
+  m3.back = await page.evaluate(() => App.ctx());
+  ok(m3.open && m3.l === 12 && m3.r === 12 && !m3.over && !m3.back, 'phone: the clef dropdown spans the screen; Back tucks it away: ' + JSON.stringify(m3));
+  await page.evaluate(() => App.switchTo('quiz')); await page.waitForTimeout(150);
   await page.tap('#tabbar-m .tabbar-btn:has-text("Play")'); await page.waitForTimeout(200);
   ok(await page.evaluate(() => App.active) === 'songs', 'phone: bottom tab navigates');
   await page.tap('#met-btn'); await page.waitForTimeout(300);

@@ -221,6 +221,7 @@
   var samplesRequested = false;
   var samplesLoaded = 0;
   var samplesTotal = 0;
+  var samplesFailed = 0; // display only: lets the loading note clear when some can't load
 
   function loadSamples() {
     if (samplesRequested || !ctx) return;
@@ -234,18 +235,19 @@
         xhr.open('GET', set.dir + set.notes[m] + '.mp3', true);
         xhr.responseType = 'arraybuffer';
         xhr.onload = function () {
-          if ((xhr.status !== 200 && xhr.status !== 0) || !xhr.response) return;
+          if ((xhr.status !== 200 && xhr.status !== 0) || !xhr.response) { samplesFailed++; sampleInfo(); return; }
           ctx.decodeAudioData(xhr.response, function (buf) {
             sampleBuf[setId + '/' + m] = jamCondense(buf, 2.8);
             if (App.sampleLead) App.sampleLead(sampleBuf[setId + '/' + m]); // scan at decode
             samplesLoaded++;
             sampleInfo();
-          }, function () { /* undecodable — synth fallback */ });
+          }, function () { /* undecodable — synth fallback */ samplesFailed++; sampleInfo(); });
         };
-        xhr.onerror = function () { /* offline / blocked — synth fallback */ };
-        try { xhr.send(); } catch (e) { /* file access blocked — synth fallback */ }
+        xhr.onerror = function () { /* offline / blocked — synth fallback */ samplesFailed++; sampleInfo(); };
+        try { xhr.send(); } catch (e) { /* file access blocked — synth fallback */ samplesFailed++; }
       });
     });
+    sampleInfo();
   }
 
   function jamCondense(buf, secs) {
@@ -263,7 +265,10 @@
 
   function sampleInfo() {
     var el = document.getElementById('jam-sinfo');
-    if (el) el.textContent = samplesLoaded > 0 ? 'sampled band ready (' + samplesLoaded + '/' + samplesTotal + ')' : '';
+    // a note only while the band samples are still arriving — no status noise once ready
+    var done = samplesLoaded + samplesFailed;
+    if (el) el.textContent = (samplesTotal > 0 && done < samplesTotal) ?
+      'Loading band samples… ' + Math.round(100 * done / samplesTotal) + '%' : '';
   }
 
   function setReady(setId) {
@@ -957,11 +962,11 @@
       '.jam-now{font-family:var(--font-condensed,var(--font-display));font-size:40px;font-weight:700;line-height:1;min-height:44px}' +
       '.jam-nowsub{font-size:13px;color:var(--muted);min-height:18px}' +
       '.jam-sec{cursor:pointer;font-family:inherit;color:var(--text);gap:6px}' +
-      '.jam-sec b{color:var(--accent)}' +
+      '.jam-sec b{color:var(--accent-ink)}' +
       '.jam-sec.jam-off{opacity:0.45}' +
       '.jam-sec.jam-onair{border-color:var(--teal);box-shadow:0 0 10px rgba(76,201,176,0.35)}' +
       '.jam-pal{cursor:pointer;font-family:inherit;color:var(--text);gap:7px}' +
-      '.jam-pal b{color:var(--accent)}' +
+      '.jam-pal b{color:var(--accent-ink)}' +
       '.jam-pal.jam-onair{border-color:var(--teal);color:var(--teal)}' +
       '.jam-edch{gap:7px;padding-right:7px;cursor:grab;touch-action:none}' +
       '.jam-pal{touch-action:none}' +
@@ -970,10 +975,26 @@
       '.jam-dropsec{border-color:var(--accent) !important;box-shadow:0 0 10px var(--accent-glow)}' +
       '.jam-chdragging{opacity:0.45}' +
       '.jam-dropch{border-color:var(--accent) !important}' +
-      '.jam-edx{background:transparent;border:none;color:var(--muted);cursor:pointer;padding:2px;display:inline-flex}' +
+      // 26px tap target around the 10px × without growing the chip
+      '.jam-edx{background:transparent;border:none;color:var(--muted);cursor:pointer;display:inline-flex;' +
+        'padding:8px;margin:-8px -7px -8px -4px}' +
       '.jam-edx:hover{color:var(--red)}' +
-      '.jam-mixrow{display:grid;grid-template-columns:86px auto 1fr auto;gap:12px;align-items:center;margin-top:10px}' +
-      '.jam-mixrow select{min-width:104px}' +
+      // one select column for all three rows, so the kit/bass/comp pickers line up
+      '.jam-mixrow{display:grid;grid-template-columns:86px auto 1fr 190px;gap:12px;align-items:center;margin-top:10px}' +
+      '.jam-mixrow select{min-width:104px;width:100%}' +
+      '.jam-mixrow input[type=range]{width:100%;min-width:0}' +
+      // phones: LABEL | Mute | slider, the kit/bass/comp select full width underneath
+      '@media (max-width:640px){.jam-mixrow{grid-template-columns:52px auto minmax(0,1fr);row-gap:8px}' +
+        '.jam-mixrow select{grid-column:2 / -1;min-width:0;width:100%}}' +
+      // band controls: labels on one line, every control one height (--h-ctl)
+      '.jam-ctl{align-items:flex-end}' +
+      '.jam-field{display:inline-flex;flex-direction:column;gap:5px}' +
+      '.jam-ctl input[type=range]{height:var(--h-ctl);margin:0}' +
+      '.jam-ctl .seg{height:var(--h-ctl)}' +
+      '#jam-play,#jam-finish{display:inline-flex;align-items:center;justify-content:center;gap:10px}' +
+      // the key is a caption for the palette, not one of its (tappable) chips
+      '#jam-keylabel{background:transparent;border-color:transparent;box-shadow:none;padding-left:0;' +
+        'color:var(--label);font-weight:600}' +
       '.jam-mixlabel{font-size:12px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:var(--label)}' +
       '.jam-editor{margin-top:12px;padding:12px 14px;background:var(--card2);border:1px solid var(--line);border-radius:12px}' +
       '.tab.jam-live::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;' +
@@ -983,22 +1004,23 @@
     rootEl.innerHTML =
       '<div class="card">' +
         '<h2>Band</h2>' +
-        '<div class="row">' +
+        '<div class="row jam-ctl">' +
           '<label class="field">Genre<select id="jam-genre">' +
             GENRE_ORDER.map(function (id) {
               return '<option value="' + id + '">' + GENRES[id].name + '</option>';
             }).join('') + '</select></label>' +
-          '<div class="fb-field">Energy<div class="seg" id="jam-energy">' +
+          '<div class="jam-field"><span class="ctl-label">Energy</span><div class="seg" id="jam-energy">' +
             '<button type="button" data-jen="1">Chill</button>' +
             '<button type="button" data-jen="2">Groove</button>' +
             '<button type="button" data-jen="3">Push</button></div></div>' +
           '<label class="field">Swing<input type="range" id="jam-swing" min="0" max="100" step="5" style="width:110px"></label>' +
-          '<label class="field">BPM<input id="jam-bpm" type="number" min="30" max="280" step="1" style="width:74px"></label>' +
+          '<label class="field" title="The band plays at the tempo in the bar at the top — change it in either place">Tempo (BPM)' +
+            '<input id="jam-bpm" type="number" min="30" max="280" step="1" style="width:84px"></label>' +
           '<button type="button" class="btn sm" id="jam-newsong" title="Re-arrange the song from the genre preset (replaces your section edits)">New song</button>' +
         '</div>' +
         '<div class="row" style="margin-top:14px">' +
           '<button type="button" class="btn big primary" id="jam-play">' + App.icon('play', 16) + ' Play</button>' +
-          '<button type="button" class="btn" id="jam-finish" disabled title="Cue the ending and land the song">Finish</button>' +
+          '<button type="button" class="btn big" id="jam-finish" disabled title="Cue the ending and land the song">Finish</button>' +
           '<span>' +
             '<div class="jam-now" id="jam-now"></div>' +
             '<div class="jam-nowsub" id="jam-nowsub"></div>' +
@@ -1006,7 +1028,7 @@
           '<span class="muted small" id="jam-sinfo"></span>' +
         '</div>' +
         '<div class="row tight" style="margin-top:14px">' +
-          '<span class="muted small">Form</span>' +
+          '<span class="ctl-label">Form</span>' +
           '<span class="row tight" id="jam-form"></span>' +
         '</div>' +
         '<div class="jam-editor">' +

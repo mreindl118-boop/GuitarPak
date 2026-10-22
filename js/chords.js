@@ -714,10 +714,11 @@
       els.palette.innerHTML = '<div class="muted small">No diatonic chords for this scale.</div>';
       return;
     }
-    dia.forEach(function (d) {
+    dia.forEach(function (d, i) {
       var b = document.createElement('button');
       b.type = 'button';
       b.className = 'chip ch-pal';
+      b.style.setProperty('--deg-c', App.colors.forNote(d.rootPc, i)); // the chord root's color (App.colors)
       b.title = 'Add ' + d.name + ' to the progression';
       b.innerHTML = '<span class="ch-pal-roman">' + esc(d.roman) + '</span>' + esc(d.name);
       b.addEventListener('click', function () {
@@ -728,6 +729,7 @@
   }
 
   function renderTrack() {
+    els.clear.hidden = !st.track.length;
     els.track.innerHTML = '';
     if (!st.track.length) {
       els.track.innerHTML = '<div class="muted small">Empty — click palette chords above or pick a preset, then press Play.</div>';
@@ -1019,17 +1021,18 @@
     '.ch-tonechip{border-color:var(--deg-c,var(--line));gap:7px;}' +
     '.ch-tonechip b{color:var(--deg-c,var(--accent));font-size:14px;}' +
     '.ch-fnline{font-size:14px;}' +
-    '.ch-field{display:inline-flex;flex-direction:column;gap:4px;font-size:12.5px;' +
-      'color:var(--label,var(--muted));font-weight:600;}' +
+    '.ch-field{display:inline-flex;flex-direction:column;gap:4px;font-size:11.5px;' +
+      'letter-spacing:1.4px;text-transform:uppercase;color:var(--label,var(--muted));font-weight:600;}' +
     '.ch-line{stroke:var(--line);stroke-width:1;}' +
     '.ch-string{stroke:var(--muted);stroke-opacity:.55;stroke-width:1;}' +
     '.ch-nut{fill:var(--text);}' +
     '.ch-xo{fill:var(--muted);font-size:9px;font-weight:700;}' +
     '.ch-fretnum{fill:var(--muted);font-size:9.5px;}' +
     '.ch-palette{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 14px;}' +
-    '.chip.ch-pal{cursor:pointer;font-family:inherit;color:var(--text);gap:7px;}' +
+    '.chip.ch-pal{cursor:pointer;font-family:inherit;color:var(--text);gap:7px;' +
+      'border-color:var(--deg-c,var(--ctl-border));}' +
     '.chip.ch-pal:hover{border-color:var(--accent-dim);}' +
-    '.ch-pal-roman{color:var(--accent);}' +
+    '.ch-pal-roman{color:var(--deg-c,var(--accent));}' +
     '.ch-trackwrap{display:flex;gap:16px;align-items:stretch;flex-wrap:wrap;}' +
     '.ch-trackbox{flex:1 1 320px;min-width:0;}' +
     '.ch-trackbox h3{margin:0;}' +
@@ -1037,18 +1040,36 @@
     '.ch-bar{background:var(--card2);border:1px solid var(--line);border-radius:10px;' +
       'padding:7px 12px;cursor:pointer;text-align:center;color:var(--text);font-family:inherit;}' +
     '.ch-bar:hover{border-color:var(--red);}' +
-    '.ch-bar-name{font-size:17px;font-weight:700;line-height:1.15;}' +
+    '.ch-bar-name{font-family:var(--font-condensed);font-size:17px;font-weight:700;line-height:1.15;}' +
     '.ch-bar-roman{font-size:11.5px;color:var(--muted);}' +
     '.ch-bar.ch-active{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent);}' +
     '.ch-bar.ch-active .ch-bar-name{color:var(--accent);}' +
     '.ch-now{display:none;flex-direction:column;align-items:center;justify-content:center;gap:2px;' +
       'background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:12px 20px;}' +
     '.ch-now.ch-on{display:flex;}' +
-    '.ch-now-name{font-size:40px;font-weight:800;line-height:1.1;}' +
+    '.ch-now-name{font-family:var(--font-condensed);font-size:40px;font-weight:700;line-height:1.1;}' +
     '.ch-check{display:inline-flex;align-items:center;gap:7px;font-size:13px;' +
       'color:var(--muted);font-weight:600;cursor:pointer;}' +
     '.ch-status{margin-top:10px;}' +
-    '.ch-status:empty{display:none;}';
+    '.ch-status:empty{display:none;}' +
+    '#ch-clear[hidden]{display:none;}' +
+    // rows mixing label-above selects with buttons: line up the bottom edges
+    '.ch-exrow,.ch-playrow{align-items:flex-end;}' +
+    '.ch-check,.ch-playrow>.muted{min-height:40px;}' +
+    '.ch-playrow>.muted{display:inline-flex;align-items:center;}' +
+    // light theme: the bright degree palette is unreadable as TEXT on white —
+    // deepen it (borders keep the pure color)
+    ':root[data-theme="light"] .ch-inkeychip b,:root[data-theme="light"] .ch-tonechip b,' +
+      ':root[data-theme="light"] .ch-pal-roman{color:color-mix(in srgb,var(--deg-c,var(--accent)) 55%,#000);}' +
+    // phone: the chord name gets its own line, Root/Chord/View share one,
+    // Strum and + Progression split the next
+    '@media (max-width:640px){' +
+      '.ch-exname{flex-basis:100%;}' +
+      '.ch-exrow>label.field{min-width:0;}' +
+      '.ch-exrow>label.field:nth-of-type(2){flex:1 1 0;}' +
+      '.ch-exrow select{width:100%;}' +
+      '#ch-ex-strum,#ch-ex-add{flex:1 1 calc(50% - 7px);}' +
+    '}';
 
   function buildDOM(root) {
     root.innerHTML =
@@ -1064,7 +1085,7 @@
           '<span id="ch-inkey" class="ch-inkeyrow" style="margin-top:0"></span>' +
         '</div>' +
         // 2. the chord itself: name, free pickers, view, actions
-        '<div class="row" style="margin-top:16px">' +
+        '<div class="row ch-exrow" style="margin-top:16px">' +
           '<span class="ch-exname" id="ch-ex-name"></span>' +
           '<label class="field">Root<select id="ch-ex-root"></select></label>' +
           '<label class="field">Chord<select id="ch-ex-quality"></select></label>' +
@@ -1124,12 +1145,12 @@
             '<div id="ch-now-roman" class="muted"></div>' +
           '</div>' +
         '</div>' +
-        '<div class="row" style="margin-top:14px">' +
+        '<div class="row ch-playrow" style="margin-top:14px">' +
           '<label class="field">BPM<input id="ch-bpm" type="number" min="40" max="240" step="1"></label>' +
           '<label class="field">Bars / chord<select id="ch-bars">' +
             '<option value="1">1</option><option value="2">2</option></select></label>' +
           '<label class="ch-check"><input id="ch-countin" type="checkbox"> Count-in</label>' +
-          '<button id="ch-play" class="btn big primary" type="button">Play</button>' +
+          '<button id="ch-play" class="btn primary" type="button">Play</button>' +
           '<span class="muted small">Space toggles play</span>' +
         '</div>' +
         '<div id="ch-status" class="ch-status"></div>' +

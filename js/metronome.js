@@ -89,9 +89,9 @@
     '.met-step{min-width:48px;padding:10px 0;font-variant-numeric:tabular-nums}',
     '.met-dots{display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;min-height:34px;}',
     '.met-dot{width:26px;height:26px;border-radius:50%;background:var(--card2);border:2px solid var(--line);cursor:pointer;padding:0;transition:transform 60ms ease,background 90ms ease,border-color 90ms ease,box-shadow 90ms ease;}',
-    '.met-dot.met-acc{border-color:var(--accent);background:rgba(255,180,84,0.18);}',
+    '.met-dot.met-acc{border-color:var(--accent);background:var(--accent-soft);}',
     '.met-dot.met-mute{opacity:0.35;background:transparent;border-style:dashed;}',
-    '.met-dot.met-on{background:var(--accent);border-color:var(--accent);transform:scale(1.22);box-shadow:0 0 12px rgba(255,180,84,0.55);}',
+    '.met-dot.met-on{background:var(--accent);border-color:var(--accent);transform:scale(1.22);box-shadow:0 0 12px var(--accent-glow);}',
     '.met-dot.met-mute.met-on{background:var(--muted);border-color:var(--muted);box-shadow:none;}',
     '.met-wide{width:100%;}',
     // fixed 3-digit width: 99 -> 100 BPM must never reflow the row while tapping
@@ -100,7 +100,7 @@
     '.met-go #met-startstop{flex:1;max-width:260px}',
     '.met-tap{min-width:96px;min-height:58px;font-family:var(--font-display);font-size:20px;' +
       'font-weight:700;letter-spacing:2.5px;text-transform:uppercase;' +
-      'border-color:rgba(255,171,71,0.55);touch-action:manipulation;}',
+      'border-color:var(--accent-line);touch-action:manipulation;}',
     '.met-tap:active{transform:none;border-color:var(--accent);' +
       'box-shadow:0 0 14px var(--accent-glow),inset 0 2px 5px rgba(0,0,0,0.4);}',
     '.met-opts{display:flex;flex-wrap:wrap;gap:12px 16px;justify-content:center;align-items:flex-end}',
@@ -111,10 +111,14 @@
     '.met-more{margin-top:14px;border-top:1px solid var(--line-soft);padding-top:10px}',
     '.met-more summary{cursor:pointer;font-weight:600;font-size:14px;color:var(--label);padding:4px 0;list-style-position:inside}',
     '.met-more summary:hover{color:var(--text)}',
-    '.met-more[open] summary{color:var(--accent)}',
+    '.met-more[open] summary{color:var(--accent-ink,var(--accent))}',
     '.met-hint{margin:14px 0 0;text-align:center}',
     '@media (max-width:640px){.met-bpmrow{gap:6px}.met-read{min-width:0;flex:1}.met-step{min-width:42px;padding:9px 0}' +
-      '.met-tap{min-width:84px}#met-vol{width:130px}}'
+      '.met-tap{min-width:84px}' +
+      // phone sheet: Time | Subdivision on one row, Volume full width below
+      '.met-opts{display:grid;grid-template-columns:auto minmax(0,1fr);width:100%;text-align:left;align-items:end}' +
+      '.met-opts .field:last-child{grid-column:1/-1}.met-opts select{width:100%}' +
+      '#met-vol{width:100%;max-width:none}}'
   ].join('\n');
 
   var HTML = [

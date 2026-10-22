@@ -371,10 +371,15 @@
       els.tabout.innerHTML = '<span class="muted">Paste a tab or import a MIDI file to get started.</span>';
       els.songTitle.textContent = 'No song loaded';
       els.keyline.style.display = 'none';
+      // nothing to play or loop yet (style.display: the label's .row flex beats [hidden])
+      els.play.disabled = true;
+      els.loopA.parentNode.style.display = 'none';
       return;
     }
-    els.songTitle.textContent = cur.name + ' · ' + cur.bars + ' bar' + (cur.bars === 1 ? '' : 's') +
-      (cur.srcType === 'midi' ? ' · from MIDI' : ' · from tab');
+    els.songTitle.innerHTML = escapeHtml(cur.name) + '<span class="sg-meta">' + cur.bars + ' bar' + (cur.bars === 1 ? '' : 's') +
+      (cur.srcType === 'midi' ? ' · from MIDI' : ' · from tab') + '</span>';
+    els.play.disabled = false;
+    els.loopA.parentNode.style.display = '';
 
     // chunk into systems of ~24 steps, bar-aligned where possible
     var PER = 24;
@@ -440,13 +445,21 @@
       '.sg-tabout span.now{background:var(--accent);color:#1c1206;box-shadow:0 0 10px var(--accent-glow)}' +
       '.sg-paste{width:100%;min-height:130px;font-family:ui-monospace,Consolas,Menlo,monospace;font-size:12.5px;' +
         'background-color:var(--card2);color:var(--text);border:1px solid var(--ctl-border);border-radius:10px;padding:10px 12px}' +
-      '.sg-paste:focus{outline:none;border-color:rgba(255,171,71,0.6)}' +
-      '.sg-title{font-family:var(--font-display);font-size:19px;font-weight:600;letter-spacing:1px;text-transform:uppercase}' +
+      // tab lines scroll sideways instead of wrapping, so the six strings stay lined up
+      '.sg-paste{white-space:pre;overflow-x:auto;overflow-wrap:normal}' +
+      '.sg-paste:focus{outline:none;border-color:var(--accent-line)}' +
+      '.card h2.sg-title{margin:0}' +
+      '.sg-meta{font-family:var(--font-body);font-size:13px;font-weight:500;letter-spacing:0;text-transform:none;' +
+        'color:var(--muted);margin-left:10px}' +
       '.sg-libchip{cursor:pointer}' +
-      '.sg-libchip:hover{border-color:rgba(255,171,71,0.7)}' +
+      '@media (hover:hover){.sg-libchip:hover{border-color:var(--accent-line)}}' +
       '.sg-strip{margin-top:12px}' +
-      '.sg-strip select{padding:6px 26px 6px 9px;font-size:13px;background-position:right 8px center}' +
-      '.sg-strip input[type=number]{padding:6px 8px;font-size:13px}' +
+      // one height for both toolbars (--h-ctl, set globally on .btn.sm / select / input)
+      '.sg-strip select{padding-top:0;padding-bottom:0;padding-right:28px;padding-left:10px;font-size:14px;background-position:right 9px center}' +
+      '.sg-strip input[type=number]{padding:0 9px;font-size:14px}' +
+      '.sg-strip .btn,.sg-add .btn{display:inline-flex;align-items:center;gap:6px}' +
+      '.sg-strip label{color:var(--label)}' +
+      '.sg-tabout > .muted:only-child{white-space:normal;font-family:var(--font-body);font-size:14px}' +
       '#sg-file{display:none}'
     );
 
@@ -455,8 +468,8 @@
         '<h2>Add a song</h2>' +
         '<div class="muted small" style="margin-bottom:8px">Paste an ASCII guitar tab (the six-line kind you can copy from any tab site) ' +
           'or import a MIDI file. Everything is parsed on your device &mdash; nothing is uploaded, and only content you bring in is used. Standard tuning is assumed.</div>' +
-        '<textarea class="sg-paste" id="sg-paste" spellcheck="false" placeholder="e|--0--1--3--1--0-------|&#10;B|-------------------3--|&#10;G|----------------------|&#10;D|----------------------|&#10;A|----------------------|&#10;E|----------------------|"></textarea>' +
-        '<div class="row tight" style="margin-top:10px">' +
+        '<textarea class="sg-paste" id="sg-paste" wrap="off" spellcheck="false" placeholder="e|--0--1--3--1--0-------|&#10;B|-------------------3--|&#10;G|----------------------|&#10;D|----------------------|&#10;A|----------------------|&#10;E|----------------------|"></textarea>' +
+        '<div class="row tight sg-add" style="margin-top:10px">' +
           '<button type="button" class="btn sm primary" id="sg-parse">Parse tab</button>' +
           '<button type="button" class="btn sm" id="sg-midibtn">Import MIDI&hellip;</button>' +
           '<input type="file" id="sg-file" accept=".mid,.midi,audio/midi">' +
@@ -468,7 +481,7 @@
       '</div>' +
       '<div class="card">' +
         '<div class="row tight spread">' +
-          '<span class="sg-title" id="sg-songtitle">No song loaded</span>' +
+          '<h2 class="sg-title" id="sg-songtitle">No song loaded</h2>' +
           '<span class="row tight" id="sg-keyline" style="display:none">' +
             '<span class="muted small">Detected key:</span>' +
             '<span class="chip" id="sg-keyname"></span>' +
@@ -480,13 +493,15 @@
           '<button type="button" class="btn sm" id="sg-reset" title="Back to the start">' + App.icon('restart', 14) + '</button>' +
           '<label class="row tight small muted" style="gap:5px">Loop bars <select id="sg-loopa"></select>' +
             App.icon('right', 12) + '<select id="sg-loopb"></select></label>' +
-          '<input type="number" id="sg-bpm" min="30" max="280" step="1" title="Tempo (BPM) — linked to the metronome" style="width:70px">' +
-          '<select id="sg-rate" title="Steps per beat — slow a song down without changing the click">' +
+          '<label class="row tight small muted" style="gap:5px">BPM ' +
+            '<input type="number" id="sg-bpm" min="30" max="280" step="1" title="Tempo (BPM) — linked to the metronome" style="width:66px"></label>' +
+          '<label class="row tight small muted" style="gap:5px">Steps ' +
+            '<select id="sg-rate" title="Steps per beat — slow a song down without changing the click">' +
             '<option value="1">1 / beat</option>' +
             '<option value="2">8ths</option>' +
             '<option value="3">Triplets</option>' +
             '<option value="4">16ths</option>' +
-          '</select>' +
+          '</select></label>' +
           '<label class="row tight small muted" style="gap:5px"><input type="checkbox" id="sg-click">Click</label>' +
           '<span class="muted small" id="sg-status"></span>' +
         '</div>' +

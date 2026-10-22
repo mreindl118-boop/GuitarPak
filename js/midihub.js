@@ -174,6 +174,9 @@
   function send(bytes, origin) {
     var msgs = [bytes];
     if ((origin === 'thru') || (origin !== 'raw' && g('rulesApp', false))) msgs = applyRules(bytes);
+    // scale lock: thru sends only in-key note-ons — checked AFTER the rules
+    // (a transpose or a CC→note rule decides the note that actually sounds)
+    if (origin === 'thru' && App.scaleLock) msgs = msgs.filter(function (m) { return !((m[0] & 0xF0) === 0x90 && m[2] > 0 && !App.scaleLock.allows(m[1])); });
     var ok = false;
     for (var i = 0; i < msgs.length; i++) { if (hasOut()) ok = sendOut(msgs[i]) || ok; }
     if (!hasOut() && origin !== 'thru') toast('No MIDI output — pick one above');

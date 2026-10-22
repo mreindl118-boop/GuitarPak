@@ -162,6 +162,8 @@
     var b = document.getElementById('cx-rec');
     if (!b) return;
     b.classList.toggle('cx-rec-on', !!rec);
+    var cb = document.getElementById('ctx-btn'); // ● lives in the clef dropdown: a dot on the button while capturing
+    if (cb) cb.classList.toggle('rec', !!rec);
     b.title = rec
       ? 'Recording into the current song — tap to stop and keep it'
       : 'Capture: tap, play anything (ROLI, typing keys, touch), tap again — it lands in Ideas';
@@ -171,6 +173,17 @@
   function flashRec(msg) {
     var el = document.getElementById('cx-rec-msg');
     if (!el) return;
+    // the ● and its line live in the clef dropdown: when that is tucked away
+    // (a page button: Keep the last 30s, an idea's key), say it in a toast
+    if (App.ctx && !App.ctx()) {
+      el = document.getElementById('sd-toast');
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'sd-toast';
+        el.setAttribute('role', 'status');
+        document.body.appendChild(el);
+      }
+    }
     el.textContent = msg;
     el.style.display = '';
     if (flashT) clearTimeout(flashT);

@@ -25,7 +25,7 @@
     ],
     fretboard: [
       { t: 'Fretboard', x: 'Every dot is a note in your key. Its color follows Color notes by (in the Fretboard’s settings, or in Lights & help): by Interval each scale degree has its color and amber is the root; by Note every C is one color in every key. The Piano and the Studio’s note editor use the same colors.' },
-      { sel: '#cx-root', t: 'Pick your key and scale', x: 'Key, scale and mode live in this bar and follow you everywhere. Change them and the whole neck re-colors.' },
+      { sel: '#ctx-btn', t: 'Pick your key and scale', x: 'Tap the clef: key, scale, mode, tempo and time signature drop down here and follow you everywhere. Change them and the whole neck re-colors; tap anywhere else to tuck them away. LED scale lights the scale on your keyboard; Scale lock lets only the scale’s notes play.' },
       { t: 'Practice runner', x: 'Below the neck: pick a pattern and press play — it walks the scale in time, shows what to play next, and can pause at turnarounds while you catch up.' }
     ],
     tab: [
@@ -76,8 +76,8 @@
       { t: 'Theory', x: 'The circle of fifths, a guide to what chords live in every key, and an ear quiz for scale degrees. Tap around the circle — the app’s key follows.' }
     ],
     song: [
-      { t: 'Your song', x: 'The Studio’s home. There’s always a current song — its key and tempo are whatever the top bar says, and everything you capture or build lands in it.' },
-      { sel: '#cx-rec', t: 'The capture button', x: 'This red dot works on EVERY page, both sides of the app. Tap it, play anything — ROLI, typing keys, touch piano — tap again, and it’s saved in Ideas with the key and tempo you played it in.' },
+      { t: 'Your song', x: 'The Studio’s home. There’s always a current song — its key and tempo are whatever the clef at the top says, and everything you capture or build lands in it.' },
+      { sel: '#ctx-btn', t: 'The capture button', x: 'Tap the clef, then the red dot: it works on every Studio page. Tap it, play anything — ROLI, typing keys, touch piano — tap again, and it’s saved in Ideas with the key and tempo you played it in. While it records, the clef shows a red dot.' },
       { sel: '#sd-gotracks', t: 'Build it in Tracks', x: 'Tracks is the loop workstation: drums, synths and samplers all looping in sync. Ideas can be sent there with one tap.' }
     ],
     arrange: [
@@ -204,7 +204,7 @@
     if (App.showBar) App.showBar(); // tours point at the top bar too
     close();
     steps = extraSteps || TOURS[page] || [
-      { t: 'This page', x: 'Explore freely — nothing here can break anything. The bar at the top (key, scale, tempo) is shared by every page, and the gear holds app-wide settings.' }
+      { t: 'This page', x: 'Explore freely — nothing here can break anything. The clef at the top (key, scale, tempo) is shared by every page, and the gear holds app-wide settings.' }
     ];
     idx = 0;
     ov = document.createElement('div');
@@ -224,8 +224,8 @@
   function welcome() {
     openTour(null, [
       { t: 'Welcome to soundLAB', x: 'Start with Exercises: a short theory and ear-training course you answer by playing. Around it are two workspaces: Practice (guitar, keys, jam band, tuner…) and the Studio (record ideas, build loops, finger-drum). The Studio button in the top corner switches between them.' },
-      { t: 'One musical brain', x: 'The bar at the top — key, scale, tempo — is shared by EVERYTHING. Change it once and the fretboard re-colors, the jam re-harmonizes, and the Studio follows.' },
-      { t: 'Sections', x: 'The tabs — Learn, Guitar, Keys, Play, Practice (along the bottom on phones) — are the app’s sections. The pills under the top bar switch pages inside a section (Neck / Tab / Notation, Piano / Synth / Pads…).' },
+      { t: 'One musical brain', x: 'The clef button at the top opens key, scale and tempo, shared by EVERYTHING. Change it once and the fretboard re-colors, the jam re-harmonizes, and the Studio follows. Its metronome ▶ starts the click from any page.' },
+      { t: 'Sections', x: 'The tabs — Learn, Guitar, Keys, Play, Practice (along the bottom on phones) — are the app’s sections. The pills at the top of the page switch pages inside a section (Neck / Tab / Notation, Piano / Synth / Pads…).' },
       { sel: '#met-btn', t: 'The metronome', x: 'Always one tap away in the top corner: it opens over any page and keeps playing when you close it.' },
       { t: 'Whenever you’re lost', x: 'Tap the ? in the top bar — it explains whichever page you’re on, step by step. Try it on every page once.' }
     ]);

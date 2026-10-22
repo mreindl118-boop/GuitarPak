@@ -129,6 +129,17 @@ const J = JSON.stringify;
   const s2 = thru.sent.map(b => b.join(' '));
   ok(thru.n === 3 && s2.join('|') === '144 72 100|176 1 40|176 7 100', 'Thru: transposed, remapped, aftertouch blocked, others untouched, active sensing never forwarded: ' + s2.join('|'));
   ok(thru.ar.length === 1 && thru.ar[0].join(' ') === '145 22 1', 'applyRules keeps the channel and adds 12: ' + J(thru.ar));
+  const lockThru = await page.evaluate(() => {
+    const r0 = App.store.get('fb.root', 9), s0 = App.store.get('fb.scale', 'minorPent');
+    App.store.set('fb.root', 0); App.store.set('fb.scale', 'major');
+    App.scaleLock.set(true);
+    const from = __sent.length;
+    __recv([0x90, 61, 100]); __recv([0x80, 61, 0]); __recv([0x90, 62, 100]); // C# (out of C major), then D — each +12 by the rule
+    const sent = __since(from).map(b => b.join(' '));
+    App.scaleLock.set(false); App.store.set('fb.root', r0); App.store.set('fb.scale', s0);
+    return sent;
+  });
+  ok(lockThru.join('|') === '128 73 0|144 74 100', 'Scale lock on Thru: checked on the note the rules produce; out-of-key note-ons stay home, note-offs pass: ' + lockThru.join('|'));
 
   console.log('# rules on what soundLAB hears');
   const heard = await page.evaluate(() => {
