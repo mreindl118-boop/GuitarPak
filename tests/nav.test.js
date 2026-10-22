@@ -39,7 +39,7 @@ const tabs = sel => [...document.querySelectorAll(sel + ' .tabbar-btn')].map(b =
   ok((await page.evaluate(() => [...document.querySelectorAll('#subnav .subtab')].map(b => b.textContent).join('|'))) === 'Piano|Synth|Pads|MIDI', 'Keys pills: Piano | Synth | Pads | MIDI');
   await page.click('#subnav .subtab:has-text("Synth")'); await page.waitForTimeout(150);
   ok(await clickTab('Guitar') === 'fretboard', 'Guitar tab opens the neck');
-  ok((await page.evaluate(() => [...document.querySelectorAll('#subnav .subtab')].map(b => b.textContent).join('|'))) === 'Neck|Tab|Notation', 'Guitar pills: Neck | Tab | Notation');
+  ok((await page.evaluate(() => [...document.querySelectorAll('#subnav .subtab')].map(b => b.textContent).join('|'))) === 'Neck|Tab|Notation|Helix', 'Guitar pills: Neck | Tab | Notation | Helix');
   ok(await clickTab('Keys') === 'synth', 'Keys remembers the last page (Synth)');
   ok(await clickTab('Practice') === 'shed', 'Practice opens the Woodshed');
   ok((await page.evaluate(() => [...document.querySelectorAll('#subnav .subtab')].map(b => b.textContent).join('|'))) === 'Woodshed|Trainer|Tuner', 'Practice pills: Woodshed | Trainer | Tuner');

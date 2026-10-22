@@ -34,14 +34,14 @@ the same, with three built-in rules:
 | # | Step | Status |
 |---|---|---|
 | 1 | This handoff record | done (`tasks/` on `feat/helix-stadium`) |
-| 2 | `js/helix.js` from the plugin: `App.register('helix', …)`, no boot connections, CSS via `App.injectCSS('helix', …)` | pending |
-| 3 | `index.html`: `<section class="panel" id="panel-helix">` + `<script src="js/helix.js">` before `js/help.js` | pending |
-| 4 | `js/app.js`: `helix` in `SPACES.practice`, Guitar group `pages`, `SPACE_LABELS.helix = 'Helix Stadium'`, `SUB_LABELS.helix = 'Helix'` | pending |
-| 5 | `sw.js`: add `'js/helix.js'` to `ASSETS` (the `CACHE` bump is release bookkeeping, step 10) | pending |
-| 6 | `js/plugins.js`: skip + flag the old stored Helix plugin | pending |
-| 7 | `js/help.js`: `TOURS.helix` (3–4 stops: header strip/arm, views, Preset card) | pending |
-| 8 | `plugins/helix-stadium.js`: replace with a short stub that says it is built in (keeps old links working) | pending |
-| 9 | Tests: `tests/helix.test.js` drives the built-in page (no plugin injection) + a check that a stored old plugin is skipped; fix any suite that counts Guitar pills (`tests/nav.test.js` likely); run ALL suites | pending |
+| 2 | `js/helix.js` from the plugin: `App.register('helix', …)`, no boot connections, CSS via `App.injectCSS('helix', …)` | done (`3074727`) |
+| 3 | `index.html`: `<section class="panel" id="panel-helix">` + `<script src="js/helix.js">` before `js/help.js` | done (`3074727`) |
+| 4 | `js/app.js`: `helix` in `SPACES.practice`, Guitar group `pages`, `SPACE_LABELS.helix = 'Helix Stadium'`, `SUB_LABELS.helix = 'Helix'` | done (`3074727`) |
+| 5 | `sw.js`: add `'js/helix.js'` to `ASSETS` (the `CACHE` bump is release bookkeeping, step 10) | done (`3074727`) |
+| 6 | `js/plugins.js`: skip + flag the old stored Helix plugin | done (`3074727`) |
+| 7 | `js/help.js`: `TOURS.helix` (3–4 stops: header strip/arm, views, Preset card) | done (`3074727`) |
+| 8 | `plugins/helix-stadium.js`: replace with a short stub that says it is built in (keeps old links working) | done (`3074727`) |
+| 9 | Tests: `tests/helix.test.js` drives the built-in page (no plugin injection) + a check that a stored old plugin is skipped; fix any suite that counts Guitar pills (`tests/nav.test.js` likely); run ALL suites | helix (54) + nav (33) pass; full run in progress |
 | 10 | Release (Matt approves first): `APP_VERSION` 0.82.0, `version.json` `web` + `notes` (never `version`), `android/AndroidManifest.xml` versionCode +1 / versionName, `sw.js` `CACHE` → `guitarlab-v118`; no APK build needed (web-only change) | pending, needs Matt |
 | 11 | Docs: `CLAUDE.md` entry moves from `plugins/` to `js/helix.js`; `PLUGINS.md`; `docs/HELIX-STADIUM.md` (no longer "load from Settings › Plugins") | pending |
 | 12 | Merge to `main`, push, republish the claude.ai artifact (`CLAUDE.md` › claude.ai Artifact) | pending, needs Matt |
@@ -88,3 +88,5 @@ regression.
 (updated at each milestone; see the newest commit message too)
 
 - 21:41Z: record written; no code changed yet.
+- 22:0xZ: steps 2-8 committed as `3074727` (built-in page wired; plugin is a stub). Next: step 9 tests.
+- 22:1xZ: tests converted (`tests/helix.test.js` 54 checks, `tests/nav.test.js` Guitar pills) and one bug fixed: the first visit now always requests the page's own Web MIDI access (the boot-time `midi:state` could leave it on the shared output with no input). Next: run every suite.

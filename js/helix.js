@@ -1087,7 +1087,9 @@
       armMsg = safe() ? 'Output is disarmed. Press Arm before sending anything to the Helix.' : 'Safe mode is off: controls send immediately.';
       paintArm();
       visible = true;
-      if (!midi.access && midi.mode === 'none') midiConnect(true);
+      // the page's own Web MIDI access on the first visit (the boot-time midi:state can
+      // already have settled on the app's shared output, which gives no input to listen to)
+      if (!midi.access) midiConnect(true);
       if (g('bridgeAuto', false)) brConnect();
       if (devOnline()) devRefresh();
       showView(view);
