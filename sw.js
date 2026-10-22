@@ -1,5 +1,5 @@
 /* GuitarLab service worker — cache-first so the app works fully offline once visited. */
-var CACHE = 'guitarlab-v108';
+var CACHE = 'guitarlab-v109';
 var ASSETS = [
   '.',
   'index.html',

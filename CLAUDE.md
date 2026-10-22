@@ -394,6 +394,15 @@ version.json      auto-update feed (source of truth for latest version)
 - Fretboard is drawn in horizontal-neck coordinates and rotated 90° cw as one
   SVG group (nut at top, low E left). Practice-runner paths dedupe identical
   pitches at string crossings.
+- VISUAL SYSTEM (v0.78.0): icons = Lucide (ISC, icons/LUCIDE-LICENSE.txt)
+  in app.js ICONS — add new ones from lucide-static, never hand-draw.
+  Tokens: --accent-soft / --accent-line (tints) and --accent-ink (accent as
+  TEXT, deepened in light) — never hardcode rgba(255,171,71,…); --h-ctl =
+  the one toolbar control height; --warn; light theme re-inks the status
+  colors. Casing: uppercase only for Bebas headings and small field labels
+  (label.field, .cx-field, .ctl-label); everything else title/sentence case.
+  details.tips = the quiet disclosure for long page hints. SVG text inside a
+  rotated group (vertical neck, portrait keyboard) is counter-rotated.
 - Note colors: one bright color per scale degree (DEG_COLORS in fretboard.js);
   user-customizable in the fretboard settings (stored as fb.colors, DEG_DEFAULTS
   restores). Light/dark theme: data-theme attr on <html>, app.theme in storage.

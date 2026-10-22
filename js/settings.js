@@ -10,9 +10,16 @@
       '.set-sub{margin:16px 0 8px;font-size:12px;font-weight:600;letter-spacing:1.4px;' +
         'text-transform:uppercase;color:var(--label,var(--muted))}' +
       '.set-sub:first-of-type{margin-top:12px}' +
-      '.set-acc{width:22px;height:22px;border-radius:50%;border:2px solid transparent;cursor:pointer;padding:0}' +
+      '.set-acc{width:32px;height:32px;border-radius:50%;border:2px solid transparent;cursor:pointer;padding:0}' +
       '.set-acc.active{border-color:var(--text);box-shadow:0 0 0 2px var(--card)}' +
-      '#set-vol{width:200px;max-width:56vw;vertical-align:middle}'
+      '#set-accent{gap:12px}' +
+      '#set-vol{width:200px;max-width:56vw;vertical-align:middle}' +
+      // checkbox settings: the name reads as a control, the note sits under it
+      '.set-check{display:flex;align-items:flex-start;gap:12px;margin-top:14px;font-size:14px;font-weight:500;' +
+        'line-height:1.4;color:var(--text);cursor:pointer}' +
+      '.set-check input{flex:0 0 auto;width:20px;height:20px;margin:0}' +
+      '.set-check small{display:block;margin-top:2px;font-size:12.5px;font-weight:400;color:var(--muted)}' +
+      '#panel-settings{max-width:760px;margin:0 auto}'
     );
 
     var accBtns = '';
@@ -46,8 +53,9 @@
           '<span class="muted small" id="set-vol-val"></span>' +
         '</div>' +
         '<div class="muted small set-theme-note">One knob for everything &mdash; metronome, practice notes, the Jam band, the Studio.</div>' +
-        '<label class="row tight small muted" style="gap:6px;margin-top:12px">' +
-          '<input type="checkbox" id="set-click">Metronome click during Studio playback (the loop, the Arrange song, and pad recording) &mdash; a global setting, also toggleable on the Pads page' +
+        '<label class="set-check">' +
+          '<input type="checkbox" id="set-click"><span>Metronome click during Studio playback' +
+          '<small>The loop, the Timeline song and pad recording. Also on the Pads page.</small></span>' +
         '</label>' +
         '<div class="set-sub">Latency</div>' +
         '<div class="muted small" id="set-latency">&mdash;</div>' +
@@ -91,7 +99,7 @@
             '<button type="button" data-retro="60">60s</button>' +
           '</div>' +
         '</div>' +
-        '<div class="muted small set-theme-note">How far back &ldquo;Keep the last take&rdquo; reaches. Everything you play is remembered for this long.</div>' +
+        '<div class="muted small set-theme-note">How far back &ldquo;Keep the last 30s&rdquo; on the Ideas page reaches. Everything you play is remembered for this long.</div>' +
         '<div class="muted small set-theme-note">Time signature: the context-bar signature drives the metronome; the Studio loop and the Jam band currently play 4/4 (odd meters there are on the roadmap).</div>' +
         '<div class="set-sub">Idea playback voice</div>' +
         '<div class="fb-field">' +
@@ -117,8 +125,9 @@
       '</div>' +
       '<div class="card">' +
         '<h2>Screen &amp; battery</h2>' +
-        '<label class="row tight small muted" style="gap:6px">' +
-          '<input type="checkbox" id="set-wake">Keep the screen awake while sound is playing or a practice runner is going' +
+        '<label class="set-check" style="margin-top:0">' +
+          '<input type="checkbox" id="set-wake"><span>Keep the screen awake' +
+          '<small>While sound plays or a practice runner is going.</small></span>' +
         '</label>' +
       '</div>' +
       '<div class="card">' +
@@ -135,7 +144,8 @@
           '<button type="button" class="btn sm" id="set-midi-test" title="Briefly lights a C major arpeggio on the device">Light test</button>' +
           '<button type="button" class="btn sm" id="set-midi-bt" style="display:none" title="Open the system Bluetooth MIDI pairing sheet">Pair Bluetooth&hellip;</button>' +
         '</div>' +
-        '<div class="fb-field" style="margin-top:14px">Pitch bend' +
+        '<div class="set-sub">Pitch bend</div>' +
+        '<div>' +
           '<div class="seg" id="set-midi-bend" role="group" aria-label="Pitch bend">' +
             '<button type="button" data-bend="0">Off</button>' +
             '<button type="button" data-bend="2">&plusmn;2</button>' +
@@ -152,8 +162,10 @@
         '<h2>Audio devices</h2>' +
         '<div class="muted small">Pick which interface soundLAB listens to (Woodshed mic scoring, future recording) and plays out of. ' +
           'A Line&nbsp;6 Helix / Stadium is auto-detected by name. Devices are re-checked on plug/unplug.</div>' +
-        '<label class="row tight small muted" style="gap:6px;margin-top:10px">' +
-          '<input type="checkbox" id="set-tonein">&frac14;&Prime; / guitar TONE-IN &mdash; detect the notes you play on the audio input and light them on every instrument page (fretboard positions, keys, guide mode), exactly like a MIDI keyboard. Detection only &mdash; nothing is re-sounded.' +
+        '<label class="set-check">' +
+          '<input type="checkbox" id="set-tonein"><span>&frac14;&Prime; guitar TONE-IN' +
+          '<small>Detects the notes you play on the audio input and lights them on every instrument page ' +
+            '(fretboard positions, keys, guide mode), exactly like a MIDI keyboard. Detection only &mdash; nothing is re-sounded.</small></span>' +
         '</label>' +
         '<div class="row" style="margin-top:12px" id="set-audio-row">' +
           '<button type="button" class="btn sm primary" id="set-audio-enable">List devices</button>' +

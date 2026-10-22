@@ -1181,7 +1181,7 @@
         'stroke:#ffffff !important;stroke-width:3 !important}' +
       '.pn-dotg{pointer-events:none}' +
       '.pn-dott{font:700 11px var(--font-body);fill:#1c1206}' +
-      '#pn-perf [hidden]{display:none!important}' +
+      '#pn-perf [hidden],#pn-display[hidden],#pn-legend[hidden]{display:none!important}' +
       '.pn-oct{font:600 11px var(--font-body);fill:var(--muted)}' +
       '.pn-jamring{opacity:0;stroke:rgba(0,0,0,0.65);stroke-width:2.5;transition:opacity 0.25s ease}' +
       '.pn-jamring.on{opacity:0.95}' +
