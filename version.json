@@ -1,6 +1,6 @@
 {
   "version": "0.75.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/soundLAB-alpha.apk",
-  "web": "0.80.0",
-  "notes": "Synth control: the MIDI tab opens on big, easy knobs for one Part at a time (filter, envelope, effects, volume, Super Knob and Assign knobs on a MODX) with program Prev/Next; it sends to your synth while a LUMI keeps the key lights, and the synth's knobs move the ones on screen. LUMI Display now guides Songs and the Woodshed too: the notes to play light up in their colors, and Wait mode holds the light until you play it."
+  "web": "0.80.1",
+  "notes": "Fix: scrolling the page over the MIDI tab's big knobs no longer turns them. A scroll passing over Volume or Cutoff used to send them down, so your synth went quiet. A knob now turns with the mouse wheel only after you click it or tab to it."
 }
