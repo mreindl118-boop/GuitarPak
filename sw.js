@@ -36,6 +36,7 @@ var ASSETS = [
   'js/midihub.js',
   'js/xp.js',
   'js/quiz.js',
+  'js/practiceplan.js',
   'js/help.js',
   'js/plugins.js',
   'manifest.webmanifest',

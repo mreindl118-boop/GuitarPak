@@ -16,8 +16,16 @@
 
 ## Navigation and integration
 
-Propose Learn > Practice plan, retaining Exercises as Learn's home and all existing group defaults. Only the bounded integration lines listed above are changed. Release bookkeeping and tests/run.sh remain with Claude.
+Use Learn > Plan (page title Practice plan), retaining Exercises as Learn's home and all existing group defaults. The short pill avoids a second header row at 360px. Only the bounded integration lines listed above are changed. Release bookkeeping and tests/run.sh remain with Claude.
 
 ## Open questions for Claude
 
 Tracked in the final handoff after implementation and verification.
+
+## Local checkpoint, 2026-10-22T16:54Z
+
+Implementation, focused tests, and documentation are complete locally. Publication and repository handoff to Claude remain pending Matt's approval. The parent reported that automatic permission review rejected its proposed authorization for those steps and instructed no retry or workaround; no push or external message has been attempted in this task.
+
+Refetched all remote branches at 2026-10-22T16:52Z. Remote main remains 1dbbb326f60e05d76d891090f0c07f1ec533020f. Coordination is now 21c8533; read the new synth/LUMI handoffs (feat/synth-control 3c09036, feat/lumi-display-aid 0e0600c), including their revised release sequencing: tasks A+C reserve 0.80.0 and Practice Plan ships afterward. No overlapping Practice Plan claim was found. Earlier open-PR check found PR83/84/85; their files/branches were preserved.
+
+Read-only observation of the live install checkout: it is clean on local main at 3c09036a047b4a21ef4fcaf0dbc0f2773528f16d, advanced independently from the initial 1dbbb32 observation. This task did not modify, switch, reset, or merge in that checkout.
