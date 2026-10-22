@@ -320,8 +320,18 @@ plugins/helix-stadium.js  HELIX STADIUM plugin (page 'helix', Practice; prefix
                   /ParamValueSet + /BlockEnableSet, echoes from 2001) /
                   Presets (containers -1 -2 -5, /LoadPresetWithCID after a
                   confirm) / Looper & Song / Mixer / Monitor. Verified live on
-                  a Stadium XL fw 1.1.0. Docs docs/HELIX-STADIUM.md, suite
-                  tests/helix.test.js (fake MIDI port + fake bridge), hook
+                  a Stadium XL fw 1.1.0. Built WITH null (Codex): SAFETY =
+                  output starts disarmed, Arm = 90 s window renewed per
+                  command, page exit / app hide / window blur / port or
+                  channel change / bridge drop / failed send disarm (hx.safe
+                  false = always armed); PORT ALLOW-LIST (Helix|Stadium, never
+                  MODX/MONTAGE/LUMI/ROLI/virtual/loopMIDI/thru; App.midi's
+                  shared output only when IT is the Helix); FAVORITES hx.favs
+                  (CC32+PC+snapshot, byte preview, ★ fills from the bridge's
+                  numbering); OBSERVED panel. Near the 100 KB plugin cap: the
+                  next feature should promote it to js/helix.js. Docs
+                  docs/HELIX-STADIUM.md, suite tests/helix.test.js (fake MIDI
+                  ports + fake bridge, incl. port isolation), hook
                   window.SLHelix.
 js/midihub.js     MIDI HUB page ('midihub', Keys group, pill "MIDI", v0.78.0;
                   prefix mh-): read / write / reshape plain MIDI for ANY
