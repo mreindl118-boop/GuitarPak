@@ -108,7 +108,7 @@
     lights: [
       { t: 'Lights & help', x: 'One place for how much the app helps you. The Help level is the difficulty: Full shows the scale in color with names, fingers and the next note; None is a bare keyboard. It applies to the Keys page, Scale lessons, Exercises and your keyboard’s own lights.' },
       { t: 'Your keyboard’s lights', x: 'A LUMI lights every key of the scale in the same color as the screen (Color notes by: Interval = by scale degree, Note = every C one color), and follows the app’s key on every page. Play a note after pressing its octave buttons and the app follows the new octave too.' },
-      { t: 'LUMI Display', x: 'On by default: during a lesson or practice run the LUMI shows only what to play \u2014 the note to play now steady in its color, the next one blinking \u2014 and the full scale comes back when the run ends. Double-tap your keyboard\u2019s lowest key, or the lesson card, to start and stop a lesson.' }
+      { t: 'LUMI Display', x: 'On by default: during a lesson or practice run the LUMI shows only what to play \u2014 the note to play now steady in its color, the next one blinking \u2014 and the full scale comes back when the run ends. Songs and the Woodshed light the notes to play the same way; Woodshed Wait mode holds the light until you play it. Double-tap your keyboard\u2019s lowest key, or the lesson card, to start and stop a lesson.' }
     ],
     settings: [
       { t: 'Settings', x: 'App-wide preferences, grouped by section: theme and accent color, one master volume for everything, studio capture options, screen wake, MIDI setup, and plugins for advanced workflows.' }

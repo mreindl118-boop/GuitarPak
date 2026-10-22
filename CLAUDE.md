@@ -82,6 +82,12 @@ js/midi.js        MIDI service (App.midi: in/out ports, note/bend/pressure
                   scale = root color) instead of white. No guide = normal
                   layout. Off = classic (layout + white now-note). Switch
                   in Lights & help (LUMI rows) and the lesson card chip.
+                  v0.80.0: every practice page lights keys ONLY through
+                  App.midi.guide - Songs (plGuide: the sounding step + the
+                  next, cleared on pause/hide) and the Woodshed (lightsUpdate
+                  calls guide only when its now/next targets change, so the
+                  blink keeps time; Wait mode lights the first note at Go).
+                  Nothing calls App.midi.light/dark for practice any more.
 js/tonein.js      1/4"/audio-in TONE-IN: pitch-detects the selected audio
                   input (audio.inId; toggle audio.tonein in Settings) and
                   emits midi:note {silent:true} — instrument pages show the

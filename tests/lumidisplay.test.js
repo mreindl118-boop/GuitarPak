@@ -144,6 +144,52 @@ async function newPage(browser, seed) {
   ok(run.running && run.n >= 1 && run.n <= 2 && !run.white, 'during the run: 1-2 colored keys, no white, no scale: ' + JSON.stringify(run));
   ok(run.after === 14, 'stopped: the scale is back on the keys');
 
+  console.log('# Woodshed: Wait mode lights the note to play in its color, then the next');
+  const ws = await page.evaluate(async () => {
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+    App.emit('fb:set', { source: 't', root: 0, scale: 'major', mode: 1 });
+    App.help.set(4); App.midi.setDisplay(true);
+    App.store.set('ws.instr', 'piano');
+    App.switchTo('shed'); await wait(150);
+    document.getElementById('ws-gen-scale').click(); await wait(80);
+    document.querySelector('[data-wsplay="wait"]').click(); await wait(120);
+    const pre = Object.keys(__lit()).length; // the session is set up, not started: the scale still shows
+    document.getElementById('ws-go').click(); await wait(200);
+    const S = Woodshed.session, first = S.targets[0].n.m, second = S.targets[1].n.m;
+    const l1 = __lit();
+    const o = { pre, mode: S.mode, first, second, lit1: Object.keys(l1).map(Number).sort((a, b) => a - b), v1: l1[first], white: Object.values(l1).includes(127) };
+    __tap(first); await wait(150);
+    const l2 = __lit();
+    o.idx = S.waitIdx; o.lit2 = Object.keys(l2).map(Number).sort((a, b) => a - b); o.v2 = l2[second];
+    App.switchTo('piano'); await wait(150);
+    o.after = Object.keys(__lit()).length;
+    return o;
+  });
+  ok(ws.mode === 'wait' && ws.lit1.includes(ws.first) && ws.lit1.every(n => n === ws.first || n === ws.second) && ws.v1 !== 127 && !ws.white, 'Wait mode: only the note to play (and the next) lit, in color: ' + JSON.stringify(ws));
+  ok(ws.idx === 1 && ws.lit2.includes(ws.second) && !ws.lit2.includes(ws.first) && ws.v2 !== 127, 'playing it moves the light to the next note');
+  ok(ws.after === 14, 'leaving the Woodshed hands the keys back to the scale');
+
+  console.log('# Songs: play-along lights the notes sounding now');
+  const sg = await page.evaluate(async () => {
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+    App.switchTo('songs'); await wait(150);
+    document.getElementById('sg-paste').value = ['e|-------------|', 'B|-------------|', 'G|-------------|', 'D|-------------|', 'A|-3---5---7---|', 'E|-------------|'].join('\n');
+    document.getElementById('sg-parse').click(); await wait(80);
+    document.getElementById('sg-play').click();
+    const seen = new Set(), white = [];
+    for (let i = 0; i < 30; i++) {
+      await wait(60);
+      const l = __lit();
+      const ks = Object.keys(l);
+      if (ks.length <= 3) ks.forEach(k => { seen.add(+k); if (l[k] === 127) white.push(+k); }); // guided frames only
+    }
+    document.getElementById('sg-play').click(); await wait(120);
+    return { seen: [...seen].sort((a, b) => a - b), white: white.length, after: Object.keys(__lit()).length };
+  });
+  // A string frets 3/5/7 = C3 48, D3 50, E3 52 - inside the LUMI's C3-B4 window
+  ok([48, 50, 52].filter(n => sg.seen.includes(n)).length >= 2 && sg.white === 0, 'Songs light the notes it plays, in color: ' + JSON.stringify(sg.seen));
+  ok(sg.after === 14, 'pausing hands the keys back to the scale');
+
   ok(errs.length === 0, 'no page errors' + (errs.length ? ': ' + errs.join(' | ') : ''));
   await ctx.close();
   await browser.close();
