@@ -1,6 +1,6 @@
 {
   "version": "0.75.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/soundLAB-alpha.apk",
-  "web": "0.81.0",
-  "notes": "Practice plan (Learn > Plan): paste your teacher's lesson notes and get today's session as short, timed blocks that open the right soundLAB tool, ticked off by what you actually play. Each block shows the note it came from, the week's progress is on one card, and anything soundLAB can't teach yet is listed as a module gap you can export."
+  "web": "0.81.1",
+  "notes": "MIDI tab fix: scrolling the page over the Control knobs no longer turns them (it could turn your synth's Volume or Cutoff down). Click or tab to a knob to turn it with the wheel. Plus the Practice plan from 0.81.0."
 }

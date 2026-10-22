@@ -9,7 +9,7 @@ python3 tests/serve.py & srv=$!
 trap 'kill $srv 2>/dev/null' EXIT
 for i in 1 2 3 4 5 6 7 8 9 10; do python3 -c "import urllib.request;urllib.request.urlopen('http://127.0.0.1:4573/index.html')" 2>/dev/null && break; sleep 0.3; done
 fail=0
-for t in ${@:-fingering lights keys practice game quiz nav smoke taps update audio-level midihub audioin btmidi colors multiin lumidisplay practiceplan}; do
+for t in ${@:-fingering lights keys practice game quiz nav smoke taps update audio-level midihub audioin btmidi colors multiin lumidisplay practiceplan midihub-wheel}; do
   echo "== $t"
   node "tests/$t.test.js" > "/tmp/sl-$t.out" 2>&1 && echo "   pass ($(grep -c PASS /tmp/sl-$t.out) checks)" || { fail=1; grep -E "FAIL|Error" "/tmp/sl-$t.out" | head -20; }
 done

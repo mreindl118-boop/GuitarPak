@@ -235,7 +235,7 @@
   }
   function knobHTML(k, hero) {
     var v = kv(k.cc), a = (ARC0 + (ARC1 - ARC0) * v / 127) * Math.PI / 180;
-    return '<div class="mh-knob' + (hero ? ' hero' : '') + '" role="slider" tabindex="0" data-cc="' + k.cc + '" aria-label="' + esc(k.name) + '" aria-valuemin="0" aria-valuemax="127" aria-valuenow="' + v + '" title="' + esc(k.name) + ' \u00b7 CC ' + k.cc + ' \u2014 drag up/down, scroll, or arrow keys; double-tap resets">' +
+    return '<div class="mh-knob' + (hero ? ' hero' : '') + '" role="slider" tabindex="0" data-cc="' + k.cc + '" aria-label="' + esc(k.name) + '" aria-valuemin="0" aria-valuemax="127" aria-valuenow="' + v + '" title="' + esc(k.name) + ' \u00b7 CC ' + k.cc + ' \u2014 drag up/down or arrow keys (click it first to scroll it); double-tap resets">' +
       '<svg viewBox="0 0 64 64" aria-hidden="true"><path class="mh-ktrack" d="' + arcPath(127) + '"/><path class="mh-karc" d="' + arcPath(v) + '"/>' +
       '<line class="mh-kptr" x1="32" y1="32" x2="' + (32 + 17 * Math.sin(a)).toFixed(2) + '" y2="' + (32 - 17 * Math.cos(a)).toFixed(2) + '"/></svg>' +
       '<b class="mh-kv">' + v + '</b><span class="mh-kn">' + esc(k.name) + '</span><small class="muted">CC ' + k.cc + '</small></div>';
@@ -307,8 +307,10 @@
     });
     var end = function () { drag = null; };
     box.addEventListener('pointerup', end); box.addEventListener('pointercancel', end);
+    // the wheel turns only a knob that was clicked or tabbed to: a page scroll
+    // passing over the knobs must never turn the synth down (Volume / Cutoff)
     box.addEventListener('wheel', function (e) {
-      var k = e.target.closest && e.target.closest('.mh-knob'); if (!k) return;
+      var k = e.target.closest && e.target.closest('.mh-knob'); if (!k || document.activeElement !== k) return;
       e.preventDefault();
       var c = +k.dataset.cc; turn(c, kv(c) + (e.deltaY < 0 ? 1 : -1) * (e.shiftKey ? 1 : 4));
     }, { passive: false });

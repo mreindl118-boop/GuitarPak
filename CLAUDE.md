@@ -339,7 +339,8 @@ js/midihub.js     MIDI HUB page ('midihub', Keys group, pill "MIDI", v0.78.0;
                   (portId, bytes) - Web MIDI only; native = send(). The
                   header's 'Synth out' select sets it. New first view
                   'control' (default): Part 1-16 buttons (= midihub.ch),
-                  big SVG knobs (drag / wheel / arrows / dblclick = start
+                  big SVG knobs (drag / wheel ONLY when focused - a page scroll
+                  over a knob never turns it (v0.80.1) / arrows / dblclick = start
                   value) for BASE_KNOBS + profile.knobs {hero, extra}
                   (Yamaha: Super Knob 95 + Assign 1-8 = CC 17-24), values
                   per Part in midihub.kv; program Prev/Next (bank
