@@ -305,6 +305,24 @@ js/plugins.js     window.SoundLab plugin API v1: registerPage (App.addPage),
                   cap, per-plugin enable/error) run right after boot; loaded
                   from Settings > Plugins. Docs PLUGINS.md; sample plugin
                   plugins/sample-lofi.js (Lo-fi fx + Glass bell voice).
+plugins/helix-stadium.js  HELIX STADIUM plugin (page 'helix', Practice; prefix
+                  hx-, store hx.*): read / write / control a Line 6 Helix
+                  Stadium (XL). MIDI (its own Web MIDI port when the browser
+                  lists one, else App.midi.send; the manual's CC map: CC32+PC
+                  presets, CC69 snapshots, CC38-45 knobs, CC9 buttons, looper
+                  52-62, song 10/46-51/63, Matrix mixer 11-29/+23/+46/+69 on
+                  the layer's channel) + BRIDGE = tools/helix-bridge.js (Node,
+                  zero deps: the pedal's editor protocol over the LAN, NOT USB
+                  — ZMTP 3 / OSC / msgpack on 2002 RPC, 2001 change stream,
+                  2003 telemetry — relayed as JSON on ws://127.0.0.1:4575;
+                  model/param names from tools/helix-defs.json, MIT from
+                  helixgen-core). Views Rig / Blocks (edit buffer: live
+                  /ParamValueSet + /BlockEnableSet, echoes from 2001) /
+                  Presets (containers -1 -2 -5, /LoadPresetWithCID after a
+                  confirm) / Looper & Song / Mixer / Monitor. Verified live on
+                  a Stadium XL fw 1.1.0. Docs docs/HELIX-STADIUM.md, suite
+                  tests/helix.test.js (fake MIDI port + fake bridge), hook
+                  window.SLHelix.
 js/midihub.js     MIDI HUB page ('midihub', Keys group, pill "MIDI", v0.78.0;
                   prefix mh-): read / write / reshape plain MIDI for ANY
                   device on App.midi's ports — device-AGNOSTIC by design,
@@ -422,6 +440,9 @@ android/          APK project — build.ps1 (no Gradle: javac→d8→aapt→zipa
 ios/              WKWebView wrapper (XcodeGen project.yml + Swift; needs a Mac
                   to build — the PWA is the primary iPad install)
 releases/         built signed APK (committed; raw URL = download link)
+tools/helix-bridge.js  Helix Stadium bridge for plugins/helix-stadium.js (run
+                  `node tools/helix-bridge.js [host]`; finds p35x1.local / mDNS)
+tools/helix-defs.json  Stadium model + parameter id table the bridge serves
 tools/artifact_build.py  stages the multi-file claude.ai artifact (see below)
 version.json      auto-update feed (source of truth for latest version)
 ```
