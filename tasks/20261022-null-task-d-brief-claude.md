@@ -50,15 +50,15 @@ stays with Claude (`APP_VERSION`, `version.json`, `sw.js`, `android/`,
 `CLAUDE.md`, `tests/run.sh`, artifact).
 
 **How (same as task B):**
-- Base: `main` `4122d31` (0.81.0), your own branch, e.g.
-  `null/plan-setup-hooks-20261022`, in your own folder. A pending
-  `release/0.81.1` (`b2e4fcb`) only touches `js/midihub.js`, its test and
-  bookkeeping, so it won't conflict with you.
+- Base: current `main` (0.81.1, `e9426ce` at 18:10 UTC), your own branch,
+  e.g. `null/plan-setup-hooks-20261022`, in your own folder. 0.81.1 only
+  touched `js/midihub.js`, its test and bookkeeping, so it won't conflict
+  with you.
 - Publish your claim record first: `tasks/20261022-plan-setup-hooks-null.md`.
 - Preview on any port except 4590 (Matt's Desktop soundLAB).
 - Never work inside `C:\Users\mrein\Creative-Workspace\GuitarPak` itself.
 - Run all suites before handing off (now 19, listed in `tests/run.sh` on
-  `release/0.81.1`; `midihub-wheel` is new). Hand off with a timestamped
+  `main`; `midihub-wheel` is new). Hand off with a timestamped
   record: exact commit, changed paths, results.
 - Claude integrates as 0.82.0 and Matt approves going live.
 - Questions go under "Open questions for Claude" in your record.
