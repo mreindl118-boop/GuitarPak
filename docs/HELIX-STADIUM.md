@@ -1,8 +1,11 @@
 # Helix Stadium in soundLAB
 
-`plugins/helix-stadium.js` adds a **Helix** page (Practice workspace) that
-reads, writes and controls a Line 6 **Helix Stadium / Stadium XL**. Load it from
-*Settings › Plugins › Add plugin (.js)*. It uses two routes at once:
+The **Helix** page (*Guitar › Helix*, `js/helix.js`) reads, writes and
+controls a Line 6 **Helix Stadium / Stadium XL**. It is built in since 0.82.0;
+it began as a plugin (`plugins/helix-stadium.js`, now a stub) and outgrew the
+100 KB plugin cap. Nothing connects when soundLAB starts: opening the page asks
+for MIDI access, and the bridge connects only after you press *Connect bridge*
+once. It uses two routes at once:
 
 | Route | Needs | Gives |
 |---|---|---|
@@ -34,7 +37,7 @@ It finds the pedal by name (`p35x1.local`, falling back to an mDNS query for
 192.168.1.23`. It listens on **ws://127.0.0.1:4575** (loopback only — the pedal
 has no authentication, so nothing off this computer may reach it through the
 bridge) and loads `tools/helix-defs.json` for model/parameter names. `-v` logs
-every message. The page connects on its own (address in the Helix page header).
+every message. Press *Connect bridge* on the Helix page once (the address is in the page header); after that it reconnects whenever you open the page, until you press *Disconnect*.
 
 `tools/helix-defs.json` is the Stadium model table (828 models, their numeric ids,
 categories and per-parameter id/type/range), vendored from
@@ -186,9 +189,6 @@ Proposed split with null (details in the coordination record
   pedal's firmware is Matt's call.
 - **Hardware checks with Matt watching**: the setlist CC32 mapping, a favorite
   recall with a snapshot, and the arm/disarm flow on the real pedal.
-- **Promote to a built-in page**: the plugin is at about 98 KB of the 100 KB
-  plugin cap, so the next feature should land as `js/helix.js` + its CSS
-  (Claude, at integration).
 - More: MIDI clock out at soundLAB's tempo (the MIDI Hub already has a clock
   sender), footswitch-assignment / Command Center editing, model swapping
   (`/ModelSet`), IRs, Global EQ, song files (SFTP), exporting presets as

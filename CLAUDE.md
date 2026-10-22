@@ -305,8 +305,15 @@ js/plugins.js     window.SoundLab plugin API v1: registerPage (App.addPage),
                   cap, per-plugin enable/error) run right after boot; loaded
                   from Settings > Plugins. Docs PLUGINS.md; sample plugin
                   plugins/sample-lofi.js (Lo-fi fx + Glass bell voice).
-plugins/helix-stadium.js  HELIX STADIUM plugin (page 'helix', Practice; prefix
-                  hx-, store hx.*): read / write / control a Line 6 Helix
+js/helix.js       HELIX STADIUM page ('helix', Guitar group pill "Helix",
+                  0.82.0; prefix hx-, store hx.*; built in from the former
+                  plugin, plugins/helix-stadium.js is now a stub and
+                  js/plugins.js skips an old stored copy whose code sets
+                  window.SLHelix). NOTHING CONNECTS AT BOOT: init builds the
+                  DOM only; Web MIDI on the first onShow; the bridge only
+                  after Connect bridge was pressed once (hx.bridgeAuto,
+                  default off) and retries only while visible. Read / write /
+                  control a Line 6 Helix
                   Stadium (XL). MIDI (its own Web MIDI port when the browser
                   lists one, else App.midi.send; the manual's CC map: CC32+PC
                   presets, CC69 snapshots, CC38-45 knobs, CC9 buttons, looper
@@ -328,8 +335,7 @@ plugins/helix-stadium.js  HELIX STADIUM plugin (page 'helix', Practice; prefix
                   MODX/MONTAGE/LUMI/ROLI/virtual/loopMIDI/thru; App.midi's
                   shared output only when IT is the Helix); FAVORITES hx.favs
                   (CC32+PC+snapshot, byte preview, ★ fills from the bridge's
-                  numbering); OBSERVED panel. Near the 100 KB plugin cap: the
-                  next feature should promote it to js/helix.js. Docs
+                  numbering); OBSERVED panel. Docs
                   docs/HELIX-STADIUM.md, suite tests/helix.test.js (fake MIDI
                   ports + fake bridge, incl. port isolation), hook
                   window.SLHelix.
@@ -450,7 +456,7 @@ android/          APK project — build.ps1 (no Gradle: javac→d8→aapt→zipa
 ios/              WKWebView wrapper (XcodeGen project.yml + Swift; needs a Mac
                   to build — the PWA is the primary iPad install)
 releases/         built signed APK (committed; raw URL = download link)
-tools/helix-bridge.js  Helix Stadium bridge for plugins/helix-stadium.js (run
+tools/helix-bridge.js  Helix Stadium bridge for the Helix page, js/helix.js (run
                   `node tools/helix-bridge.js [host]`; finds p35x1.local / mDNS)
 tools/helix-defs.json  Stadium model + parameter id table the bridge serves
 tools/artifact_build.py  stages the multi-file claude.ai artifact (see below)
@@ -472,7 +478,7 @@ version.json      auto-update feed (source of truth for latest version)
   bar, clock, key and MIDI service are shared across both — that's the point.
 - SECTION TAB BAR (v0.70.0; app.js GROUPS + populateNav): the main nav is a
   tab bar of GROUPS (icon + label), not a drop-down — practice: Learn
-  (quiz=Exercises HOME/chords/theory), Guitar (fretboard/tab/notation), Keys
+  (quiz=Exercises HOME/chords/theory), Guitar (fretboard/tab/notation/helix), Keys
   (piano/synth/pads/midihub), Play (songs/jam), Practice (shed/trainer/tuner);
   studio: Studio (arrange=Timeline HOME / tracks=Editor), Sketch (song/ideas).
   Rendered twice: #tabbar inside the top bar (> 900px) and #tabbar-m fixed

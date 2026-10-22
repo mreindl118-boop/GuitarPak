@@ -43,7 +43,7 @@ the same, with three built-in rules:
 | 8 | `plugins/helix-stadium.js`: replace with a short stub that says it is built in (keeps old links working) | done (`3074727`) |
 | 9 | Tests: `tests/helix.test.js` drives the built-in page (no plugin injection) + a check that a stored old plugin is skipped; fix any suite that counts Guitar pills (`tests/nav.test.js` likely); run ALL suites | helix (54) + nav (33) pass; full run in progress |
 | 10 | Release (Matt approves first): `APP_VERSION` 0.82.0, `version.json` `web` + `notes` (never `version`), `android/AndroidManifest.xml` versionCode +1 / versionName, `sw.js` `CACHE` → `guitarlab-v118`; no APK build needed (web-only change) | pending, needs Matt |
-| 11 | Docs: `CLAUDE.md` entry moves from `plugins/` to `js/helix.js`; `PLUGINS.md`; `docs/HELIX-STADIUM.md` (no longer "load from Settings › Plugins") | pending |
+| 11 | Docs: `CLAUDE.md` entry moves from `plugins/` to `js/helix.js`; `PLUGINS.md`; `docs/HELIX-STADIUM.md` (no longer "load from Settings › Plugins") | done |
 | 12 | Merge to `main`, push, republish the claude.ai artifact (`CLAUDE.md` › claude.ai Artifact) | pending, needs Matt |
 
 ## How to verify (PC recipe from `CLAUDE.md` › Dev loop)

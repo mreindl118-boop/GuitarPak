@@ -13,12 +13,10 @@ A complete working example ships in this repo: [`plugins/sample-lofi.js`](plugin
 — it adds a "Lo-fi" FX and a "Glass bell" synth voice. Load it from Settings
 to try the pipeline, then copy it as your starting point.
 
-A full-size one too: [`plugins/helix-stadium.js`](plugins/helix-stadium.js) adds
-a **Helix** page that reads, writes and controls a Line 6 Helix Stadium over
-MIDI and, with `node tools/helix-bridge.js` running, over the pedal's own
-network protocol — see [docs/HELIX-STADIUM.md](docs/HELIX-STADIUM.md). It shows
-a page with several views, its own Web MIDI port, a WebSocket helper, store
-keys and injected CSS.
+A plugin is also a good place to prototype a whole page. The Helix Stadium
+page started as `plugins/helix-stadium.js` and became built in (*Guitar ›
+Helix*, `js/helix.js`) in 0.82.0 when it outgrew the 100 KB cap; see
+[docs/HELIX-STADIUM.md](docs/HELIX-STADIUM.md).
 
 ## The API (`window.SoundLab`, apiVersion 1)
 
