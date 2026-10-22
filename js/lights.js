@@ -6,6 +6,9 @@
  *   - KEY LIGHTS on a MIDI keyboard (App.midi keybed engine): on/off, the two
  *     LUMI colors (home key + scale), brightness, keyboard type, the range it
  *     is playing (follows its octave buttons), a light test
+ *   - NOTE COLORS by Interval (scale degree) | Note (pitch class) — the
+ *     App.colors mode the Fretboard editor sets too; the LUMI color row
+ *     shows the palette in use
  * Everything here is the same setting the pages read — change it anywhere,
  * it changes everywhere.
  */
@@ -24,9 +27,24 @@
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function M() { return App.midi; }
 
-  function palette() {
-    var cols = App.store.get('fb.colors', null);
-    return Array.isArray(cols) && cols.length === 7 ? cols : ['#ffab47', '#e8d44d', '#7ad97a', '#4cc9b0', '#6ea8fe', '#b48ef0', '#ff85b3'];
+  // the swatches the color row shows: 7 degree colors (R, 2..7) by interval,
+  // 12 note colors (C..B) by note — App.colors, same as every page
+  var NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  function swatches() {
+    if (App.colors.mode() === 'note') {
+      return App.colors.notes().map(function (col, i) { return { col: col, lab: NOTE_NAMES[i], title: NOTE_NAMES[i] }; });
+    }
+    return App.colors.degrees().map(function (col, i) { return { col: col, lab: i ? String(i + 1) : 'R', title: 'Degree ' + (i + 1) }; });
+  }
+
+  // "Color notes by" Interval | Note (the shared App.colors mode)
+  function colModeRow() {
+    var cm = App.colors.mode();
+    return '<div class="lc-row"><span class="lc-lab">Color notes by</span><div class="seg" role="group" aria-label="Color notes by">' +
+      [['interval', 'Interval'], ['note', 'Note']].map(function (o) {
+        var on = o[0] === cm;
+        return '<button type="button" data-lccolmode="' + o[0] + '" class="' + (on ? 'active' : '') + '" aria-pressed="' + on + '">' + o[1] + '</button>';
+      }).join('') + '</div></div>';
   }
 
   function status() {
@@ -49,6 +67,9 @@
     var h = App.help.level(), m = M(), st = status(), on = m && m.lightsOn, lumi = m && m.lumi;
     var bright = parseInt(App.store.get('lights.bright', 80), 10) || 80;
     var lumiPref = App.store.get('midi.lumi', null);
+    var octHand = App.store.get('lights.octHand', true) !== false;
+    var lumiRows = st.kind === 'ok' && lumi, byNote = App.colors.mode() === 'note';
+    var disp = m && m.display;
     root.innerHTML =
       '<div class="lc-sec">' +
         '<h3>Help level</h3>' +
@@ -57,6 +78,9 @@
         '</div>' +
         '<p class="lc-desc">' + DESC[h] + '</p>' +
         '<p class="muted small">The same setting on the Keys page, in Scale lessons, in Exercises and on your keyboard’s lights. Less help is harder.</p>' +
+        // with a LUMI the color seg sits by its color row (below)
+        (lumiRows ? '' : colModeRow() +
+          '<p class="muted small">Interval: each scale degree has its color. Note: each note has its own color in every key.</p>') +
       '</div>' +
       '<div class="lc-sec">' +
         '<h3>Keyboard lights</h3>' +
@@ -69,12 +93,24 @@
           '<div class="lc-row"><span class="lc-lab">Lights</span><div class="seg" role="group" aria-label="Key lights">' +
             '<button type="button" data-lcon="1" class="' + (on ? 'active' : '') + '">On</button><button type="button" data-lcon="0" class="' + (!on ? 'active' : '') + '">Off</button></div></div>' +
           (lumi ?
-            '<div class="lc-row"><span class="lc-lab">Colors</span><span class="lc-degs" aria-label="Scale degree colors on screen and on the LUMI">' +
-              palette().map(function (col, i) {
-                return '<span class="lc-deg" title="Degree ' + (i + 1) + '"><i style="background:' + col + '"></i><i style="background:' + m.lumiColor(col) + '"></i><b>' + (i ? i + 1 : 'R') + '</b></span>';
+            colModeRow() +
+            '<div class="lc-row"><span class="lc-lab">Colors</span><span class="lc-degs' + (byNote ? ' lc-notes' : '') + '" aria-label="' + (byNote ? 'Note' : 'Scale degree') + ' colors on screen and on the LUMI">' +
+              swatches().map(function (s) {
+                return '<span class="lc-deg" title="' + s.title + '"><i style="background:' + s.col + '"></i><i style="background:' + m.lumiColor(s.col) + '"></i><b>' + s.lab + '</b></span>';
               }).join('') + '</span></div>' +
-            '<p class="muted small">Every key lights in its scale-degree color, like the screen (top: screen, bottom: the LUMI’s nearest color). The note to play glows white, answers green. Edit the colors in the Fretboard settings.</p>' +
+            '<p class="muted small">' + (byNote
+              ? 'Every scale key lights in its note color, like the screen (top: screen, bottom: the LUMI’s nearest color); keys outside the scale stay dark.'
+              : 'Every key lights in its scale-degree color, like the screen (top: screen, bottom: the LUMI’s nearest color).') +
+              ' The note to play glows white, answers green. Edit the colors in the Fretboard settings.</p>' +
             '<div class="lc-row"><label class="lc-lab" for="lc-bright">Brightness</label><input type="range" id="lc-bright" min="10" max="100" step="5" value="' + bright + '"><span class="lc-val" id="lc-brightv">' + bright + '%</span></div>' +
+            '<div class="lc-row"><span class="lc-lab">Octave keys</span><div class="seg" role="group" aria-label="What the LUMI octave buttons do">' +
+              '<button type="button" data-lcoct="1" class="' + (octHand ? 'active' : '') + '">Switch hands</button><button type="button" data-lcoct="0" class="' + (!octHand ? 'active' : '') + '">Octave only</button></div></div>' +
+            '<p class="muted small">Press octave down below C3 for the left-hand view, back up for the right hand. The keys still play as normal. The switch happens on the first note you play after pressing.</p>' +
+            '<div class="lc-row"><span class="lc-lab">LUMI Display</span><div class="seg" role="group" aria-label="LUMI Display in lessons">' +
+              '<button type="button" data-lcdisp="1" class="' + (disp ? 'active' : '') + '" aria-pressed="' + !!disp + '">On</button><button type="button" data-lcdisp="0" class="' + (!disp ? 'active' : '') + '" aria-pressed="' + !disp + '">Off</button></div></div>' +
+            '<p class="muted small">' + (disp
+              ? 'In lessons and practice runs the LUMI shows only what to play: the note to play now in its ' + (byNote ? 'note' : 'interval') + ' color, the next one blinking. The full scale comes back when the run ends.'
+              : 'Lessons keep the scale lit and show the note to play in white.') + '</p>' +
             (m.sysexOk ? '' : '<p class="lc-warn">Brightness and the dark background need the MIDI permission the browser blocked (SysEx); colors still work. Reload and allow the MIDI prompt.</p>')
             : '<p class="muted small">Your keyboard lights the scale keys (home key brightest) and the keys to play.</p>') +
           '<div class="lc-row"><span class="lc-lab">Keyboard</span><div class="seg" role="group" aria-label="Keyboard type">' +
@@ -93,6 +129,9 @@
     var a, m = M();
     if ((a = b.getAttribute('data-lchelp')) != null) { App.help.set(+a); return; }
     if ((a = b.getAttribute('data-lcon')) != null) { if (m) m.setLightsOn(a === '1'); paint(); return; }
+    if ((a = b.getAttribute('data-lcdisp')) != null) { if (m) m.setDisplay(a === '1'); paint(); return; }
+    if ((a = b.getAttribute('data-lcoct')) != null) { App.store.set('lights.octHand', a === '1'); paint(); return; }
+    if ((a = b.getAttribute('data-lccolmode')) != null) { App.colors.setMode(a); paint(); return; } // 'colors' repaints the pages + keybed
     if ((a = b.getAttribute('data-lctype')) != null) {
       App.store.set('midi.lumi', a === '' ? null : a === '1');
       if (m) m.repaint();
@@ -132,13 +171,15 @@
         '.lc-row{display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap}.lc-lab{min-width:84px;font-size:13.5px;color:var(--muted);font-weight:600}' +
         '.lc-degs{display:flex;gap:6px;flex-wrap:wrap}.lc-deg{display:grid;justify-items:center;gap:2px}.lc-deg i{display:block;width:26px;height:12px;border-radius:3px}' +
         '.lc-deg i+i{border-radius:3px}.lc-deg b{font-size:11px;color:var(--muted);font-weight:600}' +
+        '.lc-notes{gap:5px}.lc-notes .lc-deg i{width:21px}' + // 12 note colors fit one row on a phone
+
         '#lc-bright{flex:1;min-width:120px}.lc-val{font-variant-numeric:tabular-nums;font-size:13px;min-width:3em}' +
         '.lc-chk{display:flex;gap:8px;align-items:center;font-size:13.5px}' +
         '.lc-warn{font-size:13.5px;color:var(--warn)}.lc-acts{display:flex;gap:8px;flex-wrap:wrap}');
       el.addEventListener('click', onClick);
       el.addEventListener('input', onInput);
       el.addEventListener('change', onInput);
-      ['help:level', 'midi:state', 'midi:range'].forEach(function (ev) { App.on(ev, function () { if (App.sheet === 'lights') paint(); }); });
+      ['help:level', 'midi:state', 'midi:range', 'colors', 'lights:display'].forEach(function (ev) { App.on(ev, function () { if (App.sheet === 'lights') paint(); }); });
       App.on('midi:status', function (d) { btMsg = d && d.text || ''; if (App.sheet === 'lights') paint(); });
       paint();
     },

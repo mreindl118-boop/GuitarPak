@@ -4,6 +4,8 @@
 (function () {
   'use strict';
 
+  var audioUI = null; // the Sound input card's meter (set by init)
+
   function init(rootEl) {
     App.injectCSS('settings',
       '.set-theme-note{margin-top:10px}' +
@@ -19,7 +21,20 @@
         'line-height:1.4;color:var(--text);cursor:pointer}' +
       '.set-check input{flex:0 0 auto;width:20px;height:20px;margin:0}' +
       '.set-check small{display:block;margin-top:2px;font-size:12.5px;font-weight:400;color:var(--muted)}' +
-      '#panel-settings{max-width:760px;margin:0 auto}'
+      '#panel-settings{max-width:760px;margin:0 auto}' +
+      '#set-ain-gain{width:180px;max-width:32vw;vertical-align:middle}' +
+      '.set-meter{position:relative;height:10px;max-width:420px;margin-top:12px;border-radius:5px;' +
+        'background:var(--inset);border:1px solid var(--ctl-border);overflow:hidden}' +
+      '.set-meter i{position:absolute;left:0;top:0;bottom:0;width:0;' +
+        'background:linear-gradient(90deg,var(--accent-dim),var(--accent));transition:width 50ms linear}' +
+      '.set-meter b{position:absolute;top:0;bottom:0;left:0;width:2px;background:var(--text);opacity:0}' +
+      '.set-meter.live b{opacity:.75}' +
+      '.set-meter.clip i{background:var(--red)}' +
+      '.set-ain-hint{margin-top:10px;color:var(--accent)}' +
+      '.set-ain-warn{margin-top:10px;color:var(--red)}' +
+      // Hear input is On but held (a microphone / a missing input): not lit
+      '#set-ain-mon button.held{background:transparent;color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);opacity:.8}' +
+      '#set-ain-test{margin-left:8px}'
     );
 
     var accBtns = '';
@@ -144,6 +159,9 @@
           '<button type="button" class="btn sm" id="set-midi-test" title="Briefly lights a C major arpeggio on the device">Light test</button>' +
           '<button type="button" class="btn sm" id="set-midi-bt" style="display:none" title="Open the system Bluetooth MIDI pairing sheet">Pair Bluetooth&hellip;</button>' +
         '</div>' +
+        '<div class="muted small" id="set-midi-btnote" style="display:none;margin-top:10px">Bluetooth keyboard not listed? On Windows, Chrome and Edge only see Bluetooth MIDI with ' +
+          '<b>Windows Runtime MIDI</b> switched on: the soundLAB Windows shortcuts do that for you, or turn on <b>use-winrt-midi-api</b> in chrome://flags (edge://flags) and restart the browser. ' +
+          'Pair the keyboard in Windows Bluetooth settings first. A USB cable always works.</div>' +
         '<div class="set-sub">Pitch bend</div>' +
         '<div>' +
           '<div class="seg" id="set-midi-bend" role="group" aria-label="Pitch bend">' +
@@ -153,26 +171,48 @@
             '<button type="button" data-bend="48">&plusmn;48 (ROLI)</button>' +
           '</div>' +
         '</div>' +
+        '<label class="row tight small muted" style="gap:6px;margin-top:14px">' +
+          '<input type="checkbox" id="set-midi-appsound">Play soundLAB&rsquo;s voice for the notes my keyboard sends. Turn it OFF for a synth or stage piano that makes its own sound (a MODX, a Nord&hellip;) so nothing is doubled; a silent controller like a LUMI needs it ON. The MIDI Hub page mutes the voice by itself while open.' +
+        '</label>' +
         '<div class="row tight" style="margin-top:14px">' +
           '<button type="button" class="btn sm" id="set-open-lights">Lights &amp; help</button>' +
           '<span class="muted small">Key lights (a LUMI shows the scale in your colors), brightness and the Help level live in one place: the keyboard icon at the top of every page.</span>' +
         '</div>' +
       '</div>' +
-      '<div class="card">' +
-        '<h2>Audio devices</h2>' +
-        '<div class="muted small">Pick which interface soundLAB listens to (Woodshed mic scoring, future recording) and plays out of. ' +
-          'A Line&nbsp;6 Helix / Stadium is auto-detected by name. Devices are re-checked on plug/unplug.</div>' +
-        '<label class="set-check">' +
-          '<input type="checkbox" id="set-tonein"><span>&frac14;&Prime; guitar TONE-IN' +
-          '<small>Detects the notes you play on the audio input and lights them on every instrument page ' +
-            '(fretboard positions, keys, guide mode), exactly like a MIDI keyboard. Detection only &mdash; nothing is re-sounded.</small></span>' +
-        '</label>' +
+      '<div class="card" id="set-audio-card">' +
+        '<h2>Sound input &amp; output</h2>' +
+        '<div class="muted small">Pick the interface soundLAB listens to (tone-in, Woodshed scoring) and plays out of. ' +
+          '<b>Hear input</b> plays it live through soundLAB at the master volume &mdash; a synth on USB audio (Yamaha MODX / MONTAGE), ' +
+          'a Helix or any line input. A Line&nbsp;6 Helix / Stadium is auto-detected by name. Devices are re-checked on plug/unplug.</div>' +
         '<div class="row" style="margin-top:12px" id="set-audio-row">' +
-          '<button type="button" class="btn sm primary" id="set-audio-enable">List devices</button>' +
+          '<button type="button" class="btn sm primary" id="set-audio-enable" title="Asks for audio-input permission so the device names can be shown">List devices</button>' +
           '<label class="field" style="display:none">Input<select id="set-audio-in"></select></label>' +
           '<label class="field" style="display:none">Output<select id="set-audio-out"></select></label>' +
           '<span class="muted small" id="set-audio-msg"></span>' +
         '</div>' +
+        '<div class="small set-ain-hint" id="set-audio-hint" hidden></div>' +
+        '<div class="set-sub" id="set-ain-sub">Hear input</div>' +
+        '<div class="row tight" id="set-ain-row">' +
+          '<div class="seg" id="set-ain-mon" role="group" aria-label="Hear input">' +
+            '<button type="button" data-mon="off" aria-pressed="true">Off</button>' +
+            '<button type="button" data-mon="on" aria-pressed="false">On</button>' +
+          '</div>' +
+          '<span class="muted small">Gain</span>' +
+          '<input type="range" id="set-ain-gain" min="0" max="200" step="5" aria-label="Input gain">' +
+          '<span class="muted small" id="set-ain-gain-val"></span>' +
+        '</div>' +
+        '<div class="row tight" id="set-ain-meterrow" style="margin-top:12px">' +
+          '<div class="set-meter" id="set-ain-meter" role="meter" aria-label="Input level" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="margin-top:0;flex:1"><i></i><b></b></div>' +
+          '<button type="button" class="btn sm" id="set-ain-test" hidden title="Opens the input for the level meter while Settings is open">Test input</button>' +
+        '</div>' +
+        '<div class="small set-ain-warn" id="set-ain-warn" role="alert" hidden></div>' +
+        '<div class="muted small set-theme-note" id="set-ain-msg"></div>' +
+        '<div class="set-sub">Tone-in</div>' +
+        '<label class="set-check" style="margin-top:0">' +
+          '<input type="checkbox" id="set-tonein"><span>&frac14;&Prime; guitar TONE-IN' +
+          '<small>Detects the notes you play on the audio input and lights them on every instrument page ' +
+            '(fretboard positions, keys, guide mode), exactly like a MIDI keyboard. Detection only &mdash; nothing is re-sounded.</small></span>' +
+        '</label>' +
       '</div>' +
       '<div class="card">' +
         '<h2>Plugins</h2>' +
@@ -268,50 +308,190 @@
       App.wake.reapply();
     });
 
-    // ---- audio devices ----
+    // ---- sound input & output ----
+    // App.audioIn (js/audioin.js) owns the live input: Hear input, its gain
+    // and the level tap. This card only paints it. Device names need input
+    // permission — until they're readable, "List devices" asks for it.
     var audMsg = document.getElementById('set-audio-msg');
     var audIn = document.getElementById('set-audio-in');
     var audOut = document.getElementById('set-audio-out');
+    var audBtn = document.getElementById('set-audio-enable');
+    var audHint = document.getElementById('set-audio-hint');
+    var monSeg = document.getElementById('set-ain-mon');
+    var ainGain = document.getElementById('set-ain-gain');
+    var ainGainVal = document.getElementById('set-ain-gain-val');
+    var meterEl = document.getElementById('set-ain-meter');
+    var meterBar = meterEl.querySelector('i');
+    var meterPk = meterEl.querySelector('b');
+    var ainWarn = document.getElementById('set-ain-warn');
+    var ainMsg = document.getElementById('set-ain-msg');
+    var ainTest = document.getElementById('set-ain-test');
+    var ainRows = ['set-ain-sub', 'set-ain-row', 'set-ain-meterrow'].map(function (id) { return document.getElementById(id); });
+    var ainNote = '';    // a one-off line for the Hear input card (cleared on the next action)
+    var meterTest = false; // "Test input" pressed: the meter holds the input until Settings closes
+    var outGone = false;   // the chosen output was missing at the last listing
+    var fillGone = '';     // the "not connected" note fillDevices wrote last
+    var AIN = App.audioIn || null;
+    var SYNTH_RE = /MODX|MONTAGE|Yamaha|Steinberg/i;
+    var named = false;   // device labels readable (input permission granted)
+    var lastDevs = [];
+
+    function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); }
+    function labelOf(id) {
+      for (var i = 0; i < lastDevs.length; i++) {
+        if (lastDevs[i].kind === 'audioinput' && lastDevs[i].deviceId === id) return lastDevs[i].label || '';
+      }
+      return '';
+    }
+
+    // a synth's USB audio (Yamaha MODX / MONTAGE: "Line (MODX)") — say how
+    // to hear it; never turns Hear input on by itself
+    function paintHint() {
+      var ins = lastDevs.filter(function (d) { return d.kind === 'audioinput' && SYNTH_RE.test(d.label || ''); });
+      var real = ins.filter(function (d) { return d.deviceId !== 'default' && d.deviceId !== 'communications'; });
+      var synth = real[0] || ins[0];
+      var txt = '';
+      if (synth && named) {
+        var nm = /MONTAGE/i.test(synth.label) ? 'MONTAGE' : /MODX/i.test(synth.label) ? 'MODX' :
+          /Steinberg/i.test(synth.label) ? 'Steinberg' : 'Yamaha';
+        if (!SYNTH_RE.test(labelOf(App.store.get('audio.inId', '')))) {
+          txt = nm + ' audio found — pick it as Input and turn on Hear input to play it through soundLAB.';
+        } else if (App.store.get('audio.monitor', false) !== true) {
+          txt = nm + ' audio is your Input — turn on Hear input to play it through soundLAB.';
+        }
+      }
+      audHint.textContent = txt;
+      audHint.hidden = !txt;
+    }
+
+    function pickInput(id) {
+      if (AIN) AIN.setDevice(id); else App.store.set('audio.inId', id);
+      audIn.value = id;
+    }
 
     function fillDevices(devs) {
-      var ins = devs.filter(function (d) { return d.kind === 'audioinput'; });
-      var outs = devs.filter(function (d) { return d.kind === 'audiooutput'; });
+      lastDevs = devs || [];
+      named = lastDevs.some(function (d) { return !!d.label; });
+      var ins = lastDevs.filter(function (d) { return d.kind === 'audioinput'; });
+      var outs = lastDevs.filter(function (d) { return d.kind === 'audiooutput'; });
+      audBtn.style.display = named ? 'none' : '';
+      if (!named) {
+        // no permission yet: the lists would be nameless — keep the button
+        audIn.parentElement.style.display = 'none';
+        audOut.parentElement.style.display = 'none';
+        paintHint();
+        return;
+      }
+      var gone = [];
       function fill(sel, list, storeKey) {
         var cur = App.store.get(storeKey, '');
-        sel.innerHTML = '<option value="">System default</option>' + list.map(function (d) {
-          return '<option value="' + d.deviceId + '"' + (d.deviceId === cur ? ' selected' : '') + '>' +
-            (d.label || d.kind).replace(/</g, '&lt;').slice(0, 48) + '</option>';
+        var html = '<option value="">System default</option>' + list.map(function (d) {
+          return '<option value="' + esc(d.deviceId) + '"' + (d.deviceId === cur ? ' selected' : '') + '>' +
+            esc((d.label || d.kind).slice(0, 48)) + '</option>';
         }).join('');
-        sel.parentElement.style.display = '';
+        // keep a chosen device that is unplugged right now: it is used again
+        // the moment it comes back (a synth switched off and on)
         if (cur && !list.some(function (d) { return d.deviceId === cur; })) {
-          App.store.set(storeKey, '');
-          sel.value = '';
-          audMsg.textContent = 'a selected device went away — fell back to the system default';
+          html += '<option value="' + esc(cur) + '" selected>Chosen device (not connected)</option>';
+          gone.push(storeKey === 'audio.inId' ? 'input' : 'output');
         }
+        sel.innerHTML = html;
+        sel.parentElement.style.display = '';
       }
       fill(audIn, ins, 'audio.inId');
       fill(audOut, outs, 'audio.outId');
-      var helix = devs.filter(function (d) { return /helix|stadium|line 6/i.test(d.label || ''); })[0];
-      if (helix && !App.store.get('audio.inId', '')) {
-        audMsg.textContent = 'Helix detected: “' + helix.label.slice(0, 40) + '” — selected as input.';
-        if (helix.kind === 'audioinput') { App.store.set('audio.inId', helix.deviceId); audIn.value = helix.deviceId; }
+      var goneMsg = gone.map(function (g) {
+        return g === 'input'
+          ? 'The chosen input is not connected — Hear input and tone-in wait for it and use it again the moment it comes back.'
+          : 'The chosen output is not connected — sound plays on the system default until it comes back.';
+      }).join(' ');
+      var msg = goneMsg;
+      var outBack = gone.indexOf('output') === -1;
+      if (outBack) applySink(outGone);
+      outGone = !outBack;
+      // auto-pick a known interface only while the user never chose an input
+      var picked = App.store.get('audio.inPicked', false) === true;
+      var helix = lastDevs.filter(function (d) { return /helix|stadium|line 6/i.test(d.label || ''); })[0];
+      if (helix && !App.store.get('audio.inId', '') && !picked) {
+        msg = 'Helix detected: “' + helix.label.slice(0, 40) + '” — selected as input.';
+        if (helix.kind === 'audioinput') pickInput(helix.deviceId);
       }
-      document.getElementById('set-audio-enable').style.display = 'none';
+      var synth = ins.filter(function (d) {
+        return SYNTH_RE.test(d.label || '') && d.deviceId !== 'default' && d.deviceId !== 'communications';
+      })[0];
+      if (synth && !App.store.get('audio.inId', '') && !picked) {
+        msg = 'Found “' + synth.label.slice(0, 40) + '” — selected as Input. Turn on Hear input to play it through soundLAB.';
+        pickInput(synth.deviceId);
+      }
+      // a re-listing with nothing new keeps the last note (e.g. "Found
+      // Line (MODX) — selected"); only a "not connected" note it wrote clears
+      if (msg) audMsg.textContent = msg;
+      else if (fillGone && audMsg.textContent === fillGone) audMsg.textContent = '';
+      fillGone = msg && msg === goneMsg ? goneMsg : '';
+      paintHint();
+    }
+
+    // the chosen output (audio.outId), applied to the shared context — at the
+    // first gesture after launch (no AudioContext before one) and again when
+    // the device comes back after an unplug (force: the context fell back)
+    function applySink(force) {
+      var id = App.store.get('audio.outId', '');
+      if (!id) return;
+      function go() {
+        try {
+          var ctx = App.getAudio();
+          if (typeof ctx.setSinkId !== 'function' || (!force && ctx.sinkId === id)) return;
+          ctx.setSinkId(id).catch(function () { audMsg.textContent = 'output switch refused — using default'; });
+        } catch (e) { /* no audio here */ }
+      }
+      var ua = navigator.userActivation;
+      if (!ua || ua.hasBeenActive) { go(); return; }
+      if (applySink.wait) return;
+      applySink.wait = true;
+      function once() {
+        document.removeEventListener('pointerdown', once, true);
+        document.removeEventListener('keydown', once, true);
+        applySink.wait = false;
+        go();
+      }
+      document.addEventListener('pointerdown', once, true);
+      document.addEventListener('keydown', once, true);
     }
 
     function listDevices(withPoke) {
-      var p = withPoke && navigator.mediaDevices.getUserMedia
-        ? navigator.mediaDevices.getUserMedia({ audio: true }).then(function (s) {
-            s.getTracks().forEach(function (t) { t.stop(); });
-          }).catch(function () { /* labels stay generic without permission */ })
-        : Promise.resolve();
-      p.then(function () { return navigator.mediaDevices.enumerateDevices(); })
-        .then(fillDevices)
-        .catch(function () { audMsg.textContent = 'device listing unavailable here'; });
+      var m = navigator.mediaDevices;
+      if (!m || typeof m.enumerateDevices !== 'function') {
+        audBtn.disabled = true;
+        audMsg.textContent = 'Device listing is not available here.';
+        return Promise.resolve();
+      }
+      var p = Promise.resolve();
+      if (withPoke) {
+        p = AIN ? AIN.devices(true) : (m.getUserMedia ? m.getUserMedia({ audio: true }).then(function (s) {
+          s.getTracks().forEach(function (t) { t.stop(); });
+        }).catch(function () { /* labels stay generic without permission */ }) : p);
+      }
+      return p.then(function () { return m.enumerateDevices(); })
+        .then(function (d) {
+          fillDevices(d);
+          // why the names stay hidden: declined, or no input at all (a MODX
+          // switched off / its USB audio driver missing) — not the same fix
+          if (withPoke && !named) audMsg.textContent = (AIN && AIN.listError) || 'Input permission was not granted — device names stay hidden.';
+          paintAin();
+          if (named && App.active === 'settings') meterStart();
+        })
+        .catch(function () { audMsg.textContent = 'Device listing is not available here.'; });
     }
 
-    document.getElementById('set-audio-enable').addEventListener('click', function () { listDevices(true); });
-    audIn.addEventListener('change', function () { App.store.set('audio.inId', this.value); });
+    audBtn.addEventListener('click', function () { listDevices(true); });
+    audIn.addEventListener('change', function () {
+      App.store.set('audio.inPicked', true);
+      if (AIN) AIN.setDevice(this.value); else App.store.set('audio.inId', this.value);
+      audMsg.textContent = '';
+      ainNote = '';
+      paintHint();
+      if (App.active === 'settings') meterStart();
+    });
     audOut.addEventListener('change', function () {
       App.store.set('audio.outId', this.value);
       try {
@@ -325,11 +505,119 @@
       } catch (e) { /* no audio yet */ }
     });
     if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
-      navigator.mediaDevices.addEventListener('devicechange', function () {
-        if (document.getElementById('set-audio-in') &&
-            document.getElementById('set-audio-enable').style.display === 'none') listDevices(false);
-      });
+      navigator.mediaDevices.addEventListener('devicechange', function () { listDevices(false); });
     }
+
+    // ---- Hear input + gain ----
+    function paintAin() {
+      var want = App.store.get('audio.monitor', false) === true;
+      var avail = !!(AIN && AIN.supported);
+      var s = avail ? AIN.state : null;
+      monSeg.querySelectorAll('button').forEach(function (b) {
+        var isOn = b.getAttribute('data-mon') === 'on', act = isOn === want;
+        var held = isOn && act && !!(s && s.held);
+        b.classList.toggle('active', act && !held);
+        b.classList.toggle('held', held);
+        b.setAttribute('aria-pressed', String(act));
+        b.title = held ? 'On, but paused — the note below says why' : '';
+      });
+      // QUIET CHROME: no Hear input controls where capture can't work
+      ainRows.forEach(function (el) { if (el) el.style.display = avail ? '' : 'none'; });
+      if (!avail) {
+        ainMsg.textContent = 'Audio input is not available here (this browser or viewer does not allow it).';
+        ainWarn.hidden = true;
+        meterEl.classList.remove('live');
+        return;
+      }
+      ainWarn.textContent = s.warn || '';
+      ainWarn.hidden = !s.warn;
+      ainMsg.textContent = s.error || s.msg ||
+        (s.monitor ? (s.paused
+          ? 'Hear input is on — click or tap anywhere to turn on sound (the browser keeps audio off until you interact with the page).'
+          : 'Hearing “' + (s.label || 'the input') + '” through soundLAB, at the master volume.') : ainNote);
+      meterEl.classList.toggle('live', !!s.on);
+      ainTest.hidden = !(App.active === 'settings' && !meterWanted());
+      paintHint();
+    }
+    monSeg.addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-mon]');
+      if (!b || !AIN) return;
+      var on = b.getAttribute('data-mon') === 'on';
+      ainNote = '';
+      if (on && !named) {
+        // device names not readable yet: this first press only asks for the
+        // input permission and lists the inputs — nothing is heard before an
+        // input can be seen and picked (a laptop mic would howl straight away)
+        listDevices(true).then(function () {
+          if (named) ainNote = App.store.get('audio.inId', '') ? 'Now press On to hear it.' : 'Pick your instrument as Input above, then press On.';
+          paintAin();
+        });
+        return;
+      }
+      AIN.setMonitor(on).then(function () { if (App.active === 'settings') meterStart(); paintAin(); });
+      paintAin();
+    });
+    ainGain.value = String(AIN ? AIN.gain : 100);
+    ainGainVal.textContent = ainGain.value + '%';
+    ainGain.addEventListener('input', function () {
+      var v = AIN ? AIN.setGain(parseInt(this.value, 10)) : parseInt(this.value, 10);
+      ainGainVal.textContent = v + '%';
+    });
+    App.on('audioin:state', paintAin);
+
+    // live level meter (dBFS, -60..0): polled only while Settings is on screen
+    var meterTimer = null, pkHold = 0, pkAt = 0;
+    function meterTick() {
+      var l = AIN.level();
+      var pct = l.peak > 0.001 ? Math.max(0, Math.min(100, (20 * Math.log(l.peak) / Math.LN10 + 60) / 60 * 100)) : 0;
+      var now = Date.now();
+      if (pct >= pkHold || now - pkAt > 1200) { pkHold = pct; pkAt = now; }
+      meterBar.style.width = pct.toFixed(1) + '%';
+      meterPk.style.left = pkHold.toFixed(1) + '%';
+      meterEl.classList.toggle('clip', l.clip);
+      meterEl.setAttribute('aria-valuenow', String(Math.round(pct)));
+    }
+    // the meter opens the input only when it is in use — Hear input, tone-in,
+    // an input picked here — or on "Test input": opening Settings alone never
+    // grabs a device (a Bluetooth headset's mic would drop the headphones to
+    // call quality, and the OS recording light would come on)
+    function meterWanted() {
+      var id = App.store.get('audio.inId', '');
+      return App.store.get('audio.monitor', false) === true || App.store.get('audio.tonein', false) === true ||
+        meterTest || (named && !!id && id !== 'default' && id !== 'communications');
+    }
+    function meterStart() {
+      if (!AIN || !AIN.supported) return;
+      if (meterWanted()) {
+        AIN.hold('settings-meter');
+        if (!meterTimer && !document.hidden) meterTimer = setInterval(meterTick, 50);
+      } else {
+        meterStop(false);
+      }
+      paintAin();
+    }
+    ainTest.addEventListener('click', function () {
+      meterTest = true;
+      if (!named) listDevices(true); else meterStart();
+    });
+    function meterStop(keepHold) {
+      if (meterTimer) { clearInterval(meterTimer); meterTimer = null; }
+      if (!keepHold) meterTest = false;
+      if (!keepHold && AIN) AIN.release('settings-meter');
+      meterBar.style.width = '0%';
+      pkHold = 0;
+      meterPk.style.left = '0%';
+    }
+    document.addEventListener('visibilitychange', function () {
+      if (App.active !== 'settings') return;
+      if (document.hidden) meterStop(true); else meterStart();
+    });
+    // on show: re-read the list (names may have become readable elsewhere —
+    // no permission prompt, enumerateDevices only), then the meter
+    audioUI = { show: function () { paintAin(); meterStart(); listDevices(false); }, hide: function () { meterStop(false); paintAin(); } };
+
+    listDevices(false);
+    paintAin();
 
     // ---- plugins ----
     var plugMsg = document.getElementById('set-plugin-msg');
@@ -494,12 +782,34 @@
         });
       }
       fill(midiIn, App.midi.inputs, App.midi.inputId);
+      // All keyboards (the default): every connected keyboard plays at once
+      if (App.midi.inputs.length) {
+        var allOpt = document.createElement('option');
+        allOpt.value = 'all';
+        allOpt.textContent = 'All keyboards';
+        midiIn.insertBefore(allOpt, midiIn.firstChild);
+        if (App.midi.inputId === 'all') midiIn.value = 'all';
+      }
       fill(midiOut, App.midi.outputs, App.midi.outputId);
       document.getElementById('set-midi-bt').style.display = App.midi.native ? '' : 'none';
-      midiMsg.textContent = App.midi.inputs.length ? '' :
+      // Web MIDI on Windows lists Bluetooth LE MIDI ports only with the
+      // Windows Runtime MIDI backend on (MidiManagerWinrt) — the hint shows
+      // until a Bluetooth port is actually listed
+      var btSeen = App.midi.inputs.concat(App.midi.outputs).some(function (p) { return /bluetooth/i.test(p.name || ''); });
+      btNoteEl.style.display = !App.midi.native && /Windows/i.test(navigator.userAgent) && !btSeen ? '' : 'none';
+      midiMsg.textContent = btNote || (App.midi.inputs.length ? '' :
         (App.midi.native ? 'Connected — pair your keyboard with the Bluetooth button.' :
-          'Connected — plug in a keyboard and it will appear here.');
+          'Connected — plug in a keyboard and it will appear here.'));
     }
+    // Bluetooth progress from the native bridge ("Looking…", "Connecting to
+    // X…", "Connected: X", "Couldn't connect…") — shown here as well as in
+    // Lights & help, so Pair Bluetooth never looks like it did nothing
+    var btNote = '';
+    var btNoteEl = document.getElementById('set-midi-btnote');
+    App.on('midi:status', function (d) {
+      btNote = (d && d.text) || '';
+      if (App.midi && App.midi.native && App.midi.ready) midiMsg.textContent = btNote;
+    });
 
     midiEnable.addEventListener('click', function () {
       App.midi.enable().then(paintMidi).catch(function () {
@@ -510,6 +820,8 @@
     midiIn.addEventListener('change', function () { App.midi.setInput(this.value); });
     midiOut.addEventListener('change', function () { App.midi.setOutput(this.value); });
     document.getElementById('set-midi-bt').addEventListener('click', function () {
+      btNote = 'Looking for Bluetooth MIDI keyboards…';
+      midiMsg.textContent = btNote;
       App.midi.bluetooth();
     });
     document.getElementById('set-midi-test').addEventListener('click', function () {
@@ -535,11 +847,16 @@
 
     document.getElementById('set-open-lights').addEventListener('click', function () { App.switchTo('lights'); });
 
+    var asChk = document.getElementById('set-midi-appsound');
+    asChk.checked = !App.midi || App.midi.appSound;
+    asChk.addEventListener('change', function () { if (App.midi) App.midi.setAppSound(!!this.checked); });
+
     var toneChk = document.getElementById('set-tonein');
     toneChk.checked = App.store.get('audio.tonein', false) === true;
     toneChk.addEventListener('change', function () {
       App.store.set('audio.tonein', !!this.checked);
       if (App.tonein) { if (this.checked) App.tonein.start(); else App.tonein.stop(); }
+      if (App.active === 'settings') meterStart();
     });
 
     document.getElementById('set-backup-out').addEventListener('click', function () {
@@ -582,7 +899,9 @@
 
   App.register('settings', {
     init: init,
+    onHide: function () { if (audioUI) audioUI.hide(); },
     onShow: function () {
+      if (audioUI) audioUI.show();
       // dynamic prefs may have changed elsewhere (pads click chip, wake from
       // code, volume) — re-read them when the page opens
       var c = document.getElementById('set-click');

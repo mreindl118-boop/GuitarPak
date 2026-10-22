@@ -6,7 +6,8 @@ rem  Creates Desktop + Start Menu shortcuts that open soundLAB
 rem  in its own app window (Edge/Chrome app mode - no tabs, no
 rem  address bar). MIDI keyboards work natively: Chromium's
 rem  built-in Web MIDI is the bridge - approve the MIDI prompt
-rem  on first run. The app itself works offline after the first
+rem  on first run. --enable-features=MidiManagerWinrt lets it see
+rem  Bluetooth LE MIDI keyboards too (Windows MIDI default: USB only). The app itself works offline after the first
 rem  visit (it is a PWA) and auto-updates.
 rem ============================================================
 setlocal
@@ -35,23 +36,26 @@ set "ICO=%ICODIR%\soundLAB.ico"
 if not exist "%ICODIR%" mkdir "%ICODIR%"
 powershell -NoProfile -ExecutionPolicy Bypass -Command "try { Invoke-WebRequest -UseBasicParsing 'https://github.com/mreindl118-boop/GuitarPak/raw/main/icons/soundlab.ico' -OutFile '%ICO%' } catch { }"
 
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$ws=New-Object -ComObject WScript.Shell; $l=$ws.CreateShortcut([Environment]::GetFolderPath('Desktop')+'\soundLAB.lnk'); $l.TargetPath='%BROWSER%'; $l.Arguments='--app=%URL%'; $l.Description='soundLAB - guitar + keys practice and studio'; if (Test-Path '%ICO%') { $l.IconLocation='%ICO%,0' }; $l.Save()"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$ws=New-Object -ComObject WScript.Shell; $l=$ws.CreateShortcut([Environment]::GetFolderPath('Desktop')+'\soundLAB.lnk'); $l.TargetPath='%BROWSER%'; $l.Arguments='--enable-features=MidiManagerWinrt --app=%URL%'; $l.Description='soundLAB - guitar + keys practice and studio'; if (Test-Path '%ICO%') { $l.IconLocation='%ICO%,0' }; $l.Save()"
 if errorlevel 1 goto :fail
 
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$ws=New-Object -ComObject WScript.Shell; $d=Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'; $l=$ws.CreateShortcut((Join-Path $d 'soundLAB.lnk')); $l.TargetPath='%BROWSER%'; $l.Arguments='--app=%URL%'; $l.Description='soundLAB - guitar + keys practice and studio'; if (Test-Path '%ICO%') { $l.IconLocation='%ICO%,0' }; $l.Save()"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$ws=New-Object -ComObject WScript.Shell; $d=Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'; $l=$ws.CreateShortcut((Join-Path $d 'soundLAB.lnk')); $l.TargetPath='%BROWSER%'; $l.Arguments='--enable-features=MidiManagerWinrt --app=%URL%'; $l.Description='soundLAB - guitar + keys practice and studio'; if (Test-Path '%ICO%') { $l.IconLocation='%ICO%,0' }; $l.Save()"
 if errorlevel 1 goto :fail
 
 echo.
 echo Installed. soundLAB is now on your Desktop and in the Start Menu.
 echo.
 echo First run tips:
-echo   - Plug in (or Bluetooth-pair in Windows Settings) your MIDI keyboard,
-echo     then allow the MIDI permission prompt in soundLAB's Settings.
+echo   - Bluetooth MIDI keyboards (ROLI LUMI) work through the shortcut: it turns on
+echo     the browser's Windows Runtime MIDI. Pair the keyboard in Windows first.
+echo     If the browser was already open, close it fully once so the switch applies.
+echo   - Select the keyboard's LED output in soundLAB's Settings and allow MIDI.
+echo     For a LUMI with a generic port name, select Keyboard type LUMI.
 echo   - The app keeps working offline after the first visit.
 echo.
 choice /c YN /m "Launch soundLAB now"
 if errorlevel 2 exit /b 0
-start "" "%BROWSER%" --app=%URL%
+start "" "%BROWSER%" --enable-features=MidiManagerWinrt --app=%URL%
 exit /b 0
 
 :fail

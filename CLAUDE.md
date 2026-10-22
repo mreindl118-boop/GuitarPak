@@ -57,12 +57,83 @@ js/midi.js        MIDI service (App.midi: in/out ports, note/bend/pressure
                   (midi.lumi null|true|false); lights.on default on for a
                   LUMI, off for other outputs (a synth would play note-ons).
                   LUMI SysEx per benob/LUMI-lights (dev-id 0x37 + 0x00, values
-                  <5-bit type><value>). Loaded right after app.js
+                  <5-bit type><value>). Loaded right after app.js.
+                  v0.78.0 RAW TAP for the MIDI Hub: 'midi:raw' {bytes} for
+                  EVERY incoming message (channel, SysEx, realtime; both
+                  backends) before dispatch, 'midi:out' {bytes} after every
+                  successful send, App.midi.send(bytes) (any bytes to the
+                  output) and App.midi.setInputFilter(fn) — ONE fn(bytes) ->
+                  bytes|null run before dispatch (null drops it); the Hub
+                  installs its rules there when midihub.rulesIn is on.
+                  v0.78.1 APP SOUND: midi:note carries mute:true when
+                  midi.appSound is false (Settings > MIDI keyboard switch,
+                  App.midi.setAppSound) or any App.midi.mute(owner, on) is
+                  held (the Hub holds 'midihub' while open unless midihub.
+                  hear) - only piano.js's voice honours it; pads, lessons,
+                  quiz, range learning and lights still react (unlike
+                  tone-in's silent:true). A synth that sounds itself is
+                  never doubled.
+                  v0.79.0 LUMI DISPLAY (lights.display, default on;
+                  App.midi.display / setDisplay, 'lights:display'): while a
+                  guide is up (help >= 2) wanted() drops the scale/tonic
+                  layout and lights only guideNow steady + guideNext
+                  blinking, each in its App.colors color (guideColorVel:
+                  degree in Interval mode, pitch class in Note mode; off-
+                  scale = root color) instead of white. No guide = normal
+                  layout. Off = classic (layout + white now-note). Switch
+                  in Lights & help (LUMI rows) and the lesson card chip.
+                  v0.80.0: every practice page lights keys ONLY through
+                  App.midi.guide - Songs (plGuide: the sounding step + the
+                  next, cleared on pause/hide) and the Woodshed (lightsUpdate
+                  calls guide only when its now/next targets change, so the
+                  blink keeps time; Wait mode lights the first note at Go).
+                  Nothing calls App.midi.light/dark for practice any more.
 js/tonein.js      1/4"/audio-in TONE-IN: pitch-detects the selected audio
                   input (audio.inId; toggle audio.tonein in Settings) and
                   emits midi:note {silent:true} — instrument pages show the
                   visuals (rings/presses/guide) but never re-sound; pauses on
                   'shed' (its own mic) — loaded right after midi.js
+js/audioin.js     SOUND INPUT (App.audioIn): the ONE shared live-input service.
+                  Opens audio.inId RAW (no echo cancel / noise suppression /
+                  AGC, channelCount ideal 2, deviceId exact). HEAR INPUT
+                  (audio.monitor, default off): source -> ONE GainNode
+                  (audio.inGain 0-200 %) -> App.getAudio().destination (master
+                  volume + soft clipper apply), never connected when off — how
+                  a MODX/MONTAGE on USB audio ("Line (MODX)") plays through.
+                  AnalyserNode tap after the gain = level() {peak, rms, clip}.
+                  The stream is open only while needed: Hear input, or
+                  hold(tag)/release(tag) (the Settings meter); tab switches
+                  never close it; app hidden KEEPS Hear input sounding (a mixer
+                  passthrough) but releases anything not heard. HOLDS
+                  (state.held + why + msg, nothing routed, device released when
+                  no meter holds it): 'mic' = a mic-like or loopback label
+                  (isMic: MIC_RE incl. Mikrofon/Micrófono/Stereo Mix, minus
+                  INSTR_RE interfaces like "Microphone (USB Audio CODEC)") that
+                  is not a chosen input the user pressed On for; 'fell' = the
+                  chosen input is missing — Hear input WAITS for it, the system
+                  default stands in only for a meter or after On is pressed
+                  again (ack); 'perm' = launch restore without a granted
+                  permission (permissions.query; 'denied' or a declined prompt
+                  switches audio.monitor off). A busy device (NotReadable) is an
+                  error, never a fallback. devicechange: unplug closes + says
+                  so, the chosen id newly listed re-opens, the mic check re-runs
+                  (a new OS default). A suspended context = state.paused + the
+                  #snd-hint "tap to start". audio.inLabel = the chosen input's
+                  name for "is not connected" notes. Bus 'audioin:state',
+                  'audioin:device' {id} (tone-in re-opens on it; tone-in opens
+                  audio.inId EXACT and retries on devicechange / track end).
+                  No getUserMedia or a frame without the microphone permission
+                  policy = supported false, a message, never a throw. Settings
+                  card "Sound input & output": Input/Output selects once device
+                  names are readable (else List devices; the first Hear input
+                  On only asks + lists), Hear input seg (aria-pressed, .held),
+                  gain, meter (opens the device only while Hear input / tone-in
+                  / a picked input is in use, else a Test input button), MODX/
+                  MONTAGE hint + auto-pick only while no input was ever chosen
+                  (audio.inPicked); a missing chosen input/output is kept, and
+                  audio.outId is re-applied (setSinkId) when it is listed again.
+                  Suite tests/audioin.test.js (Chromium fake media device).
+                  Loaded right after tonein.js.
 js/metronome.js   ┐ feature modules; each registers (metronome = the corner
                   │  sheet, not a page — see OVERLAY SHEETS)
 js/fretboard.js   │ App.register(name, {init, onShow, onHide, onKey})
@@ -98,6 +169,15 @@ js/keylessons.js  │ SCALE LESSONS on the Keys page (mounted into #pn-lessons
                   │  clean notes ('off'/miss/wrong break it); kl.speedup
                   │  adds +4 bpm per clean loop (max +60); best streak per
                   │  level in kl.prog[id].inf[step] (runs get inf + bpm).
+                  │  DOUBLE-TAP CONTROL (v0.79.0, kl.dbltap default on):
+                  │  two strikes of the CONTROL KEY (App.midi.range().lo,
+                  │  a LUMI's leftmost key) within 350 ms start the lesson
+                  │  from list/done, and stop a run unless the 2nd strike
+                  │  was a right note (R.wrong / R.lastHit unchanged-or-
+                  │  wrong check, so turnarounds never stop); demo runs
+                  │  stop on any double-tap; pointerup x2 on empty card
+                  │  space does the same. Chips kl-disp / kl-dbltap.
+                  │  Suite tests/lumidisplay.test.js.
                   │  Stores kl.prog/kl.sel/kl.tier/kl.reps; wake tag kl-run
                   │  (ledger area Keys); stops on transport:claim, page
                   │  hide, app hide; summary() feeds Exercises Progress.
@@ -202,6 +282,20 @@ js/xp.js          XP / streak service under the course (App.xp = window.SLXP,
                   Tests pin the clock with SLXP._now(fn) + SLXP._reload();
                   SLXP._tick() runs one ledger tick. Loaded right before
                   quiz.js.
+js/practiceplan.js PRACTICE PLAN ('practiceplan', Learn group pill "Plan",
+                  v0.81.0, prefix pp-; built by null, see docs/PRACTICE-PLAN.md):
+                  teacher notes (paste / .txt / .md / Google Docs JSON export;
+                  the Doc link is only a bookmark, nothing is fetched) ->
+                  RULES table -> timed blocks that launch existing modules
+                  (Keys lessons via App.keysLessons.open, Fretboard via
+                  fb:practice, Chords/Jam/Woodshed/Exercises/Tuner via
+                  switchTo + shared key/tempo). Completion is MEASURED: a new
+                  kl.prog run, a new passing qz.prog score, a ws.xp gain, or
+                  active minutes from App.xp. Unmatched lines -> pp.gaps
+                  (module-gap metric, exportable). Stores pp.students /
+                  pp.active / pp.sessions (90 days) / pp.history / pp.running
+                  / pp.gaps. App.practicePlan test hook. Suite
+                  tests/practiceplan.test.js.
 js/help.js        (?) button + guided page tours (TOURS per page id, spotlight
                   ring + card overlay, first-run welcome; help.seen/help.done)
 js/plugins.js     window.SoundLab plugin API v1: registerPage (App.addPage),
@@ -211,6 +305,48 @@ js/plugins.js     window.SoundLab plugin API v1: registerPage (App.addPage),
                   cap, per-plugin enable/error) run right after boot; loaded
                   from Settings > Plugins. Docs PLUGINS.md; sample plugin
                   plugins/sample-lofi.js (Lo-fi fx + Glass bell voice).
+js/midihub.js     MIDI HUB page ('midihub', Keys group, pill "MIDI", v0.78.0;
+                  prefix mh-): read / write / reshape plain MIDI for ANY
+                  device on App.midi's ports — device-AGNOSTIC by design,
+                  PROFILES (generic default / yamaha MODX-MONTAGE / roland)
+                  only add CC names, bank hints, SysEx builders and notes.
+                  Views (seg, midihub.view): Play (2-octave keys touch +
+                  QWERTY via onKey/keyup, velocity, bend/mod/pressure, bank
+                  MSB/LSB + program), Controls (CC slider list midihub.ccs,
+                  switch CCs, FA/FB/FC + MIDI clock at met.bpm, 5 ms ticker
+                  with stall guard), Rules (midihub.rules: match type/ch/
+                  number range -> block / convert / set ch / set number /
+                  add / value %; applyRules(bytes) -> [bytes]; always on
+                  Thru (midihub.thru: 'midi:raw' -> rules -> App.midi.send,
+                  never 0xFE), optionally on what the app hears (rulesIn ->
+                  App.midi.setInputFilter) and on the Hub's own controls
+                  (rulesApp); Learn = next incoming message fills a match),
+                  SysEx (identity request + reply decode, profile builders:
+                  Yamaha F0 43 1n 7F 1C mm addr(3) data F7 / 2n bulk,
+                  Roland DT1/RQ1 with checksum; raw hex; last received),
+                  Monitor ('midi:raw' + 'midi:out' rows, rAF-batched, 800
+                  cap, clock/active-sensing filters, export), Learn (cheat
+                  sheet + profile notes, export/import/reset). Keys played
+                  here emit note:input {src:'midihub'} (capture). Warns when
+                  key lights are on for a non-LUMI output (a synth would
+                  play the "lights"). Panic = 123/120/64/bend on 16 chans.
+                  window.SLMidiHub = test hook (decode, applyRules,
+                  PROFILES, parseHex, hex, rules). Suite tests/midihub.test.js.
+                  v0.80.0 SYNTH CONTROL: the Hub sends through its OWN output
+                  (midihub.outId: a port id | 'shared' = the key-light
+                  output | unset = auto: a synth-named port, port 1 first,
+                  never LUMI / Microsoft GS Wavetable) via App.midi.sendTo
+                  (portId, bytes) - Web MIDI only; native = send(). The
+                  header's 'Synth out' select sets it. New first view
+                  'control' (default): Part 1-16 buttons (= midihub.ch),
+                  big SVG knobs (drag / wheel ONLY when focused - a page scroll
+                  over a knob never turns it (v0.81.1) / arrows / dblclick = start
+                  value) for BASE_KNOBS + profile.knobs {hero, extra}
+                  (Yamaha: Super Knob 95 + Assign 1-8 = CC 17-24), values
+                  per Part in midihub.kv; program Prev/Next (bank
+                  midihub.msb/lsb), Send all, Reset knobs. TWO-WAY: onRaw
+                  moves a knob / the program number when the synth sends
+                  that CC / Program Change on the selected Part.
 js/pads.js        drum-pad controller page ('pads', PRACTICE Instrument group
                   since v0.64.0; still records to st.tracks + studio-armed
                   MIDI works): 8 velocity pads on the pad drum track's live
@@ -267,6 +403,15 @@ android/          APK project — build.ps1 (no Gradle: javac→d8→aapt→zipa
                   MidiManager (USB + any system MIDI device) + Bluetooth LE
                   MIDI scan/connect (BLUETOOTH_SCAN/CONNECT; location <= 11),
                   last BLE device reconnects at launch. Same protocol as iOS.
+                  Settings › MIDI shows the bridge's midi:status text too
+                  (tests/btmidi.test.js fakes the bridge). WINDOWS BLUETOOTH
+                  MIDI: Chromium's default Windows MIDI (WinMM) lists no BLE
+                  ports; --enable-features=MidiManagerWinrt (chrome://flags
+                  use-winrt-midi-api; WebView2 via WEBVIEW2_ADDITIONAL_BROWSER_
+                  ARGUMENTS) does. releases/soundLAB-windows.bat shortcuts pass
+                  it; Settings › MIDI shows a hint until a Bluetooth port is
+                  listed. A BLE keyboard stays connected only while an app
+                  holds its port (a LUMI searches again when soundLAB closes).
                   build.ps1 (PC) and build.sh (Linux/cloud: ANDROID_JAR,
                   BUILD_TOOLS, KEYSTORE, D8_JAR — build-tools-34 d8 crashes on
                   JDK 21, use r8 8.7.x from Google Maven) both write
@@ -297,7 +442,7 @@ version.json      auto-update feed (source of truth for latest version)
 - SECTION TAB BAR (v0.70.0; app.js GROUPS + populateNav): the main nav is a
   tab bar of GROUPS (icon + label), not a drop-down — practice: Learn
   (quiz=Exercises HOME/chords/theory), Guitar (fretboard/tab/notation), Keys
-  (piano/synth/pads), Play (songs/jam), Practice (shed/trainer/tuner);
+  (piano/synth/pads/midihub), Play (songs/jam), Practice (shed/trainer/tuner);
   studio: Studio (arrange=Timeline HOME / tracks=Editor), Sketch (song/ideas).
   Rendered twice: #tabbar inside the top bar (> 900px) and #tabbar-m fixed
   along the bottom (<= 900px) — #tabbar-m sits OUTSIDE <header> because the
@@ -423,8 +568,14 @@ version.json      auto-update feed (source of truth for latest version)
   /opt/node22/lib/node_modules, Chromium at /opt/pw-browsers; env.js reads
   SL_URL / CHROMIUM / AAPT). Suites: fingering (pure Node), lights (a fake
   LUMI via a stubbed requestMIDIAccess), keys, practice,
-  game, quiz, nav, smoke, taps, update. Run them before every release and add a
-  suite or checks for new features.
+  game, quiz, nav, smoke, taps, update, midihub (a fake synth port: raw tap,
+  rules on Thru / input filter, profiles + SysEx builders, clock), audioin
+  (fake media device), btmidi (a fake Android MidiBridge). Run them
+  before every release and add a suite or checks for new features.
+  PC (2026-10-19): Node 24 IS on this machine now; install playwright into a
+  scratch folder (`npm i playwright@1.49.1 && npx playwright install chromium`)
+  and run suites with NODE_PATH=<that>/node_modules SL_URL=http://127.0.0.1:4573/index.html
+  against the preview server (tests/run.sh expects python3 + a free 4573).
 - The service worker is cache-first: after editing, bump `CACHE` in sw.js and,
   in the preview, unregister SW + clear caches + reload twice — otherwise you
   WILL verify stale files (this has bitten repeatedly).

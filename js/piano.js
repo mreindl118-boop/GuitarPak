@@ -1,7 +1,7 @@
 /* GuitarLab piano module — a keyboard twin of the fretboard.
  *
- * Keys are colored by scale degree with the SAME palette the fretboard uses
- * (fb.colors, customizable there), the key/scale follow the shared context
+ * Keys are colored by scale degree (or by note) with the SAME palette the
+ * fretboard uses (App.colors, customizable there), the key/scale follow the shared context
  * bar exactly like every other page (fb:set / fb:scale on the bus), labels
  * switch between note names / intervals / degrees, every key is playable
  * with a real sampled piano voice, and the Jam tab's sounding chord lights
@@ -61,9 +61,9 @@
   var WHITE_PCS = [0, 2, 4, 5, 7, 9, 11];
   var W = 44, H = 190, BW = 27, BH = 118;
 
-  // same defaults as the fretboard; live values come from the shared store so
-  // a palette customized in the fretboard settings recolors this page too
-  var DEG_DEFAULTS = ['#ffab47', '#e8d44d', '#7ad97a', '#4cc9b0', '#6ea8fe', '#b48ef0', '#ff85b3'];
+  // key colors come from App.colors — the fretboard's palette: by scale
+  // degree (interval mode) or by note (12 pitch-class colors), edited in the
+  // fretboard settings / Lights & help; 'colors' repaints this page live
 
   function mixHex(a, b, t) { // blend a toward b by t (0..1)
     var pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
@@ -73,13 +73,6 @@
       c |= v << sh;
     }
     return '#' + ('00000' + c.toString(16)).slice(-6);
-  }
-
-  function degColors() {
-    var cols = App.store.get('fb.colors', null);
-    cols = (Object.prototype.toString.call(cols) === '[object Array]' && cols.length === 7 &&
-      cols.every(function (c) { return /^#[0-9a-fA-F]{6}$/.test(c); })) ? cols : DEG_DEFAULTS;
-    return cols;
   }
 
   function curRoot() { var v = App.store.get('fb.root', 9); return (typeof v === 'number' && v >= 0 && v < 12) ? Math.floor(v) : 9; }
@@ -93,6 +86,7 @@
   var hand = 'right';
 
   function handBase() { return hand === 'left' ? 36 : 48; }
+  var OCT_SPLIT = 48; // a LUMI window starting below this = the left-hand view
 
   // HELP LEVEL (pn.assist): how much the keyboard tells you. 4 Full = degree
   // colors + note labels + fingering + now/next rings and LEDs; 3 Colors =
@@ -197,11 +191,12 @@
   // All open source (samples/CREDITS.md): grand = Salamander Grand (real
   // recording, via tonejs-instruments), bright = FluidR3 piano, electric =
   // MusyngKite EP, organ = MusyngKite drawbar. Same anchor notes per set,
-  // nearest-anchor pitch shift, synth fallback until decoded. trim = RMS-
-  // measured loudness compensation per set. Chosen in Settings
+  // nearest-anchor pitch shift, synth fallback until decoded. Grand is
+  // already leveled by sampleNorm; the other sets keep their existing trims.
+  // Chosen in Settings
   // (app.pianoTone, App.setPianoTone).
   var PIANO_SETS = {
-    grand: { dir: 'samples/piano2/', trim: 0.21 },
+    grand: { dir: 'samples/piano2/', trim: 1.0 }, // sampleNorm already levels this bank
     bright: { dir: 'samples/keys/', trim: 1.0 },
     electric: { dir: 'samples/epiano/', trim: 1.57 },
     organ: { dir: 'samples/organ/', trim: 1.17 }
@@ -579,7 +574,6 @@
     var root = curRoot(), scaleId = curScale();
     var pf = preferFlat();
     var info = Theory.scaleInfo(root, scaleId, pf);
-    var cols = degColors();
     var mwin = modeWindow(info);
 
     // fingering notation for the practice window: each key in the window
@@ -605,15 +599,16 @@
       var inScale = step !== undefined;
       var isRoot = pc === Theory.mod12(root);
       var outWin = mwin && (midi < mwin[0] || midi > mwin[1]);
-      // FULL-KEY degree color: in-scale keys are painted with their degree
-      // color edge to edge (white keys bright, black keys shaded darker so
-      // the two key heights still read); out-of-scale stays ivory/ebony.
+      // FULL-KEY color: in-scale keys are painted with their degree (or, in
+      // note mode, note) color edge to edge (white keys bright, black keys
+      // shaded darker so the two key heights still read); out-of-scale stays
+      // ivory/ebony in both modes — the layout is the scale either way.
       // Inline style beats the class fill; the pressed state uses filter +
       // stroke (with !important) so it stays visible over any color.
-      var keyStyle = '', dc = inScale ? ' data-dc="' + cols[step % 7] + '"' : '';
+      var kc = inScale ? App.colors.forNote(pc, step) : null;
+      var keyStyle = '', dc = kc ? ' data-dc="' + kc + '"' : '';
       if (isRoot && assist > 0 && assist < 3) keyStyle = ' style="stroke:var(--accent);stroke-width:3.5"';
-      if (inScale && assist >= 3) {
-        var kc = cols[step % 7];
+      if (kc && assist >= 3) {
         var fillC = isWhite
           ? (outWin ? mixHex(kc, '#f7f3ea', 0.55) : kc)
           : (outWin ? mixHex(kc, '#221d20', 0.72) : mixHex(kc, '#221d20', 0.35));
@@ -693,10 +688,11 @@
 
     if (jamLast) jamPaint(jamLast); // fresh svg — reapply the live chord overlay
 
-    // legend: one colored chip per degree, same shape as the fretboard's
+    // legend: one chip per degree in the color its keys get, same shape as
+    // the fretboard's
     var lg = '';
     for (var i = 0; i < info.pcs.length; i++) {
-      lg += '<span class="pn-leg"><span class="legend-dot" style="background:' + cols[i % 7] +
+      lg += '<span class="pn-leg"><span class="legend-dot" style="background:' + App.colors.forNote(info.pcs[i], i) +
         '"></span>' + info.intervals[i] + ' &middot; ' + info.names[i] + '</span>';
     }
     els.legend.innerHTML = lg;
@@ -1651,11 +1647,11 @@
       var studioArmed = App.space === 'studio' && App.store.get('st.armed', null);
       var padsOwn = App.active === 'pads'; // the pads page owns the keys there
       if (d.on) {
-        if (!studioArmed && !padsOwn && !d.silent) noteOn(d.midi, d.vel, d.chan);
+        if (!studioArmed && !padsOwn && !d.silent && !d.mute) noteOn(d.midi, d.vel, d.chan);
         pressKeyHold(d.midi, true);
         guideCheck(d.midi);
       } else {
-        if (!padsOwn && !d.silent) noteOff(d.midi, d.chan);
+        if (!padsOwn && !d.silent && !d.mute) noteOff(d.midi, d.chan);
         pressKeyHold(d.midi, false);
       }
     }, true); // sound first, visuals after
@@ -1665,8 +1661,14 @@
     // shared context: follow key/scale/mode changes from the bar, theory page…
     App.on('fb:set', function () { render(); ppRebuild(); });
     App.on('fb:scale', function () { render(); ppRebuild(); });
+    App.on('colors', function () { render(); }); // Interval | Note, palette edits
     App.on('jam:chord', function (ev) { jamLast = ev; jamPaint(ev); });
     App.on('midi:range', function (r) {
+      // LUMI octave buttons pick the hand (lights.octHand, on by default):
+      // its 24 keys below C3 = the left-hand view, C3 and up = the right hand
+      if (r && r.lumi && r.prev != null && App.store.get('lights.octHand', true) !== false) {
+        setHand(r.lo < OCT_SPLIT ? 'left' : 'right');
+      }
       render();
       if (state.orient !== 'h' || !els.stage || !r) return;
       var x0 = whiteIndex(Math.max(LO, r.lo)) * W, x1 = whiteIndex(Math.min(HI, r.hi)) * W + W;

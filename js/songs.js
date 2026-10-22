@@ -310,9 +310,22 @@
         if (el.scrollIntoView) el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
       }
       plStatus('bar ' + (cur.steps[hit.step].bar + 1) + ' / ' + cur.bars);
+      plGuide(hit.step);
     }
     pl.raf = requestAnimationFrame(plDraw);
   }
+
+  // KEY LIGHTS (v0.80.0): the notes sounding now + the next step's, through
+  // the keybed engine (App.midi.guide) - LUMI Display colors them, folded
+  // into the keyboard's window, so a song plays along on the keys too
+  function stepMidis(i) { var st = cur && cur.steps[i]; return st ? st.notes.map(function (n) { return n.midi; }) : null; }
+  function plGuide(step) {
+    if (!App.midi || !App.midi.guide) return;
+    var pos = pl.seq.indexOf(step), nx = pos === -1 ? null : pl.seq[(pos + 1) % pl.seq.length];
+    App.midi.guide(stepMidis(step), nx == null ? null : stepMidis(nx));
+    pl.guided = true;
+  }
+  function plGuideOff() { if (pl.guided && App.midi && App.midi.guide) App.midi.guide(null, null); pl.guided = false; }
 
   function plStart() {
     if (!cur) { plStatus('load a song first'); return; }
@@ -336,6 +349,7 @@
     if (pl.raf) { cancelAnimationFrame(pl.raf); pl.raf = 0; }
     pl.running = false;
     pl.vis.length = 0;
+    plGuideOff();
     App.wake.release('sg-run');
     plBtn(false);
   }

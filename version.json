@@ -1,6 +1,6 @@
 {
   "version": "0.75.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/soundLAB-alpha.apk",
-  "web": "0.78.0",
+  "web": "0.82.0",
   "notes": "A cleaner look. Key, scale and tempo now tuck away behind a treble-clef button next to the metronome: tap it to change them, tap anywhere else to put them away. New icons throughout (a real guitar, piano and metronome), a one-row header on phones, quieter page pills, one control height everywhere, note names on the vertical neck and portrait keyboard now read upright, and the light theme is easier to read."
 }

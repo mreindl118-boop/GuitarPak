@@ -9,9 +9,11 @@
  *
  * Loaded right after app.js so every module can use it. Broadcasts on the bus:
  *   'midi:state'    {supported, ready, inputName, outputName}
- *   'midi:note'     {on, midi, vel, chan}      note on/off (vel 0-127)
+ *   'midi:note'     {on, midi, vel, chan, mute} note on/off (vel 0-127; mute = don't re-sound)
  *   'midi:bend'     {chan, semis}              pitch bend in semitones
  *   'midi:pressure' {chan, val}                channel pressure 0-127
+ *   'midi:raw'      {bytes}                    every incoming message, untouched
+ *   'midi:out'      {bytes}                    every message sent to the output
  *
  * MPE-style per-note expression works out of the box because bend/pressure
  * are reported per channel and consumers apply them to the notes held on
@@ -39,6 +41,18 @@
 
   var access = null;                    // Web MIDI backend
   var input = null, output = null;
+  // ALL KEYBOARDS (midi.inputId 'all', the default): every connected input
+  // plays the app at once (a MODX for playing + a LUMI as the lit display);
+  // the key LIGHTS still go to the one output. inputs[] = the ports heard.
+  var ALL = 'all', allIn = false, inputs = [];
+  var srcName = '';                     // input port of the message being dispatched
+  // v0.79: hear every keyboard by default — once, older single-input choices
+  // (usually just "the first port") become All keyboards; a single input can
+  // still be picked in Settings / the MIDI Hub
+  if (!App.store.get('midi.allIn.v1', false)) {
+    App.store.set('midi.inputId', ALL);
+    App.store.set('midi.allIn.v1', true);
+  }
   var nativeReady = false;              // CoreMIDI bridge backend
   var nativePorts = { inputs: [], outputs: [] };
   var nativeInId = null, nativeOutId = null;
@@ -53,7 +67,8 @@
     try {
       if (iosMidi) window.webkit.messageHandlers.midi.postMessage(msg);
       else if (androidMidi) window.SoundLabMidi.post(JSON.stringify(msg));
-    } catch (e) { /* bridge gone */ }
+      return true;
+    } catch (e) { return false; }
   }
 
   function supported() { return native || (typeof navigator !== 'undefined' && !!navigator.requestMIDIAccess); }
@@ -68,11 +83,16 @@
     App.emit('midi:state', {
       supported: supported(),
       ready: ready(),
-      inputName: native ? portName(nativePorts.inputs, nativeInId)
-                        : (input ? (input.name || 'input') : null),
+      inputName: inputLabel(),
       outputName: native ? portName(nativePorts.outputs, nativeOutId)
                          : (output ? (output.name || 'output') : null)
     });
+  }
+
+  function inputLabel() {
+    if (native) return nativeInId === ALL ? 'All keyboards' : portName(nativePorts.inputs, nativeInId);
+    if (allIn) return inputs.length ? 'All keyboards (' + inputs.map(function (p) { return p.name || 'input'; }).join(', ') + ')' : null;
+    return input ? (input.name || 'input') : null;
   }
 
   function listPorts(map) {
@@ -82,16 +102,24 @@
     return out;
   }
 
+  // APP SOUND (v0.78.1): a hardware synth makes its own sound, so soundLAB
+  // must not double it. midi.appSound false (Settings), or any mute owner
+  // (the MIDI Hub page while open), tags midi:note with mute:true - the
+  // visuals, pads, lessons and the keybed still react, only the Keys page
+  // voice stays quiet. Distinct from tone-in's silent:true (not a keyboard).
+  var muteOwners = {};
+  function muted() { return App.store.get('midi.appSound', true) === false || Object.keys(muteOwners).length > 0; }
+
   // one complete channel message -> app events
   function dispatch(d) {
     if (!d || d.length < 2) return;
-    var st = d[0] & 0xf0, chan = d[0] & 0x0f;
+    var st = d[0] & 0xf0, chan = d[0] & 0x0f, mute = muted();
     if (st === 0x90 && d[2] > 0) {
       held[d[1]] = d[2];
-      App.emit('midi:note', { on: true, midi: d[1], vel: d[2], chan: chan });
+      App.emit('midi:note', { on: true, midi: d[1], vel: d[2], chan: chan, port: srcName, mute: mute });
     } else if (st === 0x80 || (st === 0x90 && d[2] === 0)) {
       delete held[d[1]];
-      App.emit('midi:note', { on: false, midi: d[1], vel: 0, chan: chan });
+      App.emit('midi:note', { on: false, midi: d[1], vel: 0, chan: chan, port: srcName, mute: mute });
     } else if (st === 0xe0) {
       var raw = ((d[2] << 7) | d[1]) - 8192;
       if (bendOn()) App.emit('midi:bend', { chan: chan, semis: (raw / 8192) * bendRange });
@@ -102,7 +130,24 @@
     }
   }
 
-  function onMsg(e) { dispatch(e.data); }
+  // RAW TAP + INPUT FILTER (the MIDI Hub page, js/midihub.js): every incoming
+  // message — channel, SysEx and realtime alike — is broadcast as 'midi:raw'
+  // {bytes} before anything else happens, and a registered input filter
+  // (App.midi.setInputFilter) may rewrite or drop a channel message before
+  // the app hears it (the Hub's rules: transpose, remap, block…).
+  var inputFilter = null;
+  function hear(bytes) {
+    App.emit('midi:raw', { bytes: bytes });
+    if (!inputFilter) return bytes;
+    try { return inputFilter(bytes) || null; } catch (e) { return bytes; }
+  }
+
+  function onMsg(e, port) {
+    srcName = port ? (port.name || '') : (input ? input.name || '' : '');
+    var d = hear(Array.prototype.slice.call(e.data));
+    if (d) dispatch(d);
+    srcName = '';
+  }
 
   // CoreMIDI packets can pack several messages (and use running status) in
   // one byte string — split into complete messages before dispatching
@@ -112,12 +157,14 @@
     var i = 0, lastStatus = 0;
     while (i < bytes.length) {
       var b = bytes[i];
-      if (b === 0xf0) {              // sysex: skip to F7 (we don't consume it)
-        while (i < bytes.length && bytes[i] !== 0xf7) i++;
-        i++;
+      if (b === 0xf0) {              // sysex: tapped for the Hub, never dispatched
+        var sx = [];
+        while (i < bytes.length && bytes[i] !== 0xf7) sx.push(bytes[i++]);
+        if (i < bytes.length) sx.push(bytes[i++]);
+        App.emit('midi:raw', { bytes: sx });
         continue;
       }
-      if (b >= 0xf8) { i++; continue; }        // realtime
+      if (b >= 0xf8) { App.emit('midi:raw', { bytes: [b] }); i++; continue; } // realtime
       var status = b >= 0x80 ? b : lastStatus; // running status
       if (b >= 0x80) i++;
       var len = MSG_LEN[status & 0xf0];
@@ -125,28 +172,54 @@
       lastStatus = status;
       var msg = [status];
       for (var k = 1; k < len && i < bytes.length; k++, i++) msg.push(bytes[i]);
-      if (msg.length === len) dispatch(msg);
+      if (msg.length === len) { msg = hear(msg); if (msg) dispatch(msg); }
     }
   }
 
   // ---- Web MIDI backend ----
 
+  function listen(p) { p.onmidimessage = function (e) { onMsg(e, p); }; }
   function pickWebInput(id) {
+    inputs.forEach(function (p) { try { p.onmidimessage = null; } catch (e) {} });
     if (input) { try { input.onmidimessage = null; } catch (e) {} }
     input = null;
+    inputs = [];
+    allIn = id == null || id === ALL;
+    if (allIn) {
+      if (access) access.inputs.forEach(function (p) { if (p.state !== 'disconnected') inputs.push(p); });
+      inputs.forEach(listen);
+      input = inputs[0] || null;
+      App.store.set('midi.inputId', ALL);
+      announce();
+      return;
+    }
     if (access && id) access.inputs.forEach(function (p) { if (p.id === id) input = p; });
     if (!input && access) access.inputs.forEach(function (p) { if (!input) input = p; });
     if (input) {
-      input.onmidimessage = onMsg;
+      inputs = [input];
+      listen(input);
       App.store.set('midi.inputId', input.id);
     }
     announce();
   }
 
   function pickWebOutput(id) {
-    output = null;
-    if (access && id) access.outputs.forEach(function (p) { if (p.id === id) output = p; });
-    if (!output && access) access.outputs.forEach(function (p) { if (!output) output = p; });
+    var nextOutput = null;
+    if (access && id) access.outputs.forEach(function (port) {
+      if (port.id === id && port.state !== 'disconnected') nextOutput = port;
+    });
+    // nothing chosen yet: prefer an LED keyboard (a LUMI) for the lights
+    if (!nextOutput && access && !id) access.outputs.forEach(function (port) {
+      if (!nextOutput && port.state !== 'disconnected' && /lumi/i.test(port.name || '')) nextOutput = port;
+    });
+    if (!nextOutput && access && !id) access.outputs.forEach(function (port) {
+      if (!nextOutput && port.state !== 'disconnected') nextOutput = port;
+    });
+    if (nextOutput !== output) {
+      allDark();
+      resetOutputLights();
+    }
+    output = nextOutput;
     if (output) App.store.set('midi.outputId', output.id);
     announce();
   }
@@ -160,18 +233,26 @@
       nativePorts.outputs = (p.outputs || []).map(function (x) { return { id: x.id, name: x.name }; });
       // restore / default picks
       var storedIn = App.store.get('midi.inputId', null);
-      nativeInId = portName(nativePorts.inputs, storedIn) !== null ? storedIn
+      nativeInId = storedIn == null || storedIn === ALL ? ALL
+        : portName(nativePorts.inputs, storedIn) !== null ? storedIn
         : (nativePorts.inputs.length ? nativePorts.inputs[0].id : null);
       var storedOut = App.store.get('midi.outputId', null);
-      nativeOutId = portName(nativePorts.outputs, storedOut) !== null ? storedOut
-        : (nativePorts.outputs.length ? nativePorts.outputs[0].id : null);
+      var nextOutputId = portName(nativePorts.outputs, storedOut) !== null ? storedOut
+        : (storedOut == null && nativePorts.outputs.length ? nativePorts.outputs[0].id : null);
+      if (nextOutputId !== nativeOutId) {
+        allDark();
+        resetOutputLights();
+      }
+      nativeOutId = nextOutputId;
       if (nativeOutId !== null) post({ cmd: 'setOutput', id: nativeOutId });
       announce();
     },
     onmidi: function (srcId, bytes) {
       if (!nativeReady || !bytes) return;
-      if (nativeInId !== null && srcId !== 0 && srcId !== nativeInId) return;
+      if (nativeInId !== null && nativeInId !== ALL && srcId !== 0 && srcId !== nativeInId) return;
+      srcName = portName(nativePorts.inputs, srcId) || '';
       splitAndDispatch(bytes);
+      srcName = '';
     },
     // Bluetooth progress from the Android bridge ("Looking…", "Connected: LUMI")
     onstatus: function (text) { App.emit('midi:status', { text: String(text || '') }); }
@@ -203,8 +284,8 @@
 
   function setInput(id) {
     if (native) {
-      nativeInId = typeof id === 'string' ? parseInt(id, 10) : id;
-      if (isNaN(nativeInId)) nativeInId = null;
+      nativeInId = id === ALL || id == null ? ALL : (typeof id === 'string' ? parseInt(id, 10) : id);
+      if (typeof nativeInId === 'number' && isNaN(nativeInId)) nativeInId = ALL;
       App.store.set('midi.inputId', nativeInId);
       announce();
       return;
@@ -214,9 +295,15 @@
 
   function setOutput(id) {
     if (native) {
-      nativeOutId = typeof id === 'string' ? parseInt(id, 10) : id;
-      if (isNaN(nativeOutId)) nativeOutId = null;
-      App.store.set('midi.outputId', nativeOutId);
+      var requestedOutputId = typeof id === 'string' ? parseInt(id, 10) : id;
+      if (isNaN(requestedOutputId)) requestedOutputId = null;
+      var nextOutputId = portName(nativePorts.outputs, requestedOutputId) !== null ? requestedOutputId : null;
+      if (nextOutputId !== nativeOutId) {
+        allDark();
+        resetOutputLights();
+      }
+      nativeOutId = nextOutputId;
+      App.store.set('midi.outputId', requestedOutputId);
       if (nativeOutId !== null) post({ cmd: 'setOutput', id: nativeOutId });
       announce();
       return;
@@ -225,32 +312,52 @@
   }
 
   function hasOutput() {
-    return native ? nativeOutId !== null : !!output;
+    return native ? nativeOutId !== null : !!(output && output.state !== 'disconnected');
   }
 
   function sendBytes(bytes) {
-    if (native) { post({ cmd: 'send', data: bytes }); return; }
-    if (!output) return;
-    try { output.send(bytes); } catch (e) { /* port gone */ }
+    if (!hasOutput()) return false;
+    // the Hub's monitor sees every outgoing byte ('midi:out'); the bridge's
+    // post() swallows errors, so there it is reported as sent
+    if (native) { var r = post({ cmd: 'send', data: bytes }); App.emit('midi:out', { bytes: bytes }); return r; }
+    try { output.send(bytes); } catch (e) { return false; }
+    App.emit('midi:out', { bytes: bytes });
+    return true;
+  }
+
+  // SEND TO ONE OUTPUT (v0.80.0, the MIDI Hub's synth out): any listed Web
+  // MIDI output by id, independent of the key-light output above. The
+  // native bridges have one output, so there (or with no id) it is send().
+  function sendTo(id, bytes) {
+    if (id == null || id === '' || native) return sendBytes(bytes);
+    var port = null;
+    if (access) access.outputs.forEach(function (p) { if (String(p.id) === String(id) && p.state !== 'disconnected') port = p; });
+    if (!port) return false;
+    try { port.send(bytes); } catch (e) { return false; }
+    App.emit('midi:out', { bytes: bytes, port: port.name || '' });
+    return true;
   }
 
   // ---- LED output (generic: devices light incoming notes) ----
 
   var lit = {};
 
+  function resetOutputLights() {
+    lit = {};
+    lumiShown = null;
+  }
+
   function light(midi, vel) {
     if (!hasOutput()) return;
     midi = Math.max(0, Math.min(127, Math.round(midi)));
     var v = Math.max(1, Math.min(127, Math.round(vel == null ? 100 : vel)));
-    sendBytes([0x90, midi, v]);
-    lit[midi] = v;
+    if (sendBytes([0x90, midi, v])) lit[midi] = v;
   }
 
   function dark(midi) {
     if (!hasOutput()) return;
     midi = Math.max(0, Math.min(127, Math.round(midi)));
-    sendBytes([0x80, midi, 0]);
-    delete lit[midi];
+    if (sendBytes([0x80, midi, 0])) delete lit[midi];
   }
 
   function allDark() {
@@ -261,7 +368,7 @@
   // Pushes root key, scale, light mode and the app's degree COLORS to a LUMI
   // (USB or Bluetooth — same bytes either way). The hardware supports exactly
   // TWO colors: the root color and the in-scale color; we map degree 1 and
-  // degree 5 of the app's palette (fb.colors). Values pack as a 5-bit type +
+  // degree 5 of the app's palette (App.colors). Values pack as a 5-bit type +
   // value spread over 7-bit bytes; frame device id 0x37 = LUMI. Wrong bytes
   // are simply ignored by non-LUMI devices.
 
@@ -278,14 +385,15 @@
   }
 
   function lumiCmd(cmd) {
-    if (!hasOutput()) return;
+    if (!hasOutput() || !sysexOk()) return false;
     while (cmd.length < 8) cmd.push(0);
     // device id is topology-dependent (0x37 on the documented unit, 0x00 =
     // broadcast per the same doc's own uncertainty) — send BOTH; the config
     // frames are idempotent, so whichever id this LUMI answers to wins
     var tail = cmd.concat([lumiChecksum(cmd), 0xf7]);
-    sendBytes([0xf0, 0x00, 0x21, 0x10, 0x77, 0x37].concat(tail));
-    sendBytes([0xf0, 0x00, 0x21, 0x10, 0x77, 0x00].concat(tail));
+    var sentSpecific = sendBytes([0xf0, 0x00, 0x21, 0x10, 0x77, 0x37].concat(tail));
+    var sentBroadcast = sendBytes([0xf0, 0x00, 0x21, 0x10, 0x77, 0x00].concat(tail));
+    return sentSpecific && sentBroadcast;
   }
 
   function lumiVal(type, v) { // <5-bit type><value> from byte 3 of the command
@@ -325,11 +433,14 @@
     if (sc !== undefined) lumiCmd([0x10, 0x60].concat(lumiVal(0x02, sc)));
     lumiCmd([0x10, 0x40].concat(lumiVal(0x02, LUMI_MODES.scale)));
     lumiCmd([0x10, 0x40].concat(lumiVal(0x04, brightness())));
-    var cols = App.store.get('fb.colors', null) || [];
     // overridable in Settings — LED color rendering differs from screens, so
-    // the two hardware slots can be dialed by eye; defaults follow the palette
-    var rootC = App.store.get('midi.lumiRoot', '') || cols[0] || '#ffab47';
-    var scaleC = App.store.get('midi.lumiScale', '') || cols[4] || '#6ea8fe';
+    // the two hardware slots can be dialed by eye; defaults follow the app's
+    // colors (App.colors): degree 1 + degree 5 by interval, or by note the
+    // key's root note + the note on degree 5 of this scale
+    var info = Theory.scaleInfo(key, Theory.SCALES[scaleId] ? scaleId : 'minorPent');
+    var fifth = info.pcs.length > 4 ? info.pcs[4] : key + 7;
+    var rootC = App.store.get('midi.lumiRoot', '') || App.colors.forNote(key, 0);
+    var scaleC = App.store.get('midi.lumiScale', '') || App.colors.forNote(fifth, 4);
     lumiColor(0x30, rootC);  // root key slot
     lumiColor(0x20, scaleC); // in-scale key slot
   }
@@ -383,18 +494,33 @@
     lumiVelCache[hex] = best;
     return best;
   }
-  function palette() {
-    var cols = App.store.get('fb.colors', null);
-    return Array.isArray(cols) && cols.length === 7 ? cols : ['#ffab47', '#e8d44d', '#7ad97a', '#4cc9b0', '#6ea8fe', '#b48ef0', '#ff85b3'];
-  }
+  // the LUMI velocity (= color) of a note's screen color (App.colors: by
+  // degree, or by note); step 0 = the root color in interval mode
+  function noteVel(pc, step) { return lumiVel(App.colors.forNote(pc, step)); }
   // the LUMI velocity (= color) for a key in the current scale, 0 = not in it
+  // (in note mode too: the layout is still the scale, only its colors change)
   function lumiKeyVel(m) {
     var root = App.store.get('fb.root', 9), rootPc = Theory.mod12(typeof root === 'number' ? root : 9);
     var info = Theory.scaleInfo(rootPc, App.store.get('fb.scale', 'minorPent'));
-    var step = info.pcToStep.get(Theory.mod12(m));
-    return step === undefined ? 0 : lumiVel(palette()[step % 7]);
+    var pc = Theory.mod12(m), step = info.pcToStep.get(pc);
+    return step === undefined ? 0 : noteVel(pc, step);
   }
   var LUMI_WHITE = 127, LUMI_GREEN = 60;
+  // LUMI DISPLAY (v0.79.0, lights.display, default on): while a lesson /
+  // runner / guide is showing what to play, the keybed shows ONLY that -
+  // the note to play now steady in ITS color, the next one blinking in its
+  // color (App.colors: Interval = scale degree, Note = pitch class) - and
+  // the scale layout steps aside so the keys read as "play this". With no
+  // guide the normal layout is back. Off = the classic look (layout + the
+  // note to play in white).
+  function displayOn() { return App.store.get('lights.display', true) !== false; }
+  function guideColorVel(n) {
+    var root = App.store.get('fb.root', 9), rootPc = Theory.mod12(typeof root === 'number' ? root : 9);
+    var info = Theory.scaleInfo(rootPc, App.store.get('fb.scale', 'minorPent'));
+    var pc = Theory.mod12(n), step = info.pcToStep.get(pc);
+    var col = App.colors.forNote(pc, step === undefined ? undefined : step) || App.colors.forNote(rootPc, 0);
+    return lumiVel(col);
+  }
   var guideNow = [], guideNext = [], blinkOn = false, blinkT = null;
   var revealSet = [], revealT = null, hidden = {}, claimedBy = null;
   var lumiShown = null; // last LUMI mode pushed: 'scale' | 'night'
@@ -418,7 +544,9 @@
   function isLumi() {
     var m = App.store.get('midi.lumi', null);
     if (m === true || m === false) return m;
-    return /lumi/i.test(outName()) || /lumi/i.test(native ? (portName(nativePorts.inputs, nativeInId) || '') : (input ? input.name || '' : ''));
+    if (/lumi/i.test(outName())) return true;
+    if (native ? nativeInId === ALL : allIn) return false; // many inputs: the output decides
+    return /lumi/i.test(native ? (portName(nativePorts.inputs, nativeInId) || '') : (input ? input.name || '' : ''));
   }
 
   // ---- the playing range (a LUMI = 24 keys; its octave buttons move it) ----
@@ -431,9 +559,12 @@
     if (midi < r.lo) lo -= 12 * Math.ceil((r.lo - midi) / 12);
     else if (midi > r.hi) lo += 12 * Math.ceil((midi - r.hi) / 12);
     if (lo === rangeLo) return;
+    var prev = rangeLo;
     rangeLo = Math.max(0, Math.min(108, lo));
     App.store.set('midi.rangeLo', rangeLo);
-    App.emit('midi:range', range());
+    var ev = range();
+    ev.prev = prev; // set only when PLAYING moved it (a LUMI octave button)
+    App.emit('midi:range', ev);
     paint();
   }
   function fold(m) { // the same note, moved by octaves onto keys the keyboard has
@@ -470,42 +601,50 @@
   function wanted() {
     var want = {}, kind = layoutKind(), r = range(), lumi = isLumi();
     var lo = Math.max(LIGHT_LO, r.lo), hi = Math.min(LIGHT_HI, r.hi), m, v;
+    var h0 = helpLvl(), guiding = displayOn() && h0 >= 2 && (list(guideNow).length > 0 || (h0 >= 3 && list(guideNext).length > 0));
+    if (guiding) kind = 'none'; // Display: only the notes to play
     var root = App.store.get('fb.root', 9), rootPc = Theory.mod12(typeof root === 'number' ? root : 9);
     if (kind === 'scale') {
       for (m = lo; m <= hi; m++) { v = lumi ? lumiKeyVel(m) : degVel(m); if (v) want[m] = v; }
     } else if (kind === 'tonic') {
-      for (m = lo; m <= hi; m++) if (Theory.mod12(m) === rootPc) want[m] = lumi ? lumiVel(palette()[0]) : 70;
+      for (m = lo; m <= hi; m++) if (Theory.mod12(m) === rootPc) want[m] = lumi ? noteVel(rootPc, 0) : 70;
     }
     revealSet.forEach(function (pc) { for (var x = lo; x <= hi; x++) if (Theory.mod12(x) === pc) want[x] = lumi ? LUMI_GREEN : 127; });
     var h = helpLvl();
-    if (h >= 2) list(guideNow).forEach(function (n) { want[fold(n)] = lumi ? LUMI_WHITE : 127; });
+    if (h >= 2) list(guideNow).forEach(function (n) { want[fold(n)] = lumi ? (guiding ? guideColorVel(n) : LUMI_WHITE) : 127; });
     if (h >= 3) list(guideNext).forEach(function (n) {
       var f = fold(n);
-      if (want[f] === LUMI_WHITE || want[f] === 127) return; // it's also the note to play now
+      if (list(guideNow).some(function (x) { return fold(x) === f; })) return; // it's also the note to play now
       if (!blinkOn) delete want[f];                          // the next note blinks
-      else want[f] = lumi ? (lumiKeyVel(f) || lumiVel(palette()[0])) : 45;
+      else want[f] = lumi ? (guiding ? guideColorVel(f) : (lumiKeyVel(f) || noteVel(Theory.mod12(f), 0))) : 45; // off-scale: root color / its note color
     });
     return want;
   }
 
   // compose + diff: only changed keys are sent
-  function paint() {
+  function paint(force) {
     if (!hasOutput()) return;
-    if (claimedBy) return; // that page drives the lights itself
+    if (claimedBy) {
+      if (force === true) {
+        if (isLumi()) lumiLayout();
+        Object.keys(lit).forEach(function (note) { light(Number(note), lit[note]); });
+      }
+      return;
+    }
     if (!lightsOn()) { allDark(); return; }
     if (isLumi()) lumiLayout();
     var want = wanted(), m;
     for (m in lit) if (!want[m]) dark(Number(m));
-    for (m in want) if (lit[m] !== want[m]) { light(Number(m), want[m]); lit[m] = want[m]; }
+    for (m in want) if (force === true || lit[m] !== want[m]) light(Number(m), want[m]);
   }
 
   // the app paints a LUMI key by key, so its own background goes dark (night
   // mode) — then only the app's colors show; brightness rides along
   function lumiLayout(force) {
     if (lumiShown === 'night' && !force) return;
-    lumiShown = 'night';
-    lumiCmd([0x10, 0x40].concat(lumiVal(0x02, LUMI_MODES.night)));
-    lumiCmd([0x10, 0x40].concat(lumiVal(0x04, brightness())));
+    var sentMode = lumiCmd([0x10, 0x40].concat(lumiVal(0x02, LUMI_MODES.night)));
+    var sentBrightness = lumiCmd([0x10, 0x40].concat(lumiVal(0x04, brightness())));
+    lumiShown = sentMode && sentBrightness ? 'night' : null;
   }
 
   function setGuide(now, next) {
@@ -518,14 +657,33 @@
   }
 
   App.on('note:input', function () { /* on-screen notes: the screen shows them */ });
-  App.on('midi:note', function (d) { if (d && d.on && !d.silent) learnRange(d.midi); });
+  // the range follows the LIT keyboard's octave buttons: when a LUMI is one of
+  // several inputs, only its own notes move the window (a MODX played in its
+  // low octaves must not drag the LUMI display or switch hands)
+  function lumiInputs() {
+    var names = native ? nativePorts.inputs.map(function (p) { return p.name || ''; })
+      : inputs.map(function (p) { return p.name || ''; });
+    return names.some(function (n) { return /lumi/i.test(n); });
+  }
+  App.on('midi:note', function (d) {
+    if (!d || !d.on || d.silent) return;
+    if (d.port && lumiInputs() && !/lumi/i.test(d.port)) return;
+    learnRange(d.midi);
+  });
 
   // follow the app's key/scale/colors/help live
-  function repaintAll() { lumiShown = null; paint(); }
+  function repaintAll(force) { lumiShown = null; paint(force === true); }
   App.on('fb:set', repaintAll);
   App.on('fb:scale', repaintAll);
   App.on('midi:state', repaintAll);
   App.on('help:level', function () { paint(); });
+  // Interval | Note + palette edits (App.colors): repaint the keybed; with
+  // the app's lights off the LUMI's own two colors follow — not while a page
+  // owns the keybed (Pads: night mode + its own key lights)
+  App.on('colors', function () {
+    repaintAll();
+    if (!claimedBy && !lightsOn() && isLumi() && hasOutput()) lumiNative();
+  });
 
   // auto-reconnect: once MIDI was enabled and the permission granted, later
   // sessions (and app updates) reconnect silently — the LUMI is just there
@@ -539,7 +697,8 @@
     get ready() { return ready(); },
     get inputs() { return listPorts('inputs'); },
     get outputs() { return listPorts('outputs'); },
-    get inputId() { return native ? nativeInId : (input ? input.id : null); },
+    get inputId() { return native ? nativeInId : (allIn ? ALL : (input ? input.id : null)); },
+    get inputsHeard() { return native ? [] : inputs.map(function (p) { return { id: p.id, name: p.name || p.id }; }); },
     get outputId() { return native ? nativeOutId : (output ? output.id : null); },
     get hasOutput() { return hasOutput(); },
     get held() { return Object.keys(held).map(Number); },
@@ -555,6 +714,18 @@
       App.store.set('midi.bendRange', bendRange);
     },
     enable: function () { App.store.set('midi.wanted', true); return enable(); },
+    // raw access for the MIDI Hub page: send any bytes to the output (channel
+    // messages, SysEx, realtime) and install ONE input filter fn(bytes) ->
+    // bytes | null that runs before dispatch (null drops the message)
+    send: function (bytes) { return sendBytes(bytes); },
+    sendTo: sendTo, // (portId, bytes): one chosen output, not the light output
+    // app sound for MIDI notes: the Settings switch + per-owner mutes (Hub)
+    get appSound() { return App.store.get('midi.appSound', true) !== false; },
+    setAppSound: function (on) { App.store.set('midi.appSound', on !== false); },
+    mute: function (owner, on) { if (on) muteOwners[owner] = true; else delete muteOwners[owner]; },
+    get muted() { return muted(); },
+    setInputFilter: function (fn) { inputFilter = typeof fn === 'function' ? fn : null; },
+    get inputFilter() { return inputFilter; },
     setInput: setInput,
     setOutput: setOutput,
     bluetooth: function () { if (native) post({ cmd: 'bluetooth' }); },
@@ -574,13 +745,16 @@
     lumiColor: function (hex) { return '#' + ('00000' + LUMI_TABLE[lumiVel(hex)].toString(16)).slice(-6); }, // what a LUMI shows for a screen color
     get platform() { return iosMidi ? 'ios' : androidMidi ? 'android' : 'web'; },
     release: function (owner) { if (claimedBy === owner) { allDark(); claimedBy = null; repaintAll(); } },
-    repaint: repaintAll,
-    lumiSync: repaintAll, // (old name)
+    repaint: function () { repaintAll(true); },
+    lumiSync: function () { repaintAll(true); },
     range: range,
     fold: fold,
     get lumi() { return isLumi(); },
     get outputName() { return outName(); },
     get lightsOn() { return lightsOn(); },
+    // LUMI Display (lessons light only the keys to play, in their colors)
+    get display() { return displayOn(); },
+    setDisplay: function (on) { App.store.set('lights.display', on !== false); App.emit('lights:display', { on: on !== false }); paint(); },
     setLightsOn: function (on) {
       App.store.set('lights.on', !!on);
       if (!on) { allDark(); if (isLumi() && hasOutput()) { lumiShown = null; lumiNative(); } }

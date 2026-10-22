@@ -12,12 +12,17 @@ async function newPage(browser, name, seed) {
   const ctx = await browser.newContext({ viewport: { width: 1200, height: 900 } });
   await ctx.addInitScript(([name, seed]) => {
     ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
+    // these checks pin the CLASSIC look (scale lit + white note to play);
+    // LUMI Display (the v0.79 default) has its own suite: lumidisplay
+    localStorage.setItem('guitarlab.lights.display', 'false');
     for (const k in seed) localStorage.setItem('guitarlab.' + k, JSON.stringify(seed[k]));
     window.__sent = [];
     const inp = { id: 'in1', name, onmidimessage: null };
-    const out = { id: 'out1', name, send: b => window.__sent.push(Array.from(b)) };
+    const out = { id: 'out1', name, state: 'connected', send: b => window.__sent.push(Array.from(b)) };
     window.__in = inp;
+    window.__out = out;
     const access = { inputs: new Map([['in1', inp]]), outputs: new Map([['out1', out]]), sysexEnabled: true, onstatechange: null };
+    window.__access = access;
     navigator.requestMIDIAccess = () => Promise.resolve(access);
     // what the keybed shows: replay note on/off; last LUMI mode from SysEx
     window.__lit = () => { const l = {}; window.__sent.forEach(b => { if (b[0] === 0x90) l[b[1]] = b[2]; else if (b[0] === 0x80) delete l[b[1]]; }); return l; };
@@ -80,15 +85,22 @@ const keys = o => Object.keys(o).map(Number).sort((a, b) => a - b);
     let ev = null; App.on('midi:range', r => { ev = r; });
     App.help.set(2);
     App.switchTo('piano');
+    App.keys.setHand('right');
     __play(30);                      // LUMI octave-down twice, then a key: the app follows
     App.midi.guide(64, null);
-    const o = { ev, lit: Object.keys(__lit()).map(Number).sort((a, b) => a - b), label: (document.querySelector('.pn-rangel') || {}).textContent };
+    const o = { ev, lit: Object.keys(__lit()).map(Number).sort((a, b) => a - b), label: (document.querySelector('.pn-rangel') || {}).textContent, handDown: App.keys.hand() };
     __play(70);                      // back up
     o.back = App.midi.range();
+    o.handUp = App.keys.hand();
     o.stored = JSON.parse(localStorage.getItem('guitarlab.midi.rangeLo'));
+    App.store.set('lights.octHand', false); // 'Octave only': the hand stays put
+    __play(30); o.handOff = App.keys.hand(); o.offLo = App.midi.range().lo;
+    __play(70); App.store.set('lights.octHand', true);
     App.midi.guide(null, null);
     return o;
   });
+  ok(oc.handDown === 'left' && oc.handUp === 'right', 'LUMI octave buttons switch the hand: below C3 = left, back up = right: ' + oc.handDown + '/' + oc.handUp);
+  ok(oc.handOff === 'right' && oc.offLo === 24, 'Octave only: the range still follows, the hand does not: ' + oc.handOff + ' @' + oc.offLo);
   ok(oc.ev && oc.ev.lo === 24 && oc.ev.hi === 47, 'playing below the range shifts it by octaves: ' + JSON.stringify(oc.ev));
   ok(oc.lit.join() === '24,36,40', 'tonic + guide lights move to the new octave (E4 guide -> E2): ' + oc.lit);
   ok(/LUMI C1–B2/.test(oc.label || ''), 'the Keys page marks the keys the LUMI covers: ' + oc.label);
@@ -152,8 +164,14 @@ const keys = o => Object.keys(o).map(Number).sort((a, b) => a - b);
     o.other = App.midi.lumi;
     document.querySelector('[data-lctype=""]').click();
     o.auto = App.midi.lumi;
+    o.octDef = (document.querySelector('[data-lcoct].active') || {}).textContent;
+    document.querySelector('[data-lcoct="0"]').click();
+    o.octOff = App.store.get('lights.octHand', true);
+    document.querySelector('[data-lcoct="1"]').click();
+    o.octOn = App.store.get('lights.octHand', false);
     return o;
   });
+  ok(cc.octDef === 'Switch hands' && cc.octOff === false && cc.octOn === true, 'octave keys: Switch hands by default, Octave only turns it off');
   ok(cc.open && /ROLI LUMI · playing C3–B4/.test(cc.status), 'Lights & help opens over the page with the keyboard status: ' + cc.status);
   ok(cc.level === 3 && cc.keysSeg === 'Colors' && /scale in color/.test(cc.desc), 'one Help level: set in the sheet, the Keys page follows');
   ok(cc.mirror === 'None', 'and set on the Keys page, the sheet follows');
@@ -179,6 +197,117 @@ const keys = o => Object.keys(o).map(Number).sort((a, b) => a - b);
   ok(pb.def === false && pb.offCount === 0 && pb.offActive === 'Off', 'pitch bend is off by default: a LUMI wiggle bends nothing');
   ok(pb.on && pb.on.semis === 6 && pb.stored === true, 'turned on in Settings (±12): bends arrive: ' + JSON.stringify(pb.on));
   ok(pb.reset && pb.offAgain === 0, 'turned off again: held bends released, new ones ignored');
+
+  console.log('# reconnecting and re-sending the physical keybed');
+  const recovery = await page.evaluate(() => {
+    App.switchTo('piano');
+    App.help.set(4);
+    App.emit('fb:set', { source: 't', root: 0, scale: 'major', mode: 1 });
+    App.switchTo('lights');
+    __sent.length = 0;
+    document.getElementById('lc-resend').click();
+    const result = { resendNotes: __sent.filter(message => message[0] === 0x90).length };
+    App.midi.setLightsOn(false);
+    __sent.length = 0;
+    document.getElementById('lc-resend').click();
+    result.offNotes = __sent.filter(message => message[0] === 0x90).length;
+    App.midi.setLightsOn(true);
+    const replacementMessages = [];
+    const replacement = { id: 'out2', name: 'LUMI Keys BLOCK', state: 'connected', send: message => replacementMessages.push(Array.from(message)) };
+    __access.outputs.set(replacement.id, replacement);
+    __sent.length = 0;
+    App.midi.setOutput(replacement.id);
+    result.oldOffs = __sent.filter(message => message[0] === 0x80).length;
+    result.selectedNotes = replacementMessages.filter(message => message[0] === 0x90).length;
+    __access.outputs.delete('out1');
+    const synthMessages = [];
+    __access.outputs.set('synth', { id: 'synth', name: 'Microsoft GS Wavetable Synth', state: 'connected', send: message => synthMessages.push(Array.from(message)) });
+    App.store.set('midi.lumi', true);
+    replacement.state = 'disconnected';
+    replacementMessages.length = 0;
+    __access.onstatechange();
+    result.disconnected = !App.midi.hasOutput;
+    result.disconnectedMessages = replacementMessages.length;
+    __access.outputs.delete(replacement.id);
+    __access.onstatechange();
+    result.removedSelected = !App.midi.hasOutput;
+    result.synthMessages = synthMessages.length;
+    result.preferredOutput = App.store.get('midi.outputId', null);
+    replacement.state = 'connected';
+    __access.outputs.set(replacement.id, replacement);
+    __access.onstatechange();
+    result.reconnectNotes = replacementMessages.filter(message => message[0] === 0x90).length;
+    const reopenedMessages = [];
+    const reopened = { id: replacement.id, name: replacement.name, state: 'connected', send: message => reopenedMessages.push(Array.from(message)) };
+    __access.outputs.set(reopened.id, reopened);
+    __access.onstatechange();
+    result.reopenedNotes = reopenedMessages.filter(message => message[0] === 0x90).length;
+    window.__out = reopened;
+    return result;
+  });
+  ok(recovery.resendNotes === 14, 'Re-send restores all 14 C-major key colors even when the cached layout is unchanged');
+  ok(recovery.offNotes === 0, 'Re-send leaves app lighting off when it is disabled');
+  ok(recovery.oldOffs === 14 && recovery.selectedNotes === 14, 'switching outputs clears the old device and lights the new device');
+  ok(recovery.disconnected && recovery.disconnectedMessages === 0, 'a disconnected output is unavailable and receives no lighting commands');
+  ok(recovery.removedSelected && recovery.synthMessages === 0 && recovery.preferredOutput === 'out2', 'the missing selected LUMI keeps its preference and never routes lighting to an available GS synthesizer');
+  ok(recovery.reconnectNotes === 14, 'the same output object reconnects with all key colors restored');
+  ok(recovery.reopenedNotes === 14, 'a replacement output object with the same port ID gets a fresh layout');
+
+  const padsRecovery = await page.evaluate(() => {
+    App.switchTo('pads');
+    const messages = [];
+    const replacement = { id: __out.id, name: __out.name, state: 'connected', send: message => messages.push(Array.from(message)) };
+    __access.outputs.set(replacement.id, replacement);
+    __access.onstatechange();
+    const result = { reconnectNotes: messages.filter(message => message[0] === 0x90).map(message => message[1]).sort((left, right) => left - right) };
+    messages.length = 0;
+    App.midi.repaint();
+    result.resendNotes = messages.filter(message => message[0] === 0x90).map(message => message[1]).sort((left, right) => left - right);
+    window.__out = replacement;
+    App.switchTo('piano');
+    return result;
+  });
+  ok(padsRecovery.reconnectNotes.length === 8 && new Set(padsRecovery.reconnectNotes).size === 8, 'Pads restores its eight keys after reconnecting without the scale layout taking ownership');
+  ok(padsRecovery.resendNotes.join() === padsRecovery.reconnectNotes.join(), 'Re-send restores the same eight Pads keys without adding scale notes');
+
+  const failedSends = await page.evaluate(() => {
+    const messages = [], attempts = [];
+    let failedNote = null, failedOff = null, failSysex = true;
+    const replacement = { id: __out.id, name: __out.name, state: 'connected', send: message => {
+      const bytes = Array.from(message);
+      attempts.push(bytes);
+      if (bytes[0] === 0x90 && failedNote === null) {
+        failedNote = bytes[1];
+        throw new Error('Temporary note-on failure');
+      }
+      if (bytes[0] === 0x80 && failedOff === null) {
+        failedOff = bytes[1];
+        throw new Error('Temporary note-off failure');
+      }
+      if (bytes[0] === 0xf0 && failSysex) {
+        failSysex = false;
+        throw new Error('Temporary SysEx failure');
+      }
+      messages.push(bytes);
+    } };
+    __access.outputs.set(replacement.id, replacement);
+    __access.onstatechange();
+    const result = { failedNote, initialNotes: messages.filter(message => message[0] === 0x90).length };
+    messages.length = 0;
+    App.emit('help:level', {});
+    result.retriedNotes = messages.filter(message => message[0] === 0x90).map(message => message[1]);
+    result.retriedSysex = messages.filter(message => message[0] === 0xf0).length;
+    App.help.set(1);
+    result.failedOff = failedOff;
+    attempts.length = 0;
+    App.emit('help:level', {});
+    result.retriedOffs = attempts.filter(message => message[0] === 0x80).map(message => message[1]);
+    window.__out = replacement;
+    return result;
+  });
+  ok(failedSends.initialNotes === 13 && failedSends.retriedNotes.join() === String(failedSends.failedNote), 'a failed note-on is retried by the next ordinary layout update instead of being cached as lit');
+  ok(failedSends.retriedSysex === 4, 'failed LUMI configuration is retried before the next layout update');
+  ok(failedSends.retriedOffs.join() === String(failedSends.failedOff), 'a failed note-off remains pending and is retried on the next layout update');
   ok(errs.length === 0, 'no page errors' + (errs.length ? ': ' + errs.join(' | ') : ''));
   await ctx.close();
 
@@ -237,6 +366,23 @@ const keys = o => Object.keys(o).map(Number).sort((a, b) => a - b);
     ok(an.sysex && an.notes, 'lights go out through the bridge (SysEx background + per-key note colors): ' + an.sends + ' sends');
     ok(an.got === 62, 'notes from the keyboard arrive as midi:note (packed packets split)');
     ok(an.bt && /Connected: LUMI/.test(an.status), 'Find a Bluetooth keyboard asks the bridge and shows its progress: ' + an.status.slice(0, 120));
+    const bridgeRecovery = await p2.evaluate(() => {
+      App.switchTo('piano');
+      App.help.set(4);
+      App.emit('fb:set', { source: 't', root: 0, scale: 'major', mode: 1 });
+      App.midi.setOutput(7);
+      __posts.length = 0;
+      window.__glMIDI.onports({ inputs: [], outputs: [{ id: 99, name: 'Microsoft GS Wavetable Synth' }] });
+      const result = { disconnected: !App.midi.hasOutput };
+      result.otherOutput = __posts.some(message => message.cmd === 'setOutput' && message.id === 99);
+      result.preferredOutput = App.store.get('midi.outputId', null);
+      __posts.length = 0;
+      window.__glMIDI.onports({ inputs: [{ id: 7, name: 'LUMI Keys BLOCK' }], outputs: [{ id: 7, name: 'LUMI Keys BLOCK' }] });
+      result.notes = __posts.filter(message => message.cmd === 'send' && message.data[0] === 0x90).length;
+      return result;
+    });
+    ok(bridgeRecovery.disconnected && bridgeRecovery.notes === 14, 'the native MIDI bridge restores the scale after removing and reconnecting the same output ID');
+    ok(!bridgeRecovery.otherOutput && bridgeRecovery.preferredOutput === 7, 'the native bridge also keeps its selected output instead of switching to a synthesizer');
     ok(e2.length === 0, 'no page errors (android bridge)');
     await ctx2.close();
   }

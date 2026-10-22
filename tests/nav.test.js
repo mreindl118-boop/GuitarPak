@@ -36,7 +36,7 @@ const tabs = sel => [...document.querySelectorAll(sel + ' .tabbar-btn')].map(b =
   ok(d1.topShown && !d1.botShown && d1.noSelect && !d1.metTab, 'top tab bar on desktop, no drop-down, no metronome tab: ' + JSON.stringify(d1));
   const clickTab = async (label, sel) => { await page.click((sel || '#tabbar') + ' .tabbar-btn:has-text("' + label + '")'); await page.waitForTimeout(120); return page.evaluate(() => App.active); };
   ok(await clickTab('Keys') === 'piano', 'Keys tab opens the piano');
-  ok((await page.evaluate(() => [...document.querySelectorAll('#subnav .subtab')].map(b => b.textContent).join('|'))) === 'Piano|Synth|Pads', 'Keys pills: Piano | Synth | Pads');
+  ok((await page.evaluate(() => [...document.querySelectorAll('#subnav .subtab')].map(b => b.textContent).join('|'))) === 'Piano|Synth|Pads|MIDI', 'Keys pills: Piano | Synth | Pads | MIDI');
   await page.click('#subnav .subtab:has-text("Synth")'); await page.waitForTimeout(150);
   ok(await clickTab('Guitar') === 'fretboard', 'Guitar tab opens the neck');
   ok((await page.evaluate(() => [...document.querySelectorAll('#subnav .subtab')].map(b => b.textContent).join('|'))) === 'Neck|Tab|Notation', 'Guitar pills: Neck | Tab | Notation');
@@ -154,6 +154,18 @@ const tabs = sel => [...document.querySelectorAll(sel + ' .tabbar-btn')].map(b =
   await page.click('#space-btn'); await page.waitForTimeout(900);
   const st = await page.evaluate(() => ({ space: App.space, tabs: [...document.querySelectorAll('#tabbar .tabbar-btn')].map(b => b.textContent).join('|'), active: App.active }));
   ok(st.space === 'studio' && st.tabs === 'Studio|Sketch', 'studio tabs: ' + JSON.stringify(st));
+  // a second switch started right after the first finished must not be eaten
+  // by the first wipe's leftover safety timers (it used to land nowhere)
+  const quick = await page.evaluate(async () => {
+    const wipe = document.getElementById('wipe'), t0 = performance.now();
+    App.setSpace('practice');
+    while (performance.now() - t0 < 2000 && (App.space !== 'practice' || wipe.style.display !== 'none')) await new Promise(r => setTimeout(r, 10));
+    const firstMs = Math.round(performance.now() - t0);
+    App.setSpace('studio');
+    await new Promise(r => setTimeout(r, 1500));
+    return { firstMs, space: App.space, curtain: wipe.style.display };
+  });
+  ok(quick.space === 'studio' && quick.curtain === 'none', 'a quick second workspace switch lands: ' + JSON.stringify(quick));
   ok(errs.length === 0, 'no page errors (studio)' + (errs.length ? '\n    ' + errs.join('\n    ') : ''));
   await ctx.close();
   await b.close();

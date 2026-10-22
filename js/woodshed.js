@@ -18,8 +18,10 @@
  * phrases resurface first). Every run is captured as an Idea (source
  * 'woodshed') for review on the DAW side.
  * Input: hardware MIDI (App.midi bus), QWERTY/touch piano (note:input) —
- * all three work on every instrument. LUMI lights mirror targets when a
- * light output is connected (current bright / next dim / wait holds).
+ * all three work on every instrument. KEY LIGHTS go through the keybed
+ * engine (App.midi.guide, v0.80.0): the note to play + the next one, in
+ * their colors with LUMI Display (Lights & help), folded into the LUMI's
+ * window; Wait mode holds the lit note until it is played.
  * Scores: built-in generators (scales, Hanon, pentatonic workout, 8 PAS
  * rudiments with sticking + accents), MIDI file import (tempo-aware),
  * ASCII tab paste (pitches only — timing marked approximate: Wait mode
@@ -433,6 +435,7 @@
     S.timer = setInterval(tickRun, 25);
     App.wake.acquire('ws-run');
     if (!rafId) rafId = requestAnimationFrame(draw);
+    if (S.mode === 'wait') lightsUpdate(ctx.currentTime); // no clock in Wait: light the first note now
     paintHud();
   }
 
@@ -707,9 +710,9 @@
 
   // ---------------- LUMI lights ----------------
 
-  var lit = [];
+  var lastGuide = '';
   function lightsUpdate(now) {
-    if (!App.midi || !App.midi.hasOutput || S.sc.instrument === 'drums') return;
+    if (!App.midi || !App.midi.guide || S.sc.instrument === 'drums') return;
     var cur = null, next = null;
     if (S.mode === 'wait') {
       cur = S.targets[S.waitIdx] && S.targets[S.waitIdx].n.m;
@@ -723,19 +726,17 @@
         if (cur !== null && dt > 0) { next = tg.n.m; break; }
       }
     }
-    var want = [];
-    if (cur != null) want.push([cur, 120]);
-    if (next != null && next !== cur) want.push([next, 25]);
-    lit.forEach(function (m) {
-      if (!want.some(function (w) { return w[0] === m; })) App.midi.dark(m);
-    });
-    want.forEach(function (w) { App.midi.light(w[0], w[1]); });
-    lit = want.map(function (w) { return w[0]; });
+    if (next === cur) next = null;
+    // only when the targets change: the engine's blink keeps its rhythm
+    var key = cur + '|' + next;
+    if (key === lastGuide) return;
+    lastGuide = key;
+    App.midi.guide(cur, next);
   }
 
   function lightsOff() {
-    if (App.midi && App.midi.hasOutput) lit.forEach(function (m) { App.midi.dark(m); });
-    lit = [];
+    if (lastGuide && App.midi && App.midi.guide) App.midi.guide(null, null);
+    lastGuide = '';
   }
 
   // ---------------- display (one canvas, three modes) ----------------

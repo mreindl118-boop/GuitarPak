@@ -55,7 +55,7 @@ async function newPage(browser, seed, locked) {
     first: document.querySelector('#tabbar .tabbar-btn').textContent,
     pills: [...document.querySelectorAll('#subnav .subtab')].map(b => b.textContent) }));
   ok(nav.v === 'Learn' && nav.first === 'Learn', 'Learn tab first + active: ' + JSON.stringify(nav));
-  ok(nav.pills.join('|') === 'Exercises|Chords|Circle', 'pill strip: ' + nav.pills.join('|'));
+  ok(nav.pills.join('|') === 'Exercises|Chords|Circle|Plan', 'pill strip: ' + nav.pills.join('|'));
   ok(await page.evaluate(() => JSON.parse(localStorage.getItem('guitarlab.qz.landed'))) === true, 'qz.landed stored');
   ok(await page.evaluate(() => !!document.querySelector('.qz-path') && !!document.querySelector('.qz-strip')), 'home opens on the path with the stats strip');
   await page.evaluate(() => document.querySelector('[data-qzh="topics"]').click());
