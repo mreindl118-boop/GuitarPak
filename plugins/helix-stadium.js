@@ -451,11 +451,22 @@
   }
   function blockAt(path, slot) { for (var i = 0; i < dev.blocks.length; i++) if (dev.blocks[i].path === path && dev.blocks[i].slot === slot) return dev.blocks[i]; return null; }
   function modelName(mid) { var d = dev.defs[mid]; return d && d.name || ('model ' + mid); }
-  function modelLabel(mid) {
-    var d = dev.defs[mid]; if (!d || !d.name) return 'Model ' + mid;
-    var s = d.name.replace(/^(HD2|HX2|Agoura|P35|Line6)_/, '').replace(/^(Amp|Preamp|Cab|Dist|Delay|Reverb|Mod|Dyn|Compressor|EQ|Pitch|Synth|Wah|Filter|Vol|Pan|FXLoop|Looper|Input|Output|Split|Merge|Gate)/, '').replace(/(Mono|Stereo)$/, '');
-    return s.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/_/g, ' ').trim() || d.name;
+  // model id string -> a readable name: drop the vendor tag, Mono/Stereo and the
+  // category word (whole camel words only), then a repeated family word
+  // (ChorusTrinityChorus -> Trinity Chorus); the Volume/Pan family needs names
+  var LABEL_FIX = { VolPanVol: 'Volume Pedal', VolPanPan: 'Pan', VolPanGain: 'Gain' };
+  var CAT_PREFIX = /^(Preamp|Amp|Cab|Dist|Delay|Reverb|Mod|Dyn|Compressor|EQ|Pitch|Synth|Wah|Filter|VolPan|FXLoop|Looper|Input|Output|Split|Merge|Gate)(?=[A-Z0-9])/;
+  var FAMILY = /^(Chorus|Tremolo|Phaser|Flanger|Vibrato|RingModulator|Rotary)(?=[A-Z0-9])/;
+  function shortName(name) {
+    var vend = /^(HD2|HX2|VIC|Agoura|P35)_/.test(name), s = name.replace(/^(HD2|HX2|VIC|Agoura|P35)_/, '').replace(/_Victoria$/, '').replace(/(Mono|Stereo)$/, '');
+    if (LABEL_FIX[s]) return LABEL_FIX[s];
+    if (vend) { s = s.replace(CAT_PREFIX, '') || s; s = s.replace(FAMILY, '') || s; }
+    s = s.replace(/(\d)_(\d)/g, '$1/$2').replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+      .replace(/(\d?)([a-z])(\d+)(?=[A-Z/_]|$)/g, function (m, d0, l, d) { return d0 && l === 'x' ? m : d0 + l + ' ' + d; }) // Inst1 -> Inst 1, never 1x10
+      .replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
+    return s || name;
   }
+  function modelLabel(mid) { var d = dev.defs[mid]; return d && d.name ? shortName(d.name) : 'Model ' + mid; }
 
   // ---- device writes ----------------------------------------------------------------
   var pendParam = {}, pendT = 0;
@@ -1087,5 +1098,5 @@
   });
 
   window.SLHelix = { CC: CC, MIX: MIX, cc: cc, pc: pc, rpc: rpc, get dev() { return dev; }, get st() { return st; }, get midi() { return midi; }, get bridge() { return br; }, useEditBuffer: useEditBuffer, slotLabel: slotLabel, onMidiIn: onMidiIn, showView: showView,
-    get armed() { return armed(); }, arm: function (on) { setArmed(on !== false); }, favs: favs, recallBytes: recallBytes, addrOf: addrOf, isHelix: isHelix, get obs() { return obs; }, get rx() { return rx; } };
+    get armed() { return armed(); }, arm: function (on) { setArmed(on !== false); }, favs: favs, recallBytes: recallBytes, addrOf: addrOf, isHelix: isHelix, shortName: shortName, get obs() { return obs; }, get rx() { return rx; } };
 })();

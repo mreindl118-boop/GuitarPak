@@ -179,7 +179,15 @@ const armState = (page) => page.evaluate(() => ({ st: document.getElementById('h
 
   console.log('# bridge: edit buffer -> blocks');
   r = await page.evaluate(() => { SLHelix.showView('blocks'); return { n: document.querySelectorAll('.hx-block').length, names: [...document.querySelectorAll('.hx-bname')].map(e => e.textContent).join('|'), cats: [...document.querySelectorAll('.hx-cat')].map(e => e.textContent).join('|'), byp: [...document.querySelectorAll('.hx-block.byp')].map(e => e.dataset.b).join('|'), snaps: [...document.querySelectorAll('.hx-snap span')].map(e => e.textContent).join('|') }; });
-  ok(r.n === 3 && r.names === 'Inst1|Pan Vol|Deluxe Comp' && r.cats === 'Input|Vol|Dyn', 'three blocks named from the defs: ' + r.names + ' / ' + r.cats);
+  ok(r.n === 3 && r.names === 'Inst 1|Volume Pedal|Deluxe Comp' && r.cats === 'Input|Vol|Dyn', 'three blocks named from the defs (HD2_VolPanVolMono reads Volume Pedal): ' + r.names + ' / ' + r.cats);
+  const labelMiss = await page.evaluate(() => {
+    const cases = { HD2_VolPanVolMono: 'Volume Pedal', HD2_VolPanPanStereo: 'Pan', HD2_VolPanGainMono: 'Gain', HD2_VolPanStereoWidthStereo: 'Stereo Width',
+      HD2_ChorusTrinityChorusStereo: 'Trinity Chorus', HD2_TremoloTremoloMono: 'Tremolo', HD2_ChorusMono: 'Chorus', HD2_RingModulatorAMRingModMono: 'AM Ring Mod',
+      HD2_Rotary122RotaryStereo: '122 Rotary', HD2_DL4TubeEchoStereo: 'DL4 Tube Echo', HD2_EQGraphic10BandMono: 'Graphic 10 Band', HD2_FXLoopStereo1_2: 'Stereo 1/2',
+      HD2_CabMicIr_1x10USPrincessWithPan: 'Mic Ir 1x10 US Princess With Pan', HX2_CompressorDeluxeCompMono: 'Deluxe Comp', P35_InputInst1: 'Inst 1', SynthLead: 'Synth Lead' };
+    return Object.keys(cases).filter(n => SLHelix.shortName(n) !== cases[n]).map(n => n + ' -> ' + SLHelix.shortName(n));
+  });
+  ok(labelMiss.length === 0, 'model-name shortener: Volume/Pan family, repeated family words, 1x10, digits, acronyms' + (labelMiss.length ? ': ' + labelMiss.join(' | ') : ''));
   ok(r.byp === '0:2', 'the bypassed block is marked: ' + r.byp);
   ok(r.snaps === 'SNAPSHOT 1||Lead|||||', 'snapshot names mapped by their own index (si__): ' + r.snaps);
   await page.evaluate(() => SLHelix.arm());
