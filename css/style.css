@@ -186,7 +186,7 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
 .topbar.bar-hidden { transform: translateY(calc(-100% - 4px)); }
 
 /* pages that don't use the shared key/tempo (app.js NO_CTX) */
-.noctx #ctxbar { display: none; }
+.noctx #ctxbar, .noctx #ctx-btn { display: none; }
 
 .brand {
   display: inline-flex;
@@ -307,7 +307,7 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
 #space-btn { display: inline-flex; align-items: center; gap: 5px; padding: 0 12px; }
 #met-btn.on { color: var(--accent-ink); border-color: var(--accent-line); }
 #met-btn.tick { box-shadow: 0 0 14px var(--accent-glow), inset 0 0 6px var(--accent-glow); }
-#met-btn.active, #settings-btn.active, #lights-btn.active { color: var(--accent-ink); background: var(--accent-soft); border-color: var(--accent-line); }
+#met-btn.active, #settings-btn.active, #lights-btn.active, #ctx-btn.active { color: var(--accent-ink); background: var(--accent-soft); border-color: var(--accent-line); }
 
 /* ---------- overlay sheets (the metronome) ---------- */
 .sheet {
@@ -390,15 +390,40 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
   border-color: var(--accent-line);
 }
 
+/* key / scale / mode / tempo / time: a dropdown under the clef button
+   (#ctx-btn), tucked away until tapped — app.js setCtx / html.ctx-open */
 .ctxbar {
-  order: 2;
-  flex-basis: 100%;
+  position: absolute;
+  top: calc(100% + 6px);
+  right: calc(18px + env(safe-area-inset-right, 0px));
+  z-index: 60;
   display: flex;
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
-  padding: 8px 2px 4px;
-  border-top: 1px solid var(--line-soft);
+  width: max-content;
+  max-width: min(720px, calc(100vw - 24px));
+  padding: 14px 16px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+}
+html:not(.ctx-open) .ctxbar { display: none; }
+.ctx-open .ctxbar { animation: ctx-in 140ms ease-out; }
+@keyframes ctx-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+#ctx-btn { position: relative; }
+/* Studio capture running (the ● lives in the dropdown) */
+#ctx-btn.rec::after {
+  content: '';
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--red);
+  box-shadow: 0 0 0 2px var(--bg);
 }
 
 .cx-field {
@@ -939,8 +964,15 @@ button .ic, .chip .ic { display: inline-block; }
   /* logo + workspace + four icons on ONE row down to 360 px */
   .tb-tools { gap: 2px; }
   #space-btn { padding: 0 10px; margin-right: 2px; }
-  /* context bar: always two clean rows — Key | Scale, then BPM | Time | ▶ */
-  .ctxbar { gap: 8px 10px; padding-top: 8px; }
+}
+/* 360-380 px phones: six corner controls still share the logo's row */
+@media (max-width: 380px) {
+  .tb-tools .icon-btn { width: 34px; height: 34px; }
+  #space-btn { padding: 0 8px; margin-right: 0; }
+}
+@media (max-width: 640px) {
+  /* the clef dropdown spans the screen: Key | Scale, then BPM | Time | ▶ */
+  .ctxbar { left: 12px; right: 12px; width: auto; max-width: none; gap: 10px; padding: 14px; }
   .cx-field { gap: 5px; font-size: 10px; letter-spacing: 1px; }
   .cx-field.cx-scale { flex: 1 1 calc(100% - 120px); min-width: 0; }
   .cx-field.cx-scale select { flex: 1 1 0; min-width: 0; }

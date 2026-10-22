@@ -341,7 +341,7 @@ async function newPage(browser, seed, locked) {
   console.log('# chrome');
   const ch = await page.evaluate(async () => {
     const wait = ms => new Promise(r => setTimeout(r, ms));
-    const disp = () => getComputedStyle(document.getElementById('ctxbar')).display;
+    const disp = () => getComputedStyle(document.getElementById('ctx-btn')).display;
     App.switchTo('quiz'); await wait(50);
     const onQuiz = disp();
     App.switchTo('fretboard'); await wait(50);
@@ -352,7 +352,7 @@ async function newPage(browser, seed, locked) {
     App.switchTo('quiz'); await wait(150);
     return { onQuiz, onNeck, started, stopped: running === false };
   });
-  ok(ch.onQuiz === 'none' && ch.onNeck !== 'none', 'context bar hidden on Exercises, shown on the neck: ' + JSON.stringify(ch));
+  ok(ch.onQuiz === 'none' && ch.onNeck !== 'none', 'key/scale clef hidden on Exercises, shown on the neck: ' + JSON.stringify(ch));
   ok(ch.started === true && ch.stopped, 'opening Exercises stops the metronome: ' + JSON.stringify(ch));
   await page.setViewportSize({ width: 1200, height: 520 });
   await page.evaluate(() => { App.switchTo('piano'); });

@@ -182,8 +182,10 @@ window.App = (function () {
   // practice strip. stroke/fill = currentColor, so icons follow button color.
   // Drawn from Lucide (https://lucide.dev, ISC license, icons/LUCIDE-LICENSE.txt)
   // so every icon shares one 24px grid and 2px stroke; transport glyphs are
-  // filled. pickdown/pickup are the guitar pick-stroke marks (not in Lucide).
+  // filled. pickdown/pickup are the guitar pick-stroke marks (not in Lucide);
+  // clef is Tabler's (MIT, icons/TABLER-LICENSE.txt — same grid and stroke).
   var ICONS = {
+    clef: '<path d="M16 12a4.16 4.16 0 0 1-5.62 3.89 3.78 3.78 0 0 1-2.38-3.39 3.42 3.42 0 0 1 2.34-3.38l3.79-1.42a2.89 2.89 0 0 0 1.87-2.7 2 2 0 1 0-4 0v14a2 2 0 1 1-4 0"/>',
     play: '<path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z" fill="currentColor"/>',
     pause: '<rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor"/><rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor"/>',
     stop: '<rect x="5" y="5" width="14" height="14" rx="2" fill="currentColor"/>',
@@ -772,8 +774,21 @@ window.App = (function () {
   var NO_CTX = { quiz: true, settings: true };
   function paintChrome() {
     document.documentElement.classList.toggle('noctx', !!NO_CTX[active]);
+    closeCtx();
     showBar();
   }
+
+  // the clef button's dropdown (key / scale / mode / tempo / time + the
+  // transport): open on tap, tucked away by a tap outside, Esc, Back, a page
+  // switch or the top bar sliding away
+  function ctxIsOpen() { return document.documentElement.classList.contains('ctx-open'); }
+  function setCtx(on) {
+    on = !!on && !NO_CTX[active];
+    document.documentElement.classList.toggle('ctx-open', on);
+    var b = document.getElementById('ctx-btn');
+    if (b) { b.setAttribute('aria-expanded', String(on)); b.classList.toggle('active', on); }
+  }
+  function closeCtx() { if (ctxIsOpen()) setCtx(false); }
 
   // The top bar slides away while you scroll DOWN a page and comes back on
   // the smallest scroll up (or at the top) — the screen goes to the page,
@@ -783,6 +798,7 @@ window.App = (function () {
     if (!topbar || h === barHidden) return;
     barHidden = h;
     topbar.classList.toggle('bar-hidden', h);
+    if (h) closeCtx();
   }
   function showBar() { setBarHidden(false); }
   function wireAutoHideBar() {
@@ -923,6 +939,7 @@ window.App = (function () {
   function goBackTo(p) { backNav = true; try { switchTo(p); } finally { backNav = false; } }
   function backStep() {
     if (window.Help && Help.isOpen && Help.isOpen()) { Help.close(); return true; }
+    if (ctxIsOpen()) { closeCtx(); return true; }
     if (sheet) { closeSheet(); return true; }
     if (active === 'settings') { toggleSettings(); return true; }
     var m = modules[active];
@@ -1124,6 +1141,32 @@ window.App = (function () {
       refreshModeSel();
       bpm.value = String(Math.max(30, Math.min(280, parseInt(store.get('met.bpm', 120), 10) || 120)));
       showSig(store.get('met.sig', '4/4'));
+      paintCtxBtn();
+    }
+
+    // the clef button names what's set, so you can check without opening it
+    var cbtn = document.getElementById('ctx-btn'), cbar = document.getElementById('ctxbar');
+    function paintCtxBtn() {
+      if (!cbtn) return;
+      var sc = Theory.SCALES[curScale()], t = 'Key, scale & tempo: ' + Theory.pcName(curRoot(), Theory.FLAT_KEYS.has(curRoot())) + ' ' +
+        (sc ? sc.name : '') + ' · ' + (parseInt(store.get('met.bpm', 120), 10) || 120) + ' BPM';
+      cbtn.title = t;
+      cbtn.setAttribute('aria-label', t);
+    }
+    if (cbtn && cbar) {
+      cbtn.innerHTML = icon('clef', 20);
+      cbtn.addEventListener('click', function () { setCtx(!ctxIsOpen()); });
+      document.addEventListener('pointerdown', function (e) {
+        if (ctxIsOpen() && !cbar.contains(e.target) && !cbtn.contains(e.target)) setCtx(false);
+      }, true);
+      document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Escape' || !ctxIsOpen()) return;
+        setCtx(false);
+        try { cbtn.focus({ preventScroll: true }); } catch (err) { /* old engines */ }
+        e.stopPropagation();
+        e.preventDefault();
+      }, true);
+      ['fb:set', 'tempo'].forEach(function (ev) { on(ev, paintCtxBtn); });
     }
     refreshAll();
 
@@ -1404,6 +1447,8 @@ window.App = (function () {
     help: help,
     openSheet: openSheet,
     closeSheet: closeSheet,
+    // the clef dropdown (key / scale / tempo): App.ctx(true|false); App.ctx() = is it open
+    ctx: function (on) { if (on != null) setCtx(on); return ctxIsOpen(); },
     get sheet() { return sheet; },
     wake: wake,
     setTheme: setTheme,

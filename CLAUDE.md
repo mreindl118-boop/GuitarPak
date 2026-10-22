@@ -337,7 +337,12 @@ version.json      auto-update feed (source of truth for latest version)
   Back leaves, and any pointerdown re-arms it. Pages with sub-views should
   implement onBack.
 - Context bar (index.html #ctxbar, wired in app.js): the single home for key/
-  scale/mode/BPM/time signature, visible under the tabs (except NO_CTX pages). It reads the
+  scale/mode/BPM/time signature. Since v0.78.0 it is a DROPDOWN behind the
+  treble-clef header button #ctx-btn (Tabler icon, beside lights + metronome):
+  html.ctx-open shows it; a tap outside, the clef again, Esc, Back, a page
+  switch or the bar auto-hiding tuck it away (app.js setCtx/closeCtx,
+  App.ctx(on)); the button's title/aria-label names the key + BPM; the clef
+  is hidden on NO_CTX pages; a red dot on it = Studio capture running. It reads the
   shared stores (fb.root/fb.scale/fb.mode, met.bpm, met.sig) and pushes changes
   over the bus; pages must NOT grow their own duplicate selects for these.
   Also hosts #cx-met (transport) and #cx-rec (studio capture ●).
@@ -395,7 +400,8 @@ version.json      auto-update feed (source of truth for latest version)
   SVG group (nut at top, low E left). Practice-runner paths dedupe identical
   pitches at string crossings.
 - VISUAL SYSTEM (v0.78.0): icons = Lucide (ISC, icons/LUCIDE-LICENSE.txt)
-  in app.js ICONS — add new ones from lucide-static, never hand-draw.
+  in app.js ICONS — add new ones from lucide-static, never hand-draw (the
+  one exception, the clef, is Tabler: MIT, icons/TABLER-LICENSE.txt).
   Tokens: --accent-soft / --accent-line (tints) and --accent-ink (accent as
   TEXT, deepened in light) — never hardcode rgba(255,171,71,…); --h-ctl =
   the one toolbar control height; --warn; light theme re-inks the status

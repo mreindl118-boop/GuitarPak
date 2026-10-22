@@ -162,6 +162,8 @@
     var b = document.getElementById('cx-rec');
     if (!b) return;
     b.classList.toggle('cx-rec-on', !!rec);
+    var cb = document.getElementById('ctx-btn'); // ● lives in the clef dropdown: a dot on the button while capturing
+    if (cb) cb.classList.toggle('rec', !!rec);
     b.title = rec
       ? 'Recording into the current song — tap to stop and keep it'
       : 'Capture: tap, play anything (ROLI, typing keys, touch), tap again — it lands in Ideas';
