@@ -2,5 +2,5 @@
   "version": "0.75.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/soundLAB-alpha.apk",
   "web": "0.82.0",
-  "notes": "A cleaner look. Key, scale and tempo now tuck away behind a treble-clef button next to the metronome: tap it to change them, tap anywhere else to put them away. New icons throughout (a real guitar, piano and metronome), a one-row header on phones, quieter page pills, one control height everywhere, note names on the vertical neck and portrait keyboard now read upright, and the light theme is easier to read."
+  "notes": "Tap the new treble-clef button (next to the metronome) for key, scale and tempo; tap anywhere else to tuck it away. Inside: LED scale lights the selected scale on your LUMI or LED keyboard (or switches the lights off), and Scale lock lets only the scale's notes play, from any keyboard or the screen. Plus a cleaner look: new icons (a real guitar, piano and metronome), a one-row header on phones, quieter page pills, upright note names on the vertical neck and portrait keyboard, and an easier-to-read light theme."
 }

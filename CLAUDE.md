@@ -487,7 +487,17 @@ version.json      auto-update feed (source of truth for latest version)
   html.ctx-open shows it; a tap outside, the clef again, Esc, Back, a page
   switch or the bar auto-hiding tuck it away (app.js setCtx/closeCtx,
   App.ctx(on)); the button's title/aria-label names the key + BPM; the clef
-  is hidden on NO_CTX pages; a red dot on it = Studio capture running. It reads the
+  is hidden on NO_CTX pages; a red dot on it = Studio capture running. Its
+  two toggles (v0.82.0): LED SCALE (#cx-led -> App.midi.setLedMode; midi.js
+  ledMode() lights.led 'auto' = lights.on + Help level, 'scale' = the keybed
+  always shows the selected scale (Display aid off, guides white on top),
+  'off' = dark incl. a LUMI (night mode, no lumiNative); the Lights & help
+  sheet's On/Off resets to 'auto') and SCALE LOCK (#cx-lock -> App.scaleLock
+  {on, active, set, allows(midi)}, store scale.lock, 'scale:lock' event):
+  out-of-scale note-ONs are dropped in midi.js dispatch, the Hub's thru, the
+  Keys page touch/QWERTY and fretboard taps (note-offs always pass); paused on
+  LOCK_FREE pages (quiz, settings, pads); html.scale-locked dims the
+  unplayable on-screen keys. It reads the
   shared stores (fb.root/fb.scale/fb.mode, met.bpm, met.sig) and pushes changes
   over the bus; pages must NOT grow their own duplicate selects for these.
   Also hosts #cx-met (transport) and #cx-rec (studio capture ●).
