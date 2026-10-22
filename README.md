@@ -76,3 +76,7 @@ releases/           built, signed APK
 - Practice streaks/goals and richer stats over the session log
 - Export/import settings and progressions
 - Custom tunings and 7-string support
+
+## Working together
+
+Contributors: read [CLAUDE.md](CLAUDE.md) and the shared [coworking README](https://github.com/mreindl118-boop/GeneralStorage/blob/docs/coworking-20261018/projects/repository-handoff-20261016/coworking/README.md) (existing private GeneralStorage access required) before starting. Check latest remote branches and scoped claims, use a separate branch/worktree, and follow the repository's review and handoff rules. Claims are advisory; Claude's acknowledgement of this workflow is invited and remains pending.
