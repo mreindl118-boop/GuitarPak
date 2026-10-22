@@ -415,7 +415,8 @@
         learning = null; renderRules(); toast('Learned: ' + dd.text);
       }
     }
-    if (g('thru', false) && b[0] !== 0xFE && hasOut()) send(b, 'thru');
+    var locked = (b[0] & 0xF0) === 0x90 && b[2] > 0 && App.scaleLock && !App.scaleLock.allows(b[1]); // scale lock
+    if (g('thru', false) && b[0] !== 0xFE && hasOut() && !locked) send(b, 'thru');
   }
   function identity(b) {
     var mf = { 0x43: 'Yamaha', 0x41: 'Roland', 0x42: 'Korg', 0x47: 'Akai', 0x00: 'extended id' }[b[5]] || ('mfr ' + hex([b[5]]));

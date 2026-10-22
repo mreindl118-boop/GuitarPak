@@ -51,6 +51,11 @@
     <button type="button" class="btn sm" id="cx-met" title="Start / stop the metronome (works on every tab)" aria-label="Start or stop the metronome"></button>
     <button type="button" class="btn sm" id="cx-rec" aria-label="Capture what you play into the current song"></button>
     <span id="cx-rec-msg" style="display:none" role="status"></span>
+    <div class="cx-toggles">
+      <button type="button" class="chip" id="cx-led" aria-pressed="false" title="Light the selected scale on your keyboard's LEDs (ROLI LUMI and LED keyboards); off = dark"></button>
+      <button type="button" class="chip" id="cx-lock" aria-pressed="false" title="Only notes in the selected scale play, from any keyboard, the on-screen keys and the neck"></button>
+      <span class="cx-tnote" id="cx-tnote" role="status" hidden></span>
+    </div>
   </div>
   <div class="subnav" id="subnav" hidden></div>
 </header>

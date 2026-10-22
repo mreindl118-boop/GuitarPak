@@ -775,6 +775,7 @@ window.App = (function () {
   var NO_CTX = { quiz: true, settings: true };
   function paintChrome() {
     document.documentElement.classList.toggle('noctx', !!NO_CTX[active]);
+    paintLock();
     closeCtx();
     showBar();
   }
@@ -790,6 +791,21 @@ window.App = (function () {
     if (b) { b.setAttribute('aria-expanded', String(on)); b.classList.toggle('active', on); }
   }
   function closeCtx() { if (ctxIsOpen()) setCtx(false); }
+
+  // SCALE LOCK (the clef dropdown's toggle, store scale.lock): only notes in
+  // the current key's scale play — from MIDI keyboards (midi.js drops the
+  // note-on), the MIDI Hub's thru, the on-screen keys and the neck. Pages
+  // that need every note keep it off; note-offs always pass (nothing hangs).
+  var LOCK_FREE = { quiz: true, settings: true, pads: true };
+  function lockOn() { return store.get('scale.lock', false) === true; }
+  function lockActive() { return lockOn() && !LOCK_FREE[active]; }
+  function lockAllows(midi) {
+    if (!lockActive()) return true;
+    var r = store.get('fb.root', 9), sc = store.get('fb.scale', 'minorPent');
+    var info = Theory.scaleInfo(Theory.mod12(typeof r === 'number' ? r : 9), Theory.SCALES[sc] ? sc : 'minorPent');
+    return info.pcToStep.has(Theory.mod12(midi));
+  }
+  function paintLock() { document.documentElement.classList.toggle('scale-locked', lockActive()); }
 
   // The top bar slides away while you scroll DOWN a page and comes back on
   // the smallest scroll up (or at the top) — the screen goes to the page,
@@ -1239,7 +1255,7 @@ window.App = (function () {
     function paintCtxBtn() {
       if (!cbtn) return;
       var sc = Theory.SCALES[curScale()], t = 'Key, scale & tempo: ' + Theory.pcName(curRoot(), Theory.FLAT_KEYS.has(curRoot())) + ' ' +
-        (sc ? sc.name : '') + ' · ' + (parseInt(store.get('met.bpm', 120), 10) || 120) + ' BPM';
+        (sc ? sc.name.replace(/\s*\(.*\)$/, '') : '') + ' · ' + (parseInt(store.get('met.bpm', 120), 10) || 120) + ' BPM';
       cbtn.title = t;
       cbtn.setAttribute('aria-label', t);
     }
@@ -1258,6 +1274,33 @@ window.App = (function () {
       }, true);
       ['fb:set', 'tempo'].forEach(function (ev) { on(ev, paintCtxBtn); });
     }
+
+    // the dropdown's two toggles: the keyboard's LEDs show the scale, and
+    // scale lock (only in-key notes play)
+    var ledB = document.getElementById('cx-led'), lockB = document.getElementById('cx-lock'), tnote = document.getElementById('cx-tnote');
+    function paintToggles() {
+      var m = App.midi, led = !!(m && m.ledScale), lk = lockOn();
+      if (ledB) { ledB.classList.toggle('active', led); ledB.setAttribute('aria-pressed', String(led)); }
+      if (lockB) { lockB.classList.toggle('active', lk); lockB.setAttribute('aria-pressed', String(lk)); }
+      if (!tnote) return;
+      var sc = Theory.SCALES[curScale()], name = Theory.pcName(curRoot(), Theory.FLAT_KEYS.has(curRoot())) + ' ' + (sc ? sc.name.replace(/\s*\(.*\)$/, '') : '');
+      var msg = [];
+      if (led && !(m && m.hasOutput)) msg.push('LED scale: connect a LUMI or LED keyboard (Lights & help).');
+      if (lk) msg.push(LOCK_FREE[active] ? 'Scale lock is paused on this page.' : 'Only ' + name + ' notes play, from any keyboard or the screen.');
+      tnote.textContent = msg.join(' ');
+      tnote.hidden = !msg.length;
+    }
+    if (ledB) {
+      ledB.innerHTML = icon('lights', 15) + ' LED scale';
+      ledB.addEventListener('click', function () { if (App.midi) App.midi.setLedMode(App.midi.ledScale ? 'off' : 'scale'); paintToggles(); });
+    }
+    if (lockB) {
+      lockB.innerHTML = icon('lock', 15) + ' Scale lock';
+      lockB.addEventListener('click', function () { App.scaleLock.set(!lockOn()); paintToggles(); });
+    }
+    ['fb:set', 'lights:led', 'help:level', 'midi:state', 'scale:lock'].forEach(function (ev) { on(ev, paintToggles); });
+    if (cbtn) cbtn.addEventListener('click', paintToggles);
+    paintToggles();
     refreshAll();
 
     function pushMusic(patch) {
@@ -1540,6 +1583,12 @@ window.App = (function () {
     closeSheet: closeSheet,
     // the clef dropdown (key / scale / tempo): App.ctx(true|false); App.ctx() = is it open
     ctx: function (on) { if (on != null) setCtx(on); return ctxIsOpen(); },
+    scaleLock: {
+      get on() { return lockOn(); },
+      get active() { return lockActive(); }, // on, and this page obeys it
+      set: function (on) { store.set('scale.lock', !!on); paintLock(); emit('scale:lock', { on: !!on }); },
+      allows: lockAllows
+    },
     get sheet() { return sheet; },
     wake: wake,
     setTheme: setTheme,

@@ -1085,6 +1085,7 @@
     var midi = qwBase() + off2;
     if (midi < LO || midi > HI) return;
     e.preventDefault();
+    if (App.scaleLock && !App.scaleLock.allows(midi)) return; // scale lock
     qw.held[e.code] = midi;
     noteOn(midi, 100, 99); // pseudo-channel for computer-keyboard voices
     pressKeyHold(midi, true);
@@ -1629,6 +1630,7 @@
       if (!k) return;
       var midi = parseInt(k.getAttribute('data-midi'), 10);
       if (isNaN(midi)) return;
+      if (App.scaleLock && !App.scaleLock.allows(midi)) return; // scale lock
       noteOn(midi, 90, 98);
       setTimeout(function () { noteOff(midi, 98); }, 450);
       pressKey(midi);

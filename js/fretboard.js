@@ -2055,6 +2055,7 @@
       var sIdx = parseInt(hit.getAttribute('data-fb-s'), 10);
       var f = parseInt(hit.getAttribute('data-fb-f'), 10);
       if (isNaN(sIdx) || sIdx < 0 || sIdx > 5 || isNaN(f) || f < 0) return;
+      if (App.scaleLock && !App.scaleLock.allows(Theory.fretMidi(sIdx, f, state.tuning))) return; // scale lock
       try {
         App.getAudio(); // inside the user gesture
         App.pluck(Theory.fretMidi(sIdx, f, state.tuning));

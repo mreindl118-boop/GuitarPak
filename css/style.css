@@ -413,6 +413,12 @@ html:not(.ctx-open) .ctxbar { display: none; }
 .ctx-open .ctxbar { animation: ctx-in 140ms ease-out; }
 @keyframes ctx-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
 #ctx-btn { position: relative; }
+.cx-toggles { flex-basis: 100%; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-top: 12px; border-top: 1px solid var(--line-soft); }
+.cx-toggles .chip { gap: 6px; }
+.cx-tnote { flex-basis: 100%; font-size: 12.5px; color: var(--muted); }
+.cx-tnote[hidden] { display: none; }
+/* scale lock: out-of-key on-screen keys read as unplayable */
+.scale-locked .pn-key:not([data-dc]) { filter: brightness(0.45); cursor: not-allowed; }
 /* Studio capture running (the ● lives in the dropdown) */
 #ctx-btn.rec::after {
   content: '';

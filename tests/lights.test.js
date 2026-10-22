@@ -58,6 +58,57 @@ const keys = o => Object.keys(o).map(Number).sort((a, b) => a - b);
   ok(lv.chip === '#439af5', 'the sheet shows the LUMI color each screen color becomes: ' + lv.chip);
   ok(lv[2].mode === 3 && lv[2].lit.join() === '48,60' && lv[1].lit.join() === '48,60' && lv[1].vel[48] === 23, 'Target / Tonic: only the home keys, in the home color: ' + lv[1].lit);
   ok(lv[0].mode === 3 && lv[0].lit.length === 0, 'None: nothing lit');
+
+  console.log('# LED scale + scale lock (the clef dropdown)');
+  const led = await page.evaluate(() => {
+    const o = {}, b = () => document.getElementById('cx-led');
+    App.help.set(1); // Tonic: normally only the home keys
+    App.switchTo('fretboard');
+    App.ctx(true);
+    o.before = { pressed: b().getAttribute('aria-pressed'), n: Object.keys(__lit()).length };
+    b().click();
+    o.scale = { mode: App.midi.ledMode, n: Object.keys(__lit()).length, lumi: __mode(), pressed: b().getAttribute('aria-pressed') };
+    App.help.set(0);
+    o.scale.none = Object.keys(__lit()).length;
+    b().click();
+    o.off = { mode: App.midi.ledMode, n: Object.keys(__lit()).length, lumi: __mode(), on: App.midi.lightsOn, pressed: b().getAttribute('aria-pressed') };
+    App.help.set(1);
+    App.midi.setLightsOn(true);
+    o.sheet = { mode: App.midi.ledMode, n: Object.keys(__lit()).length };
+    App.help.set(4);
+    return o;
+  });
+  ok(led.before.pressed === 'false' && led.before.n === 2, 'Tonic level: the toggle reads off, only the home keys lit: ' + JSON.stringify(led.before));
+  ok(led.scale.mode === 'scale' && led.scale.n === 14 && led.scale.lumi === 3 && led.scale.pressed === 'true' && led.scale.none === 14,
+    'LED scale on: the whole selected scale lights, at any Help level: ' + JSON.stringify(led.scale));
+  ok(led.off.mode === 'off' && led.off.n === 0 && led.off.lumi === 3 && !led.off.on && led.off.pressed === 'false', 'LED scale off: the keyboard goes dark (no LUMI scale mode either): ' + JSON.stringify(led.off));
+  ok(led.sheet.mode === 'auto' && led.sheet.n === 2, 'Lights & help On returns to the Help level: ' + JSON.stringify(led.sheet));
+  const lock = await page.evaluate(() => {
+    const seen = [], o = {};
+    App.on('midi:note', d => seen.push((d.on ? '+' : '-') + d.midi));
+    App.switchTo('fretboard'); // C major
+    document.getElementById('cx-lock').click();
+    o.state = { on: App.scaleLock.on, active: App.scaleLock.active, cls: document.documentElement.classList.contains('scale-locked'),
+      note: document.getElementById('cx-tnote').textContent, pressed: document.getElementById('cx-lock').getAttribute('aria-pressed') };
+    __play(61); __play(62); // C# is out of C major, D is in
+    o.locked = seen.join(); seen.length = 0;
+    App.switchTo('quiz'); __play(61);
+    o.quiz = seen.join(); o.quizActive = App.scaleLock.active; seen.length = 0;
+    App.switchTo('piano');
+    let inputs = 0; App.on('note:input', d => { if (d.on) inputs++; });
+    const k = document.querySelector('#pn-svg .pn-key[data-midi="61"]');
+    k.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+    document.querySelector('#pn-svg .pn-key[data-midi="62"]').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+    o.touch = inputs; o.dim = getComputedStyle(k).filter;
+    document.getElementById('cx-lock').click();
+    __play(61); o.after = seen.join(); o.off = !App.scaleLock.on && !document.documentElement.classList.contains('scale-locked');
+    return o;
+  });
+  ok(lock.state.on && lock.state.active && lock.state.cls && lock.state.pressed === 'true' && /Only C Major notes play/.test(lock.state.note), 'Scale lock on: ' + JSON.stringify(lock.state));
+  ok(lock.locked === '-61,+62,-62', 'a keyboard note outside the scale never plays (its note-off still passes); in-scale notes do: ' + lock.locked);
+  ok(lock.quiz === '+61,-61' && !lock.quizActive, 'Exercises need every note: the lock pauses there: ' + lock.quiz);
+  ok(lock.touch === 1 && /brightness/.test(lock.dim), 'on-screen keys outside the scale are dimmed and do not play: ' + JSON.stringify([lock.touch, lock.dim]));
+  ok(lock.off && lock.after.endsWith('+61,-61'), 'unlocked: every note plays again: ' + lock.after);
   const col = await page.evaluate(() => {
     App.help.set(4); const from = __sent.length; App.store.set('lights.bright', 40); App.midi.repaint();
     const sx = __sent.slice(from).filter(b => b[0] === 0xf0 && b[6] === 0x10);
