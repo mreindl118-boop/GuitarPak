@@ -1,6 +1,6 @@
 {
   "version": "0.75.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/soundLAB-alpha.apk",
-  "web": "0.80.0",
-  "notes": "Synth control: the MIDI tab opens on big, easy knobs for one Part at a time (filter, envelope, effects, volume, Super Knob and Assign knobs on a MODX) with program Prev/Next; it sends to your synth while a LUMI keeps the key lights, and the synth's knobs move the ones on screen. LUMI Display now guides Songs and the Woodshed too: the notes to play light up in their colors, and Wait mode holds the light until you play it."
+  "web": "0.81.0",
+  "notes": "Practice plan (Learn > Plan): paste your teacher's lesson notes and get today's session as short, timed blocks that open the right soundLAB tool, ticked off by what you actually play. Each block shows the note it came from, the week's progress is on one card, and anything soundLAB can't teach yet is listed as a module gap you can export."
 }

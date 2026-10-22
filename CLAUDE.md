@@ -282,6 +282,20 @@ js/xp.js          XP / streak service under the course (App.xp = window.SLXP,
                   Tests pin the clock with SLXP._now(fn) + SLXP._reload();
                   SLXP._tick() runs one ledger tick. Loaded right before
                   quiz.js.
+js/practiceplan.js PRACTICE PLAN ('practiceplan', Learn group pill "Plan",
+                  v0.81.0, prefix pp-; built by null, see docs/PRACTICE-PLAN.md):
+                  teacher notes (paste / .txt / .md / Google Docs JSON export;
+                  the Doc link is only a bookmark, nothing is fetched) ->
+                  RULES table -> timed blocks that launch existing modules
+                  (Keys lessons via App.keysLessons.open, Fretboard via
+                  fb:practice, Chords/Jam/Woodshed/Exercises/Tuner via
+                  switchTo + shared key/tempo). Completion is MEASURED: a new
+                  kl.prog run, a new passing qz.prog score, a ws.xp gain, or
+                  active minutes from App.xp. Unmatched lines -> pp.gaps
+                  (module-gap metric, exportable). Stores pp.students /
+                  pp.active / pp.sessions (90 days) / pp.history / pp.running
+                  / pp.gaps. App.practicePlan test hook. Suite
+                  tests/practiceplan.test.js.
 js/help.js        (?) button + guided page tours (TOURS per page id, spotlight
                   ring + card overlay, first-run welcome; help.seen/help.done)
 js/plugins.js     window.SoundLab plugin API v1: registerPage (App.addPage),
