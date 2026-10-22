@@ -21,7 +21,7 @@
   `App.midi.guide` calls only), `tests/lumidisplay.test.js`,
   `tests/lights.test.js`, `tests/colors.test.js`, this record.
 - Created / updated: 2026-10-22T16:24:00Z / 2026-10-22T18:30:00Z
-- Status: ready-for-review (`feat/lumi-display-aid` at `0e0600c`; not live)
+- Status: done (released in 0.80.0, main 0e0600c, 2026-10-22; was `feat/lumi-display-aid` at `0e0600c`; not live)
 - Remote confirmation: 2026-10-22T18:30:00Z, `main` = `1dbbb32`; no
   competing claims; no branch or record from null yet.
 - Evidence: handoff `tasks/20261022T1830Z-lumi-display-aid-claude.md`;

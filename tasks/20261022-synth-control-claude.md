@@ -22,7 +22,7 @@
   `tests/midihub.test.js`, `js/help.js` (the `TOURS.midihub` entry only),
   this record.
 - Created / updated: 2026-10-22T16:24:00Z / 2026-10-22T17:30:00Z
-- Status: ready-for-review (`feat/synth-control` at `3c09036`; not live)
+- Status: done (released in 0.80.0, main 0e0600c, 2026-10-22; was `feat/synth-control` at `3c09036`; not live)
 - Remote confirmation: 2026-10-22T16:23:56Z, `main` = `1dbbb32`; no other
   record claims these paths. PR84 (`codex/midi-hub-release-0.78.0-20261019`)
   also edits `js/midihub.js` but is superseded on `main`; left untouched.
