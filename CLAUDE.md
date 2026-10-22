@@ -312,6 +312,20 @@ js/midihub.js     MIDI HUB page ('midihub', Keys group, pill "MIDI", v0.78.0;
                   play the "lights"). Panic = 123/120/64/bend on 16 chans.
                   window.SLMidiHub = test hook (decode, applyRules,
                   PROFILES, parseHex, hex, rules). Suite tests/midihub.test.js.
+                  v0.80.0 SYNTH CONTROL: the Hub sends through its OWN output
+                  (midihub.outId: a port id | 'shared' = the key-light
+                  output | unset = auto: a synth-named port, port 1 first,
+                  never LUMI / Microsoft GS Wavetable) via App.midi.sendTo
+                  (portId, bytes) - Web MIDI only; native = send(). The
+                  header's 'Synth out' select sets it. New first view
+                  'control' (default): Part 1-16 buttons (= midihub.ch),
+                  big SVG knobs (drag / wheel / arrows / dblclick = start
+                  value) for BASE_KNOBS + profile.knobs {hero, extra}
+                  (Yamaha: Super Knob 95 + Assign 1-8 = CC 17-24), values
+                  per Part in midihub.kv; program Prev/Next (bank
+                  midihub.msb/lsb), Send all, Reset knobs. TWO-WAY: onRaw
+                  moves a knob / the program number when the synth sends
+                  that CC / Program Change on the selected Part.
 js/pads.js        drum-pad controller page ('pads', PRACTICE Instrument group
                   since v0.64.0; still records to st.tracks + studio-armed
                   MIDI works): 8 velocity pads on the pad drum track's live

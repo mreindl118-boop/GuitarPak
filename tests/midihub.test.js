@@ -48,9 +48,9 @@ const J = JSON.stringify;
     };
   });
   ok(nav.active === 'midihub' && nav.group === 'Keys' && nav.pills === 'Piano|Synth|Pads|MIDI', 'MIDI Hub is the fourth Keys pill: ' + nav.pills);
-  ok(nav.views === 'play,controls,rules,sysex,monitor,learn', 'six views: ' + nav.views);
+  ok(nav.views === 'control,play,controls,rules,sysex,monitor,learn', 'seven views, Control first: ' + nav.views);
   // the shared service hears All keyboards by default (v0.79 multi-input)
-  ok(nav.ports && nav.inSel === 'all' && nav.outSel === 'out1' && /In: All keyboards · Out: Synth Port 1/.test(nav.status), 'ports picked from the shared MIDI service: ' + nav.status);
+  ok(nav.ports && nav.inSel === 'all' && nav.outSel === 'out1' && /In: All keyboards · Synth out: Synth Port 1/.test(nav.status), 'ports picked: All keyboards in, the synth port out: ' + nav.status);
   ok(nav.keys === '15/10' && nav.tour, 'two octaves of keys and a help tour');
 
   console.log('# app voice muted on the Hub');
@@ -209,6 +209,94 @@ const J = JSON.stringify;
   ok(ck.n >= 20 && ck.n <= 28 && /off/.test(ck.label), '~24 clocks per beat at 120 BPM over half a second: ' + ck.n);
   ok(ck.tr.join() === '250,252', 'Start / Stop realtime: ' + ck.tr);
   ok(ck.left.join('|') === '130 60 0', 'leaving the page releases held keys');
+
+  ok(errs.length === 0, 'no page errors (one synth port)' + (errs.length ? ': ' + errs.join(' | ') : ''));
+  await ctx.close();
+
+  console.log('# synth control: a MODX + a LUMI + Windows\u2019 wavetable');
+  ({ ctx, page, errs } = await (async () => {
+    const c2 = await browser.newContext({ viewport: { width: 1200, height: 900 } });
+    await c2.addInitScript(() => {
+      ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
+      localStorage.setItem('guitarlab.midi.outputId', JSON.stringify('lumi'));
+      localStorage.setItem('guitarlab.midihub.profile', JSON.stringify('yamaha'));
+      window.__by = { lumi: [], gs: [], modx1: [], modx2: [] };
+      const mk = (id, name) => ({ id, name, state: 'connected', send: b => window.__by[id].push(Array.from(b)) });
+      const outs = new Map([['gs', mk('gs', 'Microsoft GS Wavetable Synth')], ['lumi', mk('lumi', 'LUMI Keys BLOCK')], ['modx2', mk('modx2', 'MODX-2')], ['modx1', mk('modx1', 'MODX-1')]]);
+      const modxIn = { id: 'mi', name: 'MODX-1', state: 'connected', onmidimessage: null };
+      const lumiIn = { id: 'li', name: 'LUMI Keys BLOCK', state: 'connected', onmidimessage: null };
+      const access = { inputs: new Map([['mi', modxIn], ['li', lumiIn]]), outputs: outs, sysexEnabled: true, onstatechange: null };
+      navigator.requestMIDIAccess = () => Promise.resolve(access);
+      window.__fromModx = (bytes) => modxIn.onmidimessage({ data: new Uint8Array(bytes) });
+    });
+    const pg = await c2.newPage(), er = [];
+    pg.on('pageerror', e => er.push(e.message));
+    await pg.goto(env.URL);
+    await pg.waitForFunction(() => window.App && App.midi && App.midi.ready && App.midi.hasOutput && App.active === 'quiz');
+    return { ctx: c2, page: pg, errs: er };
+  })());
+  const sc = await page.evaluate(async () => {
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+    App.switchTo('midihub'); await wait(100);
+    const o = {
+      view: [...document.querySelectorAll('.mh-view')].filter(v => !v.hidden).map(v => v.dataset.view).join(),
+      outSel: document.getElementById('mh-out').value, lights: App.midi.outputId, status: document.getElementById('mh-status').textContent,
+      cvout: document.getElementById('mh-cvout').textContent,
+      parts: document.querySelectorAll('#mh-parts [data-part]').length, plab: (document.querySelector('.mh-plab') || {}).textContent,
+      hero: (document.querySelector('#mh-hero .mh-kn') || {}).textContent,
+      knobs: [...document.querySelectorAll('#mh-knobs .mh-kn')].map(k => k.textContent).join('|'),
+      extra: document.querySelectorAll('#mh-extra .mh-knob').length
+    };
+    Object.keys(__by).forEach(k => { __by[k].length = 0; });
+    // keyboard: arrow up on Cutoff
+    const cut = document.querySelector('.mh-knob[data-cc="74"]');
+    cut.focus(); cut.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+    // drag the Super Knob up 30 px
+    const sk = document.querySelector('.mh-knob[data-cc="95"]'), r = sk.getBoundingClientRect();
+    sk.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: r.left + 10, clientY: r.top + 40, pointerId: 1 }));
+    sk.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: r.left + 10, clientY: r.top + 10, pointerId: 1 }));
+    sk.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 1 }));
+    o.cut = SLMidiHub.knob(74); o.sk = SLMidiHub.knob(95); o.skLabel = sk.querySelector('.mh-kv').textContent;
+    o.toModx = __by.modx1.map(b => b.join(' ')); o.toLumi = __by.lumi.length; o.toGs = __by.gs.length; o.toModx2 = __by.modx2.length;
+    // part 3, then a knob there and the values are per part
+    document.querySelector('#mh-parts [data-part="2"]').click();
+    o.p3 = { ch: App.store.get('midihub.ch'), cut: SLMidiHub.knob(74), sel: document.getElementById('mh-ch').value, active: document.querySelector('#mh-parts .active').textContent };
+    __by.modx1.length = 0;
+    document.querySelector('.mh-knob[data-cc="17"]').dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
+    o.assign = __by.modx1.map(b => b.join(' '));
+    // two-way: the MODX turns cutoff on part 3 and changes program
+    __fromModx([0xB2, 74, 20]); __fromModx([0xC2, 9]);
+    o.two = { cut: SLMidiHub.knob(74), label: document.querySelector('.mh-knob[data-cc="74"] .mh-kv').textContent, prog: document.getElementById('mh-cvpnum').textContent };
+    __fromModx([0xB0, 74, 99]); // another part: ignored here
+    o.otherPart = SLMidiHub.knob(74);
+    // program prev / next, send all, double-tap reset
+    __by.modx1.length = 0;
+    document.getElementById('mh-cvnext').click();
+    o.next = __by.modx1.map(b => b.join(' ')); o.pnum = document.getElementById('mh-cvpnum').textContent;
+    __by.modx1.length = 0;
+    document.getElementById('mh-cvsend').click();
+    o.sendAll = __by.modx1.length;
+    document.querySelector('.mh-knob[data-cc="74"]').dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    o.reset = SLMidiHub.knob(74);
+    // choosing the shared light output on purpose
+    const sel = document.getElementById('mh-out'); sel.value = 'shared'; sel.dispatchEvent(new Event('change'));
+    __by.lumi.length = 0; __by.modx1.length = 0;
+    document.querySelector('.mh-knob[data-cc="71"]').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+    o.shared = { lumi: __by.lumi.length, modx: __by.modx1.length };
+    sel.value = 'modx1'; sel.dispatchEvent(new Event('change'));
+    o.back = SLMidiHub.outId;
+    return o;
+  });
+  ok(sc.view === 'control' && sc.outSel === 'modx1' && sc.lights === 'lumi', 'Control opens first; the Hub picks MODX-1 while the key lights keep the LUMI: ' + JSON.stringify({ v: sc.view, out: sc.outSel, lights: sc.lights }));
+  ok(/Synth out: MODX-1 · Key lights: LUMI Keys BLOCK/.test(sc.status) && /Part 1 → MODX-1/.test(sc.cvout), 'status names both outputs: ' + sc.status + ' / ' + sc.cvout);
+  ok(sc.parts === 16 && sc.plab === 'Part' && sc.hero === 'Super Knob' && sc.knobs === 'Cutoff|Resonance|Attack|Release|Reverb|Chorus|Volume|Pan' && sc.extra === 8, 'Yamaha: 16 Parts, a big Super Knob, 8 sound knobs, 8 Assign knobs');
+  ok(sc.cut === 65 && sc.sk > 0 && String(sc.sk) === sc.skLabel, 'arrow key and drag turn knobs: cutoff ' + sc.cut + ', Super Knob ' + sc.sk);
+  ok(sc.toModx[0] === '176 74 65' && sc.toModx.some(b => b.startsWith('176 95 ')) && sc.toLumi === 0 && sc.toGs === 0 && sc.toModx2 === 0, 'knobs go to MODX-1 only, never the LUMI or the wavetable: ' + sc.toModx.slice(0, 3));
+  ok(sc.p3.ch === 2 && sc.p3.cut === 64 && sc.p3.sel === '2' && sc.p3.active === '3' && sc.assign[0] === '178 17 127', 'Part 3 has its own knob values and sends on channel 3: ' + sc.assign);
+  ok(sc.two.cut === 20 && sc.two.label === '20' && sc.two.prog === '10' && sc.otherPart === 20, 'two-way: the MODX\u2019s own cutoff and program on Part 3 move the screen; other parts don\u2019t: ' + JSON.stringify(sc.two));
+  ok(sc.next.join('|') === '178 0 63|178 32 0|194 10' && sc.pnum === '11', 'Next program: bank 63/0 then program 11 on Part 3: ' + sc.next.join('|'));
+  ok(sc.sendAll === 17 && sc.reset === 64, 'Send all sends every knob (17); double-tap resets a knob to its start value');
+  ok(sc.shared.lumi === 1 && sc.shared.modx === 0 && sc.back === 'modx1', 'Same as key lights is a deliberate choice; picking MODX-1 again goes back');
 
   ok(errs.length === 0, 'no page errors' + (errs.length ? ': ' + errs.join(' | ') : ''));
   await ctx.close();

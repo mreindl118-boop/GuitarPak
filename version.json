@@ -1,6 +1,6 @@
 {
   "version": "0.75.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/soundLAB-alpha.apk",
-  "web": "0.79.0",
-  "notes": "LUMI Display: in lessons the LUMI lights only the notes to play, in their Interval or Note colors. Double-tap your keyboard's lowest key (or the lesson card) to start and stop a lesson. Color notes by Interval or Note, and All keyboards: play a MODX while a LUMI shows the way."
+  "web": "0.80.0",
+  "notes": "Synth control: the MIDI tab opens on big, easy knobs for one Part at a time (filter, envelope, effects, volume, Super Knob and Assign knobs on a MODX), with program Prev/Next. It sends to your synth while a LUMI keeps the key lights, and the synth's own knobs move the ones on screen."
 }

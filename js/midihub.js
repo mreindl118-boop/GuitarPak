@@ -72,6 +72,8 @@
       name: 'Yamaha MODX / MONTAGE',
       cc: { 95: 'Super Knob', 17: 'Assign 1', 18: 'Assign 2', 19: 'Assign 3', 20: 'Assign 4', 21: 'Assign 5', 22: 'Assign 6', 23: 'Assign 7', 24: 'Assign 8' },
       extraCcs: [{ cc: 95, name: 'Super Knob' }, { cc: 17, name: 'Assign 1' }, { cc: 18, name: 'Assign 2' }, { cc: 19, name: 'Assign 3' }, { cc: 20, name: 'Assign 4' }],
+      knobs: { hero: { cc: 95, name: 'Super Knob', def: 0 }, extraTitle: 'Assign knobs',
+        extra: [17, 18, 19, 20, 21, 22, 23, 24].map(function (n, i) { return { cc: n, name: 'Assign ' + (i + 1), def: 64 }; }) },
       bankMsb: 63,
       bankHint: 'Performances: Bank MSB 63, LSB = the bank page from the Data List (Preset / User / Library), Program 1–128.',
       sysex: {
@@ -168,12 +170,12 @@
 
   // ---- sending ----
   function midi() { return App.midi; }
-  function hasOut() { return !!(midi() && midi().ready && midi().hasOutput); }
+  function hasOut() { var m = midi(); return !!(m && m.ready && (hubOutId() != null || m.hasOutput)); }
   function send(bytes, origin) {
     var msgs = [bytes];
     if ((origin === 'thru') || (origin !== 'raw' && g('rulesApp', false))) msgs = applyRules(bytes);
     var ok = false;
-    for (var i = 0; i < msgs.length; i++) { if (hasOut()) ok = midi().send(msgs[i]) || ok; }
+    for (var i = 0; i < msgs.length; i++) { if (hasOut()) ok = sendOut(msgs[i]) || ok; }
     if (!hasOut() && origin !== 'thru') toast('No MIDI output — pick one above');
     return ok;
   }
@@ -181,6 +183,157 @@
   function cc(n, v) { sendCh(11, n, v); }
   function noteOn(n, v) { sendCh(9, n, v); App.emit('note:input', { on: true, midi: n, vel: v, src: 'midihub' }); }
   function noteOff(n) { sendCh(8, n, 0); App.emit('note:input', { on: false, midi: n, vel: 0, src: 'midihub' }); }
+
+  // ---- SYNTH OUT (v0.80.0): the Hub's own output, independent of the key-
+  // light output, so a LUMI keeps the lights while a MODX gets the controls.
+  // midihub.outId = a port id, 'shared' (the light output), or unset = auto:
+  // a synth-named port (port 1 of a multi-port synth first), never a LUMI or
+  // Windows' built-in GS Wavetable.
+  var SYNTH_RE = /modx|montage|motif|yamaha|roland|korg|nord|kronos|fantom|juno|jupiter|moog|sequential|prophet|arturia|novation|waldorf|elektron|kawai|casio|synth/i;
+  var NOT_SYNTH_RE = /lumi|wavetable|microsoft/i;
+  function autoOut() {
+    var m = midi(); if (!m || !m.ready) return null;
+    var c = m.outputs.filter(function (p) { return !NOT_SYNTH_RE.test(p.name || ''); });
+    var named = c.filter(function (p) { return SYNTH_RE.test(p.name || ''); });
+    var pool = named.length ? named : c;
+    var first = pool.filter(function (p) { return /(-|port\s*)1\b|\s1$/i.test(p.name || ''); })[0] || pool[0];
+    return first ? first.id : null;
+  }
+  function hubOutId() {
+    var m = midi(); if (!m || !m.ready) return null;
+    var id = g('outId', null);
+    if (id === 'shared') return null;
+    if (id != null && m.outputs.some(function (p) { return String(p.id) === String(id); })) return id;
+    return autoOut();
+  }
+  function portName(id) { var m = midi(); var p = m && m.outputs.filter(function (x) { return String(x.id) === String(id); })[0]; return p ? p.name || '' : ''; }
+  function hubOutName() { var id = hubOutId(), m = midi(); return id == null ? (m && m.outputName) || '' : portName(id); }
+  function sendOut(b) { var m = midi(), id = hubOutId(); return id != null && m.sendTo ? m.sendTo(id, b) : m.send(b); }
+
+  // ---- CONTROL view (v0.80.0): big knobs for the sound of one Part ----
+  var BASE_KNOBS = [
+    { cc: 74, name: 'Cutoff', def: 64 }, { cc: 71, name: 'Resonance', def: 64 },
+    { cc: 73, name: 'Attack', def: 64 }, { cc: 72, name: 'Release', def: 64 },
+    { cc: 91, name: 'Reverb', def: 40 }, { cc: 93, name: 'Chorus', def: 0 },
+    { cc: 7, name: 'Volume', def: 100 }, { cc: 10, name: 'Pan', def: 64 }
+  ];
+  function knobSet() {
+    var k = profile().knobs || {};
+    return { hero: k.hero || null, main: BASE_KNOBS, extra: k.extra || [] };
+  }
+  function allKnobs() { var s = knobSet(); return (s.hero ? [s.hero] : []).concat(s.main, s.extra); }
+  function knobDef(cc) { var k = allKnobs().filter(function (x) { return x.cc === cc; })[0]; return k ? k.def : 64; }
+  function kvAll() { var o = g('kv', null); return o && typeof o === 'object' ? o : {}; }
+  function kv(cc, c) { var a = kvAll()[c == null ? ch() : c]; var v = a && a[cc]; return typeof v === 'number' ? v : knobDef(cc); }
+  function setKv(cc, v, c) { var a = kvAll(), k = String(c == null ? ch() : c); a[k] = a[k] || {}; a[k][cc] = v; set('kv', a); }
+  var ARC0 = -135, ARC1 = 135;
+  function arcPath(v) {
+    var a = (ARC0 + (ARC1 - ARC0) * v / 127) * Math.PI / 180, a0 = ARC0 * Math.PI / 180, r = 25;
+    var x0 = 32 + r * Math.sin(a0), y0 = 32 - r * Math.cos(a0), x1 = 32 + r * Math.sin(a), y1 = 32 - r * Math.cos(a);
+    var big = (a - a0) > Math.PI ? 1 : 0;
+    return v <= 0 ? '' : 'M' + x0.toFixed(2) + ' ' + y0.toFixed(2) + ' A' + r + ' ' + r + ' 0 ' + big + ' 1 ' + x1.toFixed(2) + ' ' + y1.toFixed(2);
+  }
+  function knobHTML(k, hero) {
+    var v = kv(k.cc), a = (ARC0 + (ARC1 - ARC0) * v / 127) * Math.PI / 180;
+    return '<div class="mh-knob' + (hero ? ' hero' : '') + '" role="slider" tabindex="0" data-cc="' + k.cc + '" aria-label="' + esc(k.name) + '" aria-valuemin="0" aria-valuemax="127" aria-valuenow="' + v + '" title="' + esc(k.name) + ' \u00b7 CC ' + k.cc + ' \u2014 drag up/down, scroll, or arrow keys; double-tap resets">' +
+      '<svg viewBox="0 0 64 64" aria-hidden="true"><path class="mh-ktrack" d="' + arcPath(127) + '"/><path class="mh-karc" d="' + arcPath(v) + '"/>' +
+      '<line class="mh-kptr" x1="32" y1="32" x2="' + (32 + 17 * Math.sin(a)).toFixed(2) + '" y2="' + (32 - 17 * Math.cos(a)).toFixed(2) + '"/></svg>' +
+      '<b class="mh-kv">' + v + '</b><span class="mh-kn">' + esc(k.name) + '</span><small class="muted">CC ' + k.cc + '</small></div>';
+  }
+  function paintKnob(cc) {
+    if (!els.knobs) return;
+    var el = els.knobs.parentNode.querySelector('.mh-knob[data-cc="' + cc + '"]');
+    if (!el) return;
+    var v = kv(cc), a = (ARC0 + (ARC1 - ARC0) * v / 127) * Math.PI / 180;
+    el.setAttribute('aria-valuenow', v);
+    el.querySelector('.mh-karc').setAttribute('d', arcPath(v));
+    var p = el.querySelector('.mh-kptr'); p.setAttribute('x2', (32 + 17 * Math.sin(a)).toFixed(2)); p.setAttribute('y2', (32 - 17 * Math.cos(a)).toFixed(2));
+    el.querySelector('.mh-kv').textContent = v;
+  }
+  function turn(n, v, quiet) {
+    v = clamp(Math.round(v), 0, 127);
+    if (v === kv(n)) return;
+    setKv(n, v);
+    paintKnob(n);
+    if (!quiet) cc(n, v);
+  }
+  function partLabel() { return profile() === PROFILES.yamaha ? 'Part' : 'Ch'; }
+  function renderControl() {
+    if (!els.knobs) return;
+    var s = knobSet();
+    var parts = '';
+    for (var c = 0; c < 16; c++) parts += '<button type="button" data-part="' + c + '" class="' + (c === ch() ? 'active' : '') + '" aria-pressed="' + (c === ch()) + '">' + (c + 1) + '</button>';
+    els.parts.innerHTML = '<span class="mh-plab">' + partLabel() + '</span>' + parts;
+    els.hero.innerHTML = s.hero ? knobHTML(s.hero, true) : '';
+    els.hero.hidden = !s.hero;
+    els.knobs.innerHTML = s.main.map(function (k) { return knobHTML(k); }).join('');
+    els.extra.innerHTML = s.extra.length ? '<h3>' + esc(profile().knobs.extraTitle || 'More') + '</h3><div class="mh-knobs">' + s.extra.map(function (k) { return knobHTML(k); }).join('') + '</div>' : '';
+    paintProg();
+    paintCvOut();
+  }
+  function paintCvOut() {
+    if (!els.cvout) return;
+    var n = hubOutName();
+    els.cvout.textContent = n ? partLabel() + ' ' + (ch() + 1) + ' \u2192 ' + n : 'No synth output yet \u2014 connect MIDI above';
+  }
+  function progNum() { return clamp(parseInt(g('prog', 1), 10) || 1, 1, 128); }
+  function paintProg() {
+    if (!els.cvpnum) return;
+    els.cvpnum.textContent = progNum();
+    els.cvbank.textContent = 'Bank ' + g('msb', profile().bankMsb) + '/' + g('lsb', 0);
+  }
+  function sendProgram(pg) {
+    var msb = clamp(parseInt(g('msb', profile().bankMsb), 10) || 0, 0, 127), lsb = clamp(parseInt(g('lsb', 0), 10) || 0, 0, 127);
+    pg = clamp(pg, 1, 128);
+    set('msb', msb); set('lsb', lsb); set('prog', pg);
+    cc(0, msb); cc(32, lsb); sendCh(12, pg - 1);
+    if (els.prog) els.prog.value = pg;
+    paintProg();
+    toast('Bank ' + msb + '/' + lsb + ' \u00b7 program ' + pg);
+  }
+  function wireKnobs(box) {
+    var drag = null;
+    box.addEventListener('pointerdown', function (e) {
+      var k = e.target.closest && e.target.closest('.mh-knob'); if (!k) return;
+      e.preventDefault();
+      var c = +k.dataset.cc;
+      drag = { cc: c, y: e.clientY, v: kv(c), el: k };
+      try { k.setPointerCapture(e.pointerId); } catch (x) { /* synthetic */ }
+      k.focus();
+    });
+    box.addEventListener('pointermove', function (e) {
+      if (!drag) return;
+      turn(drag.cc, drag.v + (drag.y - e.clientY) / (e.shiftKey ? 6 : 1.5));
+    });
+    var end = function () { drag = null; };
+    box.addEventListener('pointerup', end); box.addEventListener('pointercancel', end);
+    box.addEventListener('wheel', function (e) {
+      var k = e.target.closest && e.target.closest('.mh-knob'); if (!k) return;
+      e.preventDefault();
+      var c = +k.dataset.cc; turn(c, kv(c) + (e.deltaY < 0 ? 1 : -1) * (e.shiftKey ? 1 : 4));
+    }, { passive: false });
+    box.addEventListener('keydown', function (e) {
+      var k = e.target.closest && e.target.closest('.mh-knob'); if (!k) return;
+      var c = +k.dataset.cc, v = kv(c), n = null;
+      if (e.key === 'ArrowUp' || e.key === 'ArrowRight') n = v + 1;
+      else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') n = v - 1;
+      else if (e.key === 'PageUp') n = v + 10; else if (e.key === 'PageDown') n = v - 10;
+      else if (e.key === 'Home') n = 0; else if (e.key === 'End') n = 127;
+      if (n == null) return;
+      e.preventDefault(); e.stopPropagation(); turn(c, n);
+    });
+    box.addEventListener('dblclick', function (e) {
+      var k = e.target.closest && e.target.closest('.mh-knob'); if (!k) return;
+      var c = +k.dataset.cc; turn(c, knobDef(c));
+    });
+  }
+  function pickPart(c) {
+    releaseAll();
+    set('ch', c);
+    if (els.ch) els.ch.value = String(c);
+    if (els.chlabel) els.chlabel.textContent = c + 1;
+    renderCcs(); renderControl();
+  }
 
   function panic() {
     releaseAll();
@@ -245,6 +398,9 @@
   function onRaw(d) {
     var b = d && d.bytes; if (!b || !b.length) return;
     logMsg('in', b);
+    // two-way: the synth's own knobs / program changes on this Part move the screen
+    if ((b[0] & 0xF0) === 0xB0 && (b[0] & 15) === ch() && b.length > 2 && allKnobs().some(function (k) { return k.cc === b[1]; })) { setKv(b[1], b[2]); paintKnob(b[1]); }
+    if ((b[0] & 0xF0) === 0xC0 && (b[0] & 15) === ch() && b.length > 1) { set('prog', b[1] + 1); if (els.prog) els.prog.value = b[1] + 1; paintProg(); }
     if (b[0] === 0xF0 && els.rx) {
       els.rx.value = hex(b); els.rxInfo.textContent = b.length + ' bytes';
       if (b[1] === 0x7E && b[3] === 0x06 && b[4] === 0x02 && els.idReply) els.idReply.textContent = identity(b);
@@ -365,10 +521,15 @@
       list.forEach(function (p) { var o = document.createElement('option'); o.value = p.id; o.textContent = p.name; sel.appendChild(o); });
       sel.value = cur == null ? (all ? 'all' : '') : String(cur);
     };
-    fill(els.inSel, m.inputs, m.inputId, true); fill(els.outSel, m.outputs, m.outputId);
+    fill(els.inSel, m.inputs, m.inputId, true);
+    els.outSel.innerHTML = '<option value="shared">Same as key lights</option>';
+    m.outputs.forEach(function (p) { var o = document.createElement('option'); o.value = p.id; o.textContent = p.name; els.outSel.appendChild(o); });
+    var hid = hubOutId(); els.outSel.value = hid == null ? 'shared' : String(hid);
     var inN = m.inputId === 'all' ? { name: 'All keyboards' } : m.inputs.filter(function (p) { return String(p.id) === String(m.inputId); })[0], outN = m.outputs.filter(function (p) { return String(p.id) === String(m.outputId); })[0];
-    els.status.textContent = (inN ? 'In: ' + inN.name : 'In: none') + ' · ' + (outN ? 'Out: ' + outN.name : 'Out: none');
-    els.status.className = 'mh-status ' + (inN || outN ? 'ok' : 'bad');
+    var so = hubOutName();
+    els.status.textContent = (inN ? 'In: ' + inN.name : 'In: none') + ' · ' + (so ? 'Synth out: ' + so : 'Synth out: none') + (outN && outN.name !== so ? ' · Key lights: ' + outN.name : '');
+    els.status.className = 'mh-status ' + (inN || so ? 'ok' : 'bad');
+    paintCvOut();
     var warnLights = outN && m.lightsOn && !/lumi/i.test(outN.name || ''); // by the OUTPUT's name: a LUMI input + synth output must not paint the synth
     els.lightsWarn.hidden = !warnLights;
     els.thruInfo.textContent = (g('thru', false) ? 'Thru on: In → Rules → Out. ' : '') + (g('hear', false) ? '' : 'soundLAB\u2019s voice is muted here: the device makes the sound.');
@@ -384,7 +545,7 @@
         '<div class="row tight" id="mh-connect"><button type="button" class="btn sm primary" id="mh-enable">Connect MIDI</button></div>' +
         '<div class="row tight" id="mh-ports">' +
           '<label class="field">In<select id="mh-in"></select></label>' +
-          '<label class="field">Out<select id="mh-out"></select></label>' +
+          '<label class="field" title="Where the Hub sends: your synth. The key lights keep their own output (Lights & help).">Synth out<select id="mh-out"></select></label>' +
           '<label class="field">Channel<select id="mh-ch">' + chOpts + '</select></label>' +
           '<label class="field">Device<select id="mh-profile">' + profOpts + '</select></label>' +
           '<label class="mh-chk" title="Pass everything from In to Out, through the Rules"><input type="checkbox" id="mh-thru"' + (g('thru', false) ? ' checked' : '') + '> Thru</label>' +
@@ -396,12 +557,29 @@
         '<div class="row tight small mh-act"><span><i class="mh-led in" id="mh-ledin"></i>In <span class="mh-mono" id="mh-lastin">—</span></span><span><i class="mh-led out" id="mh-ledout"></i>Out <span class="mh-mono" id="mh-lastout">—</span></span></div>' +
       '</div>' +
       '<div class="seg mh-seg" id="mh-views" role="group" aria-label="Hub views">' +
-        '<button type="button" data-view="play">Play</button><button type="button" data-view="controls">Controls</button><button type="button" data-view="rules">Rules</button>' +
+        '<button type="button" data-view="control">Control</button><button type="button" data-view="play">Play</button><button type="button" data-view="controls">Controls</button><button type="button" data-view="rules">Rules</button>' +
         '<button type="button" data-view="sysex">SysEx</button><button type="button" data-view="monitor">Monitor</button><button type="button" data-view="learn">Learn</button>' +
       '</div>' +
 
+      // CONTROL (v0.80.0)
+      '<div class="mh-view" data-view="control" hidden>' +
+        '<div class="card mh-cv">' +
+          '<div class="mh-cv-head"><h2>Synth control</h2><span class="muted small" id="mh-cvout"></span></div>' +
+          '<div class="mh-parts" id="mh-parts" role="group" aria-label="Part"></div>' +
+          '<div class="mh-hero" id="mh-hero"></div>' +
+          '<div class="mh-knobs" id="mh-knobs"></div>' +
+          '<div id="mh-extra"></div>' +
+          '<div class="mh-cv-prog"><button type="button" class="btn" id="mh-cvprev" aria-label="Previous program">' + App.icon('left', 16) + ' Prev</button>' +
+            '<div class="mh-cv-pnum"><span class="muted small">Program</span><b id="mh-cvpnum"></b><span class="muted small" id="mh-cvbank"></span></div>' +
+            '<button type="button" class="btn" id="mh-cvnext" aria-label="Next program">Next ' + App.icon('right', 16) + '</button></div>' +
+          '<div class="row tight mh-cv-acts"><button type="button" class="btn sm" id="mh-cvsend" title="Send every knob on this Part to the synth">Send all</button>' +
+            '<button type="button" class="btn sm" id="mh-cvreset" title="Every knob back to its start value, sent">Reset knobs</button></div>' +
+          '<p class="muted small">Drag a knob up or down (Shift = fine), scroll on it, or use the arrow keys; double-tap puts it back. Turn a knob on the synth and the one here follows. Bank and program numbers live in Play.</p>' +
+        '</div>' +
+      '</div>' +
+
       // PLAY
-      '<div class="mh-view" data-view="play">' +
+      '<div class="mh-view" data-view="play" hidden>' +
         '<div class="card"><h2>Keys</h2>' +
           '<div class="row tight" style="margin-bottom:8px">' +
             '<button type="button" class="btn sm" id="mh-octdn">Octave −</button><span class="chip" id="mh-octlabel"></span><button type="button" class="btn sm" id="mh-octup">Octave +</button>' +
@@ -543,7 +721,8 @@
       'octdn', 'octup', 'octlabel', 'vel', 'velval', 'sus', 'alloff', 'kb', 'chlabel', 'pb', 'pbv', 'mod', 'modv', 'at', 'atv', 'msb', 'lsb', 'prog', 'sendprog', 'progprev', 'prognext', 'bankhint',
       'newcc', 'newccname', 'addcc', 'resetcc', 'ccgrid', 'switches', 'start', 'cont', 'stop', 'clock',
       'rulesin', 'rulesapp', 'addrule', 'rules', 'idreq', 'idreply', 'sxcard', 'raw', 'rawsend', 'rawerr', 'rx', 'rxcopy', 'rxraw', 'rxinfo',
-      'monin', 'monout', 'monclock', 'monas', 'monhex', 'monpause', 'monclear', 'monexport', 'moncount', 'mon', 'devnotes', 'naming', 'export', 'import', 'importfile', 'reset', 'toast', 'enable'];
+      'monin', 'monout', 'monclock', 'monas', 'monhex', 'monpause', 'monclear', 'monexport', 'moncount', 'mon', 'devnotes', 'naming', 'export', 'import', 'importfile', 'reset', 'toast', 'enable',
+      'cvout', 'parts', 'hero', 'knobs', 'extra', 'cvprev', 'cvnext', 'cvpnum', 'cvbank', 'cvsend', 'cvreset'];
     ids.forEach(function (id) { els[id] = root.querySelector('#mh-' + id); });
     // friendlier aliases used above
     els.inSel = els['in']; els.outSel = els.out; els.ledIn = els.ledin; els.ledOut = els.ledout; els.lastIn = els.lastin; els.lastOut = els.lastout;
@@ -551,8 +730,8 @@
     els.monCount = els.moncount; els.clockBtn = els.clock; els.idReply = els.idreply; els.rxInfo = els.rxinfo; els.octLabel = els.octlabel;
 
     wire();
-    buildKeyboard(); renderCcs(); renderSwitches(); renderRules(); renderSysex(); renderNotes(); paintClock(); paintPorts();
-    view(g('view', 'play'));
+    buildKeyboard(); renderCcs(); renderSwitches(); renderRules(); renderSysex(); renderNotes(); renderControl(); paintClock(); paintPorts();
+    view(g('view', 'control'));
   }
 
   function wire() {
@@ -560,13 +739,20 @@
       midi().enable().then(paintPorts).catch(function () { els.status.textContent = 'MIDI access was declined or failed.'; els.status.className = 'mh-status bad'; });
     });
     els.inSel.addEventListener('change', function () { midi().setInput(this.value); });
-    els.outSel.addEventListener('change', function () { midi().setOutput(this.value); });
-    els.ch.addEventListener('change', function () { releaseAll(); set('ch', parseInt(this.value, 10)); els.chlabel.textContent = ch() + 1; renderCcs(); });
+    els.outSel.addEventListener('change', function () { set('outId', this.value || 'shared'); paintPorts(); toast('Synth out: ' + (hubOutName() || 'none')); });
+    els.ch.addEventListener('change', function () { pickPart(parseInt(this.value, 10)); });
+    // control view
+    wireKnobs(root.querySelector('.mh-cv'));
+    els.parts.addEventListener('click', function (e) { var b = e.target.closest('[data-part]'); if (b) pickPart(+b.dataset.part); });
+    els.cvprev.addEventListener('click', function () { sendProgram(progNum() - 1); });
+    els.cvnext.addEventListener('click', function () { sendProgram(progNum() + 1); });
+    els.cvsend.addEventListener('click', function () { allKnobs().forEach(function (k) { cc(k.cc, kv(k.cc)); }); toast('Sent ' + allKnobs().length + ' knobs on ' + partLabel() + ' ' + (ch() + 1)); });
+    els.cvreset.addEventListener('click', function () { allKnobs().forEach(function (k) { setKv(k.cc, k.def); cc(k.cc, k.def); }); renderControl(); });
     els.profile.addEventListener('change', function () {
       set('profile', this.value); var p = profile();
       els.bankhint.textContent = p.bankHint; els.msb.value = p.bankMsb; set('msb', p.bankMsb);
       if (p.extraCcs) { var l = ccs() || DEFAULT_CCS.slice(); p.extraCcs.forEach(function (c) { if (!l.some(function (x) { return x.cc === c.cc; })) l.unshift({ cc: c.cc, name: c.name, val: 0 }); }); set('ccs', l); }
-      renderCcs(); renderSysex(); renderNotes(); toast('Profile: ' + p.name);
+      renderCcs(); renderSysex(); renderNotes(); renderControl(); toast('Profile: ' + p.name);
     });
     els.thru.addEventListener('change', function () { set('thru', this.checked); paintPorts(); });
     els.hear.addEventListener('change', function () { set('hear', this.checked); applyMute(); paintPorts(); });
@@ -597,7 +783,7 @@
     var sendProg = function () {
       var msb = clamp(parseInt(els.msb.value, 10) || 0, 0, 127), lsb = clamp(parseInt(els.lsb.value, 10) || 0, 0, 127), pg = clamp(parseInt(els.prog.value, 10) || 1, 1, 128);
       set('msb', msb); set('lsb', lsb); set('prog', pg);
-      cc(0, msb); cc(32, lsb); sendCh(12, pg - 1); toast('Bank ' + msb + '/' + lsb + ' · program ' + pg);
+      cc(0, msb); cc(32, lsb); sendCh(12, pg - 1); paintProg(); toast('Bank ' + msb + '/' + lsb + ' · program ' + pg);
     };
     els.sendprog.addEventListener('click', sendProg);
     els.progprev.addEventListener('click', function () { els.prog.value = clamp((parseInt(els.prog.value, 10) || 1) - 1, 1, 128); sendProg(); });
@@ -823,7 +1009,23 @@
       '.mh-learn ol,.mh-learn ul{padding-left:20px;line-height:1.5}.mh-learn h3{margin-top:16px}' +
       '.mh-table{border-collapse:collapse;width:100%;font-size:13px}.mh-table td,.mh-table th{border:1px solid var(--line);padding:5px 8px;text-align:left;vertical-align:top}.mh-table th{background:var(--card2)}' +
       '.mh-toast{position:fixed;left:50%;bottom:76px;transform:translateX(-50%);background:var(--card);border:1px solid var(--accent);padding:8px 14px;border-radius:9px;z-index:50;font-size:13px}' +
-      '@media (max-width:700px){.mh-r{grid-template-columns:56px 30px 30px 1fr}.mh-hex{display:none}}'
+      '.mh-cv-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}.mh-cv-head h2{margin:0}' +
+      '.mh-parts{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:12px 0}.mh-plab{font-size:12.5px;color:var(--muted);font-weight:600;margin-right:4px}' +
+      '.mh-parts button{min-width:40px;height:38px;border-radius:9px;border:1px solid var(--line);background:var(--card2);color:var(--text);font-weight:600;cursor:pointer}' +
+      '.mh-parts button.active{background:var(--accent);color:#1c1206;border-color:var(--accent)}' +
+      '.mh-hero{display:flex;justify-content:center;margin:4px 0 8px}' +
+      '.mh-knobs{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:12px}' +
+      '.mh-knob{display:grid;justify-items:center;gap:2px;padding:10px 6px 8px;border-radius:12px;background:var(--card2);border:1px solid var(--line);cursor:ns-resize;touch-action:none;user-select:none;outline:none}' +
+      '.mh-knob:focus-visible{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-glow)}' +
+      '.mh-knob svg{width:72px;height:72px}.mh-knob.hero svg{width:132px;height:132px}.mh-knob.hero{padding:14px 28px 12px}' +
+      '.mh-ktrack{fill:none;stroke:var(--line);stroke-width:6;stroke-linecap:round}.mh-karc{fill:none;stroke:var(--accent);stroke-width:6;stroke-linecap:round}' +
+      '.mh-kptr{stroke:var(--text);stroke-width:4;stroke-linecap:round}' +
+      '.mh-kv{font:400 26px/1 var(--font-display);font-variant-numeric:tabular-nums}.mh-knob.hero .mh-kv{font-size:40px}.mh-kn{font-size:13px;font-weight:600}.mh-knob small{font-size:11px}' +
+      '.mh-cv h3{margin:16px 0 8px}' +
+      '.mh-cv-prog{display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:center;margin-top:16px}.mh-cv-prog .btn{min-height:52px;font-size:16px}' +
+      '.mh-cv-pnum{display:grid;justify-items:center;gap:2px;min-width:110px}.mh-cv-pnum b{font:400 44px/1 var(--font-display)}' +
+      '.mh-cv-acts{justify-content:center;margin-top:12px}' +
+      '@media (max-width:700px){.mh-r{grid-template-columns:56px 30px 30px 1fr}.mh-hex{display:none}.mh-knobs{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.mh-knob svg{width:60px;height:60px}.mh-knob.hero svg{width:110px;height:110px}.mh-parts button{min-width:34px;height:36px}}'
     );
     t0 = performance.now();
     render();
@@ -855,5 +1057,5 @@
   });
 
   // test / plugin hook
-  window.SLMidiHub = { decode: decode, applyRules: applyRules, PROFILES: PROFILES, parseHex: parseHex, hex: hex, get rules() { return rules(); } };
+  window.SLMidiHub = { decode: decode, applyRules: applyRules, PROFILES: PROFILES, parseHex: parseHex, hex: hex, get rules() { return rules(); }, get outId() { return hubOutId(); }, knob: function (cc) { return kv(cc); }, turn: turn };
 })();

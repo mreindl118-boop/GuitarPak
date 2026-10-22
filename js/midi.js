@@ -325,6 +325,19 @@
     return true;
   }
 
+  // SEND TO ONE OUTPUT (v0.80.0, the MIDI Hub's synth out): any listed Web
+  // MIDI output by id, independent of the key-light output above. The
+  // native bridges have one output, so there (or with no id) it is send().
+  function sendTo(id, bytes) {
+    if (id == null || id === '' || native) return sendBytes(bytes);
+    var port = null;
+    if (access) access.outputs.forEach(function (p) { if (String(p.id) === String(id) && p.state !== 'disconnected') port = p; });
+    if (!port) return false;
+    try { port.send(bytes); } catch (e) { return false; }
+    App.emit('midi:out', { bytes: bytes, port: port.name || '' });
+    return true;
+  }
+
   // ---- LED output (generic: devices light incoming notes) ----
 
   var lit = {};
@@ -705,6 +718,7 @@
     // messages, SysEx, realtime) and install ONE input filter fn(bytes) ->
     // bytes | null that runs before dispatch (null drops the message)
     send: function (bytes) { return sendBytes(bytes); },
+    sendTo: sendTo, // (portId, bytes): one chosen output, not the light output
     // app sound for MIDI notes: the Settings switch + per-owner mutes (Hub)
     get appSound() { return App.store.get('midi.appSound', true) !== false; },
     setAppSound: function (on) { App.store.set('midi.appSound', on !== false); },
