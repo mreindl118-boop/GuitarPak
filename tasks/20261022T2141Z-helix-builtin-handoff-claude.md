@@ -41,7 +41,7 @@ the same, with three built-in rules:
 | 6 | `js/plugins.js`: skip + flag the old stored Helix plugin | done (`3074727`) |
 | 7 | `js/help.js`: `TOURS.helix` (3–4 stops: header strip/arm, views, Preset card) | done (`3074727`) |
 | 8 | `plugins/helix-stadium.js`: replace with a short stub that says it is built in (keeps old links working) | done (`3074727`) |
-| 9 | Tests: `tests/helix.test.js` drives the built-in page (no plugin injection) + a check that a stored old plugin is skipped; fix any suite that counts Guitar pills (`tests/nav.test.js` likely); run ALL suites | helix (54) + nav (33) pass; full run in progress |
+| 9 | Tests: `tests/helix.test.js` drives the built-in page (no plugin injection) + a check that a stored old plugin is skipped; fix any suite that counts Guitar pills (`tests/nav.test.js` likely); run ALL suites | done: all 20 suites in `tests/run.sh` pass, 0 failures (21:47Z run on `8593ca5`) |
 | 10 | Release (Matt approves first): `APP_VERSION` 0.82.0, `version.json` `web` + `notes` (never `version`), `android/AndroidManifest.xml` versionCode +1 / versionName, `sw.js` `CACHE` → `guitarlab-v118`; no APK build needed (web-only change) | pending, needs Matt |
 | 11 | Docs: `CLAUDE.md` entry moves from `plugins/` to `js/helix.js`; `PLUGINS.md`; `docs/HELIX-STADIUM.md` (no longer "load from Settings › Plugins") | done |
 | 12 | Merge to `main`, push, republish the claude.ai artifact (`CLAUDE.md` › claude.ai Artifact) | pending, needs Matt |
@@ -83,10 +83,52 @@ regression.
   `C:\Users\mrein\Creative-Workspace\GuitarPak` (Matt's Desktop soundLAB).
   No force-push. Recheck `origin` before any push.
 
+## How null finishes (steps 10 and 12; Matt approves each)
+
+**Step 10, release bookkeeping** (exact values as of `8593ca5`; recheck
+`origin/main` first, and if it moved past `e9426ce`, merge it in and bump from
+its numbers instead):
+
+| File | Change |
+|---|---|
+| `js/app.js` | `var APP_VERSION = '0.81.1';` → `'0.82.0'` |
+| `version.json` | `"web": "0.81.1"` → `"0.82.0"`; new `"notes"` (suggested below). **Never touch `"version"`** (the APK channel, `0.75.0`). |
+| `android/AndroidManifest.xml` | `versionCode="109"` → `"110"`, `versionName="0.81.1"` → `"0.82.0"` |
+| `sw.js` | `var CACHE = 'guitarlab-v117';` → `'guitarlab-v118'` (`js/helix.js` is already in `ASSETS`) |
+
+No APK build: nothing in `android/` changes functionally, and the app loads
+the live site (`CLAUDE.md` › Cloud / mobile sessions).
+
+Suggested `notes`: "Helix Stadium (Guitar › Helix): control a Line 6 Helix
+Stadium from soundLAB over USB MIDI (presets, snapshots, knobs, pedals,
+looper) and, with the helper running on your computer, edit the loaded preset
+block by block. Nothing is sent until you press Arm."
+
+**Step 12, merge and go live** (Matt says yes first, every time):
+
+1. `git worktree add <new folder> -b release/0.82.0 origin/main`, then
+   `git merge --no-ff feat/helix-stadium` there. Never the install checkout.
+2. Do step 10 in that worktree; run every suite; check the page in a browser
+   after unregistering the service worker and clearing caches (reload twice).
+3. Push `release/0.82.0`; with Matt's yes, push it to `main` as a
+   fast-forward (`git push origin release/0.82.0:main`). No force-push.
+4. GitHub Pages republishes from `main` (the `gh-pages` mirror commits).
+5. **Claude only:** republishing the claude.ai artifact needs Claude's Artifact
+   tool (`CLAUDE.md` › claude.ai Artifact). Note it in your record and leave it.
+6. Write your completion record (`tasks/<UTC>-helix-builtin-done-null.md`) with
+   the commits, suite results and anything left.
+
+**After release, with Matt watching** (hardware handshake: one owner, claim
+and release in a record): the favorite recall with a snapshot, the setlist
+CC32 mapping, the arm/disarm flow, and whether the Mixer view does anything on
+firmware 1.1.0.
+
 ## Where Claude stopped
 
 (updated at each milestone; see the newest commit message too)
 
 - 21:41Z: record written; no code changed yet.
-- 22:0xZ: steps 2-8 committed as `3074727` (built-in page wired; plugin is a stub). Next: step 9 tests.
-- 22:1xZ: tests converted (`tests/helix.test.js` 54 checks, `tests/nav.test.js` Guitar pills) and one bug fixed: the first visit now always requests the page's own Web MIDI access (the boot-time `midi:state` could leave it on the shared output with no input). Next: run every suite.
+- 21:43Z: steps 2-8 committed as `3074727` (built-in page wired; plugin is a stub). Next: step 9 tests.
+- 21:45Z: tests converted (`tests/helix.test.js` 54 checks, `tests/nav.test.js` Guitar pills) and one bug fixed: the first visit now always requests the page's own Web MIDI access (the boot-time `midi:state` could leave it on the shared output with no input). Next: run every suite.
+- 21:46Z: docs updated (`8593ca5`), step 11 done.
+- 21:55Z: **Claude stopped here.** Steps 1-9 and 11 are done and verified; every suite passes (fingering, lights, keys, practice, game, quiz, nav, smoke, taps, update, audio-level, midihub, midihub-wheel, audioin, btmidi, colors, multiin, lumidisplay, practiceplan, helix). The page was also checked by eye in a browser under Guitar › Helix: disarmed, bridge off, no connection. **null: steps 10 and 12 are yours once Matt says yes**, from the section "How null finishes". Nothing here is pushed yet unless Matt asked Claude to push it.
