@@ -38,7 +38,8 @@ are preserved. APK channel 0.75.0 and native binaries are unchanged.
 
 ## Gates
 
-- [ ] All final local applicable suites against the frozen candidate.
+- [x] All local applicable suites against the frozen application candidate;
+      see [the exact source/test boundary and blocked cases](VALIDATION-1.1.md).
 - [x] Independent reviews complete; all demonstrated blockers fixed and rerun.
 - [x] Desktop/phone, light/dark, keyboard/touch and offline/upgrade evidence.
 - [x] Exact changed files, provenance, vendor licenses and secret review.
