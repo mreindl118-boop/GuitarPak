@@ -20,6 +20,44 @@
 
   var MAX_VOICES = 16;
   var sharedNoise = null;
+  var pitchedInstruments = [];
+
+  // One admission point for the DAW's live, audition, sequenced and rendered
+  // pitched notes. Drums never enter this wrapper; a natural audio recording
+  // has explicit metadata because its sample root is not its musical content.
+  function guardPitched(instrument, allowAudioClip) {
+    var noteOn = instrument.noteOn, noteOff = instrument.noteOff;
+    var dispose = instrument.dispose, allNotesOff = instrument.allNotesOff;
+    var entry = { stop: function () { allNotesOff.call(instrument, true); } };
+    pitchedInstruments.push(entry);
+    instrument.noteOn = function (pitch, vel, time, channel, meta) {
+      if (!(vel > 0)) return instrument.noteOff(pitch, time, channel, meta);
+      if (!(allowAudioClip && meta && meta.audioClip === true) &&
+          App.scaleLock && !App.scaleLock.allows(pitch)) return false;
+      return noteOn.call(instrument, pitch, vel, time, channel, meta);
+    };
+    // Releases do not re-check today's scale or lock state.
+    instrument.noteOff = function (pitch, time, channel, meta) {
+      return noteOff.call(instrument, pitch, time, channel, meta);
+    };
+    if (instrument.pitchBend) {
+      var bend = instrument.pitchBend;
+      instrument.pitchBend = function (semis, channel) {
+        return bend.call(instrument, App.scaleLock && App.scaleLock.on ? 0 : semis, channel);
+      };
+    }
+    instrument.dispose = function () {
+      var i = pitchedInstruments.indexOf(entry);
+      if (i !== -1) pitchedInstruments.splice(i, 1);
+      return dispose.call(instrument);
+    };
+    return instrument;
+  }
+  App.on('scale:boundary', function () {
+    pitchedInstruments.slice().forEach(function (entry) {
+      try { entry.stop(); } catch (e) { /* a disposed audio graph cannot hold up other voices */ }
+    });
+  });
 
   function noiseBuffer(ctx) {
     if (sharedNoise && sharedNoise.sampleRate === ctx.sampleRate) return sharedNoise;
@@ -132,7 +170,7 @@
       });
     }
 
-    return {
+    return guardPitched({
       output: output,
 
       noteOn: function (pitch, vel, time, channel) {
@@ -183,7 +221,7 @@
             osc.type = oc.wave;
             var det = oc.detune + spread;
             osc.detune.value = det;
-            if (p.glide > 0 && lastFreq) {
+            if (p.glide > 0 && lastFreq && !(App.scaleLock && App.scaleLock.on)) {
               osc.frequency.setValueAtTime(lastFreq * Math.pow(2, oc.octave), time);
               osc.frequency.exponentialRampToValueAtTime(
                 Math.max(1, freq * Math.pow(2, oc.octave)), time + p.glide);
@@ -246,6 +284,7 @@
         var t = ctx.currentTime;
         voices.forEach(function (v) { killVoice(v, t); });
         voices = [];
+        lastFreq = null;
       },
 
       update: function (next) {
@@ -291,11 +330,12 @@
         try { lfo.stop(); } catch (e) { /* already stopped */ }
         output.disconnect();
       }
-    };
+    });
   }
 
   window.DAW = window.DAW || {};
   DAW.defaultSynth = defaultSynth;
   DAW.SYNTH_PRESETS = SYNTH_PRESETS;
   DAW.createSynth = createSynth;
+  DAW.guardPitched = guardPitched;
 })();

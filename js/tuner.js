@@ -197,75 +197,9 @@
   // Pick the first local peak >= 0.9 * global max, refine with parabolic interpolation.
 
   function detectPitch(bufArr, sr) {
-    var n = bufArr.length, i, lag;
-
-    var rms = 0;
-    for (i = 0; i < n; i++) rms += bufArr[i] * bufArr[i];
-    rms = Math.sqrt(rms / n);
-    if (rms < 0.008) return -1;                 // too quiet — gate
-
-    var minLag = Math.max(2, Math.floor(sr / 1300));
-    var maxLag = Math.floor(sr / 60);
-    if (maxLag > n - 64) maxLag = n - 64;
-    if (minLag >= maxLag) return -1;
-    var W = n - maxLag;                         // fixed comparison window
-
-    if (!det || det.length < maxLag + 2) det = new Float32Array(maxLag + 2);
-
-    // NSDF for every lag from 2 (not just minLag) so the first zero crossing
-    // is visible even when it falls below minLag, as it does for high notes.
-    for (lag = 2; lag <= maxLag; lag++) {
-      var ac = 0, m = 0;
-      for (i = 0; i < W; i++) {
-        var va = bufArr[i], vb = bufArr[i + lag];
-        ac += va * vb;
-        m += va * va + vb * vb;
-      }
-      det[lag] = m > 0 ? (2 * ac) / m : 0;
-    }
-
-    // McLeod guard: only trust maxima after the NSDF first dips below zero.
-    // Near lag 0 the signal is always highly self-similar (low E: nsdf at
-    // minLag is ~0.92), so noise ripple there would otherwise be picked as a
-    // "peak" and read as a wildly sharp ~1.3 kHz pitch.
-    var searchLo = minLag;
-    for (lag = 2; lag <= maxLag; lag++) {
-      if (det[lag] < 0) {
-        if (lag + 1 > searchLo) searchLo = lag + 1;
-        break;
-      }
-    }
-
-    var best = 0, bestLag = -1;
-    for (lag = searchLo; lag <= maxLag; lag++) {
-      if (det[lag] > best) { best = det[lag]; bestLag = lag; }
-    }
-    if (bestLag < 0 || best < 0.5) return -1;   // no clear periodicity
-
-    // first local peak close to the global max avoids octave-down errors
-    var chosen = bestLag, thr = best * 0.9;
-    for (lag = searchLo + 1; lag < maxLag; lag++) {
-      if (det[lag] >= thr && det[lag] >= det[lag - 1] && det[lag] >= det[lag + 1]) {
-        chosen = lag;
-        break;
-      }
-    }
-
-    var period = chosen;
-    if (chosen > 2 && chosen < maxLag) {
-      var y1 = det[chosen - 1], y2 = det[chosen], y3 = det[chosen + 1];
-      var denom = y1 - 2 * y2 + y3;
-      if (denom !== 0) {
-        var shift = 0.5 * (y1 - y3) / denom;
-        if (shift > 0.5) shift = 0.5;
-        else if (shift < -0.5) shift = -0.5;
-        period = chosen + shift;
-      }
-    }
-    if (period <= 0) return -1;
-    var freq = sr / period;
-    if (freq < 55 || freq > 1350) return -1;
-    return freq;
+    var d = window.SLPitchDetector && window.SLPitchDetector.detect(bufArr, sr,
+      { minFrequency: 55, maxFrequency: 1350, noiseFloor: 0.008 });
+    return d && !d.ambiguous && d.confidence >= 0.5 ? d.frequency : -1;
   }
 
   // ---------- tuner rendering ----------

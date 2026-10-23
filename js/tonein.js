@@ -20,22 +20,15 @@
   var req = 0; // open token: a getUserMedia that resolves after stop() is dropped
   var ctx = null, an = null, buf = null, stream = null, timer = null;
   var curMidi = -1, candMidi = -1, candCount = 0, quiet = 0;
+  var suspendOwners = {}, needsManualStart = false;
+  function suspended() { return Object.keys(suspendOwners).length > 0; }
 
   function enabled() { return App.store.get('audio.tonein', false) === true; }
 
   function detectPitch(d, sr) {
-    var minLag = Math.floor(sr / 1000), maxLag = Math.floor(sr / 60);
-    var bestLag = -1, bestR = 0, energy = 0;
-    for (var i = 0; i < d.length; i++) energy += d[i] * d[i];
-    if (energy === 0) return null;
-    for (var lag = minLag; lag <= maxLag; lag++) {
-      var r = 0;
-      for (var j = 0; j + lag < d.length; j += 2) r += d[j] * d[j + lag];
-      r = (2 * r * 2) / energy;
-      if (r > bestR) { bestR = r; bestLag = lag; }
-    }
-    if (bestLag < 0) return null;
-    return { freq: sr / bestLag, clarity: Math.min(1, bestR) };
+    var p = window.SLPitchDetector && window.SLPitchDetector.detect(d, sr,
+      { minFrequency: 60, maxFrequency: 1300, noiseFloor: 0.001 });
+    return p && !p.ambiguous ? { freq: p.frequency, clarity: p.confidence } : null;
   }
 
   function noteOff() {
@@ -72,7 +65,9 @@
     }
   }
 
-  function start() {
+  function start(automatic) {
+    if (suspended() || (automatic === true && needsManualStart)) return;
+    if (automatic !== true) needsManualStart = false;
     if (running || !enabled() || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
     var token = ++req;
     var inId = App.store.get('audio.inId', null);
@@ -125,15 +120,27 @@
     App.emit('tonein:state', { running: false });
   }
 
+  // Shared audio practice temporarily owns capture. Releasing that ownership
+  // never creates a new permission request; an explicit Settings start is
+  // required before the old opt-in may use its normal automatic paths again.
+  function suspend(owner, on) {
+    owner = owner || 'api';
+    if (on !== false) { suspendOwners[owner] = true; needsManualStart = true; stop(); }
+    else delete suspendOwners[owner];
+    App.emit('tonein:state', { running: false, suspended: suspended(), manualStart: needsManualStart,
+      message: suspended() ? 'Tone input is paused while audio practice owns capture.' :
+        'Tone input remains off. Turn it off and on in Settings to resume listening.' });
+  }
+
   document.addEventListener('visibilitychange', function () {
-    if (document.hidden) stop(); else if (enabled()) start();
+    if (document.hidden) stop(); else if (enabled()) start(true);
   });
 
   // the chosen input changed (Settings > Sound input): listen to the new one
   App.on('audioin:device', function () {
     if (!enabled()) return;
     stop();
-    if (!document.hidden) start();
+    if (!document.hidden) start(true);
   });
 
   // plug / unplug: a missing or ended input gets another try
@@ -146,18 +153,20 @@
           if (tr && tr.readyState !== 'ended') return; // still listening
           stop();
         }
-        start();
+        start(true);
       });
     }
   } catch (e) { /* no device events here */ }
 
   // auto-start on launch when the user has it on
-  setTimeout(function () { if (enabled()) start(); }, 400);
+  setTimeout(function () { if (enabled()) start(true); }, 400);
 
   App.tonein = {
     start: start,
     stop: stop,
+    suspend: suspend,
     get running() { return running; },
+    get suspended() { return suspended(); },
     _t: function () { return { stream: stream }; } // test hook
   };
 })();

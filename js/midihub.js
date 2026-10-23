@@ -36,6 +36,11 @@
   var held = {}, sustain = false, clockTimer = null, clockNext = 0, learning = null;
   var monQ = [], monRaf = 0, monPaused = false, monCount = 0, t0 = 0;
   var sw = {}; // switch CC states
+  // Incoming identities retain the notes actually sent after Rules. Releases
+  // never re-run edited transpose/channel rules or release a blocked source.
+  var sentSources = Object.create(null), sentTargets = Object.create(null);
+  var hubSending = false, hubEchoes = [];
+  var hubScaleState = null;
 
   var NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
   var CC_NAMES = {
@@ -111,7 +116,10 @@
 
   // ---- state (persisted under midihub.*) ----
   function g(k, d) { return App.store.get('midihub.' + k, d); }
-  function set(k, v) { App.store.set('midihub.' + k, v); }
+  function set(k, v) {
+    if (['rules', 'rulesApp', 'ch', 'outId', 'profile'].indexOf(k) >= 0 || (k === 'thru' && !v)) flushHub('MIDI Hub routing/rules changed');
+    App.store.set('midihub.' + k, v);
+  }
   function profile() { return PROFILES[g('profile', 'generic')] || PROFILES.generic; }
   function ch() { var c = parseInt(g('ch', 0), 10); return (c >= 0 && c < 16) ? c : 0; }
   function octave() { var o = parseInt(g('oct', 4), 10); return (o >= -1 && o <= 8) ? o : 4; }
@@ -171,14 +179,93 @@
   // ---- sending ----
   function midi() { return App.midi; }
   function hasOut() { var m = midi(); return !!(m && m.ready && (hubOutId() != null || m.hasOutput)); }
-  function send(bytes, origin) {
+  function sourceKey(bytes, origin, portId) {
+    var type = bytes[0] & 0xF0;
+    return JSON.stringify([origin || 'app', portId == null ? '' : String(portId), type === 0x80 ? 0x90 : type, bytes[0] & 15, bytes[1]]);
+  }
+  function releaseSource(key, releaseVelocity) {
+    var list = sentSources[key];
+    if (!list) return false;
+    delete sentSources[key];
+    var ok = false;
+    list.forEach(function (target) {
+      if (target.key) {
+        if (--sentTargets[target.key] > 0) return;
+        delete sentTargets[target.key];
+      }
+      var off = target.off.slice();
+      if (target.key && Number.isInteger(releaseVelocity) && releaseVelocity >= 0 && releaseVelocity <= 127) off[2] = releaseVelocity;
+      var released = sendOut(off, target.sender);
+      if (!released) toast('Original mapped MIDI output unavailable; release delivery could not be confirmed.');
+      ok = released || ok;
+    });
+    return ok;
+  }
+  function flushHub(reason) {
+    var m = midi();
+    if (m && typeof m.flushMusicalOutputs === 'function') {
+      // Note→CC rules also have a paired zero release. The shared musical
+      // ledger knows sustain, while this mapping retains any other CC target.
+      Object.keys(sentSources).forEach(function (key) { sentSources[key].forEach(function (target) {
+        if (!target.key && !sendOut(target.off, target.sender)) toast('Original mapped MIDI output unavailable; controller release could not be confirmed.');
+      }); });
+      m.flushMusicalOutputs(reason);
+    }
+    else Object.keys(sentSources).forEach(function (key) { releaseSource(key); });
+    sentSources = Object.create(null); sentTargets = Object.create(null);
+  }
+  function scaleBoundary() {
+    var next = [App.store.get('fb.root', 9), App.store.get('fb.scale', 'minorPent'), !!(App.scaleLock && App.scaleLock.on)];
+    if (hubScaleState && JSON.stringify(next) !== JSON.stringify(hubScaleState) && (next[2] || hubScaleState[2])) flushHub('Scale or lock changed');
+    hubScaleState = next;
+  }
+  function send(bytes, origin, portId) {
+    // Raw editor streams may contain multiple/running-status messages. The
+    // shared MIDI service parses and owns their musical ledger; interpreting
+    // only the first message here would lose later note releases or hide a
+    // disallowed Note On behind an allowed clock/configuration prefix.
+    if (origin === 'raw' && midi() && typeof midi().flushMusicalOutputs === 'function') return hasOut() && sendOut(bytes);
+    var type = bytes[0] & 0xF0, source = sourceKey(bytes, origin, portId);
+    var off = type === 0x80 || (type === 0x90 && bytes[2] === 0);
+    if (off && Object.prototype.hasOwnProperty.call(sentSources, source)) return releaseSource(source, bytes[2]);
+    // The same physical source/channel/pitch is held until release. This also
+    // prevents reflected Note Ons from repeatedly re-triggering the output.
+    if (type === 0x90 && bytes[2] > 0 && sentSources[source]) return true;
+    if (type === 0xB0 && bytes[2] === 0 && sentSources[source]) return releaseSource(source);
     var msgs = [bytes];
     if ((origin === 'thru') || (origin !== 'raw' && g('rulesApp', false))) msgs = applyRules(bytes);
-    // scale lock: thru sends only in-key note-ons — checked AFTER the rules
-    // (a transpose or a CC→note rule decides the note that actually sounds)
-    if (origin === 'thru' && App.scaleLock) msgs = msgs.filter(function (m) { return !((m[0] & 0xF0) === 0x90 && m[2] > 0 && !App.scaleLock.allows(m[1])); });
+    var generatesNote = msgs.some(function (b) { return (b[0] & 0xF0) === 0x90 && b[2] > 0; });
+    // Every musical origin, including on-screen keys and raw hex Note Ons,
+    // obeys the scale AFTER Rules. Protocol/configuration messages keep working.
+    if (App.scaleLock) msgs = msgs.filter(function (m) { return !((m[0] & 0xF0) === 0x90 && m[2] > 0 && !App.scaleLock.allows(m[1])); });
+    if ((type === 0x90 && bytes[2] > 0) || generatesNote) {
+      if (!sentSources[source]) sentSources[source] = [];
+    }
     var ok = false;
-    for (var i = 0; i < msgs.length; i++) { if (hasOut()) ok = sendOut(msgs[i]) || ok; }
+    for (var i = 0; i < msgs.length; i++) {
+      if (!hasOut()) continue;
+      var b = msgs[i], isOn = (b[0] & 0xF0) === 0x90 && b[2] > 0;
+      var sender = midi().bindMusicalOutput ? midi().bindMusicalOutput(hubOutId()) : null;
+      if (isOn) {
+        var targetKey = JSON.stringify([hubOutId(), b[0] & 15, b[1]]);
+        if (!sentSources[source]) sentSources[source] = [];
+        // A rule can collapse independent inputs onto one output note. Only
+        // its final source release may stop that shared sounding note.
+        if (sentSources[source].some(function (t) { return t.key === targetKey; })) continue;
+        var existing = sentTargets[targetKey] || 0;
+        if (existing || sendOut(b, sender)) {
+          sentTargets[targetKey] = existing + 1;
+          sentSources[source].push({ key: targetKey, off: [0x80 | (b[0] & 15), b[1], 0], sender: sender });
+          ok = true;
+        }
+      } else if ((b[0] & 0xF0) !== 0x80 && !((b[0] & 0xF0) === 0x90 && b[2] === 0)) {
+        var didSend = sendOut(b, sender); ok = didSend || ok;
+        if (didSend && type === 0x90 && bytes[2] > 0 && (b[0] & 0xF0) === 0xB0) {
+          sentSources[source].push({ off: [b[0], b[1], 0], sender: sender });
+        }
+      }
+      // Unowned note-offs cannot release another input's mapped voice.
+    }
     if (!hasOut() && origin !== 'thru') toast('No MIDI output — pick one above');
     return ok;
   }
@@ -211,7 +298,18 @@
   }
   function portName(id) { var m = midi(); var p = m && m.outputs.filter(function (x) { return String(x.id) === String(id); })[0]; return p ? p.name || '' : ''; }
   function hubOutName() { var id = hubOutId(), m = midi(); return id == null ? (m && m.outputName) || '' : portName(id); }
-  function sendOut(b) { var m = midi(), id = hubOutId(); return id != null && m.sendTo ? m.sendTo(id, b) : m.send(b); }
+  function sendOut(b, sender) {
+    var m = midi(), id = hubOutId();
+    hubSending = true;
+    hubEchoes.push({ key: b.join(','), until: performance.now() + (b[0] === 0xF8 ? 4 : 40) });
+    if (hubEchoes.length > 256) hubEchoes.shift();
+    try {
+      if (typeof sender === 'function') return sender(b);
+      if (arguments.length > 1 && m.bindMusicalOutput) return false;
+      return id != null && m.sendTo ? m.sendTo(id, b) : m.send(b);
+    }
+    finally { hubSending = false; }
+  }
 
   // ---- CONTROL view (v0.80.0): big knobs for the sound of one Part ----
   var BASE_KNOBS = [
@@ -342,6 +440,7 @@
 
   function panic() {
     releaseAll();
+    flushHub('MIDI Hub panic');
     for (var c = 0; c < 16; c++) {
       send([0xB0 | c, 123, 0], 'raw'); send([0xB0 | c, 120, 0], 'raw'); send([0xB0 | c, 64, 0], 'raw'); send([0xE0 | c, 0, 64], 'raw');
     }
@@ -418,7 +517,15 @@
         learning = null; renderRules(); toast('Learned: ' + dd.text);
       }
     }
-    if (g('thru', false) && b[0] !== 0xFE && hasOut()) send(b, 'thru');
+    // The explicit scale-locked practice route owns forwarding while active.
+    // A saved Hub Thru setting must not duplicate or bypass its note filter.
+    var t = b[0] & 0xF0, source = sourceKey(b, 'thru', d.portId);
+    var ownsRelease = (t === 0x80 || (t === 0x90 && b[2] === 0)) && Object.prototype.hasOwnProperty.call(sentSources, source);
+    hubEchoes = hubEchoes.filter(function (x) { return x.until > performance.now(); });
+    var echoIndex = hubEchoes.findIndex(function (x) { return x.key === b.join(','); });
+    var reflected = !ownsRelease && t !== 0x90 && echoIndex >= 0;
+    if (reflected) hubEchoes.splice(echoIndex, 1);
+    if (!hubSending && !reflected && !(App.practiceRouter && App.practiceRouter.active) && g('thru', false) && b[0] !== 0xFE && hasOut()) send(b, 'thru', d.portId);
   }
   function identity(b) {
     var mf = { 0x43: 'Yamaha', 0x41: 'Roland', 0x42: 'Korg', 0x47: 'Akai', 0x00: 'extended id' }[b[5]] || ('mfr ' + hex([b[5]]));
@@ -802,7 +909,7 @@
     els.resetcc.addEventListener('click', function () { set('ccs', null); renderCcs(); });
     els.start.addEventListener('click', function () { send([0xFA], 'raw'); });
     els.cont.addEventListener('click', function () { send([0xFB], 'raw'); });
-    els.stop.addEventListener('click', function () { send([0xFC], 'raw'); });
+    els.stop.addEventListener('click', function () { flushHub('MIDI Hub Stop'); send([0xFC], 'raw'); });
     els.clock.addEventListener('click', function () { setClock(!clockTimer); });
 
     // rules
@@ -1037,7 +1144,10 @@
     installFilter();
     App.on('midi:raw', onRaw);
     App.on('midi:out', function (d) { if (d && d.bytes) logMsg('out', d.bytes); });
-    App.on('midi:state', paintPorts);
+    App.on('midi:state', function () { flushHub('MIDI inventory changed'); paintPorts(); });
+    App.on('midi:beforeoutput', function () { flushHub('Selected MIDI output changing'); });
+    scaleBoundary();
+    ['scale:lock', 'scale:boundary', 'fb:set', 'fb:scale'].forEach(function (name) { App.on(name, scaleBoundary); });
     App.on('tempo', paintClock);
     App.on('lights', paintPorts);
     document.addEventListener('keyup', function (e) {
@@ -1045,13 +1155,15 @@
       if (e.code in KB_KEYS) release(base() + KB_KEYS[e.code]);
       else if (e.code === 'Space') setSustain(false);
     });
-    window.addEventListener('blur', releaseAll);
+    window.addEventListener('blur', function () { releaseAll(); flushHub('Window lost focus'); });
+    document.addEventListener('visibilitychange', function () { if (document.hidden) { releaseAll(); flushHub('App hidden'); } });
+    window.addEventListener('pagehide', function () { releaseAll(); flushHub('Page closed'); });
   }
 
   App.register('midihub', {
     init: init,
     onShow: function () { applyMute(); paintPorts(); paintClock(); if (midi() && midi().supported && !midi().ready && App.store.get('midi.wanted', false)) midi().enable().then(paintPorts).catch(function () { }); },
-    onHide: function () { releaseAll(); if (sustain) setSustain(false); if (midi() && midi().mute) midi().mute('midihub', false); },
+    onHide: function () { releaseAll(); if (sustain) setSustain(false); flushHub('MIDI Hub left'); if (midi() && midi().mute) midi().mute('midihub', false); },
     onKey: function (e) {
       if (e.repeat) return;
       if (e.code in KB_KEYS) { press(base() + KB_KEYS[e.code]); e.preventDefault(); }

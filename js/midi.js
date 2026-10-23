@@ -9,11 +9,11 @@
  *
  * Loaded right after app.js so every module can use it. Broadcasts on the bus:
  *   'midi:state'    {supported, ready, inputName, outputName}
- *   'midi:note'     {on, midi, vel, chan, mute} note on/off (vel 0-127; mute = don't re-sound)
+ *   'midi:note'     {on, midi, vel, chan, portId, mute, blocked} note on/off; raw grading remains available
  *   'midi:bend'     {chan, semis}              pitch bend in semitones
  *   'midi:pressure' {chan, val}                channel pressure 0-127
- *   'midi:raw'      {bytes}                    every incoming message, untouched
- *   'midi:out'      {bytes}                    every message sent to the output
+ *   'midi:raw'      {bytes, portId}            every incoming message, untouched
+ *   'midi:out'      {bytes, portId, kind}      successful music, LED or cleanup writes
  *
  * MPE-style per-note expression works out of the box because bend/pressure
  * are reported per channel and consumers apply them to the notes held on
@@ -45,6 +45,7 @@
   // plays the app at once (a MODX for playing + a LUMI as the lit display);
   // the key LIGHTS still go to the one output. inputs[] = the ports heard.
   var ALL = 'all', allIn = false, inputs = [];
+  var srcId = null;                     // exact input port, independent of display name
   var srcName = '';                     // input port of the message being dispatched
   // v0.79: hear every keyboard by default — once, older single-input choices
   // (usually just "the first port") become All keyboards; a single input can
@@ -98,7 +99,7 @@
   function listPorts(map) {
     if (native) return nativePorts[map].slice();
     var out = [];
-    if (access) access[map].forEach(function (p) { out.push({ id: p.id, name: p.name || p.id }); });
+    if (access) access[map].forEach(function (p) { if (p.state !== 'disconnected') out.push({ id: p.id, name: p.name || p.id }); });
     return out;
   }
 
@@ -115,15 +116,15 @@
     if (!d || d.length < 2) return;
     var st = d[0] & 0xf0, chan = d[0] & 0x0f, mute = muted();
     if (st === 0x90 && d[2] > 0) {
-      if (App.scaleLock && !App.scaleLock.allows(d[1])) return; // scale lock: out-of-key notes never sound
+      var blocked = !!(App.scaleLock && App.scaleLock.on && !App.scaleLock.contains(d[1]));
       held[d[1]] = d[2];
-      App.emit('midi:note', { on: true, midi: d[1], vel: d[2], chan: chan, port: srcName, mute: mute });
+      App.emit('midi:note', { on: true, midi: d[1], vel: d[2], chan: chan, port: srcName, portId: srcId, mute: mute || blocked, blocked: blocked });
     } else if (st === 0x80 || (st === 0x90 && d[2] === 0)) {
       delete held[d[1]];
-      App.emit('midi:note', { on: false, midi: d[1], vel: 0, chan: chan, port: srcName, mute: mute });
+      App.emit('midi:note', { on: false, midi: d[1], vel: 0, chan: chan, port: srcName, portId: srcId, mute: mute });
     } else if (st === 0xe0) {
       var raw = ((d[2] << 7) | d[1]) - 8192;
-      if (bendOn()) App.emit('midi:bend', { chan: chan, semis: (raw / 8192) * bendRange });
+      if (bendOn()) App.emit('midi:bend', { chan: chan, semis: lockEnabled() ? 0 : (raw / 8192) * bendRange });
     } else if (st === 0xd0) {
       App.emit('midi:pressure', { chan: chan, val: d[1] });
     } else if (st === 0xa0) { // poly aftertouch -> pressure for that channel
@@ -137,47 +138,335 @@
   // (App.midi.setInputFilter) may rewrite or drop a channel message before
   // the app hears it (the Hub's rules: transpose, remap, block…).
   var inputFilter = null;
-  function hear(bytes) {
-    App.emit('midi:raw', { bytes: bytes });
-    if (!inputFilter) return bytes;
-    try { return inputFilter(bytes) || null; } catch (e) { return bytes; }
-  }
 
   function onMsg(e, port) {
-    srcName = port ? (port.name || '') : (input ? input.name || '' : '');
-    var d = hear(Array.prototype.slice.call(e.data));
-    if (d) dispatch(d);
-    srcName = '';
+    port = port || input;
+    if (!e || !e.data || !port || webPort('inputs', port.id) !== port || inputs.indexOf(port) === -1) return;
+    var previousId = srcId, previousName = srcName;
+    srcName = port.name || ''; srcId = port.id;
+    try {
+      splitAndDispatch(e.data, port);
+    } finally { srcName = previousName; srcId = previousId; }
   }
 
-  // CoreMIDI packets can pack several messages (and use running status) in
-  // one byte string — split into complete messages before dispatching
+  // Both backends can pack or fragment messages, including realtime bytes
+  // BETWEEN a note and its velocity. Decoder state belongs to the exact
+  // input source, never the last selected port or another keyboard's status.
   var MSG_LEN = { 0x80: 3, 0x90: 3, 0xa0: 3, 0xb0: 3, 0xc0: 2, 0xd0: 2, 0xe0: 3 };
-
-  function splitAndDispatch(bytes) {
-    var i = 0, lastStatus = 0;
-    while (i < bytes.length) {
+  var ingressStates = new Map(), MAX_INGRESS_SYSEX = 65536;
+  function ingressSelection() { return native ? nativeInId : (allIn ? ALL : input ? input.id : null); }
+  function ingressPort(id) {
+    if (!native) return webPort('inputs', id);
+    for (var i = 0; i < nativePorts.inputs.length; i++) if (nativePorts.inputs[i].id === id) return nativePorts.inputs[i];
+    return id === 0 ? nativePorts.inputs : null; // legacy native aggregate source
+  }
+  function withIngressSource(state, fn) {
+    var oldId = srcId, oldName = srcName;
+    srcId = state.id; srcName = state.name;
+    try { return fn(); } finally { srcId = oldId; srcName = oldName; }
+  }
+  function dispatchIngress(state, message) { return withIngressSource(state, function () { dispatch(message); }); }
+  function rebuildIngressHeld() {
+    held = {};
+    ingressStates.forEach(function (state) { Object.keys(state.notes).forEach(function (key) { var n = state.notes[key]; held[n.midi] = n.vel; }); });
+  }
+  function releaseIngress(state) {
+    state.disposed = true;
+    var notes = state.notes; state.notes = {};
+    // These are app releases, not new physical/raw input or MIDI-output sends.
+    // Keep the original source/channel even if another device now has its ID.
+    Object.keys(notes).forEach(function (key) { var n = notes[key]; dispatchIngress(state, [0x80 | n.chan, n.midi, 0]); });
+    rebuildIngressHeld();
+  }
+  function pruneIngress() {
+    var selected = ingressSelection();
+    ingressStates.forEach(function (state, key) {
+      var current = ingressPort(state.id), selectedHere = selected === ALL || selected === state.id || native && state.id === 0;
+      if (!selectedHere || state.selection !== selected || current !== state.port || (current && !Array.isArray(current) && (current.name || '') !== state.name)) {
+        ingressStates.delete(key); releaseIngress(state);
+      }
+    });
+  }
+  App.on('midi:state', pruneIngress);
+  function validIngressChannel(message) {
+    return message && message[0] >= 0x80 && message[0] < 0xf0 && message.length === MSG_LEN[message[0] & 0xf0] &&
+      Array.prototype.every.call(message, function (b, i) { return Number.isInteger(b) && b >= 0 && b <= (i ? 127 : 239); });
+  }
+  function ingressMessage(state, message) {
+    withIngressSource(state, function () {
+      // Complete logical frames retain the pre-rule pitches/channels. One tap
+      // per frame lets Hub learn/Thru and performance grading share raw input.
+      App.emit('midi:raw', { bytes: message.slice(), portId: state.id, port: state.name });
+      if (state.disposed || message[0] >= 0xf0) return;
+      var filtered = message.slice();
+      if (inputFilter) { try { filtered = inputFilter(filtered) || null; } catch (e) { filtered = message.slice(); } }
+      if (state.disposed) return;
+      var rawType = message[0] & 0xf0;
+      var rawKey = (rawType === 0x80 || rawType === 0x90 ? 'note' : rawType) + ':' + (message[0] & 15) + ':' + message[1], paired = state.notes[rawKey];
+      var rawOff = rawType === 0x80 || rawType === 0x90 && message[2] === 0;
+      if (rawOff && paired) {
+        // A changed input rule cannot strand an already delivered note.
+        filtered = [0x80 | paired.chan, paired.midi, 0]; delete state.notes[rawKey];
+      }
+      if (!validIngressChannel(filtered)) return;
+      filtered = Array.prototype.slice.call(filtered);
+      var type = filtered[0] & 0xf0;
+      if (type === 0x90 && filtered[2] > 0) {
+        if (paired && (paired.chan !== (filtered[0] & 15) || paired.midi !== filtered[1])) dispatchIngress(state, [0x80 | paired.chan, paired.midi, 0]);
+        state.notes[rawKey] = { chan: filtered[0] & 15, midi: filtered[1], vel: filtered[2] };
+      } else if (type === 0x80 || type === 0x90 && filtered[2] === 0) {
+        if (paired && (paired.chan !== (filtered[0] & 15) || paired.midi !== filtered[1])) dispatchIngress(state, [0x80 | paired.chan, paired.midi, 0]);
+        delete state.notes[rawKey];
+      }
+      dispatchIngress(state, filtered); rebuildIngressHeld();
+    });
+  }
+  function splitAndDispatch(bytes, port) {
+    var id = srcId, identity = port || ingressPort(id);
+    if (!bytes || !identity) return;
+    var key = (native ? 'native:' : 'web:') + typeof id + ':' + String(id), state = ingressStates.get(key), selected = ingressSelection();
+    if (state && (state.port !== identity || state.name !== srcName || state.selection !== selected)) {
+      ingressStates.delete(key); releaseIngress(state); state = null;
+    }
+    if (!state) {
+      state = { id: id, name: srcName, port: identity, selection: selected, status: 0, running: 0, data: [], sysex: null, overflow: false, notes: {} };
+      ingressStates.set(key, state);
+    }
+    for (var i = 0; i < bytes.length && !state.disposed; i++) {
       var b = bytes[i];
-      if (b === 0xf0) {              // sysex: tapped for the Hub, never dispatched
-        var sx = [];
-        while (i < bytes.length && bytes[i] !== 0xf7) sx.push(bytes[i++]);
-        if (i < bytes.length) sx.push(bytes[i++]);
-        App.emit('midi:raw', { bytes: sx });
+      if (!Number.isInteger(b) || b < 0 || b > 255) { state.status = state.running = 0; state.data = []; state.sysex = null; state.overflow = false; continue; }
+      if (b >= 0xf8) { ingressMessage(state, [b]); continue; }
+      if (state.sysex || state.overflow) {
+        if (b === 0xf7) {
+          if (state.sysex) { state.sysex.push(b); ingressMessage(state, state.sysex); }
+          state.sysex = null; state.overflow = false; continue;
+        }
+        if (b < 0x80) {
+          if (state.sysex && state.sysex.length < MAX_INGRESS_SYSEX) state.sysex.push(b);
+          else { state.sysex = null; state.overflow = true; }
+          continue;
+        }
+        state.sysex = null; state.overflow = false; // malformed SysEx: resync at a new status
+      }
+      if (b >= 0x80) {
+        state.data = []; state.status = b;
+        if (b < 0xf0) state.running = b;
+        else {
+          state.running = 0;
+          if (b === 0xf0) { state.sysex = [b]; state.status = 0; continue; }
+          if (b !== 0xf1 && b !== 0xf2 && b !== 0xf3) { ingressMessage(state, [b]); state.status = 0; }
+        }
         continue;
       }
-      if (b >= 0xf8) { App.emit('midi:raw', { bytes: [b] }); i++; continue; } // realtime
-      var status = b >= 0x80 ? b : lastStatus; // running status
-      if (b >= 0x80) i++;
-      var len = MSG_LEN[status & 0xf0];
-      if (!status || !len) { i++; continue; }
-      lastStatus = status;
-      var msg = [status];
-      for (var k = 1; k < len && i < bytes.length; k++, i++) msg.push(bytes[i]);
-      if (msg.length === len) { msg = hear(msg); if (msg) dispatch(msg); }
+      if (!state.status) state.status = state.running;
+      if (!state.status) continue;
+      var length = state.status < 0xf0 ? MSG_LEN[state.status & 0xf0] : ({ 0xf1: 2, 0xf2: 3, 0xf3: 2 })[state.status];
+      if (!length) { state.status = state.running = 0; state.data = []; continue; }
+      state.data.push(b);
+      if (state.data.length === length - 1) {
+        var message = [state.status].concat(state.data); state.data = [];
+        state.status = state.status < 0xf0 ? state.running : 0;
+        ingressMessage(state, message);
+      }
     }
   }
 
   // ---- Web MIDI backend ----
+
+  // Recovered from b8ccb55 (codex/midi-hub-release-0.78.0-20261019),
+  // adapted additively: preserve main's All keyboards and selected handlers.
+  function webPort(kind, id) {
+    if (native || !access || typeof id !== 'string' || !id) return null;
+    var found = null;
+    access[kind].forEach(function (p) { if (p.id === id && p.state !== 'disconnected') found = p; });
+    return found;
+  }
+  var inputObjectIds = new WeakMap(), nextInputObjectId = 1;
+  function inputFingerprint(id) {
+    var all = id == null || id === 'all', wanted = all ? 'all' : String(id);
+    if (native) {
+      // The native bridge exposes IDs/names, not underlying object identity.
+      return 'native:' + wanted + ':' + JSON.stringify(nativePorts.inputs.filter(function (p) { return all || String(p.id) === wanted; }).map(function (p) { return [String(p.id), p.name || '']; }).sort());
+    }
+    var parts = [];
+    if (access) access.inputs.forEach(function (p) {
+      if (p.state === 'disconnected' || (!all && String(p.id) !== wanted)) return;
+      if (!inputObjectIds.has(p)) inputObjectIds.set(p, nextInputObjectId++);
+      parts.push([String(p.id), inputObjectIds.get(p), p.name || '']);
+    });
+    parts.sort(function (a, b) { return a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0; });
+    return 'web:' + wanted + ':' + JSON.stringify(parts);
+  }
+  function subscribeInput(portId, fn) {
+    var port = webPort('inputs', portId);
+    if (!port || typeof fn !== 'function' || !port.addEventListener || !port.removeEventListener) return null;
+    var active = true;
+    function listener(e) {
+      if (!active || webPort('inputs', portId) !== port || !e || !e.data) return;
+      fn({ bytes: Array.prototype.slice.call(e.data), portId: port.id });
+    }
+    try { port.addEventListener('midimessage', listener); } catch (e) { return null; }
+    return function () {
+      if (!active) return;
+      active = false;
+      try { port.removeEventListener('midimessage', listener); } catch (e) {}
+    };
+  }
+  function sendToOutputKind(portId, bytes, kind) {
+    var port = webPort('outputs', portId);
+    return !!port && writeOutput({ port: port, id: port.id, name: port.name || '', native: false }, bytes, kind || 'music');
+  }
+  function sendToOutput(portId, bytes) { return sendToOutputKind(portId, bytes, 'music'); }
+
+  function knownLumi(name) { return /lumi/i.test(name || '') && !/modx|montage|helix|stadium|seaboard|lightpad|virtual|loopback|loopmidi|thru|through/i.test(name || ''); }
+  function configuredLumiRoute() {
+    var id = App.store.get('lights.outputId', null);
+    if (id != null) {
+      if (native) {
+        var nr = selectedOutputRoute();
+        return nr && String(nr.id) === String(id) && knownLumi(nr.name) ? nr : null;
+      }
+      var p = webPort('outputs', id);
+      return p && knownLumi(p.name) ? { port: p, id: p.id, name: p.name || '', native: false } : null;
+    }
+    var route = selectedOutputRoute();
+    return route && knownLumi(route.name) ? route : null;
+  }
+  function lightOutputRoute() {
+    return App.store.get('lights.outputId', null) != null ? configuredLumiRoute() : selectedOutputRoute();
+  }
+  function hasLightOutput() { return !!lightOutputRoute(); }
+  function displayEnabled() {
+    var pref = App.store.get('lights.displayEnabled', null);
+    if (pref === true || pref === false) return pref;
+    var lm = App.store.get('lights.led', 'auto');
+    if (lm === 'off') return false;
+    if (lm === 'scale') return true;
+    var old = App.store.get('lights.on', null);
+    return old === true || old === false ? old : !!configuredLumiRoute();
+  }
+  var displayCleanupOk = true;
+  function displayState() {
+    var route = configuredLumiRoute(), saved = App.store.get('lights.outputId', null);
+    var configured = saved != null && saved !== '' || !!route, enabled = displayEnabled();
+    return { enabled: enabled, configured: configured, connected: !!route,
+      outputId: saved != null ? saved : route ? route.id : '', name: route ? route.name : '', cleanupOk: displayCleanupOk,
+      reason: !configured ? 'Choose a LUMI display output in Keys → LUMI (MIDI must be connected).' :
+        !route ? 'The configured LUMI display is disconnected or unavailable; no fallback is used.' :
+        !enabled ? 'LUMI Display is off.' : 'LUMI Display is on: ' + route.name + '.' };
+  }
+  function setDisplayEnabled(on) {
+    var current = configuredLumiRoute();
+    if (on !== false && current && App.store.get('lights.outputId', null) == null) App.store.set('lights.outputId', String(current.id));
+    App.store.set('lights.displayEnabled', on !== false);
+    displayCleanupOk = true;
+    if (on === false) {
+      Object.keys(keybedLeases).forEach(function (id) {
+        var token = keybedLeases[id];
+        if (knownLumi(token.name) && token.release && token.release({ restore: false }) === false) displayCleanupOk = false;
+      });
+      allDark();
+      if (!flushMusicalOutputs('LUMI Display switched off.', true)) displayCleanupOk = false;
+      if (Object.keys(lit).length) displayCleanupOk = false;
+      if (configuredLumiRoute()) lumiLayout(true);
+    } else repaintAll(true);
+    App.emit('lights:master', displayState());
+    App.emit('lights:display-enabled', displayState());
+    return displayState();
+  }
+  function setDisplayOutput(id) {
+    allDark();
+    App.store.set('lights.outputId', typeof id === 'string' ? id : id == null ? '' : String(id));
+    resetOutputLights(); repaintAll(true);
+    App.emit('lights:master', displayState());
+    App.emit('lights:display-enabled', displayState());
+    return displayState();
+  }
+
+  // A temporary exact-output lease suspends only the shared keybed engine.
+  // No port choice or saved lighting preference changes. It also blocks an
+  // early statechange repaint if the leased port is unplugged/replaced.
+  var keybedLeases = Object.create(null);
+  function keybedLeased() { var route = lightOutputRoute(); return !!(route && !route.native && keybedLeases[route.id]); }
+  function leaseKeybedOutput(portId, owner) {
+    var leasedPort = webPort('outputs', portId);
+    if (!leasedPort || typeof owner !== 'string' || !owner || keybedLeases[portId] || claimedBy) return null;
+    var lightRoute = lightOutputRoute();
+    if (lightRoute && !lightRoute.native && lightRoute.id === portId) {
+      allDark();
+      // A failed note-off cannot safely hand this route to another painter.
+      if (Object.keys(lit).length) return null;
+      resetOutputLights();
+    }
+    var token = { owner: owner, port: leasedPort, name: leasedPort.name };
+    keybedLeases[portId] = token;
+    var frameLit = Object.create(null), broken = false, releaseResult = true;
+    function originalPort() {
+      return webPort('outputs', portId) === token.port && token.port.name === token.name;
+    }
+    function clearFrame() {
+      var keys = Object.keys(frameLit), ok = true;
+      keys.forEach(function (k) {
+        var n = frameLit[k];
+        if (!originalPort() || !sendToOutputKind(portId, [0x80 | n.channel, n.note, 0], 'led')) ok = false;
+        else delete frameLit[k]; // failed releases stay tracked for a retry
+      });
+      return ok;
+    }
+    function release(options) {
+      if (keybedLeases[portId] !== token) return releaseResult;
+      var cleared = clearFrame(); releaseResult = cleared;
+      delete keybedLeases[portId];
+      // Cleanup cannot replay a saved route onto a same-id replacement or
+      // a renamed device. Later app inventory events follow normal policy.
+      var lightRoute = lightOutputRoute();
+      if (cleared && !(options && options.restore === false) && lightRoute && lightRoute.port === token.port && originalPort()) {
+        repaintAll(true);
+        if (!claimedBy && !lightsOn() && ledMode() !== 'off' && isLumi()) lumiNative();
+      }
+      return cleared;
+    }
+    release.clear = clearFrame;
+    // Synth routing uses the same pinned ownership without LUMI frame
+    // semantics. A same-id replacement can never receive old route cleanup.
+    release.send = function (bytes) {
+      return keybedLeases[portId] === token && originalPort() && sendToOutput(portId, bytes);
+    };
+    // One semantic frame writer owns the instructional display. Palette
+    // indices remain here with the shared LUMI renderer, never in a page.
+    release.frame = function (frame) {
+      var configured = configuredLumiRoute();
+      if (!displayEnabled() || !configured || configured.port !== token.port || keybedLeases[portId] !== token || broken || !originalPort() ||
+          !/lumi/i.test(token.name || '') || /modx|montage|helix|stadium|virtual|loopback|loopmidi|thru|through/i.test(token.name || '')) return false;
+      frame = frame || {};
+      var channel = frame.channel == null ? 0 : frame.channel;
+      var roles = ['target', 'correct', 'wrong'];
+      if (!Number.isInteger(channel) || channel < 0 || channel > 15 || roles.some(function (role) {
+        return frame[role] != null && (!Array.isArray(frame[role]) || frame[role].some(function (n) { return !Number.isInteger(n) || n < 0 || n > 127; }));
+      })) { broken = true; clearFrame(); return false; }
+      var want = Object.create(null), ok = true;
+      roles.forEach(function (role) {
+        (frame[role] || []).forEach(function (n) {
+          want[channel + ':' + n] = { channel: channel, note: n,
+            vel: App.colors.lumiVelocity ? App.colors.lumiVelocity(n) : guideColorVel(n) };
+        });
+      });
+      Object.keys(frameLit).forEach(function (k) {
+        if (!ok || want[k]) return;
+        var n = frameLit[k];
+        if (sendToOutputKind(portId, [0x80 | n.channel, n.note, 0], 'led')) delete frameLit[k]; else ok = false;
+      });
+      Object.keys(want).forEach(function (k) {
+        if (!ok || (frameLit[k] && frameLit[k].vel === want[k].vel)) return;
+        var n = want[k];
+        if (sendToOutputKind(portId, [0x90 | n.channel, n.note, n.vel], 'led')) frameLit[k] = n; else ok = false;
+      });
+      if (!ok) { broken = true; clearFrame(); }
+      return ok;
+    };
+    token.release = release;
+    return release;
+  }
 
   function listen(p) { p.onmidimessage = function (e) { onMsg(e, p); }; }
   function pickWebInput(id) {
@@ -217,6 +506,8 @@
       if (!nextOutput && port.state !== 'disconnected') nextOutput = port;
     });
     if (nextOutput !== output) {
+      App.emit('midi:beforeoutput', { outputId: output ? output.id : null });
+      flushMusicalOutputs('Selected output changed.');
       allDark();
       resetOutputLights();
     }
@@ -230,6 +521,7 @@
   window.__glMIDI = {
     onports: function (p) {
       if (!p) return;
+      flushMusicalOutputs('Native MIDI inventory changed.');
       nativePorts.inputs = (p.inputs || []).map(function (x) { return { id: x.id, name: x.name }; });
       nativePorts.outputs = (p.outputs || []).map(function (x) { return { id: x.id, name: x.name }; });
       // restore / default picks
@@ -241,6 +533,7 @@
       var nextOutputId = portName(nativePorts.outputs, storedOut) !== null ? storedOut
         : (storedOut == null && nativePorts.outputs.length ? nativePorts.outputs[0].id : null);
       if (nextOutputId !== nativeOutId) {
+        App.emit('midi:beforeoutput', { outputId: nativeOutId });
         allDark();
         resetOutputLights();
       }
@@ -248,12 +541,12 @@
       if (nativeOutId !== null) post({ cmd: 'setOutput', id: nativeOutId });
       announce();
     },
-    onmidi: function (srcId, bytes) {
+    onmidi: function (inputPortId, bytes) {
       if (!nativeReady || !bytes) return;
-      if (nativeInId !== null && nativeInId !== ALL && srcId !== 0 && srcId !== nativeInId) return;
-      srcName = portName(nativePorts.inputs, srcId) || '';
-      splitAndDispatch(bytes);
-      srcName = '';
+      if (nativeInId !== null && nativeInId !== ALL && inputPortId !== 0 && inputPortId !== nativeInId) return;
+      srcName = portName(nativePorts.inputs, inputPortId) || '';
+      srcId = inputPortId;
+      try { splitAndDispatch(bytes); } finally { srcId = null; srcName = ''; }
     },
     // Bluetooth progress from the Android bridge ("Looking…", "Connected: LUMI")
     onstatus: function (text) { App.emit('midi:status', { text: String(text || '') }); }
@@ -274,6 +567,7 @@
     }).then(function (a) {
       access = a;
       a.onstatechange = function () {
+        flushMusicalOutputs('MIDI inventory changed.');
         pickWebInput(App.store.get('midi.inputId', null));
         pickWebOutput(App.store.get('midi.outputId', null));
       };
@@ -284,6 +578,7 @@
   }
 
   function setInput(id) {
+    flushMusicalOutputs('Selected input changed.');
     if (native) {
       nativeInId = id === ALL || id == null ? ALL : (typeof id === 'string' ? parseInt(id, 10) : id);
       if (typeof nativeInId === 'number' && isNaN(nativeInId)) nativeInId = ALL;
@@ -295,11 +590,13 @@
   }
 
   function setOutput(id) {
+    flushMusicalOutputs('Selected output changed.');
     if (native) {
       var requestedOutputId = typeof id === 'string' ? parseInt(id, 10) : id;
       if (isNaN(requestedOutputId)) requestedOutputId = null;
       var nextOutputId = portName(nativePorts.outputs, requestedOutputId) !== null ? requestedOutputId : null;
       if (nextOutputId !== nativeOutId) {
+        App.emit('midi:beforeoutput', { outputId: nativeOutId });
         allDark();
         resetOutputLights();
       }
@@ -316,27 +613,147 @@
     return native ? nativeOutId !== null : !!(output && output.state !== 'disconnected');
   }
 
-  function sendBytes(bytes) {
-    if (!hasOutput()) return false;
-    // the Hub's monitor sees every outgoing byte ('midi:out'); the bridge's
-    // post() swallows errors, so there it is reported as sent
-    if (native) { var r = post({ cmd: 'send', data: bytes }); App.emit('midi:out', { bytes: bytes }); return r; }
-    try { output.send(bytes); } catch (e) { return false; }
-    App.emit('midi:out', { bytes: bytes });
+  // Public output is musical; internal keybed/frame writes alone carry the
+  // private LED exemption. Every emitted musical note-on shares the same gate,
+  // including raw packets, native output, transformed Hub notes and MPE.
+  var musicalOutputs = [], musicCleanupOk = true;
+  function parseOutput(bytes) {
+    var messages = [], i = 0, status = 0;
+    while (i < bytes.length) {
+      var b = bytes[i];
+      if (b >= 0xf8) { messages.push([b]); i++; continue; }
+      if (b === 0xf0) {
+        var sx = [bytes[i++]];
+        while (i < bytes.length && bytes[i] !== 0xf7) {
+          if (bytes[i] >= 0x80 && bytes[i] < 0xf8) return null;
+          sx.push(bytes[i++]);
+        }
+        if (i === bytes.length) return null;
+        sx.push(bytes[i++]); messages.push(sx); status = 0; continue;
+      }
+      if (b >= 0x80) { status = b; i++; }
+      if (!status) return null;
+      var len = status < 0xf0 ? MSG_LEN[status & 0xf0] : ({ 0xf1: 2, 0xf2: 3, 0xf3: 2, 0xf6: 1, 0xf7: 1 })[status];
+      if (!len) return null;
+      var msg = [status];
+      while (msg.length < len && i < bytes.length) {
+        if (bytes[i] >= 0xf8) { messages.push([bytes[i++]]); continue; }
+        if (bytes[i] >= 0x80) return null;
+        msg.push(bytes[i++]);
+      }
+      if (msg.length !== len) return null;
+      messages.push(msg);
+      if (status >= 0xf0) status = 0;
+    }
+    return messages;
+  }
+  function lockEnabled() { return !!(App.scaleLock && App.scaleLock.on); }
+  function prepareMusical(bytes) {
+    if (!bytes || !bytes.length) return null;
+    var copy = Array.prototype.slice.call(bytes);
+    if (copy.some(function (n) { return !Number.isInteger(n) || n < 0 || n > 255; })) return null;
+    var messages = parseOutput(copy);
+    if (!messages) return lockEnabled() ? null : { bytes: copy, messages: [] };
+    var allowed = [], dropped = false;
+    messages.forEach(function (b) {
+      var type = b[0] & 0xf0;
+      if (lockEnabled() && ((type === 0x90 && b[2] > 0 && !App.scaleLock.contains(b[1])) || (type === 0xe0 && (b[1] !== 0 || b[2] !== 64)))) dropped = true;
+      else allowed.push(b);
+    });
+    if (!allowed.length) return null;
+    return { bytes: dropped ? [].concat.apply([], allowed) : copy, messages: allowed };
+  }
+  function selectedOutputRoute() {
+    if (!hasOutput()) return null;
+    return native ? { native: true, id: nativeOutId, name: portName(nativePorts.outputs, nativeOutId), port: null }
+      : { native: false, id: output.id, name: output.name || '', port: output };
+  }
+  function originalOutput(route) {
+    return route.native ? nativeOutId === route.id && portName(nativePorts.outputs, route.id) === route.name
+      : webPort('outputs', route.id) === route.port && (route.port.name || '') === route.name;
+  }
+  function rememberMusical(route, messages) {
+    var entry = null;
+    musicalOutputs.forEach(function (e) { if (e.native === route.native && e.id === route.id && e.port === route.port && e.name === route.name) entry = e; });
+    messages.forEach(function (b) {
+      var type = b[0] & 0xf0, channel = b[0] & 15, key = channel + ':' + b[1];
+      if (type !== 0x90 && type !== 0x80 && type !== 0xe0 && !(type === 0xb0 && b[1] === 64)) return;
+      if (!entry) { entry = { native: route.native, id: route.id, name: route.name, port: route.port, notes: {}, used: {}, bends: {} }; musicalOutputs.push(entry); }
+      if (type === 0x90 && b[2] > 0) {
+        if (!entry.notes[key]) entry.notes[key] = { channel: channel, note: b[1], count: 0 };
+        entry.notes[key].count++; entry.used[channel] = true;
+      } else if (type === 0x80 || (type === 0x90 && b[2] === 0)) {
+        if (entry.notes[key] && --entry.notes[key].count <= 0) delete entry.notes[key];
+      } else if (type === 0xe0) {
+        if (b[1] === 0 && b[2] === 64) delete entry.bends[channel]; else entry.bends[channel] = true;
+      } else entry.used[channel] = true;
+    });
+  }
+  function rawOutput(route, bytes, kind) {
+    if (!route || !originalOutput(route)) return false;
+    if (route.native) { if (!post({ cmd: 'send', data: bytes })) return false; }
+    else { try { route.port.send(bytes); } catch (e) { return false; } }
+    App.emit('midi:out', { bytes: bytes, portId: route.id, port: route.name || '', kind: kind });
     return true;
   }
-
-  // SEND TO ONE OUTPUT (v0.80.0, the MIDI Hub's synth out): any listed Web
-  // MIDI output by id, independent of the key-light output above. The
-  // native bridges have one output, so there (or with no id) it is send().
+  function writeOutput(route, bytes, kind) {
+    if (!route) return false;
+    // A generic keyboard's incoming "light" notes can be real synth sound.
+    // Only an identified LUMI display gets the non-musical note exemption.
+    var display = kind === 'led' && knownLumi(route.name);
+    if (knownLumi(route.name) && !displayEnabled()) {
+      var offPacket = parseOutput(Array.prototype.slice.call(bytes || []));
+      if (!offPacket) return false;
+      var offOnly = offPacket.filter(function (b) { return !((b[0] & 0xf0) === 0x90 && b[2] > 0); });
+      if (!offOnly.length) return false;
+      if (offOnly.length !== offPacket.length) bytes = [].concat.apply([], offOnly);
+    }
+    var effectiveKind = display ? 'led' : 'music';
+    var prepared = display ? { bytes: Array.prototype.slice.call(bytes || []), messages: [] } : prepareMusical(bytes);
+    if (!prepared || !prepared.bytes.length || !rawOutput(route, prepared.bytes, effectiveKind)) return false;
+    if (!display) rememberMusical(route, prepared.messages);
+    return true;
+  }
+  function flushMusicalOutputs(reason, lumiOnly) {
+    var ok = true;
+    musicalOutputs.forEach(function (entry) {
+      if (lumiOnly === true && !knownLumi(entry.name)) return;
+      Object.keys(entry.notes).forEach(function (key) {
+        var n = entry.notes[key], sent = true;
+        for (var i = 0; i < n.count; i++) if (!rawOutput(entry, [0x80 | n.channel, n.note, 0], 'music-cleanup')) sent = false;
+        if (sent) delete entry.notes[key]; else ok = false;
+      });
+      Object.keys(entry.bends).forEach(function (channel) {
+        if (rawOutput(entry, [0xe0 | +channel, 0, 64], 'music-cleanup')) delete entry.bends[channel]; else ok = false;
+      });
+      Object.keys(entry.used).forEach(function (channel) {
+        if (rawOutput(entry, [0xb0 | +channel, 64, 0], 'music-cleanup')) delete entry.used[channel]; else ok = false;
+      });
+    });
+    musicalOutputs = musicalOutputs.filter(function (e) { return Object.keys(e.notes).length || Object.keys(e.used).length || Object.keys(e.bends).length; });
+    musicCleanupOk = ok;
+    App.emit('midi:cleanup', { reason: reason || 'Musical routes stopped.', ok: ok });
+    return ok;
+  }
+  function sendBytes(bytes, kind) { return writeOutput(kind === 'led' ? lightOutputRoute() : selectedOutputRoute(), bytes, kind || 'music'); }
+  // Preserve the existing selected-output fallback for the legacy Hub API;
+  // independent sendToOutput and lease.send continue to require exact ports.
   function sendTo(id, bytes) {
     if (id == null || id === '' || native) return sendBytes(bytes);
     var port = null;
     if (access) access.outputs.forEach(function (p) { if (String(p.id) === String(id) && p.state !== 'disconnected') port = p; });
-    if (!port) return false;
-    try { port.send(bytes); } catch (e) { return false; }
-    App.emit('midi:out', { bytes: bytes, port: port.name || '' });
-    return true;
+    return !!port && writeOutput({ port: port, id: port.id, name: port.name || '', native: false }, bytes, 'music');
+  }
+
+  function bindMusicalOutput(id) {
+    var route = null;
+    if (id == null || id === '' || native) route = selectedOutputRoute();
+    else {
+      var port = webPort('outputs', String(id));
+      if (port) route = { port: port, id: port.id, name: port.name || '', native: false };
+    }
+    if (!route) return null;
+    return function (bytes) { return writeOutput(route, bytes, 'music'); };
   }
 
   // ---- LED output (generic: devices light incoming notes) ----
@@ -349,16 +766,16 @@
   }
 
   function light(midi, vel) {
-    if (!hasOutput()) return;
+    if (!hasLightOutput() || keybedLeased()) return;
     midi = Math.max(0, Math.min(127, Math.round(midi)));
     var v = Math.max(1, Math.min(127, Math.round(vel == null ? 100 : vel)));
-    if (sendBytes([0x90, midi, v])) lit[midi] = v;
+    if (sendBytes([0x90, midi, v], 'led')) lit[midi] = v;
   }
 
   function dark(midi) {
-    if (!hasOutput()) return;
+    if (!hasLightOutput() || keybedLeased()) return;
     midi = Math.max(0, Math.min(127, Math.round(midi)));
-    if (sendBytes([0x80, midi, 0])) delete lit[midi];
+    if (sendBytes([0x80, midi, 0], 'led')) delete lit[midi];
   }
 
   function allDark() {
@@ -367,8 +784,8 @@
 
   // ---- ROLI LUMI sync (community-documented SysEx: benob/LUMI-lights) ----
   // Pushes root key, scale, light mode and the app's degree COLORS to a LUMI
-  // (USB or Bluetooth — same bytes either way). The hardware supports exactly
-  // TWO colors: the root color and the in-scale color; we map degree 1 and
+  // (USB or Bluetooth — same bytes either way). Native User-mode config has
+  // two color slots (not a hardware RGB limitation); we map degree 1 and
   // degree 5 of the app's palette (App.colors). Values pack as a 5-bit type +
   // value spread over 7-bit bytes; frame device id 0x37 = LUMI. Wrong bytes
   // are simply ignored by non-LUMI devices.
@@ -386,14 +803,14 @@
   }
 
   function lumiCmd(cmd) {
-    if (!hasOutput() || !sysexOk()) return false;
+    if (!hasLightOutput() || keybedLeased() || !sysexOk()) return false;
     while (cmd.length < 8) cmd.push(0);
     // device id is topology-dependent (0x37 on the documented unit, 0x00 =
     // broadcast per the same doc's own uncertainty) — send BOTH; the config
     // frames are idempotent, so whichever id this LUMI answers to wins
     var tail = cmd.concat([lumiChecksum(cmd), 0xf7]);
-    var sentSpecific = sendBytes([0xf0, 0x00, 0x21, 0x10, 0x77, 0x37].concat(tail));
-    var sentBroadcast = sendBytes([0xf0, 0x00, 0x21, 0x10, 0x77, 0x00].concat(tail));
+    var sentSpecific = sendBytes([0xf0, 0x00, 0x21, 0x10, 0x77, 0x37].concat(tail), 'led');
+    var sentBroadcast = sendBytes([0xf0, 0x00, 0x21, 0x10, 0x77, 0x00].concat(tail), 'led');
     return sentSpecific && sentBroadcast;
   }
 
@@ -425,7 +842,8 @@
   // the LUMI's OWN scale display (key, scale, two colors) — what it shows
   // when the app's lights are off
   function lumiNative() {
-    if (!isLumi() || !hasOutput()) return;
+    if (!isLumi() || !hasLightOutput()) return;
+    if (!displayEnabled()) { lumiLayout(true); return; }
     var root = App.store.get('fb.root', 9);
     var scaleId = App.store.get('fb.scale', 'minorPent');
     var key = Theory.mod12(typeof root === 'number' ? root : 9);
@@ -472,28 +890,15 @@
 
   var LIGHT_LO = 24, LIGHT_HI = 108;
 
-  // A LUMI colors EACH KEY by the velocity of the note sent to it: its
-  // default program lights an incoming note in colourLookup[velocity] (0 off,
+  // The archived LUMI default program colors EACH KEY by note velocity.
+  // Physical firmware/program behavior is not verified here. That program lights an incoming note in colourLookup[velocity] (0 off,
   // 1-126 a hue sweep red > yellow > green > cyan > blue > violet, 127 white),
   // only within its current 24-key octave window. So the app's degree colors
   // go to the keybed one key at a time, matched to the nearest table color.
-  var LUMI_TABLE = (function () {
-    var hex = '000000ff506fff546cff5869ff5c66ff6063ff6460ff695cff6d59ff7156ff7553ff7950ff7d4dff814aff8547ff8944ff8d41ff923dff963aff9a37ff9e34ffa231ffa62effaa2effae2dffb12dffb52cffb92cffbd2bffc12bffc42bffc82affcc2affd029ffd429ffd828ffdb28ffdf28ffe327ffe727ffeb26ffee26fff225fff625f7f62af0f72ee8f733e1f837d9f83cd1f841caf945c2f94abaf94fb3fa53abfa58a4fb5c9cfb6194fb668dfc6a85fc6f7dfc7476fd786efd7d67fe815ffe865cfc8b59fa8f56f89453f69850f49d4df2a24af0a647eeab44ecb041eab43ee9b93be7bd38e5c235e3c732e1cb2fdfd02cddd529dbd926d9de23d7e220d5e723d0e826cbe929c6ea2cc1ec2fbced32b7ee35b2ef38adf03ba8f13ea3f2409ff4439af54695f64990f74c8bf84f86f95281fa557cfc5877fd5b72fe5e6dff616bfe6469fd6767fc6b64fb6e62fa7160f9745ef8775cf77a5af67e58f58155f38453f28751f18a4ff08d4def904bee9448ed9746ec9a44eb9d42eaffffff', out = [];
-    for (var i = 0; i < 128; i++) out.push(parseInt(hex.substr(i * 6, 6), 16));
-    return out;
-  })();
-  var lumiVelCache = {};
-  function lumiVel(hex) { // nearest LUMI palette entry (1-126) to a CSS hex color
-    if (lumiVelCache[hex]) return lumiVelCache[hex];
-    var c = parseInt(String(hex).replace('#', ''), 16) || 0;
-    var r = (c >> 16) & 255, g = (c >> 8) & 255, b = c & 255, best = 1, bd = 1e12;
-    for (var i = 1; i < 127; i++) {
-      var t = LUMI_TABLE[i], r2 = (t >> 16) & 255, g2 = (t >> 8) & 255, b2 = t & 255, rm = (r + r2) / 2;
-      var d = (2 + rm / 256) * (r - r2) * (r - r2) + 4 * (g - g2) * (g - g2) + (2 + (255 - rm) / 256) * (b - b2) * (b - b2);
-      if (d < bd) { bd = d; best = i; }
-    }
-    lumiVelCache[hex] = best;
-    return best;
+  var LUMI_TABLE = window.SLNotePalette.table;
+  function lumiVel(hex) {
+    var value = window.SLNotePalette.nearest(hex);
+    return value == null ? window.SLNotePalette.nearest('#ffab47') : value;
   }
   // the LUMI velocity (= color) of a note's screen color (App.colors: by
   // degree, or by note); step 0 = the root color in interval mode
@@ -506,14 +911,13 @@
     var pc = Theory.mod12(m), step = info.pcToStep.get(pc);
     return step === undefined ? 0 : noteVel(pc, step);
   }
-  var LUMI_WHITE = 127, LUMI_GREEN = 60;
-  // LUMI DISPLAY (v0.79.0, lights.display, default on): while a lesson /
+  // Legacy guide-color style (v0.79.0 'LUMI Display', lights.display): while a lesson /
   // runner / guide is showing what to play, the keybed shows ONLY that -
   // the note to play now steady in ITS color, the next one blinking in its
   // color (App.colors: Interval = scale degree, Note = pitch class) - and
   // the scale layout steps aside so the keys read as "play this". With no
-  // guide the normal layout is back. Off = the classic look (layout + the
-  // note to play in white).
+  // guide the normal layout is back. Off keeps the legacy layout alongside
+  // the target; both styles retain mapped pitch identity.
   function displayOn() { return App.store.get('lights.display', true) !== false; }
   function guideColorVel(n) {
     var root = App.store.get('fb.root', 9), rootPc = Theory.mod12(typeof root === 'number' ? root : 9);
@@ -529,6 +933,8 @@
   // on by default for a LUMI (SysEx scale colors are safe); other outputs stay
   // opt-in — a sound module there would PLAY note-on lights (old midi.lights)
   function lightsOn() {
+    if (isLumi() && !displayEnabled()) return false;
+    if (isLumi() && App.store.get('lights.displayEnabled', null) === true) return true;
     var lm = ledMode();
     if (lm === 'scale') return true;
     if (lm === 'off') return false;
@@ -544,13 +950,14 @@
   function helpLvl() { return App.help ? App.help.level() : 4; }
   // LED SCALE (v0.82.0, the clef dropdown's toggle): 'scale' = the keybed
   // always shows the selected scale (whatever the Help level or Display
-  // aid; notes to play still light white on top), 'off' = dark, 'auto' =
+  // aid; current targets retain their mapped pitch color), 'off' = dark, 'auto' =
   // lights.on + the Help level (the Lights & help sheet sets auto)
   function ledMode() { var v = App.store.get('lights.led', 'auto'); return v === 'scale' || v === 'off' ? v : 'auto'; }
   function outName() {
     return native ? (portName(nativePorts.outputs, nativeOutId) || '') : (output ? (output.name || '') : '');
   }
   function isLumi() {
+    if (App.store.get('lights.outputId', null) != null) return !!configuredLumiRoute();
     var m = App.store.get('midi.lumi', null);
     if (m === true || m === false) return m;
     if (/lumi/i.test(outName())) return true;
@@ -600,7 +1007,7 @@
   function layoutKind() {
     if (claimedBy) return 'none';
     for (var k in hidden) if (hidden[k]) return 'none';
-    if (ledMode() === 'scale') return 'scale';
+    if (ledMode() === 'scale' || (isLumi() && App.store.get('lights.displayEnabled', null) === true)) return 'scale';
     var h = helpLvl();
     return h >= 3 ? 'scale' : h >= 1 ? 'tonic' : 'none';
   }
@@ -611,7 +1018,8 @@
   function wanted() {
     var want = {}, kind = layoutKind(), r = range(), lumi = isLumi();
     var lo = Math.max(LIGHT_LO, r.lo), hi = Math.min(LIGHT_HI, r.hi), m, v;
-    var h0 = helpLvl(), guiding = ledMode() !== 'scale' && displayOn() && h0 >= 2 && (list(guideNow).length > 0 || (h0 >= 3 && list(guideNext).length > 0));
+    var explicit = lumi && App.store.get('lights.displayEnabled', null) === true;
+    var h0 = explicit ? 4 : helpLvl(), guiding = (explicit || (ledMode() !== 'scale' && displayOn())) && h0 >= 2 && (list(guideNow).length > 0 || (h0 >= 3 && list(guideNext).length > 0));
     if (guiding) kind = 'none'; // Display: only the notes to play
     var root = App.store.get('fb.root', 9), rootPc = Theory.mod12(typeof root === 'number' ? root : 9);
     if (kind === 'scale') {
@@ -619,21 +1027,21 @@
     } else if (kind === 'tonic') {
       for (m = lo; m <= hi; m++) if (Theory.mod12(m) === rootPc) want[m] = lumi ? noteVel(rootPc, 0) : 70;
     }
-    revealSet.forEach(function (pc) { for (var x = lo; x <= hi; x++) if (Theory.mod12(x) === pc) want[x] = lumi ? LUMI_GREEN : 127; });
-    var h = helpLvl();
-    if (h >= 2) list(guideNow).forEach(function (n) { want[fold(n)] = lumi ? (guiding ? guideColorVel(n) : LUMI_WHITE) : 127; });
+    revealSet.forEach(function (pc) { for (var x = lo; x <= hi; x++) if (Theory.mod12(x) === pc) want[x] = lumi ? guideColorVel(x) : 127; });
+    var h = explicit ? 4 : helpLvl();
+    if (h >= 2) list(guideNow).forEach(function (n) { want[fold(n)] = lumi ? guideColorVel(n) : 127; });
     if (h >= 3) list(guideNext).forEach(function (n) {
       var f = fold(n);
       if (list(guideNow).some(function (x) { return fold(x) === f; })) return; // it's also the note to play now
       if (!blinkOn) delete want[f];                          // the next note blinks
-      else want[f] = lumi ? (guiding ? guideColorVel(f) : (lumiKeyVel(f) || noteVel(Theory.mod12(f), 0))) : 45; // off-scale: root color / its note color
+      else want[f] = lumi ? guideColorVel(f) : 45; // off-scale: root color / its note color
     });
     return want;
   }
 
   // compose + diff: only changed keys are sent
   function paint(force) {
-    if (!hasOutput()) return;
+    if (!hasLightOutput() || keybedLeased()) return;
     if (claimedBy) {
       if (force === true) {
         if (isLumi()) lumiLayout();
@@ -641,7 +1049,7 @@
       }
       return;
     }
-    if (!lightsOn()) { allDark(); if (ledMode() === 'off' && isLumi()) lumiLayout(); return; } // off: a dark LUMI
+    if (!lightsOn()) { allDark(); if ((ledMode() === 'off' || !displayEnabled()) && isLumi()) lumiLayout(); return; } // off: a dark LUMI
     if (isLumi()) lumiLayout();
     var want = wanted(), m;
     for (m in lit) if (!want[m]) dark(Number(m));
@@ -692,8 +1100,18 @@
   // owns the keybed (Pads: night mode + its own key lights)
   App.on('colors', function () {
     repaintAll();
-    if (!claimedBy && !lightsOn() && ledMode() !== 'off' && isLumi() && hasOutput()) lumiNative();
+    if (!claimedBy && !lightsOn() && ledMode() !== 'off' && isLumi() && hasLightOutput()) lumiNative();
   });
+
+  var musicalBoundary = [App.store.get('fb.root', 9), App.store.get('fb.scale', 'minorPent'), lockEnabled()];
+  function boundaryCleanup() {
+    var next = [App.store.get('fb.root', 9), App.store.get('fb.scale', 'minorPent'), lockEnabled()];
+    if (JSON.stringify(next) !== JSON.stringify(musicalBoundary) && (next[2] || musicalBoundary[2])) flushMusicalOutputs('Selected scale or lock changed.');
+    musicalBoundary = next;
+  }
+  ['fb:set', 'fb:scale', 'scale:lock', 'scale:boundary'].forEach(function (event) { App.on(event, boundaryCleanup); });
+  window.addEventListener && window.addEventListener('blur', function () { flushMusicalOutputs('Window lost focus.'); });
+  window.addEventListener && window.addEventListener('pagehide', function () { flushMusicalOutputs('Page hidden.'); });
 
   // auto-reconnect: once MIDI was enabled and the permission granted, later
   // sessions (and app updates) reconnect silently — the LUMI is just there
@@ -729,6 +1147,18 @@
     // bytes | null that runs before dispatch (null drops the message)
     send: function (bytes) { return sendBytes(bytes); },
     sendTo: sendTo, // (portId, bytes): one chosen output, not the light output
+    get explicitPortsSupported() { return !native && !!access; },
+    subscribeInput: subscribeInput,
+    inputFingerprint: inputFingerprint,
+    sendToOutput: sendToOutput,
+    leaseKeybedOutput: leaseKeybedOutput,
+    get displayEnabled() { return displayEnabled(); },
+    get displayState() { return displayState(); },
+    setDisplayEnabled: setDisplayEnabled,
+    setDisplayOutput: setDisplayOutput,
+    flushMusicalOutputs: flushMusicalOutputs,
+    bindMusicalOutput: bindMusicalOutput,
+    get musicCleanupOk() { return musicCleanupOk; },
     // app sound for MIDI notes: the Settings switch + per-owner mutes (Hub)
     get appSound() { return App.store.get('midi.appSound', true) !== false; },
     setAppSound: function (on) { App.store.set('midi.appSound', on !== false); },
@@ -746,13 +1176,13 @@
     guide: setGuide,
     reveal: function (pcs, ms) {
       clearTimeout(revealT);
-      revealSet = helpLvl() >= 2 ? list(pcs).map(function (n) { return Theory.mod12(n); }) : [];
+      revealSet = (helpLvl() >= 2 || (isLumi() && App.store.get('lights.displayEnabled', null) === true)) ? list(pcs).map(function (n) { return Theory.mod12(n); }) : [];
       paint();
       if (revealSet.length) revealT = setTimeout(function () { revealSet = []; paint(); }, ms || 1500);
     },
     hideLayout: function (owner, on) { hidden[owner] = !!on; paint(); },
     claim: function (owner) { if (claimedBy !== owner) { allDark(); claimedBy = owner; if (isLumi()) { lumiShown = null; lumiCmd([0x10, 0x40].concat(lumiVal(0x02, LUMI_MODES.night))); } } },
-    lumiColor: function (hex) { return '#' + ('00000' + LUMI_TABLE[lumiVel(hex)].toString(16)).slice(-6); }, // what a LUMI shows for a screen color
+    lumiColor: function (hex) { return '#' + ('00000' + LUMI_TABLE[lumiVel(hex)].toString(16)).slice(-6); }, // mapped default-program RGB; physical color remains unverified
     get platform() { return iosMidi ? 'ios' : androidMidi ? 'android' : 'web'; },
     release: function (owner) { if (claimedBy === owner) { allDark(); claimedBy = null; repaintAll(); } },
     repaint: function () { repaintAll(true); },
@@ -768,7 +1198,7 @@
     setLightsOn: function (on) {
       App.store.set('lights.led', 'auto'); // the sheet's On/Off: back to the Help level
       App.store.set('lights.on', !!on);
-      if (!on) { allDark(); if (isLumi() && hasOutput()) { lumiShown = null; lumiNative(); } }
+      if (!on) { allDark(); if (isLumi() && hasLightOutput()) { lumiShown = null; lumiNative(); } }
       repaintAll();
     },
     // LED scale (the clef dropdown): 'scale' | 'off' | 'auto'
@@ -783,7 +1213,7 @@
       App.emit('lights:led', { mode: ledMode() });
     },
     test: function () { // a C major arpeggio across the range, then back to normal
-      if (!hasOutput()) return false;
+      if (!hasLightOutput() || (isLumi() && !displayEnabled())) return false;
       var r = range(), base = r.lo - Theory.mod12(r.lo) + 12 * Math.floor((r.keys - 12) / 24);
       [0, 4, 7, 12].forEach(function (o, i) {
         setTimeout(function () { light(fold(base + o), 127); }, i * 180);

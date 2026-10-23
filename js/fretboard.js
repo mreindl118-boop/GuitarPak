@@ -218,7 +218,7 @@
   }
 
   // the color editor: "Color notes by" Interval (7 degree pickers) | Note
-  // (12 pitch-class pickers, C..B); Reset restores the shown palette
+  // (natural anchors plus five derived chromatic blends); Reset restores defaults
   var NOTE_LABELS = ['C', 'C#/Db', 'D', 'D#/Eb', 'E', 'F', 'F#/Gb', 'G', 'G#/Ab', 'A', 'A#/Bb', 'B'];
   function renderColorInputs() {
     if (!els.colors) return;
@@ -231,8 +231,9 @@
     if (mode === 'note') {
       var nc = App.colors.notes();
       for (i = 0; i < 12; i++) {
-        h += '<label class="fb-colpick" title="Color for every ' + NOTE_LABELS[i] + '">' + NOTE_LABELS[i] +
-          '<input type="color" value="' + nc[i] + '" data-fbncol="' + i + '"></label>';
+        var derived = [1, 3, 6, 8, 10].indexOf(i) >= 0;
+        h += '<label class="fb-colpick" title="' + (derived ? 'Derived blend of neighboring natural-note colors for ' : 'Color for every ') + NOTE_LABELS[i] + '">' + NOTE_LABELS[i] +
+          '<input type="color" value="' + nc[i] + '" data-fbncol="' + i + '"' + (derived ? ' disabled aria-label="Derived accidental color"' : '') + '></label>';
       }
     } else {
       var dc = App.colors.degrees();
@@ -811,6 +812,32 @@
     return pr.path[pr.seq[step % pr.seq.length]];
   }
 
+  // Tab and sheet music share this exact exercise/playhead. Publish its
+  // structured pitches through the one keybed renderer, never a MIDI writer.
+  var prGuided = false, prGuideStep = 0;
+  function prGuide(step) {
+    if (!pr.seq || !pr.seq.length || !App.midi || !App.midi.guide) return;
+    var now = prNodeAt(step), next = prNodeAt(step + 1);
+    App.midi.guide(now ? now.midi : null, next ? next.midi : null);
+    prGuided = true;
+    prGuideStep = step;
+  }
+  function prGuideOff() {
+    if (prGuided && App.midi && App.midi.guide) App.midi.guide(null, null);
+    prGuided = false;
+  }
+  function prRebuild() {
+    pr.idx = 0;
+    pr.pausedAtIdx = -1;
+    if (!pr.running) return;
+    pr.path = prPath();
+    pr.seq = prSeq(pr.path, pr.pattern, pr.dir);
+    pr.vis.length = 0;
+    if (!pr.seq.length) { prPause(); prStatus('no notes in this position'); return; }
+    pr.nextT = pr.ctx.currentTime + 0.15;
+    prGuide(0);
+  }
+
   // phrase length for the runner's velocity accents: group patterns accent
   // each group start, intervals the lower note of each pair, plain runs the
   // beat (or every 4th note at one-note-per-beat)
@@ -904,6 +931,7 @@
     var hit = null;
     while (pr.vis.length && pr.vis[0].t <= now) hit = pr.vis.shift();
     if (hit) {
+      prGuide(hit.step);
       var rings = state.view === 'board' ? prRings() : null;
       if (rings) {
         rings.cur.setAttribute('cx', hit.node.cx);
@@ -1232,8 +1260,9 @@
 
   function prStart() {
     pr.path = prPath();
-    if (!pr.path.length) { prStatus('no notes in this position'); return; }
+    if (!pr.path.length) { prGuideOff(); prStatus('no notes in this position'); return; }
     pr.seq = prSeq(pr.path, pr.pattern, pr.dir);
+    if (!pr.seq.length) { prGuideOff(); prStatus('no notes in this position'); return; }
     try { pr.ctx = App.getAudio(); } catch (e) { prStatus('audio unavailable'); return; }
     pr.vis.length = 0;
     pr.pausedAtIdx = -1;
@@ -1246,6 +1275,7 @@
       pr.nextT += pr.pause * b0;
     }
     pr.running = true;
+    prGuide(pr.idx); // the first instruction is visible during count-in
     App.wake.acquire('fb-run');
     pr.timer = setInterval(prTick, 25);
     prTick();
@@ -1254,6 +1284,7 @@
   }
 
   function prPause() {
+    prGuideOff();
     if (!pr.running) return;
     if (pr.timer) { clearInterval(pr.timer); pr.timer = null; }
     if (pr.raf) { cancelAnimationFrame(pr.raf); pr.raf = 0; }
@@ -1407,9 +1438,7 @@
       pr.pattern = compose();
       App.store.set('fb.pr.pattern', pr.pattern);
       paintPatternUI();
-      pr.idx = 0;
-      pr.pausedAtIdx = -1;
-      if (pr.running) { pr.path = prPath(); pr.seq = prSeq(pr.path, pr.pattern, pr.dir); }
+      prRebuild();
       renderBoard(); // one-string dimming / mode-band visibility follow the pattern
       renderAltView();
       if (/^ss/.test(pr.pattern) && state.view === 'board') scrollToFret(0);
@@ -1444,9 +1473,7 @@
       pr.dir = b.getAttribute('data-fbdir');
       App.store.set('fb.pr.dir', pr.dir);
       paintDir();
-      pr.idx = 0;
-      pr.pausedAtIdx = -1;
-      if (pr.running) { pr.path = prPath(); pr.seq = prSeq(pr.path, pr.pattern, pr.dir); }
+      prRebuild();
       renderAltView();
     });
     // one-string "Mode box" lock (default off: the run slides the whole string)
@@ -1455,8 +1482,7 @@
       pr.ssLock = !pr.ssLock;
       App.store.set('fb.pr.ssLock', pr.ssLock);
       lockBtn.classList.toggle('active', pr.ssLock);
-      pr.idx = 0;
-      if (pr.running) { pr.path = prPath(); pr.seq = prSeq(pr.path, pr.pattern, pr.dir); }
+      prRebuild();
       renderBoard();
       renderAltView();
     });
@@ -1899,7 +1925,8 @@
       var note = inp.hasAttribute('data-fbncol');
       var ci = parseInt(inp.getAttribute(note ? 'data-fbncol' : 'data-fbcol'), 10);
       if (isNaN(ci) || ci < 0 || ci > (note ? 11 : 6)) return;
-      var cols = note ? App.colors.notes() : App.colors.degrees();
+      if (note && [1, 3, 6, 8, 10].indexOf(ci) >= 0) return;
+      var cols = note ? App.colors.sourceNotes() : App.colors.sourceDegrees();
       cols[ci] = inp.value.toLowerCase();
       colFromPicker = true;
       try { if (note) App.colors.setNotes(cols); else App.colors.setDegrees(cols); } finally { colFromPicker = false; }
@@ -1989,9 +2016,7 @@
         });
       }
       saveState();
-      pr.idx = 0;
-      pr.pausedAtIdx = -1;
-      if (pr.running) { pr.path = prPath(); pr.seq = prSeq(pr.path, pr.pattern, pr.dir); }
+      prRebuild();
       renderAll();
       // the scale really did change — downstream followers (chords) get the
       // same announcement as for a change made on this page
@@ -2110,8 +2135,12 @@
   var TRIO = ['fretboard', 'tab', 'notation'];
 
   function maybePause() {
+    // Clear before the destination page can publish its own target. The
+    // deferred trio check must never erase a new page's instructional frame.
+    prGuideOff();
     setTimeout(function () {
       if (TRIO.indexOf(App.active) === -1) prPause();
+      else if (pr.running) prGuide(prGuideStep);
     }, 0);
   }
 

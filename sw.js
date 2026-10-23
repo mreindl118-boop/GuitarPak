@@ -1,9 +1,10 @@
 /* GuitarLab service worker — cache-first so the app works fully offline once visited. */
-var CACHE = 'guitarlab-v118';
+var CACHE = 'guitarlab-v123';
 var ASSETS = [
   '.',
   'index.html',
   'css/style.css',
+  'css/lumi-practice.css',
   'fonts/barlow-400.woff2',
   'fonts/barlow-500.woff2',
   'fonts/barlowcond-600.woff2',
@@ -12,7 +13,9 @@ var ASSETS = [
   'fonts/slmusic.woff2',
   'js/theory.js',
   'js/app.js',
+  'js/note-palette.js',
   'js/midi.js',
+  'js/practice-router.js',
   'js/tonein.js',
   'js/audioin.js',
   'js/metronome.js',
@@ -32,8 +35,15 @@ var ASSETS = [
   'js/studio.js',
   'js/arrange.js',
   'js/woodshed.js',
+  'js/performance-engine.js',
+  'js/performance-player.js',
+  'js/practice-progress.js',
+  'js/practice-progress-ui.js',
+  'js/pitch-detector.js',
+  'js/practice-input.js',
   'js/pads.js',
   'js/midihub.js',
+  'js/lumi-practice.js',
   'js/xp.js',
   'js/quiz.js',
   'js/practiceplan.js',

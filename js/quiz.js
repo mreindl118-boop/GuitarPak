@@ -1084,6 +1084,74 @@
   // ================= state + persistence =================
 
   var root = null, view = 'home', topicId = null, openMode = {}, cur = null, advT = 0;
+  // Retain physical presses across questions; layered channels on one keyboard
+  // are one press, while another keyboard has its own held notes.
+  var inputHeld = {}, inputRoute = null;
+  var lumiOwned = false, lumiQuestion = null, lumiFeedbackT = 0, lumiFeedbackUntil = 0;
+
+  // Instruction comes only from structured answer pitches. Contextual ear-
+  // training audio is not an answer and must not become a guessed LED target.
+  function lumiTargets(q) {
+    q = q || (cur && cur.q);
+    if (!q) return [];
+    var pcs = q.kind === 'set' ? Object.keys(q.pcs || {}).map(Number) :
+      q.kind === 'single' && q.pc != null ? [q.pc] : q.pcAnswer != null ? [q.pcAnswer] : [];
+    var candidates = q.reveal && q.reveal.keys ? q.reveal.keys.slice() : [];
+    if (!candidates.length && q.audio) {
+      q.audio.slice().reverse().forEach(function (event) { (event.m || []).forEach(function (m) { candidates.push(m); }); });
+    }
+    if (pcs.length) {
+      var range = App.midi && App.midi.range ? App.midi.range() : { lo: 48, hi: 71 };
+      return pcs.map(function (pc) {
+        var match = candidates.filter(function (n) { return Number.isInteger(n) && n >= 0 && n <= 127 && mod(n, 12) === mod(pc, 12); })[0];
+        if (match != null) return match;
+        return range.lo + mod(pc - range.lo, 12);
+      });
+    }
+    // Spelling/recognition tasks can provide a complete written answer chord.
+    // Questions with only words/scale names/relative ear context stay unsupported.
+    if (!q.ear && q.reveal && q.reveal.staff) {
+      return (q.reveal.staff.cols || []).reduce(function (out, column) { return out.concat(column.map(midiOf)); }, []);
+    }
+    if (!q.ear && q.audio && q.audio.length === 1 && q.audio[0].m && q.audio[0].m.length > 1) return q.audio[0].m.slice();
+    return [];
+  }
+  function clearLumi() {
+    clearTimeout(lumiFeedbackT); lumiFeedbackT = 0; lumiFeedbackUntil = 0;
+    if (lumiOwned && App.midi) {
+      if (App.midi.guide) App.midi.guide(null, null);
+      if (App.midi.reveal) App.midi.reveal([], 0);
+    }
+    lumiOwned = false; lumiQuestion = null;
+  }
+  function syncLumi() {
+    if (!cur || !cur.q || view !== 'run' || covered()) { clearLumi(); return; }
+    var m = App.midi;
+    if (!m || !m.guide) return;
+    if (cur.q !== lumiQuestion) {
+      clearTimeout(lumiFeedbackT); lumiFeedbackT = 0; lumiFeedbackUntil = 0;
+      if (m.reveal) m.reveal([], 0);
+    }
+    lumiQuestion = cur.q; lumiOwned = true;
+    var targets = lumiTargets(cur.q);
+    if (cur.answered && Date.now() < lumiFeedbackUntil && m.reveal) {
+      m.guide(null, null); // answer feedback owns the same pitches briefly
+      m.reveal(targets.map(function (n) { return mod(n, 12); }), Math.max(1, lumiFeedbackUntil - Date.now()));
+    } else m.guide(targets, null);
+    var hint = el('qz-lumi-hint');
+    if (hint) hint.hidden = !m.displayEnabled || !!targets.length;
+  }
+  function lumiFeedback(ms) {
+    clearTimeout(lumiFeedbackT);
+    lumiFeedbackUntil = Date.now() + ms;
+    var question = cur && cur.q;
+    syncLumi();
+    if (!lumiOwned) return;
+    lumiFeedbackT = setTimeout(function () {
+      lumiFeedbackT = 0; lumiFeedbackUntil = 0;
+      if (cur && cur.q === question) syncLumi();
+    }, ms);
+  }
 
   function esc(s) {
     return String(s).replace(/[&<>"']/g, function (c) {
@@ -1145,12 +1213,14 @@
   function render() {
     if (!root) return;
     clearTimeout(advT);
-    // the keyboard's lights must not give answers away mid-question
+    // The base scale is hidden; an explicitly enabled instructional display
+    // shows this question's structured target rather than unrelated scale keys.
     if (App.midi && App.midi.hideLayout) App.midi.hideLayout('quiz', view === 'run' && App.active === 'quiz');
     if (view === 'home') renderHome();
     else if (view === 'topic') renderTopic();
     else if (view === 'run') renderRun();
     else renderDone();
+    if (App.active === 'quiz' || lumiOwned) syncLumi();
   }
 
   // keep the start of a view (or a unit) in sight, just below the top bar
@@ -1314,7 +1384,8 @@
     var hear = q.audio && !q.ear
       ? '<button type="button" class="qz-hear" id="qz-hear" aria-label="Hear it" title="Hear it (Space)">' + App.icon('play', 13) + '</button>' : '';
     box.innerHTML = '<div class="qz-prompt"><span>' + esc(q.prompt) + '</span>' + hear + '</div>' +
-      '<div class="qz-vis" id="qz-vis"></div><div class="qz-ans" id="qz-ans"></div>';
+      '<div class="qz-vis" id="qz-vis"></div><div class="qz-ans" id="qz-ans"></div>' +
+      '<p id="qz-lumi-hint" class="small muted" hidden>LUMI: this exercise has no playable note target.</p>';
     box.classList.remove('qz-in');
     void box.offsetWidth; // restart the entrance fade
     box.classList.add('qz-in');
@@ -1543,8 +1614,8 @@
     }
     if (q.reveal && q.reveal.staff) paintVis();
     // the keyboard lights the answer (Help: Target and up)
-    var apcs = q.kind === 'single' ? [q.pc] : q.kind === 'set' ? Object.keys(q.pcs || {}).map(Number) : q.pcAnswer != null ? [q.pcAnswer] : [];
-    if (apcs.length && App.midi && App.midi.reveal) App.midi.reveal(apcs, cur.sprint ? 700 : 1800);
+    var apcs = lumiTargets(q).map(function (n) { return mod(n, 12); });
+    if (apcs.length && App.midi && App.midi.reveal) lumiFeedback(cur.sprint ? 700 : 1800);
     var fb = el('qz-fb');
     if (fb) {
       fb.className = 'qz-fb ' + (ok ? 'ok' : 'bad');
@@ -1593,8 +1664,16 @@
   }
 
   function inputNote(midi, src, pos) {
-    if (!cur || view !== 'run' || cur.answered) return;
+    if (!cur || view !== 'run') return;
     var q = cur.q, pc = mod(midi, 12);
+    if (cur.answered) {
+      // A fresh correction advances without re-grading the miss or granting XP.
+      // Sprints retain their existing feedback/advance timing.
+      if (!cur.lastOk && !cur.sprint &&
+          ((q.kind === 'choice' && q.pcAnswer != null && src !== 'tap' && pc === q.pcAnswer) ||
+           (q.kind === 'single' && pc === q.pc && (q.string == null || !pos || pos.s === q.string)))) nextQ();
+      return;
+    }
     if (q.kind === 'choice') {
       if (q.pcAnswer == null || src === 'tap') return;
       if (pc === q.pcAnswer) resolve(true, q.correct);
@@ -2147,6 +2226,7 @@
   }
   // back in sight: a fresh clock (and the sound, if it never got to play)
   function resumeQ() {
+    syncLumi();
     if (!cur || view !== 'run' || cur.answered || covered()) return;
     if (cur.q.auto && cur.autoPlayed !== cur.q) { cur.autoPlayed = cur.q; playQ(cur.q); }
     startClock();
@@ -2569,14 +2649,39 @@
       e._t = setTimeout(function () { if (e.parentNode) e.parentNode.removeChild(e); }, 4000);
     });
     root.addEventListener('click', onClick);
-    document.addEventListener('visibilitychange', function () { if (document.hidden) stopClock(); else resumeQ(); });
-    App.on('sheet', function (d) { if (d && d.open) stopClock(); else resumeQ(); });
-    App.on('tour', function (d) { if (d && d.open) stopClock(); else resumeQ(); });
+    document.addEventListener('visibilitychange', function () { if (document.hidden) { stopClock(); clearLumi(); } else resumeQ(); });
+    App.on('sheet', function (d) { if (d && d.open) { stopClock(); clearLumi(); } else resumeQ(); });
+    App.on('tour', function (d) { if (d && d.open) { stopClock(); clearLumi(); } else resumeQ(); });
+    App.on('lights:master', function () { if (App.active === 'quiz') syncLumi(); });
     root.addEventListener('pointerdown', onPointer);
     // decode the piano bank on the first touch here, ahead of the first question
     root.addEventListener('pointerdown', function () { if (App.keys && App.keys.warm) App.keys.warm(); }, true);
+    inputRoute = App.midi ? App.midi.inputId : null;
+    App.on('midi:state', function () {
+      var m = App.midi, route = m ? m.inputId : null;
+      var changed = route !== inputRoute;
+      inputRoute = route;
+      var ports = m && m.ready ? m.inputs : null;
+      Object.keys(inputHeld).forEach(function (key) {
+        var h = inputHeld[key];
+        if (h.src !== 'midi') return;
+        if (changed || (ports && h.portId != null && !ports.some(function (p) { return String(p.id) === h.portId; }))) delete inputHeld[key];
+      });
+    });
     App.on('midi:note', function (d) {
-      if (d && d.on && App.active === 'quiz') inputNote(d.midi, d.silent ? 'tone' : 'midi');
+      if (!d || !Number.isInteger(d.midi) || d.midi < 0 || d.midi > 127) return;
+      var src = d.silent ? 'tone' : 'midi', portId = d.portId == null ? null : String(d.portId);
+      var port = portId == null ? ['name', d.port || ''] : ['id', portId];
+      var key = JSON.stringify([src, port, d.midi]), channel = d.chan == null ? 0 : d.chan;
+      var held = inputHeld[key];
+      if (!d.on) {
+        if (held) { delete held.channels[channel]; if (!Object.keys(held.channels).length) delete inputHeld[key]; }
+        return; // releases never answer a question
+      }
+      var fresh = !held;
+      if (!held) held = inputHeld[key] = { src: src, portId: portId, channels: {} };
+      held.channels[channel] = true; // record before inputNote can change question
+      if (fresh && App.active === 'quiz') inputNote(d.midi, src);
     });
     if (document.fonts && document.fonts.load) {
       document.fonts.load('48px SLMusic').then(function () { if (view === 'run' && cur) paintVis(); }, function () { /* fallback glyphs */ });
@@ -2611,6 +2716,12 @@
     clock: function (s) { if (s != null) App.store.set('qz.clock', s); return clockSetting(); },
     tab: setHomeTab,
     finishSprint: finishSprint,
+    lumiTargets: lumiTargets,
+    lumiState: function () {
+      var targets = cur && view === 'run' ? lumiTargets(cur.q) : [];
+      return { supported: !!targets.length, target: targets, active: !!targets.length && lumiOwned && !covered(),
+        reason: targets.length ? 'Structured answer pitches.' : 'This question has no structured playable pitch target.' };
+    },
     theory: { nt: nt, midiOf: midiOf, nm: nm, addIv: addIv, IV: IV, buildChord: buildChord, buildScale: buildScale, keyChords: keyChords, KEYS: KEYS }
   };
 
@@ -2628,6 +2739,7 @@
     onHide: function () {
       clearTimeout(advT);
       stopClock();
+      clearLumi();
       if (cur && cur.sprint && !cur.sprint.done && view === 'run') finishSprint();
       if (App.midi && App.midi.hideLayout) App.midi.hideLayout('quiz', false);
     },

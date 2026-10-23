@@ -36,17 +36,19 @@ js/midi.js        MIDI service (App.midi: in/out ports, note/bend/pressure
                   default (midi.bendOn; Settings Pitch bend Off/±2/±12/±48):
                   dispatch drops 0xE0 unless on; setBendOn(false) emits
                   midi:bend semis 0 on all 16 channels. + THE KEYBED (v0.74.0):
-                  ONE lighting engine for every page. Layout by App.help
-                  level: >=3 scale, 1-2 tonic keys, 0 dark. A LUMI is PAINTED
-                  PER KEY (v0.75.0): its default LittleFoot program lights an
-                  incoming note in colourLookup[velocity] (0 off, 1-126 hue
-                  sweep, 127 white; table copied as LUMI_TABLE, lumiVel(hex)
-                  = nearest), only inside its 24-key octave window — so each
-                  scale key gets its fb.colors degree color, the note to play
-                  white (127), answers green (60), over a night-mode (SysEx)
-                  background + lights.bright. Lights off = lumiNative() (its
-                  own scale mode, midi.lumiRoot/Scale). Other LED keyboards:
-                  note-on brightness by degree.
+                  ONE lighting engine for every page. Legacy layout follows
+                  App.help (>=3 scale, 1-2 tonic, 0 dark); explicit LUMI Display
+                  ON shows the selected scale at every Help level and gives
+                  active practice targets priority. OFF releases owned notes
+                  and display leases. The archived default LittleFoot program
+                  uses colourLookup[velocity] inside its 24-key window
+                  (0 off, 1-126 hue sweep, 127 white). js/note-palette.js owns
+                  this shared profile: App.colors maps screen and LED pitch
+                  identity together, including chromatic natural-anchor blends.
+                  Target/correct/wrong states retain pitch hue; labels, icons
+                  and outlines communicate feedback. Physical program/RGB
+                  behavior remains unverified. Other LED keyboards retain
+                  their note-on brightness behavior.
                   Layers: guide(now, next) (Keys runner/Guide/lessons, chord
                   player; now at help>=2, next blinks at >=3), reveal(pcs, ms)
                   (Exercises answers, help>=2), hideLayout(owner, on) (quiz
@@ -73,15 +75,16 @@ js/midi.js        MIDI service (App.midi: in/out ports, note/bend/pressure
                   quiz, range learning and lights still react (unlike
                   tone-in's silent:true). A synth that sounds itself is
                   never doubled.
-                  v0.79.0 LUMI DISPLAY (lights.display, default on;
-                  App.midi.display / setDisplay, 'lights:display'): while a
-                  guide is up (help >= 2) wanted() drops the scale/tonic
-                  layout and lights only guideNow steady + guideNext
-                  blinking, each in its App.colors color (guideColorVel:
-                  degree in Interval mode, pitch class in Note mode; off-
-                  scale = root color) instead of white. No guide = normal
-                  layout. Off = classic (layout + white now-note). Switch
-                  in Lights & help (LUMI rows) and the lesson card chip.
+                  v0.79.0 lights.display remains the legacy Guide focus style
+                  (App.midi.display / setDisplay, 'lights:display'): target-only
+                  versus scale-alongside-target, with steady current and
+                  blinking next notes. Both retain mapped pitch colors,
+                  including out-of-scale chromatic intervals. The sole master
+                  is lights.displayEnabled (setDisplayEnabled), in the clef
+                  dropdown; its explicit ON prioritizes guides/reveals at any
+                  Help level. The old lesson/Lights sheet chips are Guide
+                  focus, not another illumination master. See NOTE-PALETTE.md
+                  and LUMI-PRACTICE.md under docs/ for protocol/ownership limits.
                   v0.80.0: every practice page lights keys ONLY through
                   App.midi.guide - Songs (plGuide: the sounding step + the
                   next, cleared on pause/hide) and the Woodshed (lightsUpdate
@@ -183,6 +186,20 @@ js/keylessons.js  │ SCALE LESSONS on the Keys page (mounted into #pn-lessons
                   │  hide, app hide; summary() feeds Exercises Progress.
 js/songs.js       │ (songs: user-imported ASCII tab / MIDI parsed on-device,
                   │  bar-loop player at shared tempo, key detect → fb:set)
+js/lumi-practice.js LUMI note/triad practice under Keys (selectively recovered
+                  from b8ccb55; see docs/LUMI-PRACTICE.md). Session-only
+                  simulated answers by default; optional exact LUMI/MODX
+                  input and LUMI output through additive Web MIDI subscriptions.
+                  App.midi.leaseKeybedOutput pauses the shared LED painter
+                  on the same selected output during test/armed guidance;
+                  cleanup restores its current layout. Native independent
+                  routes unsupported. Tests: lumi-practice, midi-ports.
+js/practice-router.js Scale-locked external synth sound for LUMI practice:
+                  explicit synth input/sound output, separate display output;
+                  reuses App.scaleLock.contains, blocks out-of-scale notes,
+                  tracks paired notes/pedal by channel, and uses pinned
+                  output ownership. Requires manual Local Control OFF; never
+                  changes hardware settings. Test: practice-router.
 js/jam.js         │ (jam: auto-band — genre presets write an intro/A/B/ending
                   │  song of DEGREE tokens that re-harmonize live against the
                   │  context-bar key; section editor, energy/swing, per-
@@ -584,6 +601,9 @@ version.json      auto-update feed (source of truth for latest version)
   rules on Thru / input filter, profiles + SysEx builders, clock), audioin
   (fake media device), btmidi (a fake Android MidiBridge). Run them
   before every release and add a suite or checks for new features.
+  `SL_LOG_DIR` keeps concurrent baseline/feature test logs separate. The
+  quiz-correction suite covers fresh corrections after a miss and held-note
+  identity across input ports and layered channels.
   PC (2026-10-19): Node 24 IS on this machine now; install playwright into a
   scratch folder (`npm i playwright@1.49.1 && npx playwright install chromium`)
   and run suites with NODE_PATH=<that>/node_modules SL_URL=http://127.0.0.1:4573/index.html
@@ -595,7 +615,16 @@ version.json      auto-update feed (source of truth for latest version)
   setTimeout when testing animations) and `preview_click` may not deliver
   events — drive the DOM with `preview_eval` + `.click()`.
 
-## Release checklist (all five, every release)
+## Release checklist (separate web and APK channels)
+
+For a web/PWA-only release, update `APP_VERSION`, `version.json.web`/`notes`,
+and the service-worker assets/cache, then complete the review and full CI gate.
+Keep the APK feed channel, native manifest and binaries unchanged unless a new
+wrapper is actually built. The current candidate is web 1.0.0 with the existing
+APK channel 0.75.0; candidate metadata is not evidence of publication. See
+`docs/RELEASE-1.0.0-CHECKLIST.md` and `docs/CI-DEPLOYMENT.md`.
+
+When rebuilding a native wrapper, also complete the native release checklist:
 
 1. `APP_VERSION` in js/app.js
 2. `version.json`: bump `web` + `notes` (drives the web / PWA / Android-app
@@ -610,8 +639,11 @@ version.json      auto-update feed (source of truth for latest version)
 5. Build APK: `android\build.ps1` (outputs to releases/; sets JAVA_HOME itself;
    toolchain lives in C:\Users\mrein\AndroidBuildTools)
 
-Then: verify in preview, commit + push (credential is stored), and republish
-the artifact (below).
+Publish only within current authorization and after the applicable gates pass.
+Use normal reviewed commits and ordinary pushes. The Pages workflow requires
+the full reusable test job, checks out its exact passing SHA and appends a
+deployment commit without rewriting gh-pages history. Artifact publication
+below is a separate destination and requires its own authorization.
 
 ## claude.ai Artifact (the app, hosted in claude.ai)
 
@@ -658,6 +690,16 @@ session runs android\build.ps1, and open a pull request instead of pushing
 to main so the owner can review from their phone.
 
 ## Gotchas
+
+- The cloud integration on `codex/soundlab-lumi-consolidation-20261023` is a
+  web 1.0.0 release candidate. Publication is conditional on completed features,
+  independent review and software gates. A normal review-branch push may run
+  hosted CI after the local feature freeze; main/tag/release/deployment wait
+  for the agreed gates and reporting of unresolved conditions. No force push,
+  hardware, credential, billing or unrelated-repository change is authorized.
+  Preserve APK channel/binaries and all source branches. Read the release
+  checklist, branch audit, coverage and validation notes under `docs/` before
+  extending the shared Scale Lock, instructional MIDI or performance player.
 
 - PowerShell 5.1: no `&&`; embedded double quotes split native args (use
   single quotes in commit messages).

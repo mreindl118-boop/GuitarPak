@@ -23,7 +23,7 @@
  * their colors with LUMI Display (Lights & help), folded into the LUMI's
  * window; Wait mode holds the lit note until it is played.
  * Scores: built-in generators (scales, Hanon, pentatonic workout, 8 PAS
- * rudiments with sticking + accents), MIDI file import (tempo-aware),
+ * rudiments with sticking + accents), MIDI file import (constant initial practice tempo),
  * ASCII tab paste (pitches only — timing marked approximate: Wait mode
  * immediately, scored modes after assuming even eighths), and any Studio
  * synth track. Library in ws.lib with auto difficulty.
@@ -32,6 +32,7 @@
   'use strict';
 
   var els = {};
+  var progressUI = null;
   var view = 'lib';          // lib | session | report | cal
   var WIN = { perfect: 30, great: 60, good: 100 };
   var PHRASE_BEATS = 8;
@@ -85,6 +86,28 @@
     }
     var name = Theory.pcName(Theory.mod12(rootPc), Theory.FLAT_KEYS.has(rootPc));
     return mkScore(name + ' pentatonic fours', 'guitar', 88, notes, true, 'generator');
+  }
+
+  // Original practice material: structured melody, repeated attacks, triads
+  // and rests in the user's selected scale. No copyrighted song content.
+  function guidedScore(chords) {
+    var root = Theory.mod12(App.store.get('fb.root', 0)), id = App.store.get('fb.scale', 'major');
+    var scale = Theory.SCALES[id] || Theory.SCALES.major, steps = scale.steps;
+    function degree(i) { return 48 + root + steps[i % steps.length] + 12 * Math.floor(i / steps.length); }
+    var notes = [];
+    function put(m,t,d) { notes.push({m:m,t:t,d:d,v:96}); }
+    if (chords) {
+      [0,3,4,0].forEach(function (r,i) {
+        var t=i*8;
+        [r,r+2,r+4].forEach(function (n) { put(degree(n),t,2); });
+        [r,r+1,r+2,r+2].forEach(function (n,j) { put(degree(n),t+3+j,.75); });
+      });
+    } else {
+      [0,0,1,2,3,2,1,0,2,4,3,2,1,1,0].forEach(function (n,i) { put(degree(n), i+(i>=8?2:0), .8); });
+      [0,2,4].forEach(function (n) { put(degree(n),20,2); });
+      [0,1,2,3,4,3,2,1,0].forEach(function(n,i) { put(degree(n),23+i*.75,.5); });
+    }
+    return mkScore(Theory.pcName(root,Theory.FLAT_KEYS.has(root))+' '+scale.name+' · '+(chords?'Chord journey':'Melody and rhythm'), 'piano', chords?72:84, notes, true, 'original-generator');
   }
 
   // The full 40 PAS rudiments. flam: one grace ~30ms before the marked
@@ -182,89 +205,172 @@
 
   // ---------------- importers ----------------
 
-  // minimal tempo-aware SMF reader (type 0/1)
+  // Bounded SMF reader (type 0/1), beat timing with a chosen constant tempo.
   function importMidi(buf, name) {
-    var d = new DataView(buf);
-    var p = 0;
-    function u32() { var v = d.getUint32(p); p += 4; return v; }
-    function u16() { var v = d.getUint16(p); p += 2; return v; }
-    function u8() { return d.getUint8(p++); }
-    function vlq() { var v = 0, b; do { b = u8(); v = (v << 7) | (b & 0x7f); } while (b & 0x80); return v; }
+    var d = new DataView(buf), p = 0, limit = d.byteLength;
+    function need(n) {
+      if (n < 0 || p + n > limit) throw new Error('truncated MIDI chunk or event');
+    }
+    function u32() { need(4); var v = d.getUint32(p); p += 4; return v; }
+    function u16() { need(2); var v = d.getUint16(p); p += 2; return v; }
+    function u8() { need(1); return d.getUint8(p++); }
+    function skip(n) { need(n); p += n; }
+    function vlq() {
+      var v = 0, b;
+      for (var i = 0; i < 4; i++) {
+        b = u8(); v = v * 128 + (b & 0x7f);
+        if (!(b & 0x80)) return v;
+      }
+      throw new Error('MIDI variable-length value exceeds four bytes');
+    }
+    function data() { var v = u8(); if (v > 127) throw new Error('invalid MIDI data byte'); return v; }
     if (u32() !== 0x4d546864) throw new Error('not a MIDI file');
-    u32(); u16();
-    var nTracks = u16(), division = u16();
+    var headerLength = u32();
+    if (headerLength < 6) throw new Error('invalid MIDI header length');
+    need(headerLength);
+    var headerEnd = p + headerLength, format = u16(), nTracks = u16(), division = u16();
+    p = headerEnd;
+    if (format !== 0 && format !== 1) throw new Error('only MIDI formats 0 and 1 are supported');
+    if (!nTracks || (format === 0 && nTracks !== 1)) throw new Error('invalid MIDI track count');
     if (division & 0x8000) throw new Error('SMPTE time not supported');
-    var tempo = 500000, notes = [], drums = false;
+    if (!division) throw new Error('MIDI ticks per quarter note must be positive');
+    var notes = [], tempos = [], warnings = [], dropped = {}, order = 0, lastTick = 0;
+    var unclosed = 0, unmatched = 0, overlaps = 0;
+    function omitted(kind) { dropped[kind] = (dropped[kind] || 0) + 1; }
     for (var tr = 0; tr < nTracks; tr++) {
-      if (u32() !== 0x4d54726b) break;
-      var len = u32(), end = p + len, tick = 0, run = 0;
-      var open = {};
+      if (u32() !== 0x4d54726b) throw new Error('missing MIDI track chunk');
+      var len = u32(); need(len);
+      var end = p + len, tick = 0, run = 0, ended = false;
+      limit = end;
+      var open = Object.create(null);
       while (p < end) {
         tick += vlq();
+        if (!Number.isSafeInteger(tick)) throw new Error('MIDI tick position is too large');
         var st = u8();
-        if (st < 0x80) { p--; st = run; } else run = st;
+        if (st < 0x80) {
+          if (!run) throw new Error('MIDI running status has no channel status');
+          p--; st = run;
+        } else if (st < 0xf0) run = st;
+        else run = 0;
         var type = st & 0xf0, ch = st & 0x0f;
         if (st === 0xff) {
           var meta = u8(), ml = vlq();
-          if (meta === 0x51 && ml === 3) { tempo = (u8() << 16) | (u8() << 8) | u8(); }
-          else p += ml;
-        } else if (st === 0xf0 || st === 0xf7) {
-          p += vlq();
-        } else if (type === 0x90 || type === 0x80) {
-          var m = u8(), v = u8();
-          var beat = tick / division;
-          if (type === 0x90 && v > 0) {
-            open[ch + ':' + m] = { t: beat, v: v };
-            if (ch === 9) drums = true;
+          need(ml);
+          if (meta === 0x2f) {
+            if (ml !== 0 || p !== end) throw new Error('invalid MIDI end-of-track event');
+            ended = true; break;
+          } else if (meta === 0x51) {
+            if (ml !== 3) throw new Error('invalid MIDI tempo event');
+            var tempo = u8() * 65536 + u8() * 256 + u8();
+            if (!tempo) throw new Error('MIDI tempo must be positive');
+            tempos.push({ tick: tick, value: tempo, order: tempos.length });
           } else {
-            var o = open[ch + ':' + m];
-            if (o) {
-              notes.push({ m: m, t: o.t, d: Math.max(0.1, beat - o.t), v: o.v, lane: ch === 9 ? (notes.length % 2) : undefined });
-              delete open[ch + ':' + m];
-            }
+            if (meta === 0x58) omitted('time signatures');
+            else if (meta === 0x59) omitted('key signatures');
+            else if (meta >= 1 && meta <= 9) omitted('text, lyrics and track labels');
+            else omitted('other metadata');
+            skip(ml);
           }
-        } else if (type === 0xc0 || type === 0xd0) { p += 1; }
-        else { p += 2; }
+        } else if (st === 0xf0 || st === 0xf7) {
+          skip(vlq()); omitted('SysEx');
+        } else if (type === 0x90 || type === 0x80) {
+          var m = data(), v = data(), key = ch + ':' + m;
+          var beat = tick / division, queue = open[key];
+          if (type === 0x90 && v > 0) {
+            if (!queue) queue = open[key] = [];
+            if (queue.length) overlaps++;
+            queue.push({ t: beat, v: v, order: order++ });
+          } else {
+            if (queue && queue.length) {
+              var o = queue.shift();
+              notes.push({ m: m, t: o.t, d: beat - o.t, v: o.v, ch: ch, order: o.order });
+            } else unmatched++;
+          }
+        } else if (st >= 0x80 && st < 0xf0) {
+          data(); if (type !== 0xc0 && type !== 0xd0) data();
+          omitted(type === 0xb0 ? 'controllers (including sustain)' : type === 0xe0 ? 'pitch bends' :
+            type === 0xc0 ? 'program changes' : 'pressure');
+        } else throw new Error('unsupported system event in MIDI file');
       }
-      p = end;
+      if (!ended) throw new Error('MIDI track is missing its end-of-track event');
+      Object.keys(open).forEach(function (key) { unclosed += open[key].length; });
+      lastTick = Math.max(lastTick, tick);
+      p = end; limit = d.byteLength;
     }
     if (!notes.length) throw new Error('no notes found');
-    notes.sort(function (a, b) { return a.t - b.t; });
-    if (notes.length > 1500) notes = notes.slice(0, 1500);
-    var t0 = notes[0].t;
-    notes.forEach(function (n) { n.t = Math.round((n.t - t0) * 100) / 100; });
-    var bpm = Math.max(40, Math.min(240, Math.round(60000000 / tempo)));
-    return mkScore(name.replace(/\.[^.]+$/, '').slice(0, 40), drums ? 'drums' : 'piano', bpm, notes, true, 'midi');
+    var pitched = notes.filter(function (n) { return n.ch !== 9; }), drums = !pitched.length;
+    if (!drums && pitched.length !== notes.length) {
+      warnings.push('Channel 10 percussion was excluded from this pitched exercise (' + (notes.length - pitched.length) + ' notes).');
+      notes = pitched;
+    }
+    notes.sort(function (a, b) { return a.t - b.t || a.order - b.order; });
+    if (notes.length > 1500) {
+      warnings.push('Only the first 1500 notes were imported (' + (notes.length - 1500) + ' omitted).');
+      notes = notes.slice(0, 1500);
+    }
+    notes.forEach(function (n, i) { delete n.order; if (drums) n.lane = i % 2; });
+    tempos.sort(function (a, b) { return a.tick - b.tick || a.order - b.order; });
+    // SMF defaults to 120 bpm before its first tempo event. Practice chooses
+    // the final beat-zero tempo and keeps it constant; notes remain in beats.
+    var initialTempo = 500000;
+    tempos.forEach(function (t) { if (t.tick === 0) initialTempo = t.value; });
+    var variableTempo = tempos.some(function (t) { return t.tick > 0 && t.value !== initialTempo; });
+    if (variableTempo) warnings.push('Tempo changes are not followed: practice uses the initial tempo (' +
+      Math.round(60000000 / initialTempo * 100) / 100 + ' bpm) at a constant rate. Beat positions and note durations are preserved.');
+    if (tempos.filter(function (t) { return t.tick === 0; }).some(function (t) { return t.value !== initialTempo; }))
+      warnings.push('Conflicting beat-zero tempos: the last beat-zero tempo in track order was selected.');
+    if (unclosed) warnings.push(unclosed + ' note attacks without matching releases were omitted; no held duration was invented.');
+    if (unmatched) warnings.push(unmatched + ' unmatched note releases were ignored.');
+    if (overlaps) warnings.push('Overlapping attacks of the same channel/pitch were paired with releases in attack order; ties are not inferred.');
+    if (drums) warnings.push('Percussion pitches are preserved; sticking and limb assignments are not encoded (display lanes alternate).');
+    if (Object.keys(dropped).length) warnings.push('Not applied: ' + Object.keys(dropped).join(', ') + '.');
+    if (p < d.byteLength) warnings.push('Trailing data after the declared MIDI tracks was ignored.');
+    var sc = mkScore(String(name || 'Imported MIDI').replace(/\.[^.]+$/, '').slice(0, 40),
+      drums ? 'drums' : 'piano', 60000000 / initialTempo, notes, true, 'midi');
+    // Preserve leading, internal and trailing rests rather than rebasing or
+    // quantizing the original beat grid. Other score generators stay bar-sized.
+    sc.len = Math.max(lastTick / division, notes.reduce(function (max, n) { return Math.max(max, n.t + n.d); }, 0));
+    sc.sourceLengthBeats = lastTick / division;
+    sc.importWarnings = warnings;
+    sc.importTempo = { policy: 'constant-initial', microsecondsPerQuarter: initialTempo, variable: variableTempo };
+    sc.diff = difficulty(sc);
+    return sc;
   }
 
   var TAB_TUNING = [64, 59, 55, 50, 45, 40]; // e B G D A E
   function importAscii(text, name) {
-    var lines = text.split(/\r?\n/);
+    var lines = String(text).split(/\r?\n/);
     var systems = [], run = [];
+    function flush() {
+      while (run.length >= 6) systems.push(run.splice(0, 6));
+      run = [];
+    }
     lines.forEach(function (ln) {
-      if (/^[eEBGDAd]?[|:]?[-0-9hpbrx/\\~|]{6,}/.test(ln.trim()) && /-/.test(ln)) run.push(ln);
-      else { if (run.length >= 6) systems.push(run.slice(0, 6)); run = []; }
+      if (/^[eEBGDAd]?[|:]?[-0-9hpbrx/\\~|]{6,}/.test(ln.trim()) && /-/.test(ln)) run.push(ln.trim());
+      else flush();
     });
-    if (run.length >= 6) systems.push(run.slice(0, 6));
+    flush();
     if (!systems.length) throw new Error('no tab found — need six string lines');
-    var notes = [];
+    var notes = [], omitted = 0;
     var col0 = 0;
     systems.forEach(function (sys) {
-      var start = 0;
-      sys.forEach(function (ln) { var i = ln.indexOf('-'); if (i > start) start = i; });
-      var width = Math.max.apply(null, sys.map(function (l) { return l.length; }));
-      for (var c = start; c < width; c++) {
+      // Strip the string label/separator, not initial fret numbers. Column
+      // position is shared by all strings; a two-digit fret consumes columns
+      // only on its own string and must not move the other chord voices.
+      var bodies = sys.map(function (ln) { return ln.replace(/^[eEBGDAd]?[|:]/, '').replace(/^[eEBGDAd](?=[-0-9])/, ''); });
+      var width = Math.max.apply(null, bodies.map(function (l) { return l.length; }));
+      for (var c = 0; c < width; c++) {
         for (var s = 0; s < 6; s++) {
-          var ch = sys[s][c];
+          var ch = bodies[s][c];
           if (ch >= '0' && ch <= '9') {
-            var fret = parseInt(ch, 10);
-            if (sys[s][c + 1] >= '0' && sys[s][c + 1] <= '9') { fret = fret * 10 + parseInt(sys[s][c + 1], 10); }
-            if (fret <= 24) notes.push({ m: TAB_TUNING[s] + fret, t: col0 + (c - start), d: 0.9, v: 96, str: s, fret: fret });
-            if (fret > 9) c++;
+            if (c && /[0-9]/.test(bodies[s][c - 1])) continue;
+            var digits = bodies[s].slice(c).match(/^\d+/)[0], fret = parseInt(digits, 10);
+            if (digits.length <= 2 && fret <= 24) notes.push({ m: TAB_TUNING[s] + fret, t: col0 + c, d: 0.9, v: 96, str: s, fret: fret });
+            else omitted++;
           }
         }
       }
-      col0 += width - start + 2;
+      col0 += width + 2;
     });
     if (!notes.length) throw new Error('no fret numbers found');
     // collapse columns to sequential positions, assume even eighths
@@ -272,7 +378,9 @@
     notes.forEach(function (n) { if (cols.indexOf(n.t) === -1) cols.push(n.t); });
     cols.sort(function (a, b) { return a - b; });
     notes.forEach(function (n) { n.t = cols.indexOf(n.t) * 0.5; n.d = 0.45; });
-    var sc = mkScore(name.slice(0, 40) || 'Pasted tab', 'guitar', 80, notes, false, 'ascii');
+    var sc = mkScore(String(name || 'Pasted tab').slice(0, 40), 'guitar', 80, notes, false, 'ascii');
+    sc.importWarnings = ['Standard guitar tuning is assumed. ASCII tab rhythm, rests and techniques are not interpreted; onset groups use even eighths and note holds are approximate. Ties are not inferred.'];
+    if (omitted) sc.importWarnings.push(omitted + ' unsupported fret numbers outside 0–24 were omitted.');
     return sc;
   }
 
@@ -683,20 +791,9 @@
   }
 
   function detectPitch(buf, sr) {
-    // normalized autocorrelation over guitar-range lags
-    var minLag = Math.floor(sr / 1000), maxLag = Math.floor(sr / 60);
-    var bestLag = -1, bestR = 0;
-    var energy = 0;
-    for (var i = 0; i < buf.length; i++) energy += buf[i] * buf[i];
-    if (energy === 0) return null;
-    for (var lag = minLag; lag <= maxLag; lag++) {
-      var r = 0;
-      for (var j = 0; j + lag < buf.length; j += 2) r += buf[j] * buf[j + lag];
-      r = (2 * r * 2) / energy; // normalize (stride-2 compensation)
-      if (r > bestR) { bestR = r; bestLag = lag; }
-    }
-    if (bestLag < 0) return null;
-    return { freq: sr / bestLag, clarity: Math.min(1, bestR) };
+    var p = window.SLPitchDetector && window.SLPitchDetector.detect(buf, sr,
+      { minFrequency: 60, maxFrequency: 1300, noiseFloor: 0.001 });
+    return p && !p.ambiguous ? { freq: p.frequency, clarity: p.confidence } : null;
   }
 
   function paintMicChip() {
@@ -1058,6 +1155,7 @@
   }
 
   function renderLib() {
+    if(progressUI){progressUI.unmount();progressUI=null;}
     var weak = weakQueue();
     var h =
       '<div class="card">' +
@@ -1065,6 +1163,10 @@
           '<span class="muted small">' + statsLine() + '</span></div>' +
         '<div class="muted small" style="margin-top:6px">Pick something to practice — every run is scored (Perfect ±' + WIN.perfect +
           'ms) and lands as a take in your Studio Ideas. Calibrate once per input for honest timing.</div>' +
+        '<div class="card" style="margin-top:12px;background:var(--card2)"><h3 style="margin-top:0">Guided performance</h3>' +
+          '<p class="small">See what to play on the piano roll and keyboard. <b>Wait for Me</b> follows your notes and chords; <b>Play at Tempo</b> keeps time and gives a full accuracy report. MIDI and touch/typing keys work without LUMI.</p>' +
+          '<div class="row"><button type="button" class="btn primary" id="ws-guided-melody">Melody and rhythm</button><button type="button" class="btn" id="ws-guided-chords">Chord journey</button></div>' +
+          '<p class="small muted">Original exercises follow the treble-clef root/scale. Your library’s MIDI, Studio and generated scores can use either mode below. PDFs and images do not contain parsed targets.</p></div>' +
         '<div class="row" style="margin-top:12px">' +
           '<button type="button" class="btn sm" id="ws-gen-scale">+ Scale (your key)</button>' +
           '<button type="button" class="btn sm" id="ws-gen-hanon">+ Hanon</button>' +
@@ -1081,6 +1183,7 @@
         '</div>' +
         '<div class="muted small" id="ws-msg" style="margin-top:8px"></div>' +
       '</div>' +
+      '<div id="ws-progress"></div>' +
       (weak.length ? '<div class="card"><h2>Weak spots</h2><div class="row tight">' + weak.slice(0, 5).map(function (w, i) {
         return '<button type="button" class="chip fb-chip" data-wsweak="' + i + '">' + esc(w.title.slice(0, 18)) + ' · phrase ' + (w.phrase + 1) + ' · ' + w.acc + '%</button>';
       }).join('') + '</div><div class="muted small" style="margin-top:6px">Your lowest-scoring phrases — clear them and they leave the queue.</div></div>' : '') +
@@ -1099,6 +1202,7 @@
           sc.notes.length + ' notes · diff ' + '★'.repeat(sc.diff) + (sc.timingOk ? '' : ' · timing approximate') +
           (best ? ' · best ' + best : '') + '</span></span>' +
           '<span class="row tight">' +
+            (sc.instrument !== 'drums' ? '<button type="button" class="btn sm primary" data-wsperform="wait">Wait for Me</button><button type="button" class="btn sm" data-wsperform="tempo">Play at Tempo</button>' : '') +
             '<button type="button" class="btn sm primary" data-wsplay="run">Run</button>' +
             '<button type="button" class="btn sm" data-wsplay="phrase">Phrases</button>' +
             '<button type="button" class="btn sm" data-wsplay="wait">Wait</button>' +
@@ -1108,6 +1212,7 @@
       }).join('') : '<div class="muted">Nothing yet — generate an exercise above, import a MIDI file, or paste a tab.</div>') + '</div></div>';
     els.root.innerHTML = h;
     wireLib();
+    if(window.PracticeProgressUI)progressUI=PracticeProgressUI.mount(document.getElementById('ws-progress'),{instrument:App.store.get('ws.performance.instrument','piano')});
   }
 
   function renderSession() {
@@ -1272,6 +1377,12 @@
   }
 
   function wireLib() {
+    document.getElementById('ws-guided-melody').addEventListener('click', function () {
+      performanceStart(guidedScore(false), 'wait');
+    });
+    document.getElementById('ws-guided-chords').addEventListener('click', function () {
+      performanceStart(guidedScore(true), 'wait');
+    });
     document.getElementById('ws-gen-scale').addEventListener('click', function () {
       addScore(scaleScore(App.store.get('ws.instr', 'piano') === 'guitar' ? 'guitar' : 'piano'));
     });
@@ -1286,7 +1397,7 @@
         try {
           var sc = importMidi(rd.result, f.name);
           addScore(sc);
-          msg('Imported “' + sc.title + '”: ' + sc.notes.length + ' notes, ' + sc.bpm + ' BPM, tempo map applied. Preserved: pitches, timing, velocities. Dropped: program changes, CC, pitch bend, lyrics.');
+          msg('Imported “' + sc.title + '”: ' + sc.notes.length + ' notes, practice tempo ' + sc.bpm + ' BPM. Preserved: pitches, beat positions, durations and velocities. ' + (sc.importWarnings || ['Controllers, program changes, pitch bend and lyrics are not performance targets.']).join(' '));
         } catch (e) { msg('MIDI import failed: ' + e.message); }
       };
       rd.readAsArrayBuffer(f);
@@ -1309,7 +1420,7 @@
       msg('“' + t.name + '” imported from the Studio.');
     });
     document.getElementById('ws-cal-btn').addEventListener('click', startCal);
-    els.root.addEventListener('click', function (e) {
+    els.root.onclick = function (e) {
       var rud = e.target.closest('[data-wsrud]');
       if (rud) {
         var r = RUDIMENTS.filter(function (x) { return x.id === rud.getAttribute('data-wsrud'); })[0];
@@ -1329,6 +1440,13 @@
         return;
       }
       var play = e.target.closest('[data-wsplay]');
+      var guided = e.target.closest('[data-wsperform]');
+      if (guided) {
+        var grow = guided.closest('[data-wsid]');
+        var gscore = lib().filter(function (x) { return x.id === grow.getAttribute('data-wsid'); })[0];
+        if (gscore) performanceStart(gscore, guided.getAttribute('data-wsperform'));
+        return;
+      }
       if (play) {
         var row = play.closest('[data-wsid]');
         var sc2 = lib().filter(function (x) { return x.id === row.getAttribute('data-wsid'); })[0];
@@ -1340,7 +1458,7 @@
         saveLib(lib().filter(function (x) { return x.id !== del.getAttribute('data-wsdel'); }));
         renderLib();
       }
-    });
+    };
   }
 
   function msg(s) {
@@ -1349,6 +1467,14 @@
   }
 
   // ---------------- module ----------------
+
+  function performanceStart(sc, mode, opts) {
+    if(progressUI){progressUI.unmount();progressUI=null;}
+    if (S) endRun(false);
+    micStop(); lightsOff();
+    view = 'performance';
+    PerformancePlayer.open(els.root, sc, Object.assign({}, opts || {}, {mode:mode === 'tempo' ? 'tempo' : 'wait',onBack:function(){view='lib';renderLib();}}));
+  }
 
   function init(rootEl) {
     App.injectCSS('woodshed',
@@ -1402,13 +1528,16 @@
     get cal() { return cal; },
     get mic() { return mic; },
     importMidi: importMidi,
-    importAscii: importAscii
+    importAscii: importAscii,
+    importTrack: importTrack,
+    guidedScore: guidedScore,
+    performanceStart: performanceStart
   };
 
   App.register('shed', {
     init: init,
     onShow: function () { if (view === 'lib') renderLib(); },
-    onHide: function () { if (S) endRun(false); micStop(); lightsOff(); },
+    onHide: function () { if (S) endRun(false); if (window.PerformancePlayer) PerformancePlayer.hide(); micStop(); lightsOff(); },
     onKey: function (e) {
       if (view !== 'session' || !S) return;
       // QWERTY drumming/tapping: Z/X = L/R pads in the shed (drums), any-key tap for cal

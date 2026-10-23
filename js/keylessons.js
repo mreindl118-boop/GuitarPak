@@ -30,8 +30,9 @@
  * (or Again / Next level / Go again); during a run they stop it, unless the
  * second strike was a right note of the lesson (a turnaround that repeats
  * that note never stops a run). Double-tapping empty space on the lesson
- * card does the same on a touchscreen. The LUMI DISPLAY chip mirrors
- * Lights & help (App.midi.display).
+ * card does the same on a touchscreen. The GUIDE COLORS chip mirrors
+ * the legacy guide-style setting (App.midi.display); the single LUMI Display
+ * master lives in the treble-clef menu.
  */
 (function () {
   'use strict';
@@ -415,7 +416,7 @@
         '<div class="kl-acts"><button type="button" class="btn primary" id="kl-start">' + App.icon('play', 13) + ' Start</button>' +
           '<button type="button" class="btn" id="kl-listen">Listen first</button></div>' +
         '<div class="kl-ctl">' +
-          '<button type="button" class="chip fb-chip' + (lumiDisplay() ? ' active' : '') + '" id="kl-disp" aria-pressed="' + lumiDisplay() + '" title="The LUMI lights only the keys to play, in their colors">LUMI Display</button>' +
+          '<button type="button" class="chip fb-chip' + (lumiDisplay() ? ' active' : '') + '" id="kl-disp" aria-pressed="' + lumiDisplay() + '" title="Legacy guide focus; pitch colors are shared, LUMI Display master is in the clef menu">Guide focus</button>' +
           '<button type="button" class="chip fb-chip' + (dblOn() ? ' active' : '') + '" id="kl-dbltap" aria-pressed="' + dblOn() + '" title="Start and stop with a double-tap">Double-tap</button>' +
           (dblOn() ? '<span class="muted small">Double-tap <b>' + ctrlName() + '</b> (your keyboard’s lowest key) or this card to start; again to stop.</span>' : '') +
         '</div>' +

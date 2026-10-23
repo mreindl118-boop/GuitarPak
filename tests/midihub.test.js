@@ -47,7 +47,7 @@ const J = JSON.stringify;
       tour: !!(window.Help && Help.TOURS.midihub && Help.TOURS.midihub.length)
     };
   });
-  ok(nav.active === 'midihub' && nav.group === 'Keys' && nav.pills === 'Piano|Synth|Pads|MIDI', 'MIDI Hub is the fourth Keys pill: ' + nav.pills);
+  ok(nav.active === 'midihub' && nav.group === 'Keys' && nav.pills === 'Piano|Synth|Pads|MIDI|LUMI', 'MIDI Hub remains the fourth Keys pill alongside LUMI practice: ' + nav.pills);
   ok(nav.views === 'control,play,controls,rules,sysex,monitor,learn', 'seven views, Control first: ' + nav.views);
   // the shared service hears All keyboards by default (v0.79 multi-input)
   ok(nav.ports && nav.inSel === 'all' && nav.outSel === 'out1' && /In: All keyboards · Synth out: Synth Port 1/.test(nav.status), 'ports picked: All keyboards in, the synth port out: ' + nav.status);
@@ -95,7 +95,9 @@ const J = JSON.stringify;
   ok(s1.slice(5).join('|') === '178 0 63|178 32 1|194 4', 'program select = bank MSB/LSB then program (1-based → 0-based): ' + s1.slice(5).join('|'));
   ok(/Program 5/.test(out1.last), 'footer shows the last message sent: ' + out1.last);
   const pan = await page.evaluate(() => { const from = __sent.length; document.getElementById('mh-panic').click(); return __since(from); });
-  ok(pan.length === 64 && pan.filter(b => b[1] === 123).length === 16 && pan.filter(b => b[1] === 120).length === 16, 'panic: notes off, sound off, sustain off and bend centre on all 16 channels');
+  ok(pan.length >= 64 && pan.filter(b => b[1] === 123).length === 16 && pan.filter(b => b[1] === 120).length === 16 &&
+    pan.filter(b => (b[0] & 0xf0) === 0xe0 && b[1] === 0 && b[2] === 64).length === 16,
+    'panic retains notes/sound off and bend centre on all 16 channels, plus scoped held-note/sustain cleanup');
 
   console.log('# in: raw tap, monitor, decode');
   const inn = await page.evaluate(() => {
@@ -139,7 +141,7 @@ const J = JSON.stringify;
     App.scaleLock.set(false); App.store.set('fb.root', r0); App.store.set('fb.scale', s0);
     return sent;
   });
-  ok(lockThru.join('|') === '128 73 0|144 74 100', 'Scale lock on Thru: checked on the note the rules produce; out-of-key note-ons stay home, note-offs pass: ' + lockThru.join('|'));
+  ok(lockThru.join('|') === '144 74 100', 'Scale lock on Thru: post-rule out-of-key notes and their unowned offs stay home; allowed note-on passes: ' + lockThru.join('|'));
 
   console.log('# rules on what soundLAB hears');
   const heard = await page.evaluate(() => {
@@ -219,7 +221,8 @@ const J = JSON.stringify;
   }));
   ok(ck.n >= 20 && ck.n <= 28 && /off/.test(ck.label), '~24 clocks per beat at 120 BPM over half a second: ' + ck.n);
   ok(ck.tr.join() === '250,252', 'Start / Stop realtime: ' + ck.tr);
-  ok(ck.left.join('|') === '130 60 0', 'leaving the page releases held keys');
+  ok(ck.left.includes('130 60 0') && ck.left.every(b => b === '130 60 0' || b === '178 64 0'),
+    'leaving the page releases held keys and sustain only on the used channel: ' + ck.left.join('|'));
 
   ok(errs.length === 0, 'no page errors (one synth port)' + (errs.length ? ': ' + errs.join(' | ') : ''));
   await ctx.close();

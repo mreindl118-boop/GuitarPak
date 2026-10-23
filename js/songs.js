@@ -328,14 +328,15 @@
   function plGuideOff() { if (pl.guided && App.midi && App.midi.guide) App.midi.guide(null, null); pl.guided = false; }
 
   function plStart() {
-    if (!cur) { plStatus('load a song first'); return; }
+    if (!cur) { plGuideOff(); plStatus('load a song first'); return; }
     pl.seq = plSeq();
-    if (!pl.seq.length) { plStatus('loop range is empty'); return; }
+    if (!pl.seq.length) { plGuideOff(); plStatus('loop range is empty'); return; }
     try { pl.ctx = App.getAudio(); } catch (e) { plStatus('audio unavailable'); return; }
     if (pl.idx >= pl.seq.length) pl.idx = 0;
     pl.vis.length = 0;
     pl.nextT = pl.ctx.currentTime + 0.15;
     pl.running = true;
+    plGuide(pl.seq[pl.idx]); // show the target before the first sounding step
     App.wake.acquire('sg-run');
     pl.timer = setInterval(plTick, 25);
     plTick();
@@ -344,12 +345,12 @@
   }
 
   function plPause() {
+    plGuideOff();
     if (!pl.running) return;
     if (pl.timer) { clearInterval(pl.timer); pl.timer = null; }
     if (pl.raf) { cancelAnimationFrame(pl.raf); pl.raf = 0; }
     pl.running = false;
     pl.vis.length = 0;
-    plGuideOff();
     App.wake.release('sg-run');
     plBtn(false);
   }
@@ -562,12 +563,18 @@
     });
 
     els.loopA.addEventListener('change', function () {
+      var running = pl.running;
+      plPause();
       pl.loopA = parseInt(this.value, 10) || 0;
       pl.idx = 0;
+      if (running) plStart();
     });
     els.loopB.addEventListener('change', function () {
+      var running = pl.running;
+      plPause();
       pl.loopB = parseInt(this.value, 10) || 0;
       pl.idx = 0;
+      if (running) plStart();
     });
 
     els.play.addEventListener('click', function () { if (pl.running) plPause(); else plStart(); });
@@ -661,7 +668,13 @@
       } catch (err) { /* audio unavailable */ }
       var seq = plSeq();
       var at = seq.indexOf(idx);
-      if (at !== -1) pl.idx = at;
+      pl.seq = seq;
+      if (at !== -1) {
+        pl.idx = at;
+        pl.vis.length = 0;
+        if (pl.running) pl.nextT = pl.ctx.currentTime + 0.15;
+      }
+      plGuide(idx);
       var prev = els.tabout.querySelector('.now');
       if (prev) prev.classList.remove('now');
       sp.classList.add('now');

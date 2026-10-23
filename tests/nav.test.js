@@ -36,7 +36,7 @@ const tabs = sel => [...document.querySelectorAll(sel + ' .tabbar-btn')].map(b =
   ok(d1.topShown && !d1.botShown && d1.noSelect && !d1.metTab, 'top tab bar on desktop, no drop-down, no metronome tab: ' + JSON.stringify(d1));
   const clickTab = async (label, sel) => { await page.click((sel || '#tabbar') + ' .tabbar-btn:has-text("' + label + '")'); await page.waitForTimeout(120); return page.evaluate(() => App.active); };
   ok(await clickTab('Keys') === 'piano', 'Keys tab opens the piano');
-  ok((await page.evaluate(() => [...document.querySelectorAll('#subnav .subtab')].map(b => b.textContent).join('|'))) === 'Piano|Synth|Pads|MIDI', 'Keys pills: Piano | Synth | Pads | MIDI');
+  ok((await page.evaluate(() => [...document.querySelectorAll('#subnav .subtab')].map(b => b.textContent).join('|'))) === 'Piano|Synth|Pads|MIDI|LUMI', 'Keys pills include LUMI alongside Piano, Synth, Pads and MIDI');
   await page.click('#subnav .subtab:has-text("Synth")'); await page.waitForTimeout(150);
   ok(await clickTab('Guitar') === 'fretboard', 'Guitar tab opens the neck');
   ok((await page.evaluate(() => [...document.querySelectorAll('#subnav .subtab')].map(b => b.textContent).join('|'))) === 'Neck|Tab|Notation', 'Guitar pills: Neck | Tab | Notation');
