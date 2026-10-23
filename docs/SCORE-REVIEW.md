@@ -8,12 +8,14 @@ revision. File loading, viewing and editing do not award practice time or XP.
 PDF pages render locally with pinned PDF.js. Use previous/next page and fit/zoom;
 the source stays beside the editable target table on a wide screen and above it
 on a phone. A PDF being visible does **not** mean notes have been recognized.
-Choose **Recognize notation locally** to find staff regions on the current page,
-select a supported single voice and run the bundled model. Actual decoded notes
-become an unverified derivative with raw tokens, source boxes and model hashes.
-The supported scope is selected clear monophonic treble/bass engraving; general
-piano polyphony, simultaneous staves, repeat expansion and arbitrary scans are
-not established. See [the workflow and limits](LOCAL-RECOGNITION.md) and
+In **Notation recognition (Beta)**, choose **Find staff on this page**, select
+exactly one monophonic treble or bass staff, confirm the support limits and
+choose **Recognize selected staff (Beta)**. Use clear engraving, one staff on one page at a time. Actual
+notes become an unverified draft with raw tokens, source boxes and model hashes.
+Compare every pitch, rest and duration with the original and correct mistakes;
+explicit review is required before practice. Full piano, polyphonic,
+multistaff, scanned-score and whole-multipage recognition are outside this beta.
+Repeats may be omitted without warning. See [the workflow and limits](LOCAL-RECOGNITION.md) and
 [engine/runtime provenance](OMR-ENGINE.md).
 
 Enter pitches with octaves (`C4`, `F#4`, `Bb3`), explicit `MIDI:0`–`MIDI:127`,

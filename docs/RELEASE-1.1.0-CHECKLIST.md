@@ -16,10 +16,10 @@ are preserved. APK channel 0.75.0 and native binaries are unchanged.
   practice history, section/setup resume and reversible removal.
 - Offline PDF.js viewer, editable note/chord/rest targets and explicit review
   before guided practice. The existing strict structured importers are reused.
-- Actual browser-local recognition for selected monophonic staff regions,
-  with staff selection/reading order, cancellation, raw model evidence,
-  source anchors and correction drafts. Parsed predictions are retained;
-  every target and its rhythm remain unverified until explicit review.
+- Browser-local **notation recognition beta** for one selected monophonic
+  treble or bass staff on one page at a time, with cancellation, raw model
+  evidence, source anchors and correction drafts. Every target and its rhythm
+  remain unverified until comparison, correction and explicit review.
 - One material launch seam into the existing Wait/Tempo engine, palette, LUMI
   ownership and canonical instrument ledger. Unknown rhythm is Wait-only.
   An arpeggio adaptation has distinct provenance and is not original-chord
@@ -38,25 +38,31 @@ are preserved. APK channel 0.75.0 and native binaries are unchanged.
 
 ## Gates
 
-- [x] All local applicable suites against the frozen application candidate;
-      see [the exact source/test boundary and blocked cases](VALIDATION-1.1.md).
-- [x] Independent reviews complete; all demonstrated blockers fixed and rerun.
+- [x] All local applicable suites against the earlier frozen application
+      candidate; see [the exact source/test boundary and blocked cases](VALIDATION-1.1.md).
+- [x] Independent reviews of that candidate complete; demonstrated blockers fixed.
+- [x] Final beta UI/help and update changes independently reviewed and affected
+      HTTP checks rerun; workflow fixtures and final commit review are recorded
+      with the public PR before merge.
 - [x] Desktop/phone, light/dark, keyboard/touch and offline/upgrade evidence.
 - [x] Exact changed files, provenance, vendor licenses and secret review.
 - [x] Actual automatic PDF notation recognition, review/correction and practice
       integration, with a hash-bound original-score corpus and explicit limits.
-- [ ] Confirm the material scope of the measured monophonic recognition path;
-      general piano/polyphonic/multistaff/scanned PDF recognition is not supplied.
-- [ ] Public review/hosted CI and final publication authorization verified.
+- [x] User approved the limited single-staff, single-page recognition beta on
+      2026-10-23: message `Sentinel_0f701efdad1c8191bef53bd235fad469`, “yes ship beta”.
+      General piano/polyphonic/multistaff/scanned/whole-multipage recognition is excluded.
+- [x] Publication authorized for this approved beta scope, conditional on passing gates.
+- [ ] Public review and full hosted CI against the exact release source.
 - [ ] Exact final remote source, immutable version tag and public asset checks.
 
 ## Explicit limits and release decision
 
 **Automatic optical music recognition is required for this release.** The
 user confirmed this requirement on 2026-10-23. The bounded local recognition path
-is integrated and evaluated; the release remains held for final regression and
-the material scope decision. PDF.js renders
-pages; it does not recognize notation. Manual targets and structured imports
+is integrated and evaluated. The user subsequently approved shipping its limited
+single-staff, single-page beta scope on 2026-10-23. Final regression, independent
+review and hosted/publication gates remain required. PDF.js renders pages;
+it does not recognize notation. Manual targets and structured imports
 are useful existing paths, but do not satisfy the recognition gate.
 
 An eligible MIT-licensed, public-domain-trained staff-line model has run in a
@@ -82,10 +88,11 @@ app assets during online installation. Actual inference starts deliberately and
 works offline after a complete asset cache. No runtime CDN or external account
 is required. The separate CPU engines are not bundled or deployed.
 
-Recognition currently selects up to four consecutive monophonic staff regions
-from one page at a time, with an explicit reading-order acknowledgement. It does
-not align simultaneous hands/parts or assemble a whole multipage song. Repeats
-can be silently omitted by the model; block chords can be rejected or misread.
+The released beta recognizes exactly one selected monophonic treble or bass
+staff on one page at a time. It does not recognize a full piano score,
+polyphony, simultaneous or sequential multiple staves, arbitrary scanned scores
+or a whole multipage song. Repeats can be silently omitted by the model; block
+chords can be rejected or misread.
 Mandatory source comparison and explicit review prevent those raw predictions
 from automatically becoming scored practice. General whole-score recognition
 would need a substantially broader browser engine or a separately approved
@@ -114,10 +121,9 @@ it is not public UI verification. Published 1.0 used its ordinary hosted
 ## Publication and rollback
 
 Do not publish this candidate merely because its metadata says 1.1.0. Finish
-the gates and report remaining limits first. Existing workflows automatically
-release only web 1.0.0; they do not silently create a 1.1 tag. Any approved 1.1
-release must test its exact commit, preserve source/deployment history, verify
-public runtime bytes and never move an existing tag or change credential scopes.
+the gates and report remaining limits first. The approved 1.1 release must use
+the reviewed version-guarded workflow, test its exact commit, preserve
+source/deployment history, verify public runtime bytes and never move an existing tag or change credential scopes.
 Rollback is a reviewed source revert followed by the same tests and an appended
 deployment. User data is restored through validated backups/recovery; app
 cache rollback must never delete song originals, settings or practice history.

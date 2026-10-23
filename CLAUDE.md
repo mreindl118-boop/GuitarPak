@@ -613,9 +613,10 @@ version.json      auto-update feed (source of truth for latest version)
 For a web/PWA-only release, update `APP_VERSION`, `version.json.web`/`notes`,
 and the service-worker assets/cache, then complete the review and full CI gate.
 Keep the APK feed channel, native manifest and binaries unchanged unless a new
-wrapper is actually built. The current candidate is web 1.0.0 with the existing
-APK channel 0.75.0; candidate metadata is not evidence of publication. See
-`docs/RELEASE-1.0.0-CHECKLIST.md` and `docs/CI-DEPLOYMENT.md`.
+wrapper is actually built. Web 1.0.0 is published; the current candidate is
+web 1.1.0 with explicitly limited single-staff notation recognition Beta and
+the existing APK channel 0.75.0. Candidate metadata is not evidence of
+publication. See `docs/RELEASE-1.1.0-CHECKLIST.md` and `docs/CI-DEPLOYMENT.md`.
 
 When rebuilding a native wrapper, also complete the native release checklist:
 
@@ -687,7 +688,9 @@ to main so the owner can review from their phone.
 - The cloud integration on `codex/soundlab-lumi-consolidation-20261023` is a
   published web 1.0.0 source (PR #87, merge `2077f3b`, immutable v1.0.0).
   The separate `codex/soundlab-1.1-workflow-20261023` branch is an unpublished
-  candidate; read `docs/RELEASE-1.1.0-CHECKLIST.md`. Publication is conditional on completed features,
+  candidate. The owner explicitly approved shipping its single-staff recognition
+  Beta on 2026-10-23; read `docs/RELEASE-1.1.0-CHECKLIST.md`. Publication remains
+  conditional on completed features,
   independent review and software gates. A normal review-branch push may run
   hosted CI after the local feature freeze; main/tag/release/deployment wait
   for the agreed gates and reporting of unresolved conditions. No force push,

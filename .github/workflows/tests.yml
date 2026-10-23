@@ -4,7 +4,7 @@ on:
   pull_request:
   push:
     # Main runs this same workflow through the required Pages test job.
-    branches: [codex/soundlab-lumi-consolidation-20261023]
+    branches: [codex/soundlab-lumi-consolidation-20261023, codex/soundlab-1.1-workflow-20261023]
   workflow_dispatch:
   workflow_call:
     inputs:

@@ -1,6 +1,6 @@
-# Local notation recognition
+# Local notation recognition (Beta)
 
-Score review provides a deliberate **Recognize notation locally** workflow for a
+Score review provides a deliberate **Notation recognition (Beta)** workflow for a
 PDF or image already retained in the local Music Library. The original is never
 sent to a recognition service. Finding staff regions does not initialize the
 model. Bundled model/runtime assets (about21MB) are included in the app's offline
@@ -9,19 +9,24 @@ browser worker and inference session from same-origin bundled assets and reports
 its progress; Cancel aborts that job. There is no runtime CDN, external account,
 recognition backend or score upload.
 
-The first release supports selected clearly engraved, monophonic treble or bass
-staff regions. Scans and handwriting are experimental. It does not promise piano grand-staff alignment, polyphonic chords,
-overlapping voices, repeat expansion, unusual notation or arbitrary scans.
-Detection identifies five-line geometry, not a musical part or calibrated
+The beta supports **exactly one selected, clearly engraved monophonic treble or
+bass staff on one page at a time**. Correction and source comparison are required.
+It does not support general piano scores, polyphonic chords, multistaff alignment,
+scanned or handwritten scores, or whole-multipage recognition. Repeats,
+overlapping voices and unusual notation may be missed. A page may contain
+multiple candidate staves, but the radio selection includes only one of them;
+other staves remain excluded. Recognition does not establish a full musical part
+or a reliable whole song. Detection identifies five-line geometry, not calibrated
 accuracy. Candidate boxes are displayed over the actual page raster.
 
-Select at most four regions from the current page. Multiple regions require an
-explicit sequential voice/order confirmation. Simultaneous accompaniment staves
-must remain unselected. Recognize other pages separately; the app does not guess
-cross-page timing or silently merge whole-song parts.
-After recognition, staff choices, passage order and support confirmations stay
-locked until Save or Discard, so the visible selection cannot differ from the
-captured result being saved.
+Choose one staff from the current page, then confirm the single-voice support
+limits before starting recognition. There is no passage-order or sequential-staff
+merge in this beta, and `buildDraft` rejects multiple selections even if a caller
+requests sequential processing. Recognize another page or staff as a separate
+draft; the app does not infer cross-page timing or combine simultaneous parts.
+After recognition, the staff choice and support confirmation stay locked until
+Save or Discard, so the visible selection cannot differ from the captured result
+being saved.
 
 The recognition result contains actual automatically decoded pitch/rest events
 where supported, plus visible warnings and the original raw token output.

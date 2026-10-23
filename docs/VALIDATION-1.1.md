@@ -5,11 +5,14 @@ Local, unpublished candidate, 2026-10-23. The published 1.0 baseline is
 
 ## Source and test boundary
 
-The final application implementation is commit
+The historical full local regression below tested application implementation
 `a31abf942fda9ed53cea34f8ad6919b7d7a4de7f`. Commit
 `152cbd478d74b9f2d821ab5dd41a093952ce9f49` changes only the offline test;
 application JavaScript, CSS, index, service worker, vendor assets and version
-metadata are identical. This report/checklist is a documentation follow-up.
+metadata are identical. Documentation follow-up
+`a29d7c5153fb1a2031a437c1d6ae43549ab93e69` preserves that evidence. Subsequent
+single-staff beta UI/help and release-workflow changes require their own final
+checks and exact-source hosted CI; the historical totals do not certify them.
 The local branch is `codex/soundlab-1.1-workflow-20261023`.
 
 All 61 default test files were exercised in three independent local HTTP groups:
@@ -62,18 +65,43 @@ log and timing evidence remain retained; no application workaround was added.
   high-confidence secret matches. Binary review patches reconstruct the exact
   candidate tree from the published baseline in a temporary Git index.
 
+## Approved beta follow-up checks
+
+The follow-up help/feed/documentation update labels the approved single-staff,
+single-page beta and records the user scope decision without claiming release.
+`node --check js/help.js`, version-feed JSON parsing and `git diff --check`
+passed. A focused HTTP Chromium probe passed 28 assertions at 1,440 and 390
+pixels: real Library/Score review help cards fit, expose beta limits and correction
+steps, preserve the separate rhythm-review gate, close with Escape and never
+request microphone capture. These are additional UI checks, not recognition
+accuracy measurements or a replacement for final exact-source hosted CI.
+
+The frozen beta UI follow-up passed 62 HTTP Chromium assertions, including
+real PNG/PDF inference, single-staff selection, correction and Wait/Tempo flows.
+An independent UI reviewer passed 60 further assertions across 360/390/1440px,
+light/dark, keyboard/touch, source retention and no automatic XP or device I/O.
+The SW126 upgrade/offline flow passed 20 assertions after the cache-name update.
+Independent recovery/material/session/XP suites and the normal-history deployment
+fixture also passed. These local follow-ups do not claim the two blocked
+`file://` cases; the full default hosted suite remains a release requirement.
+
 ## Unmet release conditions
 
-This is not a 1.1 publication or hosted-CI success claim. No 1.1 branch push,
-PR, merge, tag, GitHub release or deployment was performed. Hosted full CI must
-test the final approved source, including the original bundled-file cases.
-The existing release workflow remains limited to web 1.0.0.
+This is not a 1.1 publication or hosted-CI success claim. At the historical
+source boundary above, no 1.1 branch push, PR, merge, tag, GitHub release or
+deployment had been performed. Final hosted CI, independent review, immutable
+tag and public asset verification remain pending and must use the final approved
+source, including the original bundled-file cases. The release-workflow update
+requires separate verification; the historical run used the earlier workflow.
 
-The actual browser recognizer supports selected monophonic staff regions, one
-page at a time. It does not provide general piano/polyphonic/multistaff/scanned
-or whole-multipage-song recognition. Repeats can be omitted without reliable
-automatic detection. Parent/user agreement on that material scope remains a
-publication gate. See [all measured cases and failures](OMR-VALIDATION.md) and
+On 2026-10-23 the user approved shipping notation recognition as a limited beta
+(message `Sentinel_0f701efdad1c8191bef53bd235fad469`: “yes ship beta”). Its released
+scope is one selected monophonic treble or bass staff on one page at a time,
+with source comparison, correction and explicit review required. General piano,
+polyphonic, multistaff, scanned and whole-multipage recognition are excluded.
+Repeats can be omitted without reliable automatic detection. Scope approval is
+complete; software and publication gates remain open. See
+[all measured cases and failures](OMR-VALIDATION.md) and
 [the release checklist](RELEASE-1.1.0-CHECKLIST.md).
 
 Physical LUMI appearance/protocol behavior, external synth Local Control,

@@ -46,6 +46,17 @@
       { sel: '#pn-assist', t: 'Help level', x: 'How much the keyboard tells you. Full shows the scale colors, note names, fingers and the next note; Colors drops the names; Target only rings the note to play; Tonic marks home; None is a bare keyboard. Pressed keys always flash their color.' },
       { sel: '.kl-card', t: 'Scale lessons', x: 'Graded scale lessons played with the click. Every note is checked for the right key and how close it lands to the beat. Score 85 to level up to a faster tempo. Pick ∞ to loop the scale until you stop and go for your longest streak of clean notes. Runs, best scores and streaks are saved here and on the Exercises Progress tab.' }
     ],
+    musiclibrary: [
+      { sel: '#ml-files', t: 'Your local music library', x: 'Add an original PDF, image, MIDI or MusicXML file. Files stay in this browser across ordinary updates. Opening or importing music earns no XP.' },
+      { t: 'Recognition beta', x: 'Open source review to recognize one selected monophonic treble or bass staff on one page. Clear engraving only: full piano, polyphonic, multistaff, scanned and whole-multipage recognition are outside this beta. Correct the draft against your source before practice.' },
+      { sel: '#ml-export', t: 'Keep a library backup', x: 'Export full library backup keeps originals, target versions, sections and practice history. Settings has a separate archive. Browser storage can be lost if site data is cleared or evicted; this is not cross-device sync.' }
+    ],
+    score: [
+      { sel: '#sr-recognition', t: 'Notation recognition beta', x: 'Recognize one selected monophonic treble or bass staff on one page at a time. Use clear engraving. Full piano, polyphonic, multistaff, scanned and whole-multipage recognition are outside this beta. Files and recognition stay local.' },
+      { sel: '#sr-rows', t: 'Compare and correct', x: 'Recognition creates an unverified draft and can miss notes or repeats. Check every pitch, rest, beat and duration against the original. Edit mistakes, mark the checked targets and Save reviewed revision. Your original stays unchanged.' },
+      { sel: '#sr-rhythm', t: 'Confirm rhythm separately', x: 'Leave rhythm unconfirmed for Wait for Me practice. Confirm beat positions and durations only after checking the source; then Play at Tempo is available. Parsed timing is not verified timing.' },
+      { sel: '#sr-launch', t: 'Practice reviewed targets', x: 'Choose your actual practice-credit instrument, mode and optional named section. Start uses the shared practice player and optional LUMI guidance. Importing, editing and review earn no XP; playing records only the instrument selected for that attempt.' }
+    ],
     songs: [
       { t: 'Songs', x: 'Bring your own music: paste an ASCII guitar tab (the six-line kind from any tab site) or import a MIDI file. soundLAB detects the key, and you can loop any bars at your own tempo to practice them.' }
     ],
@@ -61,7 +72,7 @@
       { t: 'Feed it music', x: 'Generate scales, Hanon and rudiments; import MIDI files; paste ASCII tab (Wait mode ready instantly); or pull in any Studio track. Calibrate timing once per input so scoring is honest.' }
     ],
     tuner: [
-      { t: 'Tuner', x: 'A chromatic tuner using your microphone. Press Start, allow mic access, and play one string at a time — the needle shows how far off you are; green means in tune.' }
+      { t: 'Tuner', x: 'Open the tuning-fork icon beside the clef and Settings from any page. Opening it does not start the microphone. Choose your audio input in Settings, press Start listening and play one note at a time. The meter and cents text show tuning; A4 and string presets are saved.' }
     ],
     trainer: [
       { t: 'Trainer', x: 'Practice prompts: it deals you a key, scale and tempo to work on. Hit Go and it sets up the Fretboard for that exact drill — a fresh challenge every time.' }
@@ -225,7 +236,7 @@
     openTour(null, [
       { t: 'Welcome to soundLAB', x: 'Start with Exercises: a short theory and ear-training course you answer by playing. Around it are two workspaces: Practice (guitar, keys, jam band, tuner…) and the Studio (record ideas, build loops, finger-drum). The Studio button in the top corner switches between them.' },
       { t: 'One musical brain', x: 'The clef button at the top opens key, scale and tempo, shared by EVERYTHING. Change it once and the fretboard re-colors, the jam re-harmonizes, and the Studio follows. Its metronome ▶ starts the click from any page.' },
-      { t: 'Sections', x: 'The tabs — Learn, Guitar, Keys, Play, Practice (along the bottom on phones) — are the app’s sections. The pills at the top of the page switch pages inside a section (Neck / Tab / Notation, Piano / Synth / Pads…).' },
+      { t: 'Sections', x: 'Learn, Free Play, Library and Progress organize practice around your selected instrument. Free Play keeps All tools for the other instrument pages. Library retains original scores and reviewed targets. The Studio keeps its recording and editing tools.' },
       { sel: '#met-btn', t: 'The metronome', x: 'Always one tap away in the top corner: it opens over any page and keeps playing when you close it.' },
       { t: 'Whenever you’re lost', x: 'Tap the ? in the top bar — it explains whichever page you’re on, step by step. Try it on every page once.' }
     ]);

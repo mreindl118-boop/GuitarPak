@@ -9,7 +9,7 @@
   if (root) root.SLOMRReview = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function (root) {
   'use strict';
-  var MAX_STAVES = 4, MAX_ROWS = 2048, controllers = new Set(), retained = new Map();
+  var MAX_STAVES = 1, MAX_ROWS = 2048, controllers = new Set(), retained = new Map(), staffGroupId = 0;
   function clone(value) { return JSON.parse(JSON.stringify(value)); }
   function text(value) { return typeof value === 'string' ? value : value && value.message || String(value || ''); }
   function issue(value) { return (value && value.code ? value.code + ': ' : '') + text(value); }
@@ -27,19 +27,16 @@
   }
   function buildDraft(source, selections, results, options) {
     options = options || {};
-    if (!source || !source.item || !source.item.original || !Array.isArray(selections) || !selections.length || selections.length > MAX_STAVES || selections.length !== results.length) throw new Error('Choose between one and four staff regions from one original page.');
+    if (!source || !source.item || !source.item.original || !Array.isArray(selections) || selections.length !== MAX_STAVES || !Array.isArray(results) || selections.length !== results.length) throw new Error('Notation recognition Beta requires exactly one selected monophonic staff on one original page.');
     var instrument = options.instrument || 'piano';
     if (['piano','synth','guitar','bass','drums','voice','other'].indexOf(instrument) < 0) throw new Error('Choose an actual performance instrument.');
     var rows = [], notes = [], regions = [], warnings = [], offset = 0, sourcePage = source.currentPage || 1;
-    var sequential = selections.length > 1;
-    if (sequential && options.sequential !== true) throw new Error('Confirm that selected staves are consecutive single-voice passages in the chosen order.');
     var baseWarnings = [
-      'Automatic recognition is an unverified draft. Compare every pitch, rest and duration with the original.',
+      'Notation recognition Beta produces an unverified draft. Correction and source comparison are required for every pitch, rest and duration.',
       'Model scores are not calibrated accuracy or certainty. Missing or incorrect symbols may be undetected.',
-      'Only the selected monophonic staff regions are represented; no whole-page part alignment or repeat expansion is inferred.',
+      'Only one selected monophonic staff on one page is represented. General piano, polyphonic, multistaff, scanned and whole-multipage scores are not supported.',
       'Recognized rhythm and held durations remain unconfirmed: Wait-only until you explicitly verify the rhythm in Score review.'
     ];
-    if (sequential) baseWarnings.push('You chose a sequential staff order. Cross-staff timing and simultaneous parts were not inferred.');
     results.forEach(function (result, index) {
       if (!result || !Array.isArray(result.events)) throw new Error('The recognition engine returned no readable event sequence.');
       if (!result.engine || typeof result.engine.id !== 'string' || typeof result.engine.version !== 'string' || typeof result.engine.sourceCommit !== 'string' || !/^[a-f0-9]{64}$/i.test(result.engine.modelSha256 || '')) throw new Error('The recognition result lacks verifiable engine/model provenance. Raw output remains exportable; no draft was saved.');
@@ -71,42 +68,40 @@
       });
       if (!(result.rawTokens || []).every(function (t) { return t && typeof t.token === 'string'; }) || (result.rawTokens || []).length > 32768) throw new Error('Recognition returned invalid or oversized token evidence. No draft was saved.');
       regions.push({id:region.id,order:index + 1,page:sourcePage,bbox:clone(region.bbox),lineYs:clone(region.lineYs || []),spacing:region.spacing,transform:region.transform ? clone(region.transform) : null,engine:clone(result.engine),rawTokens:clone(result.rawTokens || []),events:accepted,warnings:clone(result.warnings || []),unsupported:clone(result.unsupported || []),diagnostics:clone(result.diagnostics || {})});
-      // Sequential ordering is an explicit user choice, never polyphonic merge.
+      // Only the selected staff contributes targets; other staves stay excluded.
       offset += Math.max(regionEnd, .25);
     });
     var hasPitches = notes.some(function (n) { return !n.rest; });
     if (!hasPitches) warnings.push('No supported pitched targets were recognized. This draft retains evidence only and cannot start practice.');
     var title = String(source.item.metadata && source.item.metadata.title || source.item.original.filename || 'Recognized passage').slice(0,100) + ' · recognized draft';
-    var provenance = {version:1,sourceItemId:source.item.id,sourceSha256:source.item.original.sha256,page:sourcePage,raster:clone(options.raster || {}),coordinateSpace:'rendered-page-pixels',readingOrder:sequential ? 'user-confirmed-sequential-staves' : 'selected-single-staff',rhythmVerified:false,confidence:null,regions:regions,warnings:baseWarnings.concat(warnings)};
-    var editor = {version:1,title:title,tempo:100,length:Math.max(.25,offset),rhythmKnown:false,parts:[{id:'omr-part',name:sequential ? 'Selected consecutive voice' : 'Selected staff voice',instrument:instrument}],selectedPartIds:['omr-part'],rows:rows,importWarnings:baseWarnings.concat(warnings),recognition:clone(provenance)};
+    var provenance = {version:1,sourceItemId:source.item.id,sourceSha256:source.item.original.sha256,page:sourcePage,raster:clone(options.raster || {}),coordinateSpace:'rendered-page-pixels',readingOrder:'selected-single-staff',rhythmVerified:false,confidence:null,regions:regions,warnings:baseWarnings.concat(warnings)};
+    var editor = {version:1,title:title,tempo:100,length:Math.max(.25,offset),rhythmKnown:false,parts:[{id:'omr-part',name:'Selected staff voice',instrument:instrument}],selectedPartIds:['omr-part'],rows:rows,importWarnings:baseWarnings.concat(warnings),recognition:clone(provenance)};
     return {label:title,reviewState:'draft',verified:false,rhythmKnown:false,editor:editor,parts:clone(editor.parts),sourceAnchors:rows.map(function (r) { return Object.assign({targetId:r.id},r.sourceAnchor); }),recognition:provenance,score:hasPitches ? {title:title,instrument:instrument,bpm:100,len:editor.length,notes:notes,timingOk:false,rhythmKnown:false,source:'local-optical-recognition',importWarnings:clone(editor.importWarnings),capabilities:{wait:true,tempo:false,holdScoring:false}} : null};
   }
   function mount(host, context) {
     if (!host || !context || typeof context.getSource !== 'function' || typeof context.getPagePixels !== 'function' || typeof context.openRevision !== 'function') throw new Error('Recognition needs the Score review source adapter.');
-    var source = null, image = null, regions = [], results = [], generation = 0, abort = null, busy = false, saving = false, visible = true, disposed = false, staged = null;
+    var source = null, image = null, regions = [], results = [], generation = 0, abort = null, busy = false, saving = false, visible = true, disposed = false, staged = null, staffGroup = 'omr-staff-' + (++staffGroupId);
     host.classList.add('omr-review');
-    host.innerHTML = '<div class="omr-heading"><h3>Recognize notation locally</h3><span class="badge">Experimental · review required</span></div><p class="small">PDFs and images stay in this browser. Bundled recognition assets (about 21 MB) are cached with the app for offline use. Recognition supports selected, clearly engraved monophonic treble or bass staff regions. Scans and handwriting are experimental. Chords, overlapping voices, repeats and unusual notation may be unsupported or missed.</p><p class="small muted">Current page only. Select staff regions and confirm their order; no simultaneous parts or whole-song rhythm will be guessed. All generated targets remain unverified and silent.</p><div class="omr-actions"><button type="button" class="btn primary" data-omr="detect">Recognize notation locally</button><button type="button" class="btn" data-omr="cancel" hidden>Cancel recognition</button></div><p data-omr="status" role="status" aria-live="polite">Choose a local PDF or image in Score review.</p><div data-omr="selection" hidden><canvas data-omr="preview" aria-label="Source page with numbered candidate staff regions"></canvas><p class="small">Candidate boxes are geometry estimates, not recognized notes or an accuracy score. Select at most four staves. Leave simultaneous accompaniment staves unselected.</p><div data-omr="regions" class="omr-regions"></div><label class="omr-check"><input type="checkbox" data-omr="monophonic">I selected a single voice without chords or repeats; I will compare every generated target with the source.</label><label class="omr-check" data-omr="sequence-wrap" hidden><input type="checkbox" data-omr="sequential">These staves continue the same voice in my chosen order, rather than sounding simultaneously.</label><button type="button" class="btn primary" data-omr="run">Recognize selected staves</button></div><section data-omr="output" hidden><h4>Unverified recognition results</h4><p data-omr="summary"></p><ul data-omr="warnings"></ul><details><summary>Raw tokens and engine evidence</summary><p class="small">Raw model scores are diagnostic values, not calibrated confidence. Tokens are retained exactly, including unsupported output.</p><pre data-omr="raw"></pre></details><div class="omr-actions"><button type="button" class="btn primary" data-omr="save">Save unverified draft for correction</button><button type="button" class="btn" data-omr="export">Export recognition evidence</button><button type="button" class="btn" data-omr="discard">Discard result</button></div><p class="small muted">Saving does not mark targets reviewed, start sound, light MIDI keys or earn XP. Use the existing Score review editor to correct and explicitly review them.</p></section>';
+    host.innerHTML = '<div class="omr-heading"><h3>Notation recognition (Beta)</h3><span class="badge">Correction required</span></div><p class="small">PDFs and images stay in this browser. Bundled recognition assets (about 21 MB) are cached with the app for offline use. This beta recognizes one selected, clearly engraved monophonic treble or bass staff on one page at a time.</p><p class="small muted">General piano, polyphonic chords, multistaff alignment, scanned or handwritten scores and whole-multipage recognition are not supported. Repeats, overlapping voices and unusual notation may be missed. Select only one staff; other staves and pages are not combined. Compare and correct every target before practice. All generated targets remain unverified and silent.</p><div class="omr-actions"><button type="button" class="btn primary" data-omr="detect">Find staff on this page</button><button type="button" class="btn" data-omr="cancel" hidden>Cancel recognition</button></div><p data-omr="status" role="status" aria-live="polite">Choose a local PDF or image in Score review.</p><div data-omr="selection" hidden><canvas data-omr="preview" aria-label="Source page with numbered candidate staff regions"></canvas><p class="small">Candidate boxes are geometry estimates, not recognized notes or an accuracy score. Choose exactly one monophonic staff on this page. Accompaniment and other staves remain excluded.</p><div data-omr="regions" class="omr-regions" role="radiogroup" aria-label="Choose one staff from this page"></div><label class="omr-check"><input type="checkbox" data-omr="monophonic">I selected one clear, engraved single-voice staff without chords or repeats; I will compare and correct every generated target with the source.</label><button type="button" class="btn primary" data-omr="run">Recognize selected staff (Beta)</button></div><section data-omr="output" hidden><h4>Unverified beta recognition results</h4><p data-omr="summary"></p><ul data-omr="warnings"></ul><details><summary>Raw tokens and engine evidence</summary><p class="small">Raw model scores are diagnostic values, not calibrated confidence. Tokens are retained exactly, including unsupported output.</p><pre data-omr="raw"></pre></details><div class="omr-actions"><button type="button" class="btn primary" data-omr="save">Save unverified draft for correction</button><button type="button" class="btn" data-omr="export">Export recognition evidence</button><button type="button" class="btn" data-omr="discard">Discard result</button></div><p class="small muted">Saving does not mark targets reviewed, start sound, light MIDI keys or earn XP. Use the existing Score review editor to correct and explicitly review them.</p></section>';
     function el(name) { return host.querySelector('[data-omr="' + name + '"]'); }
     var pendingBox = document.createElement('aside'); pendingBox.className = 'omr-pending'; pendingBox.hidden = true; pendingBox.setAttribute('aria-label','Unsaved recognition evidence'); host.appendChild(pendingBox);
     function status(message, bad) { el('status').textContent = message; el('status').classList.toggle('omr-error',!!bad); }
     function validSource(s) { return s && s.item && s.item.original && ['pdf','image'].indexOf(s.item.original.kind) >= 0; }
     function selected() {
-      return Array.from(el('regions').querySelectorAll('[data-region]')).filter(function (row) { return row.querySelector('input[type="checkbox"]').checked; }).map(function (row) {
-        var r = regions.find(function (x) { return x.id === row.dataset.region; });
-        return {region:r,order:Number(row.querySelector('input[type="number"]').value)};
-      }).sort(function (a,b) { return a.order - b.order; });
+      return Array.from(el('regions').querySelectorAll('[data-region]')).filter(function (row) { return row.querySelector('input[type="radio"]').checked; }).map(function (row) {
+        return {region:regions.find(function (r) { return r.id === row.dataset.region; })};
+      });
     }
     function controls() {
       var picks = selected(), count = picks.length;
       el('detect').disabled = busy || saving || !!results.length || !visible || !validSource(source);
       el('cancel').hidden = !busy || saving;
-      el('run').disabled = busy || saving || !!results.length || !count || count > MAX_STAVES || !el('monophonic').checked || count > 1 && !el('sequential').checked;
+      el('run').disabled = busy || saving || !!results.length || count !== MAX_STAVES || !el('monophonic').checked;
       el('save').disabled = busy || saving || !staged;
       el('discard').disabled = busy || saving;
-      el('sequence-wrap').hidden = count <= 1;
       var selectionLocked = busy || saving || !!results.length;
       el('regions').querySelectorAll('input').forEach(function (input) { input.disabled = selectionLocked; });
-      el('monophonic').disabled = selectionLocked; el('sequential').disabled = selectionLocked;
+      el('monophonic').disabled = selectionLocked;
       host.setAttribute('aria-busy',String(busy || saving));
     }
     function stash() {
@@ -140,12 +135,12 @@
     }
     async function refresh() {
       stash(); cancel(); source = null; image = null; regions = []; results = []; staged = null;
-      el('selection').hidden = true; el('output').hidden = true; el('regions').textContent = ''; el('monophonic').checked = false; el('sequential').checked = false;
+      el('selection').hidden = true; el('output').hidden = true; el('regions').textContent = ''; el('monophonic').checked = false;
       var g = generation;
       try { var s = await context.getSource(); if (disposed || generation !== g) return; source = s;
         var old = validSource(s) && retained.get(pageKey(s));
         if (old) { results = clone(old.results); staged = old.draft && clone(old.draft); renderOutput(); status('Unsaved recognition restored for this original/page. Save or export it, or explicitly discard it before recognizing again.'); }
-        else status(validSource(s) ? 'Ready to find staff regions on page ' + (s.currentPage || 1) + '. Inference initializes only after you choose staves and start recognition; bundled assets may already be cached.' : 'Choose a local PDF or image in Score review.');
+        else status(validSource(s) ? 'Ready to find staff regions on page ' + (s.currentPage || 1) + '. Inference initializes only after you choose one staff and start recognition; bundled assets may already be cached.' : 'Choose a local PDF or image in Score review.');
       } catch (error) { if (generation === g) status(text(error),true); }
       controls(); paintPending();
     }
@@ -173,13 +168,12 @@
         el('regions').textContent = '';
         regions.forEach(function (r,i) {
           var row = document.createElement('div'); row.className = 'omr-region'; row.dataset.region = r.id;
-          var label = document.createElement('label'); label.className = 'omr-check'; var check = document.createElement('input'); check.type = 'checkbox'; check.checked = regions.length === 1; label.appendChild(check); label.appendChild(document.createTextNode('Staff ' + (i + 1) + ' · y ' + Math.round(r.bbox.y) + '–' + Math.round(r.bbox.y + r.bbox.height))); row.appendChild(label);
-          var orderLabel = document.createElement('label'); orderLabel.textContent = 'Passage order'; var order = document.createElement('input'); order.type = 'number'; order.min = '1'; order.max = '40'; order.value = String(i + 1); orderLabel.appendChild(order); row.appendChild(orderLabel);
+          var label = document.createElement('label'); label.className = 'omr-check'; var check = document.createElement('input'); check.type = 'radio'; check.name = staffGroup; check.checked = regions.length === 1; label.appendChild(check); label.appendChild(document.createTextNode('Staff ' + (i + 1) + ' · y ' + Math.round(r.bbox.y) + '–' + Math.round(r.bbox.y + r.bbox.height))); row.appendChild(label);
           if (r.warnings && r.warnings.length) { var p = document.createElement('p'); p.className = 'small'; p.textContent = r.warnings.map(issue).join(' '); row.appendChild(p); }
           el('regions').appendChild(row);
         });
         el('selection').hidden = false; el('output').hidden = true; preview();
-        status('Found ' + regions.length + ' candidate staff region' + (regions.length === 1 ? '' : 's') + '. Choose a single voice, confirm support and start recognition. ' + (detected.warnings || []).map(issue).join(' '));
+        status('Found ' + regions.length + ' candidate staff region' + (regions.length === 1 ? '' : 's') + '. Choose exactly one monophonic staff on this page, confirm support and start beta recognition. ' + (detected.warnings || []).map(issue).join(' '));
       } catch (error) { if (generation === g) status(error.name === 'AbortError' ? 'Recognition cancelled.' : text(error),error.name !== 'AbortError'); }
       finally { if (generation === g) { busy = false; abort = null; controls(); } }
     }
@@ -195,25 +189,24 @@
     async function recognize() {
       if (results.length || saving) return;
       var picks = selected();
-      if (!picks.length || picks.length > MAX_STAVES || !el('monophonic').checked || picks.length > 1 && !el('sequential').checked) return;
-      if (picks.some(function (p) { return !Number.isInteger(p.order) || p.order < 1 || p.order > 40; }) || new Set(picks.map(function (p) { return p.order; })).size !== picks.length) { status('Give each selected staff a unique passage order from 1 to 40.',true); return; }
+      if (picks.length !== MAX_STAVES || !el('monophonic').checked) return;
       cancel(); var g = generation; busy = true; abort = new AbortController(); staged = null; results = []; controls();
       try {
         await sameSource(g);
         if (!root.SLRecognition || !root.SLRecognition.recognize) throw new Error('The local recognition engine is unavailable. No draft was created.');
         for (var i = 0; i < picks.length; i++) {
-          alive(g); status('Loading local model / recognizing staff ' + (i + 1) + ' of ' + picks.length + '…');
+          alive(g); status('Loading local model / recognizing the selected staff…');
           var region = Object.assign({},picks[i].region,{page:source.currentPage || 1});
           var result = await root.SLRecognition.recognize({imageData:image,region:region,page:source.currentPage || 1,signal:abort.signal,onProgress:function (event) { if (generation === g) status('Local recognition: ' + (event && (event.message || event.stage) || 'working') + '. No file upload.'); }});
           alive(g); results.push(result); renderOutput();
-          // Keep each completed region even if a later region is cancelled.
-          try { staged = buildDraft(source,picks.slice(0,results.length).map(function (p) { return p.region; }),results,{sequential:el('sequential').checked,raster:{width:image.width,height:image.height},instrument:root.App && App.practiceInstrument ? App.practiceInstrument.get() : 'piano'}); } catch (e) { staged = null; }
+          // Retain completed evidence if the source changes before saving.
+          try { staged = buildDraft(source,picks.slice(0,results.length).map(function (p) { return p.region; }),results,{raster:{width:image.width,height:image.height},instrument:root.App && App.practiceInstrument ? App.practiceInstrument.get() : 'piano'}); } catch (e) { staged = null; }
           stash();
         }
         await sameSource(g);
-        staged = buildDraft(source,picks.map(function (p) { return p.region; }),results,{sequential:el('sequential').checked,raster:{width:image.width,height:image.height},instrument:root.App && App.practiceInstrument ? App.practiceInstrument.get() : 'piano'});
+        staged = buildDraft(source,picks.map(function (p) { return p.region; }),results,{raster:{width:image.width,height:image.height},instrument:root.App && App.practiceInstrument ? App.practiceInstrument.get() : 'piano'});
         stash();
-        status('Recognition finished. Compare the raw result and save an unverified draft for correction. Nothing has been reviewed or practiced.');
+        status('Beta recognition finished for one staff on this page. Compare the raw result and save an unverified draft for correction. Nothing has been reviewed or practiced.');
       } catch (error) { if (generation === g) { if (results.length) renderOutput(); status(error.name === 'AbortError' ? 'Recognition cancelled. No automatic save was made.' : text(error),error.name !== 'AbortError'); } }
       finally { if (generation === g) { busy = false; abort = null; controls(); } }
     }
@@ -237,7 +230,7 @@
     el('detect').onclick = detect; el('cancel').onclick = function () { cancel('Recognition cancelled. No automatic save was made.'); };
     el('run').onclick = recognize; el('save').onclick = save; el('export').onclick = exportEvidence;
     el('discard').onclick = function () { if (busy || saving || results.length && !confirm('Discard this unsaved recognition result? The original and any already saved revisions stay retained.')) return; if(source)retained.delete(pageKey(source));results = []; staged = null; el('output').hidden = true; status('Recognition result discarded. The original remains retained.'); controls(); paintPending(); };
-    el('regions').onchange = controls; el('monophonic').onchange = controls; el('sequential').onchange = controls;
+    el('regions').onchange = controls; el('monophonic').onchange = controls;
     var api = {onSource:refresh,setVisible:function (value) { visible = !!value; if (!visible) { stash(); cancel('Recognition stopped when leaving Score review. Completed results remain retained for this original/page.'); } else refresh(); },dispose:function () { stash(); disposed = true; cancel(); controllers.delete(api); host.textContent = ''; },checkpoint:function () { return busy || saving ? {ok:false,errors:['Local notation recognition is still running. Cancel or finish it before reloading.']} : retained.size ? {ok:false,errors:['Save or explicitly discard unverified recognition results before reloading. Export evidence first if needed.']} : {ok:true}; },snapshot:function () { return {busy:busy,visible:visible,sourceItemId:source && source.item.id,page:source && source.currentPage,regions:clone(regions),results:clone(results),draft:staged && clone(staged)}; }};
     controllers.add(api); controls(); refresh(); return api;
   }

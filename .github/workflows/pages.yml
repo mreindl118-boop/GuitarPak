@@ -110,19 +110,20 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Publish immutable web 1.0.0 release
+      - name: Publish immutable allowlisted web release
         shell: bash
         run: |
           set -euo pipefail
           web_version=$(node -e 'process.stdout.write(require("./version.json").web || "")')
-          if [ "$web_version" != 1.0.0 ]; then
-            echo "This source is not web 1.0.0; no tag or release is created."
-            exit 0
-          fi
+          case "$web_version" in
+            1.0.0|1.1.0) ;;
+            *) echo "Web version is not explicitly allowlisted; no tag or release is created."; exit 0 ;;
+          esac
           : "${TESTED_SHA:?Missing successful test commit}"
           [ "$(git rev-parse HEAD)" = "$TESTED_SHA" ] || { echo "Checkout does not match the tested commit." >&2; exit 1; }
-          tag=v1.0.0
-          notes=docs/RELEASE-NOTES-1.0.0.md
+          tag="v$web_version"
+          title="soundLAB $web_version"
+          notes="docs/RELEASE-NOTES-$web_version.md"
           [ -s "$notes" ] || { echo "Committed release notes are missing or empty." >&2; exit 1; }
           check_main() {
             local current_main
@@ -146,7 +147,7 @@ jobs:
           # A successful paginated read distinguishes absence from an API/auth
           # failure. Existing releases are immutable, including their notes.
           release_state=$(gh api --paginate "repos/$GH_REPO/releases?per_page=100" \
-            --jq '.[] | select(.tag_name == "v1.0.0") | if .draft or .prerelease then "needs-review" else "published" end')
+            --jq ".[] | select(.tag_name == \"$tag\") | if .draft or .prerelease then \"needs-review\" else \"published\" end")
           if [ -n "$release_state" ]; then
             [ "$tag_exists" = true ] && [ "$release_state" = published ] || { echo "Existing release/tag state needs review; nothing will be changed." >&2; exit 1; }
             echo "$tag is already published at the tested commit; leaving it unchanged."
@@ -163,32 +164,61 @@ jobs:
           deadline=$(( $(date +%s) + 600 ))
           probe=0
           ready=false
+          # The only public destination authorized for this publisher. Do not
+          # follow redirects or allow source paths to escape this project.
+          [ "$PAGES_URL" = 'https://mreindl118-boop.github.io/GuitarPak/' ] || { echo "Unexpected public Pages origin/path." >&2; exit 1; }
           asset_list=$(node <<'NODE'
-          const fs = require('fs'), html = fs.readFileSync('index.html', 'utf8');
+          const fs = require('fs'), path = require('path'), crypto = require('crypto');
+          const html = fs.readFileSync('index.html', 'utf8');
           const scripts = [...html.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["']/gi)].map(m => m[1]);
           const styles = [...html.matchAll(/<link\b[^>]*>/gi)].map(m => m[0])
             .filter(tag => /\brel=["']stylesheet["']/i.test(tag))
             .map(tag => (/\bhref=["']([^"']+)["']/i.exec(tag) || [])[1]).filter(Boolean);
           const local = scripts.concat(styles).filter(url => !/^(?:[a-z]+:|\/\/)/i.test(url));
-          if (local.some(url => !/^[a-z0-9_.\/-]+$/i.test(url) || url.startsWith('/') || url.split('/').includes('..'))) throw Error('Unsupported public asset path');
-          console.log([...new Set(['version.json','index.html','sw.js','manifest.webmanifest'].concat(local))].join('\n'));
+          // Parse only a literal string list, never execute service-worker
+          // source. Model, workers, WASM, fonts and PDF support all live here.
+          const sw = fs.readFileSync('sw.js', 'utf8');
+          const declaration = /^var ASSETS = \[([\s\S]*?)\];/m.exec(sw);
+          if (!declaration) throw Error('Missing literal service-worker ASSETS');
+          const tokens = declaration[1].split(',');
+          if (!tokens.at(-1).trim()) tokens.pop();
+          const cached = tokens.map(token => {
+            const item = /^\s*(['"])([a-z0-9_.\/-]+)\1\s*$/i.exec(token);
+            if (!item) throw Error('Unsupported service-worker asset expression');
+            return item[2] === '.' ? 'index.html' : item[2];
+          });
+          if (!cached.length) throw Error('Empty service-worker ASSETS');
+          const assets = [...new Set(['version.json','index.html','sw.js','manifest.webmanifest'].concat(local, cached))];
+          if (assets.length > 2048) throw Error('Public asset count exceeds release bound');
+          const root = fs.realpathSync('.');
+          let total = 0;
+          for (const asset of assets) {
+            if (!/^[a-z0-9_.\/-]+$/i.test(asset) || asset.split('/').some(part => !part || part === '.' || part === '..')) throw Error('Unsupported public asset path');
+            const resolved = path.resolve(asset), stat = fs.lstatSync(asset);
+            if (!stat.isFile() || fs.realpathSync(asset) !== resolved || !resolved.startsWith(root + path.sep)) throw Error('Public asset is not an ordinary source file');
+            total += stat.size;
+            if (stat.size > 64 * 1024 * 1024 || total > 256 * 1024 * 1024) throw Error('Public asset bytes exceed release bound');
+            const hash = crypto.createHash('sha256').update(fs.readFileSync(asset)).digest('hex');
+            console.log(hash + '\t' + Math.max(1, stat.size) + '\t' + asset);
+          }
           NODE
           )
           mapfile -t public_assets <<< "$asset_list"
           while [ "$(date +%s)" -lt "$deadline" ]; do
             probe=$((probe + 1))
             ready=true
-            for asset in "${public_assets[@]}"; do
+            for asset_record in "${public_assets[@]}"; do
+              IFS=$'\t' read -r expected download_limit asset <<< "$asset_record"
               remaining=$((deadline - $(date +%s)))
               if [ "$remaining" -le 0 ]; then ready=false; break; fi
               limit=$((remaining < 5 ? remaining : 5))
-              if ! curl --fail --silent --show-error --location --connect-timeout 3 --max-time "$limit" \
+              if ! curl --fail --silent --show-error --proto '=https' --connect-timeout 3 --max-time "$limit" --max-filesize "$download_limit" \
                 --header 'Cache-Control: no-cache' --header 'Pragma: no-cache' \
                 --output "$probe_dir/asset" "${PAGES_URL%/}/$asset?source=$TESTED_SHA&probe=$probe"; then
                 ready=false; break
               fi
-              expected=$(sha256sum "$asset"); actual=$(sha256sum "$probe_dir/asset")
-              if [ "${expected%% *}" != "${actual%% *}" ]; then ready=false; break; fi
+              actual=$(sha256sum "$probe_dir/asset")
+              if [ "$expected" != "${actual%% *}" ]; then ready=false; break; fi
             done
             if [ "$ready" = true ]; then break; fi
             remaining=$((deadline - $(date +%s)))
@@ -202,7 +232,7 @@ jobs:
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
             git -c tag.gpgsign=false tag --annotate "$tag" "$TESTED_SHA" \
-              -m "soundLAB 1.0.0" -m "Source-commit: $TESTED_SHA"
+              -m "$title" -m "Source-commit: $TESTED_SHA"
             # A concurrent tag may win; verify it rather than forcing a retag.
             if ! git push origin "refs/tags/$tag:refs/tags/$tag"; then
               verify_tag || exit 1
@@ -213,4 +243,4 @@ jobs:
           [ "$tag_exists" = true ] || exit 1
           check_main || exit 1
           gh release create "$tag" --repo "$GH_REPO" --verify-tag \
-            --target "$TESTED_SHA" --title "soundLAB 1.0.0" --notes-file "$notes"
+            --target "$TESTED_SHA" --title "$title" --notes-file "$notes"

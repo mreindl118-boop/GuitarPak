@@ -13,13 +13,16 @@ resolved the earlier public-PR approval rejection. PR #87 merged at
 was published at 17:03:15 UTC. The original denial was known not to execute;
 it was retried only with the new explicit approval, initially as a draft PR.
 
-The 1.1 branch is a separate unpublished candidate. Its scope and publication
-gates are in [the 1.1 checklist](RELEASE-1.1.0-CHECKLIST.md). The release job
-below remains intentionally limited to web 1.0.0.
+The 1.1 branch is a separate candidate. The user approved publishing 1.1.0
+with **single-staff notation recognition labeled beta**, after the feature,
+review and test gates. Its scope and publication gates are in
+[the 1.1 checklist](RELEASE-1.1.0-CHECKLIST.md). Workflow support or candidate
+metadata alone does not establish publication.
 
 ## Required test job
 
-`.github/workflows/tests.yml` runs on pull requests, pushes to the review branch,
+`.github/workflows/tests.yml` runs on all pull requests, pushes to the 1.0 and
+1.1 review branches,
 manual dispatch, and reusable calls. Every push to `main` invokes this same
 workflow through the Pages workflow, avoiding a duplicate standalone main job.
 It uses Ubuntu, Node 24, and the locally verified **Playwright 1.62.1**. Dependencies
@@ -94,17 +97,33 @@ remains blocked rather than treating the workflow push as site deployment.
 Only after tests and sync succeed can the release job run. Before creating
 either a new tag or release, it waits up to ten minutes, polling every five
 seconds, for public `version.json`, index, service worker, manifest and every
-local script/stylesheet referenced by the tested index to match the checkout's
-SHA-256 bytes. These requests carry no credentials and revalidate/cache-bust the
-responses. Stale, missing or inaccessible files fail closed. This independently
+local script/stylesheet referenced by the tested index, **plus every literal
+service-worker `ASSETS` entry**, to match the checkout's SHA-256 bytes. This
+includes the recognition ONNX model, recognition worker, ONNX Runtime WASM/module
+files, PDF worker, PDF character maps/fonts and all other cached support files.
+The root `.` cache entry is checked as `index.html`. The gate parses a string
+list without executing service-worker code, validates ordinary source files,
+and rejects traversal, absolute/external paths, symlinks or computed entries.
+It permits at most 2,048 unique assets, 64 MiB per file and 256 MiB total source
+bytes; each public download is additionally capped at its expected file size
+(one byte for an empty source) and five seconds within the overall ten-minute
+deadline. These are fail-closed release bounds, not omitted-file exceptions.
+
+Requests use only the pinned `https://mreindl118-boop.github.io/GuitarPak/`
+origin/path, HTTPS and no redirects. They carry no credentials and
+revalidate/cache-bust responses. Stale, missing or inaccessible files fail closed. This independently
 observes the publisher handoff instead of assuming that a successful push
 triggered a build.
 
-For web version **1.0.0** only, the job verifies the exact tested checkout and
-unchanged main tip. It creates an annotated `v1.0.0` with an ordinary push only
-if the remote tag is absent, then uses the same built-in workflow token to
-create the GitHub release with `--verify-tag`, the exact tested SHA and
-`docs/RELEASE-NOTES-1.0.0.md`. Existing tags are fetched/peeled and never moved.
+Only the explicit web-version allowlist **1.0.0 and 1.1.0** can publish. Other
+versions perform no public HTTP, release-API or tag operations. The job verifies
+the exact tested checkout and unchanged main tip, derives tag `v<web version>`,
+title `soundLAB <web version>` and committed
+`docs/RELEASE-NOTES-<web version>.md` from that allowlist. It creates an annotated
+tag with an ordinary push only if that remote tag is absent, then uses the same
+built-in workflow token to create the release with `--verify-tag` and the exact
+tested SHA. Publishing 1.1 leaves the existing 1.0 tag and release untouched.
+Existing tags are fetched/peeled and never moved.
 A mismatched tag, orphan release, draft/prerelease or failed release-API read
 requires review and is never overwritten. An already published release at the
 same verified tag is preserved unchanged; this no-op does not re-verify the
@@ -123,8 +142,10 @@ is used by this suite.
 
 `tests/release-workflow.test.js` executes the actual release shell against local
 Git and mocked `gh`/public HTTP/clock tools. It checks dependency wiring, scope,
-exact tag/notes, readiness byte matching and exhaustion, stale main, immutable
-existing tags/releases, API errors, retries and uncertain response recovery.
+both allowlisted versions, exact tag/title/notes, every cached asset, stale model
+and PDF worker rejection, pinned origin/path and file/download bounds, readiness
+exhaustion, stale main, immutable existing tags/releases, API errors, retries and
+uncertain response recovery.
 It performs no real HTTP or GitHub publication.
 
 Local checks do not establish a successful hosted Actions run. Publication still

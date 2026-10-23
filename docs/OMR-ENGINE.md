@@ -1,4 +1,4 @@
-# Local notation recognition engine
+# Local notation recognition engine (beta)
 
 `js/omr/recognizer.js` exposes `SLRecognition.recognize(options)`. Loading the script performs no recognition, device request or model download. A deliberate call processes rendered pixels in a dedicated local browser worker. It sends no score, image, filename, source text or expected notes to a server.
 
@@ -15,6 +15,17 @@ const result = await SLRecognition.recognize({
 The result includes model/runtime provenance, raw subtokens and their uncalibrated scores, parsed note/rest events, original-page source boxes, warnings, unsupported notation and diagnostics. Event fields include `midi`, `rest`, `beat`, `duration`, `partId`, `clef`, `keyFifths`, `meter`, `tie`, `sourceAnchor`, `confidence: null` and `verified: false`. `rhythmParsed: true` means the predicted beat/duration grammar is complete and must remain in the draft. Recognition always returns `rhythmKnown: false` and `rhythmVerified: false`: parsed grammar does not verify musical rhythm. An editor must preserve the actual predicted timing, retain the original, save an unverified draft and require review before graded practice.
 
 The API permits one active job. Abort or `SLRecognition.cancel()` terminates its worker, including pending model initialization. A later job uses a fresh worker. Input is bounded to 16 million pixels, dimensions at most 8,192, at most 64 detected staff lines, 32,768 decoded subtokens and a two-minute job deadline. Errors reject honestly; blank/unsupported output contains no invented targets. Mild vertical-shear rectification requires the shared detector's `cropStaff` helper; source boxes map back to the original pixels.
+
+## Released beta boundary
+
+Score review exposes **one selected monophonic treble or bass staff on one page
+at a time**, from clear engraving. Every output is an unverified draft requiring
+source comparison, correction and explicit review before practice. Full piano,
+polyphonic, multistaff, scanned-score and whole-multipage recognition are
+excluded; repeats may be silently omitted. The low-level API resource limits
+above and separate whole-page experiments do not establish broader released
+capabilities. See [the user workflow](LOCAL-RECOGNITION.md) and
+[all measured cases and errors](OMR-VALIDATION.md).
 
 ## Pinned assets
 

@@ -1,6 +1,6 @@
 // Local recognition UI integration. Controlled engine replies below exercise
 // lifecycle/storage failures, not musical accuracy. The real model's corpus
-// tests and one eligible end-to-end fixture are separate explicit checks.
+// tests and eligible PNG/PDF end-to-end fixtures are separate explicit checks.
 const assert=require('assert'),fs=require('fs'),path=require('path');
 const {chromium}=require('playwright'),env=require('./env'),OMR=require('../js/omr/review-recognition');
 let checks=0;function ok(value,message){assert(value,message);checks++;console.log('  PASS '+message);}
@@ -24,9 +24,11 @@ const unknown=OMR.buildDraft(source,[region],[reply([{midi:60,beat:null,duration
 ok(unknown.score.notes.map(n=>n.t).join()==='0,1'&&unknown.score.notes.every(n=>n.d===0),'partly unparsed rhythm uses explicitly disclosed onset ordering without accidental simultaneous chords');
 const evidence=OMR.buildDraft(source,[region],[reply([{midi:null,beat:null,duration:null}])],{});
 ok(evidence.score===null&&evidence.editor.rows.length===0&&evidence.recognition.regions[0].events.length===1,'unrecognized pitches retain an evidence-only draft without fabricated playable notes');
-assert.throws(()=>OMR.buildDraft(source,[region,Object.assign({},region,{id:'staff-b'})],[simple,simple],{}),/Confirm/);checks++;console.log('  PASS multiple staves require explicit sequential-voice confirmation');
-const sequential=OMR.buildDraft(source,[region,Object.assign({},region,{id:'staff-b'})],[simple,simple],{sequential:true});
-ok(sequential.score.notes.map(n=>n.t).join()==='0,1,2,3'&&sequential.editor.parts.length===1,'explicit sequential staves are concatenated rather than guessed into simultaneous parts');
+for(const options of [{},{sequential:true}]){
+ assert.throws(()=>OMR.buildDraft(source,[region,Object.assign({},region,{id:'staff-b'})],[simple,simple],options),/exactly one selected monophonic staff on one original page/);checks++;console.log('  PASS beta rejects multiple staves even with legacy sequential option: '+JSON.stringify(options));
+}
+ok(OMR.maxSelectedStaves===1&&draft.recognition.readingOrder==='selected-single-staff'&&draft.recognition.regions.length===1,'beta API and retained provenance describe exactly one selected staff');
+assert.throws(()=>OMR.buildDraft(source,[],[],{}),/exactly one/);checks++;console.log('  PASS beta requires an explicit single-staff selection');
 assert.throws(()=>OMR.buildDraft(source,[region],[Object.assign({},simple,{engine:{}})],{}),/provenance/);checks++;console.log('  PASS missing engine/model identity prevents an unverifiable draft');
 
 (async()=>{const browser=await chromium.launch({executablePath:env.CHROMIUM});try{
@@ -49,10 +51,24 @@ assert.throws(()=>OMR.buildDraft(source,[region],[Object.assign({},simple,{engin
  await ui.locator('[data-omr=detect]').click();await ui.locator('[data-omr=selection]').waitFor({state:'visible'});
  ok(await ui.locator('[data-omr=run]').isDisabled()&&await page.evaluate(()=>__omrCalls===0),'finding regions uses actual source pixels and waits for explicit support confirmation before inference');
  ok(await page.evaluate(()=>__raster.width>600&&__raster.height>600),'PDF recognition receives an offscreen page raster rather than the narrow visible preview');
- await ui.locator('[data-region="fixture-staff"] input[type=checkbox]').check();await ui.locator('[data-omr=monophonic]').check();await ui.locator('[data-omr=run]').click();await ui.locator('[data-omr=save]').waitFor({state:'visible'});await page.waitForFunction(()=>!document.querySelector('#sr-recognition [data-omr=save]').disabled);
- ok(await page.evaluate(()=>[...document.querySelectorAll('#sr-recognition [data-omr=regions] input,#sr-recognition [data-omr=monophonic],#sr-recognition [data-omr=sequential]')].every(input=>input.disabled)),'completed results freeze all staff selections, passage orders and support confirmations');
- let selectionBlocked=false;try{await ui.locator('[data-region="fixture-accompaniment"] input[type=checkbox]').check({timeout:600});}catch(error){selectionBlocked=true;}
- ok(selectionBlocked&&await page.evaluate(()=>document.querySelector('[data-region="fixture-staff"] input[type=checkbox]').checked&&!document.querySelector('[data-region="fixture-accompaniment"] input[type=checkbox]').checked&&SLOMRReview.pending()[0].draft.recognition.regions[0].id==='fixture-staff'),'a second staff cannot replace the visible selection while Save retains the first recognized snapshot');
+ ok(await ui.locator('h3').textContent().then(s=>s==='Notation recognition (Beta)')&&await ui.locator('.badge').textContent().then(s=>s.includes('Correction required')),'the visible feature is explicitly beta with correction required');
+ ok(await ui.textContent().then(s=>s.includes('one page at a time')&&s.includes('General piano')&&s.includes('scanned or handwritten')&&s.includes('whole-multipage')),'beta scope is disclosed before recognition, including unsupported general scores');
+ ok(await ui.locator('[role=radiogroup]').count()===1&&await ui.locator('.omr-region input[type=radio]').count()===2&&await ui.locator('.omr-region input[type=number],[data-omr=sequential],[data-omr=sequence-wrap]').count()===0,'candidate staves have a single-choice radio group with no order or sequential merge controls');
+ await ui.locator('[data-region="fixture-staff"] input[type=radio]').check();
+ await ui.locator('[data-region="fixture-staff"] input[type=radio]').focus();await page.keyboard.press('ArrowDown');
+ ok(await ui.locator('[data-region="fixture-accompaniment"] input[type=radio]').isChecked()&&!await ui.locator('[data-region="fixture-staff"] input[type=radio]').isChecked(),'keyboard arrows choose another staff and deselect the previous staff');
+ await page.keyboard.press('ArrowUp');await ui.locator('[data-omr=monophonic]').check();
+ await page.evaluate(()=>{const radios=[...document.querySelectorAll('#sr-recognition .omr-region input[type=radio]')];radios[1].name+='-forced';radios[1].checked=true;radios[1].dispatchEvent(new Event('change',{bubbles:true}));});
+ ok(await ui.locator('[data-omr=run]').isDisabled(),'a forced multiple selection disables the beta recognition action');
+ await page.evaluate(async()=>{await document.querySelector('#sr-recognition [data-omr=run]').onclick();});
+ ok(await page.evaluate(()=>__omrCalls===0&&SLOMRReview.pending().length===0),'calling recognition directly with forced multiple selections creates no inference or draft');
+ await page.evaluate(()=>{const radios=[...document.querySelectorAll('#sr-recognition .omr-region input[type=radio]')];radios[1].checked=false;radios[1].name=radios[0].name;radios[0].checked=true;radios[0].dispatchEvent(new Event('change',{bubbles:true}));});
+ for(const theme of ['light','dark']){await page.evaluate(t=>App.setTheme(t),theme);await page.setViewportSize({width:390,height:1000});await ui.locator('[data-omr=run]').scrollIntoViewIfNeeded();await page.screenshot({path:'/workspace/soundlab-evidence/omr-beta-selection-'+theme+'.png',fullPage:true});ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)&&await ui.locator('.omr-region label').evaluateAll(labels=>labels.every(label=>label.getBoundingClientRect().height>=44)),'single-staff beta controls fit a phone with accessible touch labels in '+theme+' theme');}
+ await page.setViewportSize({width:1280,height:1000});
+ await ui.locator('[data-region="fixture-staff"] input[type=radio]').check();await ui.locator('[data-omr=monophonic]').check();await ui.locator('[data-omr=run]').click();await ui.locator('[data-omr=save]').waitFor({state:'visible'});await page.waitForFunction(()=>!document.querySelector('#sr-recognition [data-omr=save]').disabled);
+ ok(await page.evaluate(()=>[...document.querySelectorAll('#sr-recognition [data-omr=regions] input,#sr-recognition [data-omr=monophonic]')].every(input=>input.disabled)),'completed results freeze the staff selection and support confirmation');
+ let selectionBlocked=false;try{await ui.locator('[data-region="fixture-accompaniment"] input[type=radio]').check({timeout:600});}catch(error){selectionBlocked=true;}
+ ok(selectionBlocked&&await page.evaluate(()=>document.querySelector('[data-region="fixture-staff"] input[type=radio]').checked&&!document.querySelector('[data-region="fixture-accompaniment"] input[type=radio]').checked&&SLOMRReview.pending()[0].draft.recognition.regions[0].id==='fixture-staff'),'a second staff cannot replace the visible selection while Save retains the first recognized snapshot');
  ok(await ui.locator('[data-omr=warnings]').textContent().then(s=>s.includes('TEST_UNCERTAIN'))&&await ui.locator('[data-omr=summary]').textContent().then(s=>s.includes('No confidence percentage')),'uncertain output is visible without an accuracy percentage');
  ok(!(await page.evaluate(()=>SLOMRReview.checkpoint())).ok,'unsaved automatic recognition results block a false safe reload');
  ok(await page.evaluate(()=>{const event=new Event('beforeunload',{cancelable:true});window.dispatchEvent(event);return event.defaultPrevented;}),'unsaved recognition also guards an ordinary browser reload');
@@ -69,9 +85,9 @@ assert.throws(()=>OMR.buildDraft(source,[region],[Object.assign({},simple,{engin
  ok(saved.sessions===original.sessions&&saved.permissionCalls===0,'recognition and draft save create no XP/session or MIDI/microphone access');
  ok(saved.s.revision.recognition.regions[0].engine.modelSha256===engine.modelSha256&&saved.s.editor.recognition.regions[0].rawTokens[0].token==='note-C4_quarter','engine digest and raw token evidence survive real IndexedDB readback and editor opening');
  ok(await page.evaluate(()=>{const event=new Event('beforeunload',{cancelable:true});window.dispatchEvent(event);return !event.defaultPrevented;}),'a durably saved draft no longer blocks an ordinary reload');
- await ui.locator('[data-omr=detect]').click();await ui.locator('[data-omr=selection]').waitFor({state:'visible'});await ui.locator('[data-region="fixture-staff"] input[type=checkbox]').check();await ui.locator('[data-omr=monophonic]').check();
+ await ui.locator('[data-omr=detect]').click();await ui.locator('[data-omr=selection]').waitFor({state:'visible'});await ui.locator('[data-region="fixture-staff"] input[type=radio]').check();await ui.locator('[data-omr=monophonic]').check();
  await ui.locator('[data-omr=run]').click();await page.waitForFunction(()=>!document.querySelector('#sr-recognition [data-omr=save]').disabled);page.once('dialog',dialog=>dialog.accept());await ui.locator('[data-omr=discard]').click();
- ok(await page.evaluate(()=>SLOMRReview.checkpoint().ok&&[...document.querySelectorAll('#sr-recognition [data-omr=regions] input,#sr-recognition [data-omr=monophonic],#sr-recognition [data-omr=sequential]')].every(input=>!input.disabled)),'explicit Discard unlocks staff/order/confirmation controls and clears only the unsaved result');
+ ok(await page.evaluate(()=>SLOMRReview.checkpoint().ok&&[...document.querySelectorAll('#sr-recognition [data-omr=regions] input,#sr-recognition [data-omr=monophonic]')].every(input=>!input.disabled)),'explicit Discard unlocks staff selection and confirmation controls and clears only the unsaved result');
  await page.evaluate(()=>{SLRecognition.recognize=options=>new Promise((resolve,reject)=>{window.__lateRecognition=resolve;options.signal.addEventListener('abort',()=>{__aborted++;const e=Error('Cancelled');e.name='AbortError';reject(e);},{once:true});});});
  await ui.locator('[data-omr=run]').click();await page.waitForFunction(()=>!!window.__lateRecognition);
  ok(!(await page.evaluate(()=>SLOMRReview.checkpoint())).ok,'a running worker prevents update/import from claiming checkpoint success');
@@ -86,7 +102,8 @@ assert.throws(()=>OMR.buildDraft(source,[region],[Object.assign({},simple,{engin
  await page.setInputFiles('#sr-file',path.join(__dirname,'fixtures/omr/01-treble-quarters-clean.png'));
  await page.waitForFunction(()=>SLScoreReview.snapshot().item.original.kind==='image'&&!SLScoreReview.snapshot().busy);
  await ui.locator('[data-omr=detect]').click();await ui.locator('[data-omr=selection]').waitFor({state:'visible'});
- await ui.locator('.omr-region input[type=checkbox]').first().check();await ui.locator('[data-omr=monophonic]').check();
+ ok(await ui.locator('.omr-region input[type=radio]').count()===1&&await ui.locator('.omr-region input[type=radio]:checked').count()===1,'actual clean PNG exposes exactly one selected candidate staff');
+ await ui.locator('.omr-region input[type=radio]').first().check();await ui.locator('[data-omr=monophonic]').check();
  await ui.locator('[data-omr=run]').click();await page.waitForFunction(()=>!document.querySelector('#sr-recognition [data-omr=save]').disabled,null,{timeout:120000});
  const automatic=await ui.locator('[data-omr=raw]').textContent().then(JSON.parse),manifest=JSON.parse(fs.readFileSync(path.join(__dirname,'../vendor/omr/manifest.json')));
  ok(automatic.results[0].events.filter(e=>!e.rest).map(e=>e.midi).join()==='60,62,64,65','actual source pixels through staff detection and local WASM model automatically produce C4 D4 E4 F4');
@@ -122,10 +139,12 @@ assert.throws(()=>OMR.buildDraft(source,[region],[Object.assign({},simple,{engin
  const pdfFixture=path.join(__dirname,'fixtures/omr/corpus/17-page-treble-quarters-clean.pdf');
  await page.setInputFiles('#sr-file',pdfFixture);await page.waitForFunction(()=>SLScoreReview.snapshot().item.original.kind==='pdf'&&!SLScoreReview.snapshot().busy);
  const pdfOriginal=await page.evaluate(()=>({id:SLScoreReview.snapshot().item.id,hash:SLScoreReview.snapshot().item.original.sha256}));
- await ui.locator('[data-omr=detect]').click();await ui.locator('[data-omr=selection]').waitFor({state:'visible'});await ui.locator('.omr-region input[type=checkbox]').first().check();await ui.locator('[data-omr=monophonic]').check();await ui.locator('[data-omr=run]').click();await page.waitForFunction(()=>!document.querySelector('#sr-recognition [data-omr=save]').disabled,null,{timeout:120000});
+ await ui.locator('[data-omr=detect]').click();await ui.locator('[data-omr=selection]').waitFor({state:'visible'});
+ ok(await ui.locator('.omr-region input[type=radio]').count()===2&&await ui.locator('.omr-region input[type=radio]:checked').count()===0&&await ui.locator('[data-omr=run]').isDisabled(),'actual two-staff PDF requires choosing exactly one staff instead of recognizing or combining the full page');
+ await ui.locator('.omr-region input[type=radio]').first().check();await ui.locator('[data-omr=monophonic]').check();await ui.locator('[data-omr=run]').click();await page.waitForFunction(()=>!document.querySelector('#sr-recognition [data-omr=save]').disabled,null,{timeout:120000});
  const pdfAutomatic=await ui.locator('[data-omr=raw]').textContent().then(JSON.parse);
  const truth=JSON.parse(fs.readFileSync(path.join(__dirname,'fixtures/omr/corpus/17-page-treble-quarters.truth.json'))),pdfPitches=pdfAutomatic.results[0].events.filter(e=>!e.rest).map(e=>e.midi),truthPitches=truth.parts[0].events.filter(e=>e.type==='note').map(e=>e.midi);
- ok(pdfPitches.length>0&&pdfAutomatic.results[0].rawTokens.length>0&&pdfAutomatic.results[0].events.every(e=>!e.verified&&e.confidence===null),'a real raster-only PDF page automatically produces local model events and raw tokens, all still unverified');
+ ok(pdfAutomatic.results.length===1&&pdfPitches.length>0&&pdfAutomatic.results[0].rawTokens.length>0&&pdfAutomatic.results[0].events.every(e=>!e.verified&&e.confidence===null),'a real raster-only PDF produces events and raw tokens from only the selected staff, all still unverified');
  console.log('  OBSERVED PDF selected-staff pitches:',pdfPitches.join(','),'authored prefix equal:',pdfPitches.every((m,i)=>m===truthPitches[i]),'(measurement after inference, not an input or blanket accuracy claim)');
  await ui.locator('[data-omr=save]').click();await page.waitForFunction(()=>SLScoreReview.snapshot().revision&&SLScoreReview.snapshot().revision.recognition&&!SLScoreReview.snapshot().busy);
  const pdfSaved=await page.evaluate(async()=>({s:SLScoreReview.snapshot(),original:[...await SLMusicLibrary.getOriginal(SLScoreReview.snapshot().item.id)],sessions:App.practiceProgress.history('guitar').length}));

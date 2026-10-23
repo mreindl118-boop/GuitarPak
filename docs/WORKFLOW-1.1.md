@@ -4,7 +4,7 @@ The Practice workspace has four sections: **Learn**, **Free Play**, **Library** 
 
 - **Learn** contains Exercises, Chords, Circle, Plan and Trainer. Lessons retain their own exact instrument and content limits.
 - **Free Play** opens the selected instrument’s suitable tool: Piano, Synth, the six-string Guitar neck or Drum pads. Bass, Voice and Other open a clearly labelled overview rather than relabelling a guitar or piano as another instrument. Instrument pills show the related tools; **All tools** retains every Piano, Synth, Pads, Guitar, Tab, Notation, Songs, Jam, MIDI Hub and LUMI practice route.
-- **Library** keeps original files and reviewed score revisions. The existing Woodshed remains available for generated exercises, imports and practice. A viewed PDF or unreviewed draft does not become a graded lesson automatically.
+- **Library** keeps original files and reviewed score revisions. Its notation recognition **beta** reads one selected monophonic treble or bass staff on one page at a time; source comparison, correction and explicit review are required. Full piano/polyphonic/multistaff/scanned/whole-multipage recognition is excluded. The existing Woodshed remains available for generated exercises, imports and practice. A viewed PDF or unreviewed draft does not become a graded lesson automatically.
 - **Progress** uses the existing canonical instrument ledger and progress component. Its instrument selector updates the same category used by Learn and Free Play. Earlier unassigned data stays separate.
 
 Practice starts from a lesson or a chosen/generated score. There is no second generic Play or Practice hub duplicating these choices. Saved page IDs and plugin routes still work, and Back returns through visited routes.

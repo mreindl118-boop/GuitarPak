@@ -3,6 +3,7 @@
 const {chromium}=require('playwright'),http=require('http'),fs=require('fs'),path=require('path'),env=require('./env');
 let checks=0;function ok(v,m){if(!v)throw Error(m);checks++;console.log('  PASS',m);}
 const root=env.ROOT;let current=false;
+const currentCache=fs.readFileSync(path.join(root,'sw.js'),'utf8').match(/var CACHE = '([^']+)'/)[1];
 const oldPage='<!doctype html><meta charset="utf-8"><title>Original update fixture</title><h1>Old installation fixture</h1>';
 const oldWorker="const C='guitarlab-v124';self.addEventListener('install',e=>e.waitUntil(caches.open(C).then(c=>c.addAll(['/index.html'])).then(()=>self.skipWaiting())));self.addEventListener('activate',e=>e.waitUntil(self.clients.claim()));self.addEventListener('fetch',e=>{if(e.request.method==='GET')e.respondWith(caches.open(C).then(c=>c.match(e.request)).then(r=>r||fetch(e.request)));});";
 const server=http.createServer((req,res)=>{
@@ -44,7 +45,7 @@ const browser=await chromium.launch({executablePath:env.CHROMIUM,args:['--autopl
  current=true;
  await page.evaluate(async()=>{const changed=new Promise(resolve=>navigator.serviceWorker.addEventListener('controllerchange',()=>resolve(true),{once:true}));await (await navigator.serviceWorker.getRegistration()).update();await changed;});
  await page.waitForFunction(()=>!!document.getElementById('app-update'),null,{timeout:60000});
- r=await page.evaluate(async()=>({marker:updateMarker,status:PerformancePlayer.snapshot().status,recorded:App.practiceProgress.history('guitar').length,keys:await caches.keys(),foreign:await caches.match('/unrelated-data').then(x=>x?x.text():null),old:await (await caches.open('guitarlab-v124')).match('/index.html').then(x=>x?x.text():null),fresh:await (await caches.open('guitarlab-v125')).match('/index.html').then(x=>x?x.text():null),text:document.querySelector('#app-update')?.textContent||'MISSING'}));
+ r=await page.evaluate(async cacheName=>({marker:updateMarker,status:PerformancePlayer.snapshot().status,recorded:App.practiceProgress.history('guitar').length,keys:await caches.keys(),foreign:await caches.match('/unrelated-data').then(x=>x?x.text():null),old:await (await caches.open('guitarlab-v124')).match('/index.html').then(x=>x?x.text():null),fresh:await (await caches.open(cacheName)).match('/index.html').then(x=>x?x.text():null),text:document.querySelector('#app-update')?.textContent||'MISSING'}),currentCache);
   ok(r.marker==='same running document'&&r.status==='running'&&r.recorded===0,'worker activation neither reloads over practice nor fabricates completion');
  ok(r.keys.includes('guitarlab-v124')&&r.foreign==='preserve this cache','activation retains the previous app cache and unrelated cache');
  ok(/Old installation fixture/.test(r.old)&&/practice-material.js/.test(r.fresh),'previous and new asset generations stay separate and complete '+JSON.stringify({keys:r.keys,old:r.old,fresh:!!r.fresh}));
@@ -75,7 +76,7 @@ const browser=await chromium.launch({executablePath:env.CHROMIUM,args:['--autopl
  r=await page.evaluate(sourceId=>SLMusicLibrary.listRevisions(sourceId),sourceId);
  ok(r.some(x=>x.editor&&x.editor.title==='Late programmatic edit retained'),'final checkpoint retains even a late programmatic edit before reload');
  await context.setOffline(true);await page.reload();await page.waitForFunction(()=>window.App&&App.active&&window.PracticeMaterial);
- r=await page.evaluate(async sourceId=>({source:await SLMusicLibrary.getItem(sourceId),history:App.practiceProgress.history('guitar'),cached:(await (await caches.open('guitarlab-v125')).keys()).map(r=>new URL(r.url).pathname)}),sourceId);
+ r=await page.evaluate(async ({sourceId,cacheName})=>({source:await SLMusicLibrary.getItem(sourceId),history:App.practiceProgress.history('guitar'),cached:(await (await caches.open(cacheName)).keys()).map(r=>new URL(r.url).pathname)}),{sourceId,cacheName:currentCache});
  ok(r.source.original.sha256===sourceHash&&r.history.length===1,'offline reopen retains original files and real practice history');
  ok(r.cached.some(x=>x.endsWith('/js/checkpoint.js'))&&r.cached.some(x=>x.endsWith('/vendor/pdfjs/pdf.worker.mjs')),'offline cache includes the new practice graph and local PDF worker');
  await page.evaluate(()=>App.switchTo('score'));await page.waitForTimeout(100);await page.evaluate(sourceId=>SLScoreReview.open(sourceId),sourceId);await page.waitForFunction(()=>document.querySelector('#sr-canvas').width>0&&!document.querySelector('#sr-canvas').hidden,null,{timeout:20000});
