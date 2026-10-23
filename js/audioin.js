@@ -72,6 +72,7 @@
     return v >= 0 && v <= 200 ? v : 100;
   }
   function holding() { return Object.keys(holds).length > 0; }
+  function exactHolding() { return Object.keys(holds).some(function (tag) { return holds[tag] && holds[tag].exact; }); }
   function needed() { return wantMonitor() || holding(); }
   function isMic(label) { return !!label && MIC_RE.test(label) && !INSTR_RE.test(label); }
   function chosenName() {
@@ -259,7 +260,7 @@
     var token = ++req, id = wantId();
     // the system default stands in for a missing chosen input only for a
     // meter, or after the user pressed On again (ack) — never by itself
-    var mayFall = holding() || ack;
+    var mayFall = !exactHolding() && (holding() || ack);
     // raw first; some WebViews refuse the processing flags, so retry plain
     var tries = id
       ? [{ c: raw(id) }, { c: { audio: { deviceId: { exact: id } } } }]
@@ -379,9 +380,16 @@
   }
 
   // ---- public controls ----
-  function hold(tag) {
-    holds[tag || 'api'] = true;
+  function hold(tag, options) {
+    holds[tag || 'api'] = options && options.exact ? { exact: true } : true;
     return open();
+  }
+
+  // Analysis consumers share this source; they connect/disconnect only their
+  // own analyser edge. Ownership and track lifetime remain in this service.
+  function tap(tag) {
+    if (!holds[tag || 'api'] || !stream || !src || !st.on) return null;
+    return { source: src, context: App.getAudio(), deviceId: st.device };
   }
 
   function release(tag) {
@@ -583,6 +591,7 @@
     start: start,
     stop: stop,
     hold: hold,
+    tap: tap,
     release: release,
     setDevice: setDevice,
     setMonitor: setMonitor,

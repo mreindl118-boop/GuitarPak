@@ -1,9 +1,10 @@
 /* soundLAB LIGHTS & HELP — the control center (an overlay sheet, the
- * keyboard icon at the top of every page). One place for:
+ * keyboard icon at the top of every page). The LUMI Display master is in
+ * the treble-clef menu; this sheet provides:
  *   - the HELP LEVEL (App.help: Full / Colors / Target / Tonic / None) — the
  *     practice difficulty shared by the Keys page, scale lessons, Exercises
  *     answer lights and the keyboard's own lights
- *   - KEY LIGHTS on a MIDI keyboard (App.midi keybed engine): on/off, the two
+ *   - LIGHT APPEARANCE (App.midi keybed engine): the two
  *     LUMI colors (home key + scale), brightness, keyboard type, the range it
  *     is playing (follows its octave buttons), a light test
  *   - NOTE COLORS by Interval (scale degree) | Note (pitch class) — the
@@ -56,7 +57,9 @@
         : 'This browser can’t reach MIDI keyboards. Chrome or Edge can.' };
     }
     if (!m.ready) return { kind: 'connect', text: 'No keyboard connected.' };
-    if (!m.hasOutput) return { kind: 'noout', text: m.inputId != null ? 'Your keyboard plays the app; pick its output in Settings › MIDI to light its keys.' : 'Plug in your keyboard, or pick it in Settings › MIDI.' };
+    var display = m.displayState;
+    if (display && display.configured && !display.connected) return { kind: 'noout', text: display.reason };
+    if (!m.hasOutput && !(display && display.connected)) return { kind: 'noout', text: m.inputId != null ? 'Your keyboard plays the app; pick its output in Settings › MIDI to light its keys.' : 'Plug in your keyboard, or pick it in Settings › MIDI.' };
     var r = m.range();
     return { kind: 'ok', text: (m.lumi ? 'ROLI LUMI' : esc(m.outputName || 'LED keyboard')) + ' · playing ' +
       Theory.midiName(r.lo, false) + '–' + Theory.midiName(r.hi, false) };
@@ -90,8 +93,8 @@
         (btMsg ? '<p class="muted small" role="status">' + esc(btMsg) + '</p>' : '') +
         (st.kind === 'noout' ? '<button type="button" class="btn sm" id="lc-settings">Settings › MIDI</button>' : '') +
         (st.kind === 'ok' ?
-          '<div class="lc-row"><span class="lc-lab">Lights</span><div class="seg" role="group" aria-label="Key lights">' +
-            '<button type="button" data-lcon="1" class="' + (on ? 'active' : '') + '">On</button><button type="button" data-lcon="0" class="' + (!on ? 'active' : '') + '">Off</button></div></div>' +
+          (lumi ? '<p class="muted small">LUMI Display has one master switch in the treble-clef menu. Brightness and color settings below change its appearance.</p>' : '<div class="lc-row"><span class="lc-lab">Other key lights</span><div class="seg" role="group" aria-label="Other keyboard lights">' +
+            '<button type="button" data-lcon="1" class="' + (on ? 'active' : '') + '">On</button><button type="button" data-lcon="0" class="' + (!on ? 'active' : '') + '">Off</button></div></div>') +
           (lumi ?
             colModeRow() +
             '<div class="lc-row"><span class="lc-lab">Colors</span><span class="lc-degs' + (byNote ? ' lc-notes' : '') + '" aria-label="' + (byNote ? 'Note' : 'Scale degree') + ' colors on screen and on the LUMI">' +
@@ -99,18 +102,20 @@
                 return '<span class="lc-deg" title="' + s.title + '"><i style="background:' + s.col + '"></i><i style="background:' + m.lumiColor(s.col) + '"></i><b>' + s.lab + '</b></span>';
               }).join('') + '</span></div>' +
             '<p class="muted small">' + (byNote
-              ? 'Every scale key lights in its note color, like the screen (top: screen, bottom: the LUMI’s nearest color); keys outside the scale stay dark.'
-              : 'Every key lights in its scale-degree color, like the screen (top: screen, bottom: the LUMI’s nearest color).') +
-              ' The note to play glows white, answers green. Edit the colors in the Fretboard settings.</p>' +
+              ? 'Every scale key lights in its note color, with the same mapped screen/program color (top: screen, bottom: emitted color); keys outside the scale stay dark.'
+              : 'Every key lights in its scale-degree color, with the same mapped screen/program color (top: screen, bottom: emitted color).') +
+              ' Active notes keep their shared pitch color; target focus uses timing and highlights.' +
+              ' Answer feedback uses labels and highlights while retaining pitch identity. Edit natural-note colors in the Fretboard settings.</p>' +
             '<div class="lc-row"><label class="lc-lab" for="lc-bright">Brightness</label><input type="range" id="lc-bright" min="10" max="100" step="5" value="' + bright + '"><span class="lc-val" id="lc-brightv">' + bright + '%</span></div>' +
             '<div class="lc-row"><span class="lc-lab">Octave keys</span><div class="seg" role="group" aria-label="What the LUMI octave buttons do">' +
               '<button type="button" data-lcoct="1" class="' + (octHand ? 'active' : '') + '">Switch hands</button><button type="button" data-lcoct="0" class="' + (!octHand ? 'active' : '') + '">Octave only</button></div></div>' +
             '<p class="muted small">Press octave down below C3 for the left-hand view, back up for the right hand. The keys still play as normal. The switch happens on the first note you play after pressing.</p>' +
-            '<div class="lc-row"><span class="lc-lab">LUMI Display</span><div class="seg" role="group" aria-label="LUMI Display in lessons">' +
+            '<div class="lc-row"><span class="lc-lab">Guide focus</span><div class="seg" role="group" aria-label="Legacy guide focus style">' +
               '<button type="button" data-lcdisp="1" class="' + (disp ? 'active' : '') + '" aria-pressed="' + !!disp + '">On</button><button type="button" data-lcdisp="0" class="' + (!disp ? 'active' : '') + '" aria-pressed="' + !disp + '">Off</button></div></div>' +
             '<p class="muted small">' + (disp
-              ? 'In lessons and practice runs the LUMI shows only what to play: the note to play now in its ' + (byNote ? 'note' : 'interval') + ' color, the next one blinking. The full scale comes back when the run ends.'
-              : 'Lessons keep the scale lit and show the note to play in white.') + '</p>' +
+              ? 'Legacy guides focus the target; the next target blinks.'
+              : 'Legacy guides keep the scale alongside the target.') +
+              ' Pitch colors always follow Intervals or Note Names in the clef menu. Its LUMI Display master controls illumination and prioritizes active targets; brightness does not affect sound.</p>' +
             (m.sysexOk ? '' : '<p class="lc-warn">Brightness and the dark background need the MIDI permission the browser blocked (SysEx); colors still work. Reload and allow the MIDI prompt.</p>')
             : '<p class="muted small">Your keyboard lights the scale keys (home key brightest) and the keys to play.</p>') +
           '<div class="lc-row"><span class="lc-lab">Keyboard</span><div class="seg" role="group" aria-label="Keyboard type">' +
@@ -118,7 +123,7 @@
               var act = (o[0] === '' && lumiPref == null) || (o[0] === '1' && lumiPref === true) || (o[0] === '0' && lumiPref === false);
               return '<button type="button" data-lctype="' + o[0] + '" class="' + (act ? 'active' : '') + '">' + o[1] + '</button>';
             }).join('') + '</div></div>' +
-          '<div class="lc-acts"><button type="button" class="btn sm" id="lc-test">Test lights</button><button type="button" class="btn sm" id="lc-resend">Re-send</button></div>'
+          '<div class="lc-acts"><button type="button" class="btn sm" id="lc-test"' + (lumi && m.displayEnabled === false ? ' disabled' : '') + '>Test lights</button><button type="button" class="btn sm" id="lc-resend">Re-send</button></div>'
           : '') +
       '</div>';
   }
@@ -179,7 +184,7 @@
       el.addEventListener('click', onClick);
       el.addEventListener('input', onInput);
       el.addEventListener('change', onInput);
-      ['help:level', 'midi:state', 'midi:range', 'colors', 'lights:display'].forEach(function (ev) { App.on(ev, function () { if (App.sheet === 'lights') paint(); }); });
+      ['help:level', 'midi:state', 'midi:range', 'colors', 'lights:display', 'lights:led', 'lights:master'].forEach(function (ev) { App.on(ev, function () { if (App.sheet === 'lights') paint(); }); });
       App.on('midi:status', function (d) { btMsg = d && d.text || ''; if (App.sheet === 'lights') paint(); });
       paint();
     },

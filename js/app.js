@@ -32,7 +32,7 @@ window.App = (function () {
   // Settings is deliberately in NEITHER list: it's an overlay page opened by
   // the ever-present gear in the header, from any page in either space.
   var SPACES = {
-    practice: ['quiz', 'practiceplan', 'fretboard', 'tab', 'notation', 'chords', 'piano', 'synth', 'pads', 'midihub', 'songs', 'jam', 'shed', 'tuner', 'trainer', 'theory'],
+    practice: ['quiz', 'practiceplan', 'fretboard', 'tab', 'notation', 'chords', 'piano', 'synth', 'pads', 'midihub', 'lumipractice', 'songs', 'jam', 'shed', 'tuner', 'trainer', 'theory'],
     studio: ['arrange', 'tracks', 'song', 'ideas']
   };
   var SPACE_LABELS = {
@@ -40,7 +40,7 @@ window.App = (function () {
     chords: 'Chords', piano: 'Piano', songs: 'Songs', jam: 'Jam', tuner: 'Tuner',
     trainer: 'Trainer', theory: 'Theory', settings: 'Settings', shed: 'Shed', synth: 'Synth',
     song: 'Song', arrange: 'Arrange', tracks: 'Tracks', pads: 'Pads', ideas: 'Ideas',
-    quiz: 'Exercises', midihub: 'MIDI Hub', practiceplan: 'Practice plan'
+    quiz: 'Exercises', midihub: 'MIDI Hub', lumipractice: 'LUMI practice', practiceplan: 'Practice plan'
   };
   // overlays live outside both page sets: the metronome opens as a SHEET over
   // whatever page you're on (corner icon), settings toggles in place (gear)
@@ -53,7 +53,7 @@ window.App = (function () {
     practice: [
       { id: 'gtheory', label: 'Learn', icon: 'learn', pages: ['quiz', 'chords', 'theory', 'practiceplan'] }, // Exercises = the home
       { id: 'ginst', label: 'Guitar', icon: 'guitar', pages: ['fretboard', 'tab', 'notation'] },
-      { id: 'gkeys', label: 'Keys', icon: 'keys', pages: ['piano', 'synth', 'pads', 'midihub'] }, // midihub = the MIDI Hub (js/midihub.js)
+      { id: 'gkeys', label: 'Keys', icon: 'keys', pages: ['piano', 'synth', 'pads', 'midihub', 'lumipractice'] },
       { id: 'gplay', label: 'Play', icon: 'note', pages: ['songs', 'jam'] },
       { id: 'gprac', label: 'Practice', icon: 'target', pages: ['shed', 'trainer', 'tuner'] } // the game first
     ],
@@ -68,7 +68,7 @@ window.App = (function () {
     chords: 'Chords', theory: 'Circle', songs: 'Songs', jam: 'Jam',
     trainer: 'Trainer', shed: 'Woodshed', metronome: 'Metronome', tuner: 'Tuner',
     song: 'Song', ideas: 'Ideas', tracks: 'Editor', arrange: 'Timeline', pads: 'Pads', synth: 'Synth',
-    quiz: 'Exercises', midihub: 'MIDI', practiceplan: 'Plan'
+    quiz: 'Exercises', midihub: 'MIDI', lumipractice: 'LUMI', practiceplan: 'Plan'
   };
 
   function groupOf(name) {
@@ -89,7 +89,7 @@ window.App = (function () {
   //            when an APK is actually built. Older APKs read nothing else, so
   //            this must never run ahead of the real file: when it did, the
   //            Android app kept downloading the same old APK in a loop.
-  var APP_VERSION = '0.82.0';
+  var APP_VERSION = '1.0.0';
   var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
 
   function verNum(v) {
@@ -183,9 +183,9 @@ window.App = (function () {
   // Drawn from Lucide (https://lucide.dev, ISC license, icons/LUCIDE-LICENSE.txt)
   // so every icon shares one 24px grid and 2px stroke; transport glyphs are
   // filled. pickdown/pickup are the guitar pick-stroke marks (not in Lucide);
-  // clef is Tabler's (MIT, icons/TABLER-LICENSE.txt — same grid and stroke).
+  // clef is an original G-clef stroke on the same grid.
   var ICONS = {
-    clef: '<path d="M16 12a4.16 4.16 0 0 1-5.62 3.89 3.78 3.78 0 0 1-2.38-3.39 3.42 3.42 0 0 1 2.34-3.38l3.79-1.42a2.89 2.89 0 0 0 1.87-2.7 2 2 0 1 0-4 0v14a2 2 0 1 1-4 0"/>',
+    clef: '<path d="M13.2 2.5c2.5 2.4 1.5 4.7-.7 6.9l-3.3 3.1c-3.2 3-2.5 7.3 1.2 8.2 4.7 1.1 7.7-3.3 5.7-6.7-1.8-3.1-6.7-2.2-6.7.7 0 1.5 1.2 2.3 2.5 2.3"/><path d="M12 3.8c-.9 2.7-.7 4.7.1 7.3l2.2 8.1c.8 2.9-.8 4.3-2.6 3.8-1.3-.4-1.7-1.6-1.3-2.5"/>',
     play: '<path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z" fill="currentColor"/>',
     pause: '<rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor"/><rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor"/>',
     stop: '<rect x="5" y="5" width="14" height="14" rx="2" fill="currentColor"/>',
@@ -426,7 +426,19 @@ window.App = (function () {
 
   // Plucked-string voice shared by fretboard / chords / jam / trainer:
   // the chosen sampled tone when its bank is decoded, synth twin otherwise.
+  var pluckVoices = [];
+  function trackPluck(node, gain) {
+    var voice = { node: node, gain: gain };
+    pluckVoices.push(voice);
+    node.onended = function () { var i = pluckVoices.indexOf(voice); if (i >= 0) pluckVoices.splice(i, 1); };
+  }
+  function clearPlucks() {
+    pluckVoices.splice(0).forEach(function (v) {
+      try { v.gain.gain.cancelScheduledValues(0); v.gain.gain.value = 0; v.node.stop(0); } catch (e) { /* already ended */ }
+    });
+  }
   function pluck(midi, when, dur, gain) {
+    if (!lockAllows(midi)) return;
     var ctx = getAudio();
     var t = ctx.currentTime + Math.max(0, when || 0);
     dur = dur || 1.2;
@@ -462,6 +474,7 @@ window.App = (function () {
       g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.05);
       src.connect(g);
       g.connect(ctx.destination);
+      trackPluck(src, g);
       src.start(t, sampleLead(src.buffer));
       src.stop(t + dur + 0.1);
       return;
@@ -470,6 +483,7 @@ window.App = (function () {
   }
 
   function pluckSynth(midi, when, dur, gain) {
+    if (!lockAllows(midi)) return;
     var ctx = getAudio();
     // never schedule in the past — a past-dated envelope collapses to silence
     var t = ctx.currentTime + Math.max(0, when || 0);
@@ -494,6 +508,7 @@ window.App = (function () {
     osc.connect(lp);
     lp.connect(g);
     g.connect(ctx.destination);
+    trackPluck(osc, g);
     osc.start(t);
     osc.stop(t + dur + 0.05);
   }
@@ -770,48 +785,61 @@ window.App = (function () {
     paintChrome();
   }
 
-  // pages that never use the shared key / tempo drop the context bar, so
-  // the top of the screen is just navigation
-  var NO_CTX = { quiz: true, settings: true };
+  // Musical context belongs to the whole app, including Learn and Settings.
+  // Modal utilities temporarily block its disclosure rather than cloning it.
   function paintChrome() {
-    document.documentElement.classList.toggle('noctx', !!NO_CTX[active]);
+    document.documentElement.classList.remove('noctx'); // old shell compatibility
     paintLock();
     closeCtx();
     showBar();
+    syncContextAvailability();
+    if (window.App && App.learnInstruments && typeof App.learnInstruments.refresh === 'function') App.learnInstruments.refresh();
   }
 
   // the clef button's dropdown (key / scale / mode / tempo / time + the
   // transport): open on tap, tucked away by a tap outside, Esc, Back, a page
   // switch or the top bar sliding away
   function ctxIsOpen() { return document.documentElement.classList.contains('ctx-open'); }
+  function contextBlocked() {
+    if (sheet || window.Help && Help.isOpen && Help.isOpen()) return true;
+    return Array.prototype.some.call(document.querySelectorAll('dialog[open], [aria-modal="true"]'), function (el) {
+      return !el.hidden && el.getClientRects().length > 0;
+    });
+  }
+  function syncContextAvailability() {
+    var blocked = contextBlocked(), b = document.getElementById('ctx-btn');
+    if (b) { b.disabled = blocked; b.setAttribute('aria-disabled', String(blocked)); }
+    if (blocked) closeCtx();
+  }
   function setCtx(on) {
-    on = !!on && !NO_CTX[active];
+    on = !!on && !contextBlocked();
     document.documentElement.classList.toggle('ctx-open', on);
-    var b = document.getElementById('ctx-btn');
+    var b = document.getElementById('ctx-btn'), bar = document.getElementById('ctxbar');
     if (b) { b.setAttribute('aria-expanded', String(on)); b.classList.toggle('active', on); }
+    if (bar) bar.hidden = !on;
+    if (on) {
+      showBar();
+      var first = bar && bar.querySelector('select, input, button');
+      if (first) { try { first.focus({ preventScroll: true }); } catch (e) { first.focus(); } }
+    }
   }
   function closeCtx() { if (ctxIsOpen()) setCtx(false); }
 
-  // SCALE LOCK (the clef dropdown's toggle, store scale.lock): only notes in
-  // the current key's scale play — from MIDI keyboards (midi.js drops the
-  // note-on), the MIDI Hub's thru, the on-screen keys and the neck. Pages
-  // that need every note keep it off; note-offs always pass (nothing hangs).
-  // Woodshed and Songs judge their own material (Hanon in C, imported songs),
-  // Pads and armed Studio drum tracks play drums, not pitches
-  var LOCK_FREE = { quiz: true, settings: true, pads: true, shed: true, songs: true };
+  // SCALE LOCK: global admission of pitched note events, including playback
+  // and auditions. Raw answers/visuals remain available; explicit drums,
+  // clicks and opaque recorded/live audio are outside note membership.
   function lockOn() { return store.get('scale.lock', false) === true; }
-  function drumsArmed() {
-    if (space !== 'studio' || !(window.DAW && DAW.engine && DAW.engine.tracks)) return false;
-    var id = store.get('st.armed', null);
-    return DAW.engine.tracks.some(function (t) { return t.id === id && t.kind === 'drums'; });
-  }
-  function lockActive() { return lockOn() && !LOCK_FREE[active] && !drumsArmed(); }
-  function lockAllows(midi) {
-    if (!lockActive()) return true;
+  function lockActive() { return lockOn(); }
+  // Pure scale membership for an explicitly scale-locked external synth route.
+  // Its cleanup/ownership must not depend on the page's app-sound exceptions.
+  function scaleContains(midi) {
     var r = store.get('fb.root', 9), sc = store.get('fb.scale', 'minorPent');
     var info = Theory.scaleInfo(Theory.mod12(typeof r === 'number' ? r : 9), Theory.SCALES[sc] ? sc : 'minorPent');
-    return info.pcToStep.has(Theory.mod12(midi));
+    // Calibration may detune a nominal MIDI note fractionally; admission uses
+    // its named key without quantizing the frequency sent to the voice.
+    return Number.isFinite(midi) && info.pcToStep.has(Theory.mod12(Math.round(midi)));
   }
+  function lockAllows(midi) { return !lockActive() || scaleContains(midi); }
   function paintLock() { document.documentElement.classList.toggle('scale-locked', lockActive()); }
 
   // The top bar slides away while you scroll DOWN a page and comes back on
@@ -895,12 +923,16 @@ window.App = (function () {
     if (sheet) closeSheet();
     var el = document.getElementById('sheet-' + name);
     if (!el) return;
-    sheet = name;
     sheetReturn = document.activeElement;
+    var context = document.getElementById('ctxbar');
+    if (context && context.contains(sheetReturn)) sheetReturn = document.getElementById('ctx-btn');
+    closeCtx();
+    sheet = name;
     el.hidden = false;
     void el.offsetWidth; // commit before the entrance animation
     el.classList.add('open');
     document.documentElement.classList.add('sheet-open');
+    syncContextAvailability();
     var b = document.getElementById(SHEETS[name]);
     if (b) { b.classList.add('active'); b.setAttribute('aria-expanded', 'true'); }
     if (modules[name] && modules[name].onShow) {
@@ -917,6 +949,7 @@ window.App = (function () {
     sheet = null;
     if (el) { el.classList.remove('open'); el.hidden = true; }
     document.documentElement.classList.remove('sheet-open');
+    syncContextAvailability();
     var b = document.getElementById(SHEETS[name]);
     if (b) { b.classList.remove('active'); b.setAttribute('aria-expanded', 'false'); }
     if (modules[name] && modules[name].onHide) {
@@ -952,19 +985,18 @@ window.App = (function () {
   };
 
   // ---- NOTE COLORS: the one palette behind every page and the LUMI keybed.
-  // Mode 'interval' (default): a note is colored by its SCALE DEGREE — 7
-  // colors (fb.colors), what the note does in the key. Mode 'note': by its
-  // PITCH CLASS — 12 colors (fb.noteColors), every C the same color in every
-  // key. Store fb.colorMode; 'colors' {mode, what} on every change. Pages ask
-  // forNote(pc, step) per note (step = its index in the current scale, or
-  // undefined when it's not in it) and repaint on 'colors'.
+  // Mode 'interval' (default): all twelve semitones above the selected root,
+  // seven natural colors (fb.colors) plus quantized neighboring-color blends.
+  // Mode 'note': absolute pitch class, natural CDEFGAB anchors (fb.noteColors)
+  // plus derived accidental blends. Every C keeps its color in every key.
+  // Store fb.colorMode; emit 'colors' {mode, what} on changes. The legacy
+  // forNote(pc, step) signature remains accepted, with step ignored.
   var HEX6 = /^#[0-9a-fA-F]{6}$/;
   // one bright color per degree, all light enough for dark label text
   var DEGREE_DEFAULTS = ['#ffab47', '#e8d44d', '#7ad97a', '#4cc9b0', '#6ea8fe', '#b48ef0', '#ff85b3'];
-  // C..B: a hue wheel red -> violet, light enough for the same dark labels
-  // (contrast >= 7:1 on #1c1206, like the degree colors), and 12 DIFFERENT
-  // colors on a LUMI (each lands on its own entry of its color table: hues
-  // 2, 20, 38, 51, 76, 111, 151, 179, 204, 221, 247, 269)
+  // Preserve the legacy C..B source array in storage. Only its seven
+  // natural anchors are editable; accidental values are derived below.
+  // Displayed RGB is the same quantized program-table value sent to LUMI.
   var NOTE_DEFAULTS = ['#ff7583', '#ee9468', '#edb75a', '#f2de5f', '#c6f047', '#82ef6c',
     '#6cefad', '#39efef', '#6cb8ef', '#849bf5', '#a392f6', '#d27efc'];
   function validCols(c, n) {
@@ -1000,23 +1032,26 @@ window.App = (function () {
   function degCols() { return colRead('fb.colors', function (v) { return validCols(v, 7) ? v.slice() : DEGREE_DEFAULTS.slice(); }); }
   function noteCols() { return colRead('fb.noteColors', function (v) { return validCols(v, 12) ? v.slice() : NOTE_DEFAULTS.slice(); }); }
   function colorsChanged(what) { emit('colors', { mode: colMode(), what: what }); }
+  var notePalette = window.SLNotePalette;
+  function pitchSample(note) { return notePalette.sample(note, store.get('fb.root', 9), colMode(), degCols(), noteCols()); }
   var colors = {
-    DEGREE_DEFAULTS: DEGREE_DEFAULTS.slice(),
-    NOTE_DEFAULTS: NOTE_DEFAULTS.slice(),
+    DEGREE_DEFAULTS: notePalette.mapped(DEGREE_DEFAULTS),
+    NOTE_DEFAULTS: notePalette.notes(NOTE_DEFAULTS),
     mode: colMode,
-    degrees: function () { return degCols().slice(); },
-    notes: function () { return noteCols().slice(); },
-    // the color of one note: by pitch class in 'note' mode, by scale step
-    // in 'interval' mode (null there when the note is out of the scale, so
-    // callers keep their own out-of-scale look)
-    forNote: function (pc, step) {
-      if (colMode() === 'note') {
-        pc = Math.round(Number(pc));
-        if (!isFinite(pc)) return null;
-        return noteCols()[((pc % 12) + 12) % 12];
-      }
-      if (typeof step !== 'number' || !(step >= 0) || !isFinite(step)) return null;
-      return degCols()[Math.floor(step) % 7];
+    degrees: function () { return notePalette.mapped(degCols()); },
+    notes: function () { return notePalette.notes(noteCols()); },
+    sourceNotes: function () { return noteCols().slice(); },
+    sourceDegrees: function () { return degCols().slice(); },
+    chromatic: function () { return colMode() === 'note' ? notePalette.notes(noteCols()) : notePalette.intervals(degCols()); },
+    // Chromatic pitch identity is independent of scale membership. The old
+    // step argument remains accepted for call-site compatibility; interval
+    // color now means one of all twelve semitones above the selected root.
+    forNote: function (note, step) { var value = pitchSample(note); return value ? value.color : null; },
+    forPitch: function (note) { var value = pitchSample(note); return value ? value.color : null; },
+    lumiVelocity: function (note) { var value = pitchSample(note); return value ? value.velocity : null; },
+    label: function (note) {
+      var value = pitchSample(note);
+      return !value ? '' : colMode() === 'note' ? Theory.pcName(value.pc, Theory.FLAT_KEYS.has(curRoot())) : value.label;
     },
     setMode: function (m) {
       m = m === 'note' ? 'note' : 'interval';
@@ -1271,8 +1306,16 @@ window.App = (function () {
       cbtn.setAttribute('aria-label', t);
     }
     if (cbtn && cbar) {
-      cbtn.innerHTML = icon('clef', 20);
+      cbtn.innerHTML = icon('clef', 28) + '<svg class="ctx-caret" viewBox="0 0 8 5" aria-hidden="true" focusable="false"><path d="m1 1 3 3 3-3"/></svg>';
+      // A disclosure contains form controls, so it is not an ARIA menu.
+      cbtn.removeAttribute('aria-haspopup');
+      cbar.setAttribute('role', 'region');
+      cbar.setAttribute('aria-label', 'Global key, scale, tempo and sound settings');
+      cbar.hidden = !ctxIsOpen();
       cbtn.addEventListener('click', function () { setCtx(!ctxIsOpen()); });
+      cbtn.addEventListener('keydown', function (e) {
+        if (e.key === 'ArrowDown') { e.preventDefault(); setCtx(true); }
+      });
       document.addEventListener('pointerdown', function (e) {
         if (ctxIsOpen() && !cbar.contains(e.target) && !cbtn.contains(e.target)) setCtx(false);
       }, true);
@@ -1283,33 +1326,59 @@ window.App = (function () {
         e.stopPropagation();
         e.preventDefault();
       }, true);
+      document.addEventListener('focusin', function (e) {
+        if (ctxIsOpen() && !cbar.contains(e.target) && e.target !== cbtn) setCtx(false);
+      });
+      cbar.addEventListener('keydown', function (e) {
+        if (e.key === 'Tab' && e.shiftKey && e.target === cbar.querySelector('select, input, button')) {
+          e.preventDefault(); setCtx(false); cbtn.focus();
+        }
+      });
+      ['sheet', 'tour'].forEach(function (event) { on(event, syncContextAvailability); });
       ['fb:set', 'tempo'].forEach(function (ev) { on(ev, paintCtxBtn); });
     }
 
     // the dropdown's two toggles: the keyboard's LEDs show the scale, and
     // scale lock (only in-key notes play)
     var ledB = document.getElementById('cx-led'), lockB = document.getElementById('cx-lock'), tnote = document.getElementById('cx-tnote');
+    var colorOptions = document.createElement('div');
+    colorOptions.className = 'seg cx-colors'; colorOptions.setAttribute('role', 'group');
+    colorOptions.setAttribute('aria-label', 'LUMI and screen pitch colors');
+    colorOptions.innerHTML = '<button type="button" data-cxcolormode="interval">Intervals</button><button type="button" data-cxcolormode="note">Note Names</button>';
+    if (ledB && ledB.parentNode) ledB.parentNode.insertBefore(colorOptions, tnote || null);
+    function paintColorOptions() {
+      colorOptions.querySelectorAll('[data-cxcolormode]').forEach(function (button) {
+        var selected = button.getAttribute('data-cxcolormode') === colors.mode();
+        button.classList.toggle('active', selected); button.setAttribute('aria-pressed', String(selected));
+      });
+    }
+    colorOptions.addEventListener('click', function (event) {
+      var button = event.target.closest('[data-cxcolormode]');
+      if (button) colors.setMode(button.getAttribute('data-cxcolormode'));
+    });
+    on('colors', paintColorOptions); paintColorOptions();
+
     function paintToggles() {
-      var m = App.midi, led = !!(m && m.ledScale), lk = lockOn();
+      var m = App.midi, led = !!(m && m.displayEnabled), lk = lockOn();
       if (ledB) { ledB.classList.toggle('active', led); ledB.setAttribute('aria-pressed', String(led)); }
       if (lockB) { lockB.classList.toggle('active', lk); lockB.setAttribute('aria-pressed', String(lk)); }
       if (!tnote) return;
       var sc = Theory.SCALES[curScale()], name = Theory.pcName(curRoot(), Theory.FLAT_KEYS.has(curRoot())) + ' ' + (sc ? sc.name.replace(/\s*\(.*\)$/, '') : '');
       var msg = [];
-      if (led && !(m && m.hasOutput)) msg.push('LED scale: connect a LUMI or LED keyboard (Lights & help).');
-      if (lk) msg.push(LOCK_FREE[active] ? 'Scale lock is paused on this page.' : 'Only ' + name + ' notes play, from any keyboard or the screen.');
+      if (led && m && m.displayState) msg.push(m.displayState.reason);
+      if (lk) msg.push('Only ' + name + ' pitched notes play across tools, playback and MIDI. Drums and recorded/live audio keep their own sound.');
       tnote.textContent = msg.join(' ');
       tnote.hidden = !msg.length;
     }
     if (ledB) {
-      ledB.innerHTML = icon('lights', 15) + ' LED scale';
-      ledB.addEventListener('click', function () { if (App.midi) App.midi.setLedMode(App.midi.ledScale ? 'off' : 'scale'); paintToggles(); });
+      ledB.innerHTML = icon('lights', 15) + ' LUMI Display';
+      ledB.addEventListener('click', function () { if (App.midi && App.midi.setDisplayEnabled) App.midi.setDisplayEnabled(!App.midi.displayEnabled); paintToggles(); });
     }
     if (lockB) {
-      lockB.innerHTML = icon('lock', 15) + ' Scale lock';
+      lockB.innerHTML = icon('lock', 15) + ' Scale Lock';
       lockB.addEventListener('click', function () { App.scaleLock.set(!lockOn()); paintToggles(); });
     }
-    ['fb:set', 'lights:led', 'help:level', 'midi:state', 'scale:lock'].forEach(function (ev) { on(ev, paintToggles); });
+    ['fb:set', 'lights:led', 'lights:display-enabled', 'help:level', 'midi:state', 'scale:lock'].forEach(function (ev) { on(ev, paintToggles); });
     if (cbtn) cbtn.addEventListener('click', paintToggles);
     paintToggles();
     refreshAll();
@@ -1574,6 +1643,17 @@ window.App = (function () {
     setInterval(function () { checkForUpdate(); }, 4 * 60 * 60 * 1000);
   }
 
+  var lockBoundaryKey = JSON.stringify([store.get('fb.root', 9), store.get('fb.scale', 'minorPent')]);
+  var lockBoundaryOn = lockOn();
+  function checkLockBoundary() {
+    var key = JSON.stringify([store.get('fb.root', 9), store.get('fb.scale', 'minorPent')]), onNow = lockOn();
+    if (key === lockBoundaryKey && onNow === lockBoundaryOn) return;
+    var flush = onNow || lockBoundaryOn;
+    lockBoundaryKey = key; lockBoundaryOn = onNow;
+    if (flush) { clearPlucks(); emit('scale:boundary', { on: onNow, root: store.get('fb.root', 9), scale: store.get('fb.scale', 'minorPent') }); }
+  }
+  ['fb:set', 'fb:scale', 'scale:lock'].forEach(function (event) { on(event, checkLockBoundary); });
+
   return {
     register: register,
     icon: icon,
@@ -1596,9 +1676,10 @@ window.App = (function () {
     ctx: function (on) { if (on != null) setCtx(on); return ctxIsOpen(); },
     scaleLock: {
       get on() { return lockOn(); },
-      get active() { return lockActive(); }, // on, and this page obeys it
+      get active() { return lockActive(); }, // global pitched-note scope
       set: function (on) { store.set('scale.lock', !!on); paintLock(); emit('scale:lock', { on: !!on }); },
-      allows: lockAllows
+      allows: lockAllows,
+      contains: scaleContains // current root/scale, regardless of app-page gating
     },
     get sheet() { return sheet; },
     wake: wake,

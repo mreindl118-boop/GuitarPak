@@ -1,6 +1,6 @@
 {
   "version": "0.75.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/soundLAB-alpha.apk",
-  "web": "0.82.0",
-  "notes": "Tap the new treble-clef button (next to the metronome) for key, scale and tempo; tap anywhere else to tuck it away. Inside: LED scale lights the selected scale on your LUMI or LED keyboard (or switches the lights off), and Scale lock lets only the scale's notes play, from any keyboard or the screen. Plus a cleaner look: new icons (a real guitar, piano and metronome), a one-row header on phones, quieter page pills, upright note names on the vertical neck and portrait keyboard, and an easier-to-read light theme."
+  "web": "1.0.0",
+  "notes": "Guided performance: Wait for Me and Play at Tempo with piano-roll targets, virtual/MIDI or monophonic audio input, chords, loops and accuracy reports. One clef menu controls comprehensive Scale Lock, optional LUMI Display and shared Intervals/Note Names colors. Per-instrument progress adds measured engagement, daily goals, configurable consistency XP/decay, charts and export. Audio chords and hardware response remain explicitly unverified/unsupported as documented. Native APK channel remains unchanged."
 }

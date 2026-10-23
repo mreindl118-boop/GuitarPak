@@ -323,33 +323,38 @@
 
   var OPEN = [40, 45, 50, 55, 59, 64];
   var STR_NAME = ['low E (6th)', 'A (5th)', 'D (4th)', 'G (3rd)', 'B (2nd)', 'high E (1st)'];
+  function neckContext() {
+    var bass = (cur && view === 'run' ? cur.instrument : learnInstrument()) === 'bass';
+    return bass ? { midi: [28, 33, 38, 43], names: ['E (4th)', 'A (3rd)', 'D (2nd)', 'G (1st)'], label: 'Four-string bass neck' } :
+      { midi: OPEN, names: STR_NAME, label: 'Six-string guitar neck' };
+  }
 
   GEN.neckName = function (o) {
-    var s, f, midi;
-    do { s = rnd(6); f = rnd(o.max + 1); midi = OPEN[s] + f; } while (o.nat && isBlack(midi));
+    var neck = neckContext(), s, f, midi;
+    do { s = rnd(neck.midi.length); f = rnd(o.max + 1); midi = neck.midi[s] + f; } while (o.nat && isBlack(midi));
     var pc = mod(midi, 12);
     var q = {
-      kind: 'choice', item: 'gn:' + s + ':' + f, miss: PC_LABEL[pc] + ' (' + STR_NAME[s] + ', fret ' + f + ')', sig: s + ':' + f,
+      kind: 'choice', item: 'gn:' + neck.midi.length + ':' + s + ':' + f, miss: PC_LABEL[pc] + ' (' + neck.names[s] + ', fret ' + f + ')', sig: s + ':' + f,
       prompt: 'Name the note at the dot', pcAnswer: pc,
       show: { type: 'neck', frets: o.max <= 5 ? 5 : 12, marks: [{ s: s, f: f, c: 'a' }] },
       audio: [{ m: [midi], at: 0, d: 1.2, gtr: 1 }],
-      explain: PC_LABEL[pc] + ' — ' + STR_NAME[s] + ' string, fret ' + f + '. Each fret is a half step up from the open string.'
+      explain: PC_LABEL[pc] + ' — ' + neck.names[s] + ' string, fret ' + f + '. Each fret is a half step up from the open string.'
     };
     if (o.nat) { q.choices = letterChoices(); q.correct = LET[NAT.indexOf(pc)]; } else { q.choices = pcChoices(); q.correct = 'pc' + pc; }
     return q;
   };
 
   GEN.neckFind = function (o) {
-    var s = rnd(6), f = rnd(o.max + 1), midi = OPEN[s] + f, pc = mod(midi, 12);
+    var neck = neckContext(), s = rnd(neck.midi.length), f = rnd(o.max + 1), midi = neck.midi[s] + f, pc = mod(midi, 12);
     var name = isBlack(midi) ? (Math.random() < 0.5 ? SHARP_N[pc] : FLAT_N[pc]) : LET[NAT.indexOf(pc)];
     var spots = [];
-    for (var ff = 0; ff <= 12; ff++) if (mod(OPEN[s] + ff, 12) === pc) spots.push({ s: s, f: ff });
+    for (var ff = 0; ff <= 12; ff++) if (mod(neck.midi[s] + ff, 12) === pc) spots.push({ s: s, f: ff });
     return {
       kind: 'single', pc: pc, string: s, board: 'neck', frets: 12,
-      item: 'gf:' + s + ':' + pc, miss: name + ' on ' + STR_NAME[s], sig: s + name,
-      prompt: 'Find ' + name + ' on the ' + STR_NAME[s] + ' string',
+      item: 'gf:' + neck.midi.length + ':' + s + ':' + pc, miss: name + ' on ' + neck.names[s], sig: s + name,
+      prompt: 'Find ' + name + ' on the ' + neck.names[s] + ' string',
       audio: [{ m: [midi], at: 0, d: 1.2, gtr: 1 }], reveal: { neck: spots },
-      explain: name + ' on the ' + STR_NAME[s] + ' string: fret ' + spots.map(function (p) { return p.f; }).join(' and ') + '.'
+      explain: name + ' on the ' + neck.names[s] + ' string: fret ' + spots.map(function (p) { return p.f; }).join(' and ') + '.'
     };
   };
 
@@ -837,35 +842,36 @@
 
   function neckSVG(o) {
     var F = o.frets || 12, FW = 36, X0 = 36, SG = 22, T = 14, LX = 14;
-    var W = X0 + F * FW + 8, H = T + 5 * SG + 30, s = [], f, st;
-    ['E', 'A', 'D', 'G', 'B', 'E'].forEach(function (n, i) {
-      s.push('<text class="qz-sname' + (o.hi === i ? ' hi' : '') + '" x="' + (-LX / 2) + '" y="' + (T + (5 - i) * SG + 3.5) + '">' + n + '</text>');
+    var neck = neckContext(), last = neck.midi.length - 1;
+    var W = X0 + F * FW + 8, H = T + last * SG + 30, s = [], f, st;
+    neck.midi.forEach(function (m, i) {
+      s.push('<text class="qz-sname' + (o.hi === i ? ' hi' : '') + '" x="' + (-LX / 2) + '" y="' + (T + (last - i) * SG + 3.5) + '">' + SHARP_N[mod(m, 12)] + '</text>');
     });
-    [3, 5, 7, 9].forEach(function (ff) { if (ff <= F) s.push('<circle class="qz-inlay" cx="' + (X0 + (ff - 0.5) * FW) + '" cy="' + (T + 2.5 * SG) + '" r="4"/>'); });
+    [3, 5, 7, 9].forEach(function (ff) { if (ff <= F) s.push('<circle class="qz-inlay" cx="' + (X0 + (ff - 0.5) * FW) + '" cy="' + (T + last / 2 * SG) + '" r="4"/>'); });
     if (F >= 12) {
-      s.push('<circle class="qz-inlay" cx="' + (X0 + 11.5 * FW) + '" cy="' + (T + 1.5 * SG) + '" r="4"/>');
-      s.push('<circle class="qz-inlay" cx="' + (X0 + 11.5 * FW) + '" cy="' + (T + 3.5 * SG) + '" r="4"/>');
+      s.push('<circle class="qz-inlay" cx="' + (X0 + 11.5 * FW) + '" cy="' + (T + (last / 2 - 1) * SG) + '" r="4"/>');
+      s.push('<circle class="qz-inlay" cx="' + (X0 + 11.5 * FW) + '" cy="' + (T + (last / 2 + 1) * SG) + '" r="4"/>');
     }
-    for (f = 0; f <= F; f++) s.push('<line class="' + (f ? 'qz-fret' : 'qz-nut') + '" x1="' + (X0 + f * FW) + '" y1="' + T + '" x2="' + (X0 + f * FW) + '" y2="' + (T + 5 * SG) + '"/>');
-    for (st = 0; st < 6; st++) {
-      var yy = T + (5 - st) * SG;
-      s.push('<line class="qz-str' + (o.hi === st ? ' hi' : '') + '" stroke-width="' + (o.hi === st ? 2.6 : 0.9 + (5 - st) * 0.28).toFixed(2) +
+    for (f = 0; f <= F; f++) s.push('<line class="' + (f ? 'qz-fret' : 'qz-nut') + '" x1="' + (X0 + f * FW) + '" y1="' + T + '" x2="' + (X0 + f * FW) + '" y2="' + (T + last * SG) + '"/>');
+    for (st = 0; st <= last; st++) {
+      var yy = T + (last - st) * SG;
+      s.push('<line class="qz-str' + (o.hi === st ? ' hi' : '') + '" stroke-width="' + (o.hi === st ? 2.6 : 0.9 + (last - st) * 0.28).toFixed(2) +
         '" x1="4" y1="' + yy + '" x2="' + (X0 + F * FW) + '" y2="' + yy + '"/>');
     }
     [3, 5, 7, 9, 12].forEach(function (ff) { if (ff <= F) s.push('<text class="qz-fnum" x="' + (X0 + (ff - 0.5) * FW) + '" y="' + (H - 6) + '">' + ff + '</text>'); });
     (o.marks || []).forEach(function (mk) {
       var cx = mk.f === 0 ? X0 / 2 : X0 + (mk.f - 0.5) * FW;
-      s.push('<circle class="qz-nm mk-' + (mk.c || 'a') + '" cx="' + cx + '" cy="' + (T + (5 - mk.s) * SG) + '" r="7.5"/>');
+      s.push('<circle class="qz-nm mk-' + (mk.c || 'a') + '" cx="' + cx + '" cy="' + (T + (last - mk.s) * SG) + '" r="7.5"/>');
     });
     if (o.input) {
-      for (st = 0; st < 6; st++) {
+      for (st = 0; st <= last; st++) {
         for (f = 0; f <= F; f++) {
-          s.push('<rect class="qz-fz" data-s="' + st + '" data-f="' + f + '" x="' + (f ? X0 + (f - 1) * FW : 0) + '" y="' + (T + (5 - st) * SG - SG / 2) +
+          s.push('<rect class="qz-fz" data-s="' + st + '" data-f="' + f + '" x="' + (f ? X0 + (f - 1) * FW : 0) + '" y="' + (T + (last - st) * SG - SG / 2) +
             '" width="' + (f ? FW : X0) + '" height="' + SG + '"/>');
         }
       }
     }
-    return '<svg class="qz-neck" viewBox="' + (-LX) + ' 0 ' + (W + LX) + ' ' + H + '" width="' + (W + LX) + '" role="group" aria-label="Guitar neck">' + s.join('') + '</svg>';
+    return '<svg class="qz-neck" viewBox="' + (-LX) + ' 0 ' + (W + LX) + ' ' + H + '" width="' + (W + LX) + '" role="group" aria-label="' + neck.label + '">' + s.join('') + '</svg>';
   }
 
   // ================= course =================
@@ -1084,6 +1090,74 @@
   // ================= state + persistence =================
 
   var root = null, view = 'home', topicId = null, openMode = {}, cur = null, advT = 0;
+  // Retain physical presses across questions; layered channels on one keyboard
+  // are one press, while another keyboard has its own held notes.
+  var inputHeld = {}, inputRoute = null;
+  var lumiOwned = false, lumiQuestion = null, lumiFeedbackT = 0, lumiFeedbackUntil = 0;
+
+  // Instruction comes only from structured answer pitches. Contextual ear-
+  // training audio is not an answer and must not become a guessed LED target.
+  function lumiTargets(q) {
+    q = q || (cur && cur.q);
+    if (!q) return [];
+    var pcs = q.kind === 'set' ? Object.keys(q.pcs || {}).map(Number) :
+      q.kind === 'single' && q.pc != null ? [q.pc] : q.pcAnswer != null ? [q.pcAnswer] : [];
+    var candidates = q.reveal && q.reveal.keys ? q.reveal.keys.slice() : [];
+    if (!candidates.length && q.audio) {
+      q.audio.slice().reverse().forEach(function (event) { (event.m || []).forEach(function (m) { candidates.push(m); }); });
+    }
+    if (pcs.length) {
+      var range = App.midi && App.midi.range ? App.midi.range() : { lo: 48, hi: 71 };
+      return pcs.map(function (pc) {
+        var match = candidates.filter(function (n) { return Number.isInteger(n) && n >= 0 && n <= 127 && mod(n, 12) === mod(pc, 12); })[0];
+        if (match != null) return match;
+        return range.lo + mod(pc - range.lo, 12);
+      });
+    }
+    // Spelling/recognition tasks can provide a complete written answer chord.
+    // Questions with only words/scale names/relative ear context stay unsupported.
+    if (!q.ear && q.reveal && q.reveal.staff) {
+      return (q.reveal.staff.cols || []).reduce(function (out, column) { return out.concat(column.map(midiOf)); }, []);
+    }
+    if (!q.ear && q.audio && q.audio.length === 1 && q.audio[0].m && q.audio[0].m.length > 1) return q.audio[0].m.slice();
+    return [];
+  }
+  function clearLumi() {
+    clearTimeout(lumiFeedbackT); lumiFeedbackT = 0; lumiFeedbackUntil = 0;
+    if (lumiOwned && App.midi) {
+      if (App.midi.guide) App.midi.guide(null, null);
+      if (App.midi.reveal) App.midi.reveal([], 0);
+    }
+    lumiOwned = false; lumiQuestion = null;
+  }
+  function syncLumi() {
+    if (!cur || !cur.q || view !== 'run' || covered()) { clearLumi(); return; }
+    var m = App.midi;
+    if (!m || !m.guide) return;
+    if (cur.q !== lumiQuestion) {
+      clearTimeout(lumiFeedbackT); lumiFeedbackT = 0; lumiFeedbackUntil = 0;
+      if (m.reveal) m.reveal([], 0);
+    }
+    lumiQuestion = cur.q; lumiOwned = true;
+    var targets = lumiTargets(cur.q);
+    if (cur.answered && Date.now() < lumiFeedbackUntil && m.reveal) {
+      m.guide(null, null); // answer feedback owns the same pitches briefly
+      m.reveal(targets.map(function (n) { return mod(n, 12); }), Math.max(1, lumiFeedbackUntil - Date.now()));
+    } else m.guide(targets, null);
+    var hint = el('qz-lumi-hint');
+    if (hint) hint.hidden = !m.displayEnabled || !!targets.length;
+  }
+  function lumiFeedback(ms) {
+    clearTimeout(lumiFeedbackT);
+    lumiFeedbackUntil = Date.now() + ms;
+    var question = cur && cur.q;
+    syncLumi();
+    if (!lumiOwned) return;
+    lumiFeedbackT = setTimeout(function () {
+      lumiFeedbackT = 0; lumiFeedbackUntil = 0;
+      if (cur && cur.q === question) syncLumi();
+    }, ms);
+  }
 
   function esc(s) {
     return String(s).replace(/[&<>"']/g, function (c) {
@@ -1091,20 +1165,57 @@
     });
   }
   function el(id) { return document.getElementById(id); }
-  function prog() { var p = App.store.get('qz.prog', {}); return (p && typeof p === 'object') ? p : {}; }
+  function learnInstrument() { return App.practiceInstrument ? App.practiceInstrument.get() : 'piano'; }
+  function modeAllowed(mode) { return !App.learnInstruments || App.learnInstruments.allowsMode(mode); }
+  function availableLevels() { return LEVELS.filter(function (l) { return modeAllowed(l.mode); }); }
+  function availableNodes() { return NODES.filter(function (n) { return modeAllowed(n.mode); }); }
+  function availableModes(u) { return u.modes.filter(function (m) { return modeAllowed(m.key); }); }
+  function prog(instrument) {
+    var all = App.store.get('qz.instrumentProg', {});
+    var p = App.practiceInstrument ? all && all[instrument || learnInstrument()] : App.store.get('qz.prog', {});
+    return p && typeof p === 'object' ? p : {};
+  }
+  function saveProg(p, instrument) {
+    if (!App.practiceInstrument) { App.store.set('qz.prog', p); return; }
+    var all = App.store.get('qz.instrumentProg', {});
+    if (!all || typeof all !== 'object') all = {};
+    all[instrument] = p; App.store.set('qz.instrumentProg', all);
+  }
+  function contentLabel(mode) { return App.learnInstruments ? App.learnInstruments.contentKind(mode) : MODE_NAME[mode]; }
+  function practiceSummary() {
+    var id = cur && (view === 'run' || view === 'done') ? cur.instrument : learnInstrument();
+    return App.practiceProgress ? App.practiceProgress.summary(id) : { lifetimeEarnedXP: 0, currentXP: 0, totalEngagedSeconds: 0, today: {} };
+  }
+  function pendingHTML() {
+    var pending = window.SLXP && SLXP.pending ? SLXP.pending() : [];
+    return pending.length ? '<div class="card" id="qz-save-error" role="alert"><b>Practice progress has not been saved.</b><p>' + pending.length + ' session(s) are retained for retry. No unconfirmed XP is shown as earned.</p><button class="btn sm" id="qz-retry-save">Retry saving</button> <button class="btn sm" id="qz-export-pending">Export unsaved sessions</button></div>' : '';
+  }
+  function legacyHistoryHTML() {
+    var old = App.store.get('qz.prog', {}), legacy = window.SLXP && SLXP.legacy ? SLXP.legacy() : { total: 0 };
+    var ids = old && typeof old === 'object' ? Object.keys(old) : [];
+    return '<section class="card qz-pcard" id="qz-legacy-history"><h3>Legacy / unassigned</h3><p class="muted small">' + ids.length + ' earlier course records · ' + Number(legacy.total || 0).toLocaleString() + ' historical XP. These records are preserved separately; they are not copied into any instrument category.</p></section>';
+  }
+  function stopExercise() {
+    clearTimeout(advT); stopClock(); stopSprint(); clearLumi();
+    if (cur && !cur.finished && cur.sessionId) {
+      XP().finishLevel({ instrument: cur.instrument, sessionId: cur.sessionId, status: 'stopped' }); cur.finished = true;
+    }
+    cur = null; view = 'home'; selNode = -1; render();
+    if (App.learnInstruments) App.learnInstruments.refresh();
+  }
   function starsFor(n) { return n >= 10 ? 3 : n >= 9 ? 2 : n >= 8 ? 1 : 0; }
   function starStr(s) { return '★★★'.slice(0, s) + '☆☆☆'.slice(0, 3 - s); }
   function lvlTitle(l) { return l.topic.name + ' · ' + l.unit.name + ' · ' + MODE_NAME[l.mode] + ' ' + l.n; }
   function passed(p, l) { return !!(p[l.id] && p[l.id].s); }
 
   function nextLevel() {
-    var p = prog();
-    for (var i = 0; i < LEVELS.length; i++) if (!passed(p, LEVELS[i])) return LEVELS[i];
+    var p = prog(), levels = availableLevels();
+    for (var i = 0; i < levels.length; i++) if (!passed(p, levels[i])) return levels[i];
     return null;
   }
   function nextInCourse(l) {
-    var i = LEVELS.indexOf(l);
-    return i >= 0 && i + 1 < LEVELS.length ? LEVELS[i + 1] : null;
+    var levels = availableLevels(), i = levels.indexOf(l);
+    return i >= 0 && i + 1 < levels.length ? levels[i + 1] : null;
   }
 
   // ================= sound =================
@@ -1145,12 +1256,15 @@
   function render() {
     if (!root) return;
     clearTimeout(advT);
-    // the keyboard's lights must not give answers away mid-question
+    // The base scale is hidden; an explicitly enabled instructional display
+    // shows this question's structured target rather than unrelated scale keys.
     if (App.midi && App.midi.hideLayout) App.midi.hideLayout('quiz', view === 'run' && App.active === 'quiz');
     if (view === 'home') renderHome();
     else if (view === 'topic') renderTopic();
     else if (view === 'run') renderRun();
     else renderDone();
+    if (App.active === 'quiz' || lumiOwned) syncLumi();
+    if (App.learnInstruments) App.learnInstruments.refresh();
   }
 
   // keep the start of a view (or a unit) in sight, just below the top bar
@@ -1177,7 +1291,7 @@
 
   function renderHome() {
     var tabs = [['path', 'Path'], ['topics', 'Topics'], ['progress', 'Progress']];
-    root.innerHTML = '<div class="qz-view">' + statsStrip() +
+    root.innerHTML = '<div class="qz-view"><p class="small muted" id="qz-category">' + esc(App.practiceInstrument ? App.practiceInstrument.label() : 'Piano') + ' exercises · shared theory and instrument-specific modes. New course completion stays with this category.</p>' + pendingHTML() + statsStrip() +
       '<div class="seg qz-hometabs" role="tablist" aria-label="Exercises">' + tabs.map(function (t) {
         return '<button type="button" role="tab" data-qzh="' + t[0] + '">' + t[1] + '</button>';
       }).join('') + '</div><div id="qz-homebody"></div></div>';
@@ -1195,28 +1309,32 @@
   }
 
   function firstOpenMode(u, p) {
-    for (var i = 0; i < u.modes.length; i++) {
-      if (u.modes[i].levels.some(function (l) { return !passed(p, l); })) return u.modes[i].key;
+    var modes = availableModes(u);
+    for (var i = 0; i < modes.length; i++) {
+      if (modes[i].levels.some(function (l) { return !passed(p, l); })) return modes[i].key;
     }
-    return u.modes[0].key;
+    return modes.length ? modes[0].key : null;
   }
 
   function firstOpenUnit(t, p) {
     for (var i = 0; i < t.units.length; i++) {
       var u = t.units[i];
-      for (var j = 0; j < u.modes.length; j++) {
-        if (u.modes[j].levels.some(function (l) { return !passed(p, l); })) return u.id;
+      var modes = availableModes(u);
+      for (var j = 0; j < modes.length; j++) {
+        if (modes[j].levels.some(function (l) { return !passed(p, l); })) return u.id;
       }
     }
-    return t.units[0].id;
+    var first = t.units.filter(function (u) { return availableModes(u).length; })[0];
+    return first ? first.id : null;
   }
 
   function renderTopic() {
     var t = TOPIC[topicId], p = prog(), h = '';
     if (!openUnits[t.id]) { openUnits[t.id] = {}; openUnits[t.id][firstOpenUnit(t, p)] = true; }
     t.units.forEach(function (u) {
+      if (!availableModes(u).length) return;
       var uPass = 0, uTot = 0, open = !!openUnits[t.id][u.id];
-      u.modes.forEach(function (m) { m.levels.forEach(function (l) { uTot++; if (passed(p, l)) uPass++; }); });
+      availableModes(u).forEach(function (m) { m.levels.forEach(function (l) { uTot++; if (passed(p, l)) uPass++; }); });
       h += '<section class="card qz-unit' + (open ? ' open' : '') + '" id="qz-unit-' + u.id + '">' +
         '<button type="button" class="qz-uhead" data-qzu="' + u.id + '" aria-expanded="' + open + '">' +
           '<span class="qz-uname">' + esc(u.name) + '</span>' +
@@ -1232,15 +1350,16 @@
   }
 
   function unitBody(u, p) {
-    var mode = openMode[u.id] || firstOpenMode(u, p), md = null, chips = '';
-    u.modes.forEach(function (m) {
+    var modes = availableModes(u), mode = openMode[u.id] || firstOpenMode(u, p), md = null, chips = '';
+    if (!modes.length) return '';
+    modes.forEach(function (m) {
       if (m.key === mode) md = m;
       var done = m.levels.every(function (l) { return passed(p, l); });
       chips += '<button type="button" class="chip qz-mchip' + (m.key === mode ? ' active' : '') + '" data-qzm="' + u.id + '|' + m.key + '"' +
         ' aria-pressed="' + (m.key === mode) + '">' + esc(MODE_NAME[m.key]) +
         (done ? '<span class="qz-tick" aria-label="all passed">✓</span>' : '') + '</button>';
     });
-    md = md || u.modes[0];
+    md = md || modes[0];
     var rows = md.levels.map(function (l) {
       var s = p[l.id];
       var right = !s ? '' : s.s ? '<span class="st" aria-label="' + s.s + ' of 3 stars">' + starStr(s.s) + '</span>'
@@ -1250,7 +1369,7 @@
         '<span class="go">' + App.icon('right', 14) + '</span></button>';
     }).join('');
     return '<div class="qz-ubody">' +
-      '<div class="qz-urow">' + (u.modes.length > 1 ? '<div class="qz-mchips">' + chips + '</div>' : '<div class="qz-mchips"></div>') +
+      '<p class="small muted">' + esc(contentLabel(md.key)) + '</p><div class="qz-urow">' + (modes.length > 1 ? '<div class="qz-mchips">' + chips + '</div>' : '<div class="qz-mchips"></div>') +
         '<button type="button" class="qz-learnbtn" data-qzsprint="' + NODE_BY_ID[u.id + '|' + md.key].i + '">' + ico('bolt', 14) + ' Sprint</button>' +
         (u.learn ? '<button type="button" class="qz-learnbtn" data-qzlearn="' + u.id + '" aria-expanded="false">Learn</button>' : '') + '</div>' +
       (u.learn ? '<div class="qz-learn" id="qz-learn-' + u.id + '" hidden>' + u.learn + '</div>' : '') +
@@ -1292,6 +1411,7 @@
             '<span class="qz-lvltag">' + esc(tag) + '</span>' +
             '<span class="qz-xpp" id="qz-xpp" aria-live="polite"></span>' +
             '<span class="qz-count" id="qz-count"></span></div>' +
+          '<p class="small muted" id="qz-run-instrument">Credit category: ' + esc(App.practiceInstrument ? App.practiceInstrument.label(cur.instrument) : cur.instrument) + ' · ' + esc(contentLabel(l.mode)) + '</p>' +
           (cur.sprint ? (cur.sprint.endless ? '' : '<div class="qz-timebar" aria-hidden="true"><i id="qz-timefill"></i></div>')
             : '<div class="qz-prog" id="qz-prog" aria-hidden="true"></div>') +
           (cur.clock ? '<div class="qz-timebar qz-clock" aria-hidden="true"><i id="qz-clockfill"></i></div>' : '') +
@@ -1314,7 +1434,8 @@
     var hear = q.audio && !q.ear
       ? '<button type="button" class="qz-hear" id="qz-hear" aria-label="Hear it" title="Hear it (Space)">' + App.icon('play', 13) + '</button>' : '';
     box.innerHTML = '<div class="qz-prompt"><span>' + esc(q.prompt) + '</span>' + hear + '</div>' +
-      '<div class="qz-vis" id="qz-vis"></div><div class="qz-ans" id="qz-ans"></div>';
+      '<div class="qz-vis" id="qz-vis"></div><div class="qz-ans" id="qz-ans"></div>' +
+      '<p id="qz-lumi-hint" class="small muted" hidden>LUMI: this exercise has no playable note target.</p>';
     box.classList.remove('qz-in');
     void box.offsetWidth; // restart the entrance fade
     box.classList.add('qz-in');
@@ -1453,7 +1574,7 @@
         (jump ? '' : '<div class="qz-donelinks"><button type="button" class="qz-backlink" id="qz-back">' + App.icon('left', 14) + ' ' + esc(cur.from === 'topic' ? l.unit.name : 'The path') + '</button>' +
           (ap ? '<button type="button" class="qz-backlink" data-qzapply="' + l.unit.id + '">' + esc(ap.label) + ' ' + App.icon('right', 14) + '</button>' : '') + '</div>');
     }
-    root.innerHTML = '<div class="qz-view"><div class="card qz-done qz-in">' + html + '</div></div>';
+    root.innerHTML = '<div class="qz-view">' + pendingHTML() + '<p class="small muted" id="qz-completion-instrument">Completion category: ' + esc(App.practiceInstrument ? App.practiceInstrument.label(cur.instrument) : cur.instrument) + ' · ' + esc(contentLabel(l.mode)) + '</p><div class="card qz-done qz-in">' + html + '</div></div>';
   }
 
   // ================= flow =================
@@ -1462,15 +1583,20 @@
   // the first miss), { jump: nodeIndex } for a jump test
   function startLevel(lid, opt) {
     var l = BY_ID[lid];
-    if (!l) return;
+    if (!l || !modeAllowed(l.mode)) return false;
+    if (cur && !cur.finished && cur.sessionId) {
+      XP().finishLevel({ instrument: cur.instrument, sessionId: cur.sessionId, status: 'stopped' }); cur.finished = true;
+    }
     clearTimeout(advT);
     stopSprint();
     stopClock();
     opt = opt || {};
     var from = view === 'topic' ? 'topic' : view === 'home' ? 'path' : (cur && cur.from) || 'path';
-    cur = { lvl: l, n: 10, res: [], miss: {}, q: null, answered: false, tap: {}, got: {}, played: null, playedPos: null, lastSig: null,
+    var sessionId = 'quiz-' + (window.crypto && crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(36).slice(2));
+    cur = { lvl: l, instrument: learnInstrument(), sessionId: sessionId, n: 10, res: [], miss: {}, q: null, answered: false, tap: {}, got: {}, played: null, playedPos: null, lastSig: null,
       from: from, xp: 0, combo: 0, times: [], ms: 0, prevSpeed: XP().speed(l.unit.id), jump: opt.jump != null ? opt.jump : null, sprint: null,
       drill: opt.drill || null, drillPool: [] };
+    if (window.SLXP && SLXP.beginSession) SLXP.beginSession({ id: cur.sessionId, instrument: cur.instrument, source: 'quiz' });
     if (cur.drill) cur.n = Math.min(10, Math.max(5, cur.drill.length * 2));
     if (opt.sprint != null) {
       cur.n = 1e9;
@@ -1485,6 +1611,7 @@
     newQ();
     if (cur.sprint && !cur.sprint.endless) cur.sprint.timer = setInterval(tickSprint, 100);
     reveal(root);
+    return true;
   }
 
   function newQ() {
@@ -1502,6 +1629,7 @@
     cur.timedOut = false;
     render();
     cur.t0 = (window.performance || Date).now();
+    cur.responsePaused = covered();
     if (again) { var qb = el('qz-q'); if (qb && qb.getBoundingClientRect().top < 0) reveal(el('qz-runshell')); }
     if (q.auto) setTimeout(function () { whenVoiceReady(function () { if (cur && cur.q === q && view === 'run' && !covered()) { cur.autoPlayed = q; playQ(q); startClock(); } }); }, 280);
     else startClock();
@@ -1515,6 +1643,7 @@
   }
 
   function resolve(ok, picked, note) {
+    if (!cur || view !== 'run' || covered() || cur.responsePaused) return;
     var q = cur.q;
     if (cur.answered) return;
     stopClock();
@@ -1528,7 +1657,7 @@
     cur.combo = ok ? cur.combo + 1 : 0;
     cur.ms += Math.min(ms, 45000);
     if (ok) cur.times.push(Math.min(ms, 30000));
-    var xr = XP().answer({ unit: cur.lvl.unit.id, ok: ok, ms: ms, combo: cur.combo, kind: q.ear ? 'ear' : q.kind === 'choice' ? 'choice' : 'play' });
+    var xr = XP().answer({ instrument: cur.instrument, sessionId: cur.sessionId, answerId: String(cur.res.length), unit: cur.lvl.unit.id, ok: ok, ms: ms, combo: cur.combo, kind: q.ear ? 'ear' : q.kind === 'choice' ? 'choice' : 'play' });
     cur.xp += xr.xp;
     if (!ok && q.miss) cur.miss[q.miss] = (cur.miss[q.miss] || 0) + 1;
     if (!ok && q.item && cur.drillPool.indexOf(q.item) < 0) cur.drillPool.push(q.item);
@@ -1543,8 +1672,8 @@
     }
     if (q.reveal && q.reveal.staff) paintVis();
     // the keyboard lights the answer (Help: Target and up)
-    var apcs = q.kind === 'single' ? [q.pc] : q.kind === 'set' ? Object.keys(q.pcs || {}).map(Number) : q.pcAnswer != null ? [q.pcAnswer] : [];
-    if (apcs.length && App.midi && App.midi.reveal) App.midi.reveal(apcs, cur.sprint ? 700 : 1800);
+    var apcs = lumiTargets(q).map(function (n) { return mod(n, 12); });
+    if (apcs.length && App.midi && App.midi.reveal) lumiFeedback(cur.sprint ? 700 : 1800);
     var fb = el('qz-fb');
     if (fb) {
       fb.className = 'qz-fb ' + (ok ? 'ok' : 'bad');
@@ -1568,14 +1697,16 @@
   }
 
   function finish() {
-    var score = cur.res.filter(Boolean).length, s = starsFor(score), p = prog(), old = p[cur.lvl.id];
+    if (!cur || cur.finished) return;
+    var score = cur.res.filter(Boolean).length, s = starsFor(score), p = prog(cur.instrument), old = p[cur.lvl.id];
     // a jump test only counts once it opens the path (9+), so a near miss can't unlock the step
     if ((!old || score > old.b) && (cur.jump == null || score >= 9) && !cur.drill) p[cur.lvl.id] = { b: score, s: Math.max(s, old ? old.s : 0) };
-    App.store.set('qz.prog', p);
+    saveProg(p, cur.instrument);
     cur.score = score;
     cur.stars = s;
     if (cur.jump != null && score >= 9) XP().setJump(cur.jump);
-    cur.fin = XP().finishLevel({ passed: s > 0 && !cur.drill, perfect: score === 10 && !cur.drill });
+    cur.fin = XP().finishLevel({ instrument: cur.instrument, sessionId: cur.sessionId, status: 'complete', passed: s > 0 && !cur.drill, perfect: score === 10 && !cur.drill });
+    cur.finished = true;
     cur.xp += cur.fin.bonus;
     view = 'done';
     render();
@@ -1593,8 +1724,16 @@
   }
 
   function inputNote(midi, src, pos) {
-    if (!cur || view !== 'run' || cur.answered) return;
+    if (!cur || view !== 'run' || covered()) return;
     var q = cur.q, pc = mod(midi, 12);
+    if (cur.answered) {
+      // A fresh correction advances without re-grading the miss or granting XP.
+      // Sprints retain their existing feedback/advance timing.
+      if (!cur.lastOk && !cur.sprint &&
+          ((q.kind === 'choice' && q.pcAnswer != null && src !== 'tap' && pc === q.pcAnswer) ||
+           (q.kind === 'single' && pc === q.pc && (q.string == null || !pos || pos.s === q.string)))) nextQ();
+      return;
+    }
     if (q.kind === 'choice') {
       if (q.pcAnswer == null || src === 'tap') return;
       if (pc === q.pcAnswer) resolve(true, q.correct);
@@ -1644,6 +1783,9 @@
     clearTimeout(advT);
     stopClock();
     if (view === 'run' && cur && cur.sprint && cur.sprint.endless && !cur.sprint.done) { finishSprint(); return; } // End run keeps the streak
+    if (view === 'run' && cur && !cur.finished && cur.sessionId) {
+      XP().finishLevel({ instrument: cur.instrument, sessionId: cur.sessionId, status: 'stopped' }); cur.finished = true;
+    }
     stopSprint();
     if ((view === 'run' || view === 'done') && cur && cur.from !== 'topic') { toPath(cur.lvl.node.i); return; }
     if (view === 'run' || view === 'done') {
@@ -1664,7 +1806,7 @@
 
   // ================= game layer: path, XP, sprints, progress =================
 
-  function XP() { return window.SLXP; }
+  function XP() { return window.SLXP && SLXP.forInstrument ? SLXP.forInstrument(cur && (view === 'run' || view === 'done') ? cur.instrument : learnInstrument()) : window.SLXP; }
 
   // the app's Lucide set (app.js ICONS) — plus an optional class
   function ico(n, s, cls) {
@@ -1678,20 +1820,22 @@
 
   function nodeDone(nd, p) { var c = 0; nd.levels.forEach(function (l) { if (passed(p, l)) c++; }); return c; }
   function unlocked(i, p) {
-    return i === 0 || nodeDone(NODES[i], p) > 0 || nodeDone(NODES[i - 1], p) > 0 || i <= XP().jump();
+    var nodes = availableNodes(), position = nodes.indexOf(NODES[i]);
+    return position >= 0 && (position === 0 || nodeDone(NODES[i], p) > 0 || nodeDone(nodes[position - 1], p) > 0 || i <= XP().jump());
   }
   // "you are here": the newest open node not started yet, else the first unfinished one
   // (steps a jump test skipped over don't count as "not started")
   function currentNode(p) {
-    var i, firstOpen = -1, jmp = XP().jump();
-    for (i = 0; i < NODES.length; i++) {
+    var nodes = availableNodes(), position, firstOpen = -1, jmp = XP().jump();
+    for (position = 0; position < nodes.length; position++) {
+      var nd = nodes[position], i = nd.i;
       if (!unlocked(i, p)) break;
-      var d = nodeDone(NODES[i], p);
+      var d = nodeDone(nd, p);
       if (d === 0 && i < jmp) continue;
       if (d === 0) return i;
-      if (firstOpen < 0 && d < NODES[i].levels.length) firstOpen = i;
+      if (firstOpen < 0 && d < nd.levels.length) firstOpen = i;
     }
-    return firstOpen >= 0 ? firstOpen : Math.min(i, NODES.length - 1);
+    return firstOpen >= 0 ? firstOpen : nodes[Math.min(position, nodes.length - 1)].i;
   }
   function nodeLevel(nd, p) {
     for (var i = 0; i < nd.levels.length; i++) if (!passed(p, nd.levels[i])) return nd.levels[i];
@@ -1715,17 +1859,14 @@
 
   function statsStrip() {
     var X = XP(), st = X.streak(), lv = X.level(), t = X.today(), g = X.goal(), p = prog();
-    var pct = Math.round(100 * t.x / g), ci = currentNode(p), nl = nodeLevel(NODES[ci], p);
-    var note;
-    if (st.n > 0 && !st.today) note = 'Finish a level or play 5 minutes today to keep your ' + st.n + '-day streak' + (st.freezes ? ' (you have ' + st.freezes + ' streak freeze' + (st.freezes > 1 ? 's' : '') + ')' : '') + '.';
-    else if (!st.today) note = X.total() ? 'Finish a level or play 5 minutes to start a new streak.' : 'Finish your first level to start a streak. Playing on any page counts too.';
-    else if (t.x < g) note = 'Streak safe today. ' + (g - t.x) + ' XP to your daily goal.';
-    else note = 'Daily goal reached. See you tomorrow.';
+    var summary = practiceSummary(), minutes = (summary.today.engagedSeconds || 0) / 60;
+    var pct = Math.round(100 * minutes / g), ci = currentNode(p), nl = nodeLevel(NODES[ci], p);
+    var note = 'Lifetime earned: ' + Number(summary.lifetimeEarnedXP || 0).toLocaleString() + ' XP. Consistency can decay after inactivity; it is not a measured skill level. Daily goal: ' + g + ' engaged minutes.';
     return '<div class="card qz-strip">' +
       '<div class="qz-stat' + (st.today ? ' lit' : '') + '">' + ico('flame', 26) + '<div><b>' + st.n + '</b><span>day streak</span></div></div>' +
-      '<div class="qz-stat">' + goalRing(pct, 40) + '<div><b>' + t.x + '<small>/' + g + '</small></b><span>XP today</span></div></div>' +
-      '<div class="qz-stat qz-lvstat"><span class="qz-lvbadge" aria-hidden="true">' + lv.lv + '</span><div class="qz-lvtext"><b>Level ' + lv.lv + ' · ' + lv.title + '</b>' +
-        '<span class="qz-bar"><i style="width:' + Math.round(100 * lv.into / lv.need) + '%"></i></span><span>' + (lv.need - lv.into) + ' XP to level ' + (lv.lv + 1) + '</span></div></div>' +
+      '<div class="qz-stat">' + goalRing(pct, 40) + '<div><b>' + minutes.toFixed(1) + '<small>/' + g + '</small></b><span>engaged minutes today</span></div></div>' +
+      '<div class="qz-stat qz-lvstat"><span class="qz-lvbadge" aria-hidden="true">' + lv.lv + '</span><div class="qz-lvtext"><b>Consistency level ' + lv.lv + '</b>' +
+        '<span class="qz-bar"><i style="width:' + Math.round(100 * lv.into / lv.need) + '%"></i></span><span>' + Math.max(0, lv.need - lv.into).toLocaleString(undefined, { maximumFractionDigits: 2 }) + ' XP to level ' + (lv.lv + 1) + '</span></div></div>' +
       '<button type="button" class="btn primary qz-go" id="qz-cont" data-qzl="' + nl.id + '">' + App.icon('play', 13) + ' ' + (X.total() ? 'Continue' : 'Start') + '</button>' +
       '<p class="qz-stripnote">' + esc(note) + '</p>' +
     '</div>';
@@ -1737,11 +1878,12 @@
   function pathHTML() {
     var p = prog(), ci = currentNode(p), h = '', sec = null, k = 0, n = 0;
     NODES.forEach(function (nd, i) {
+      if (!modeAllowed(nd.mode)) return;
       if (nd.topic !== sec) {
         if (sec) h += '</div></section>';
         sec = nd.topic; k = 0; n++;
         var tp = 0, tt = 0;
-        LEVELS.forEach(function (l) { if (l.topic === sec) { tt++; if (passed(p, l)) tp++; } });
+        availableLevels().forEach(function (l) { if (l.topic === sec) { tt++; if (passed(p, l)) tp++; } });
         h += '<section class="qz-psec"><header class="qz-pban"><span class="qz-eyebrow">Section ' + n + '</span><h3>' + esc(sec.name) + '</h3>' +
           '<span class="qz-pmeta">' + tp + '/' + tt + ' levels</span></header><div class="qz-pnodes">';
       }
@@ -1792,6 +1934,11 @@
   var SCALE_TO_THEORY = { major: 'major', minor: 'aeolian', harm: 'harmonicMinor', mel: 'melodicMinor', majp: 'majorPent', minp: 'minorPent',
     blues: 'blues', dorian: 'dorian', phryg: 'phrygian', lyd: 'lydian', mixo: 'mixolydian' };
   function applyFor(uid) {
+    var instrument = learnInstrument();
+    if (instrument === 'drums') return { label: 'Open Drum pads', go: function () { App.switchTo('pads'); } };
+    if (instrument === 'piano' || instrument === 'synth') return { label: 'Open Keys lessons', go: function () { App.emit('learn:lesson', { instrument: instrument, kind: 'keys' }); App.switchTo('piano'); } };
+    if (instrument === 'bass') return { label: 'Bass performance practice', go: function () { App.emit('learn:practice', { instrument: instrument }); App.switchTo('shed'); } };
+    if (instrument === 'voice' || instrument === 'other') return { label: 'Performance practice', go: function () { App.emit('learn:practice', { instrument: instrument }); App.switchTo('shed'); } };
     if (uid === 'nat' || uid === 'acc') return { label: 'See it on the Fretboard', go: function () { App.switchTo('fretboard'); } };
     if (/^s(mm|min|pent|mod)$/.test(uid)) {
       var l = null;
@@ -1805,6 +1952,7 @@
   }
 
   function selectNode(i) {
+    if (!NODES[i] || !modeAllowed(NODES[i].mode)) return;
     selNode = selNode === i ? -1 : i;
     paintHomeBody();
     if (selNode >= 0) keepVisible(document.querySelector('.qz-npop'));
@@ -1824,10 +1972,14 @@
     var p = prog(), h = '';
     COURSE.forEach(function (t) {
       var pass = 0, tot = 0;
-      LEVELS.forEach(function (l) { if (l.topic === t) { tot++; if (passed(p, l)) pass++; } });
+      availableLevels().forEach(function (l) { if (l.topic === t) { tot++; if (passed(p, l)) pass++; } });
+      if (!tot) return;
+      var blurb = t.blurb;
+      if (t.id === 'notes') blurb = learnInstrument() === 'guitar' ? 'Read staff notes and find them on the six-string guitar fretboard.' : learnInstrument() === 'bass' ? 'Read staff notes and find them on the four-string bass fretboard.' :
+        learnInstrument() === 'piano' || learnInstrument() === 'synth' ? 'Read staff notes, identify keyboard notes and train your ear.' : 'Read staff notes and train your pitch recognition.';
       h += '<button type="button" class="qz-topic" data-qzt="' + t.id + '">' +
         '<span class="qz-tname">' + esc(t.name) + '</span>' +
-        '<span class="qz-tblurb">' + esc(t.blurb) + '</span>' +
+        '<span class="qz-tblurb">' + esc(blurb) + '</span>' +
         '<span class="qz-tfoot"><span class="qz-bar"><i style="width:' + Math.round(100 * pass / tot) + '%"></i></span>' +
         '<span class="qz-tmeta">' + pass + '/' + tot + '</span></span></button>';
     });
@@ -1844,8 +1996,8 @@
     var X = XP(), days = X.history(7), today = X.dayKey(), WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     return '<div class="qz-week">' + days.map(function (d) {
       var dt = new Date(+d.key.slice(0, 4), +d.key.slice(5, 7) - 1, +d.key.slice(8, 10));
-      var state = d.l > 0 ? 'done' : d.frozen ? 'frozen' : d.key === today ? 'today' : 'missed';
-      var word = { done: 'practiced', frozen: 'covered by a streak freeze', today: 'not yet today', missed: 'missed' }[state];
+      var state = d.active ? 'done' : d.key === today ? 'today' : 'missed';
+      var word = { done: 'engaged-minute goal reached', today: 'goal not reached yet today', missed: 'no daily goal recorded' }[state];
       return '<div class="qz-wday ' + state + '" title="' + esc(WD[dt.getDay()] + ': ' + word) + '"><span class="qz-wdot">' +
         (state === 'done' ? ico('flame', 16) : state === 'frozen' ? ico('snow', 15) : '') + '</span><span>' + WD[dt.getDay()].charAt(0) + '</span>' +
         '<span class="sr">' + WD[dt.getDay()] + ' ' + word + '</span></div>';
@@ -1881,40 +2033,39 @@
 
   // Keys scale lessons (js/keylessons.js): level reached, best score, last timing
   function keysLessonsHTML() {
-    var kl = App.keysLessons && App.keysLessons.summary ? App.keysLessons.summary() : [];
+    if (learnInstrument() !== 'piano' && learnInstrument() !== 'synth') return '';
+    var kl = App.keysLessons && App.keysLessons.summary ? App.keysLessons.summary(learnInstrument()) : [];
     var body = kl.length ? '<ul class="qz-recs">' + kl.map(function (x) {
       return '<li><button type="button" class="qz-rec" data-qzkeys="' + x.id + '"><span>' + esc(x.name) + '<small>' + esc(x.hand) + ' · level ' + x.level + ' of ' + x.levels +
         ' · last timing ±' + x.timing + ' ms' + (x.streak ? ' · ∞ streak ' + x.streak : '') + (x.mastered ? ' · mastered' : '') + '</small></span><span class="qz-klbar" title="' + x.passed + ' of ' + x.levels + ' levels passed"><i style="width:' +
         Math.round(100 * x.passed / x.levels) + '%"></i></span><b>' + x.best + '</b></button></li>';
     }).join('') + '</ul>'
       : '<p class="muted small">No lessons yet. On the Keys page, pick a scale lesson and play it with the click.</p>';
-    return '<section class="card qz-pcard"><div class="qz-pchead"><h3>Keys lessons</h3><span class="muted small">Levels passed and best score per lesson</span></div>' + body + '</section>';
+    return '<section class="card qz-pcard"><div class="qz-pchead"><h3>Shared keys lesson content</h3><span class="muted small">' + esc(App.practiceInstrument ? App.practiceInstrument.label() : 'Piano') + ' timing and best-score observations only. Curriculum levels are shared.</span></div>' + body + '</section>';
   }
 
   function progressHTML() {
     var X = XP(), lv = X.level(), st = X.streak(), tot = X.totals(), g = X.goal(), t = X.today();
+    var summary = practiceSummary();
     var sprints = X.sprints(), sk = Object.keys(sprints).filter(function (k) { return recKey(k).node; });
     sk.sort(function (a, b) { return recKey(a).node.i - recKey(b).node.i || (a < b ? -1 : 1); });
-    var goalSeg = X.GOALS.map(function (v) {
-      return '<button type="button" data-qzgoal="' + v + '" class="' + (v === g ? 'active' : '') + '" aria-pressed="' + (v === g) + '">' + X.GOAL_NAMES[v] + ' <small>' + v + '</small></button>';
-    }).join('');
     return '<div class="qz-prog2">' +
       '<div class="qz-tiles">' +
-        tile('star', 'Level', lv.lv + ' · ' + esc(lv.title), (lv.need - lv.into) + ' XP to level ' + (lv.lv + 1)) +
-        tile('bolt', 'Total XP', X.total().toLocaleString(), t.x + ' today') +
-        tile('flame', 'Streak', st.n + (st.n === 1 ? ' day' : ' days'), 'Best ' + st.best + ' · ' + st.freezes + ' freeze' + (st.freezes === 1 ? '' : 's') + ' saved') +
-        tile('clock', 'Practice time', fmtDur(tot.s + tot.p), fmtDur(tot.p) + ' playing · ' + tot.l + ' levels') +
+        tile('star', 'Consistency level', lv.lv, Number(summary.currentXP || 0).toLocaleString() + ' consistency XP; not a measured skill level') +
+        tile('bolt', 'Lifetime earned XP', Number(summary.lifetimeEarnedXP || 0).toLocaleString(), t.x + ' earned today; lifetime earnings do not decay') +
+        tile('flame', 'Streak', st.n + (st.n === 1 ? ' day' : ' days'), 'Best ' + st.best + ' days meeting the engaged-minute goal') +
+        tile('clock', 'Engaged practice', fmtDur(summary.totalEngagedSeconds || 0), tot.q + ' knowledge questions · ' + tot.l + ' completed exercises') +
       '</div>' +
-      '<section class="card qz-pcard"><div class="qz-pchead"><h3>This week</h3><span class="muted small">A day counts once you finish a level or play for 5 minutes on any page. Every 7 days in a row earns a streak freeze (up to 2), which covers one missed day.</span></div>' + weekStrip() + '</section>' +
-      '<section class="card qz-pcard"><div class="qz-pchead"><h3>Daily goal</h3><span class="muted small">' + t.x + ' of ' + g + ' XP today</span></div>' +
-        '<div class="seg qz-goals" role="group" aria-label="Daily XP goal">' + goalSeg + '</div>' +
-        '<p class="muted small qz-xprules">You earn 2 XP per right answer, +1 for a quick one, +1 on a run of 5 or more, and +5 for passing a level (+5 more for 10/10). Playing on any page earns 2 XP a minute.</p></section>' +
-      '<section class="card qz-pcard"><div class="qz-pchead"><h3>XP per day</h3><span class="muted small">Last 14 days · the line is your daily goal</span></div><div class="qz-chart" id="qz-ch-xp"></div></section>' +
-      '<section class="card qz-pcard"><div class="qz-pchead"><h3>Practice time</h3><span class="muted small">Minutes per day, last 14 days · Exercises and playing on any page</span></div><div class="qz-chart" id="qz-ch-time"></div>' + areaRows() + '</section>' +
+      '<section class="card qz-pcard"><div class="qz-pchead"><h3>This week</h3><span class="muted small">A day counts when this instrument reaches its engaged-minute goal. Planned breaks and consistency settings are shared with Practice progress.</span></div>' + weekStrip() + '</section>' +
+      '<section class="card qz-pcard"><div class="qz-pchead"><h3>Daily goal</h3><span class="muted small">' + ((summary.today.engagedSeconds || 0) / 60).toFixed(1) + ' of ' + g + ' engaged minutes today</span></div>' +
+        '<button class="btn sm" id="qz-progress-settings" type="button">Open practice progress settings</button>' +
+        '<p class="muted small qz-xprules">This is the same instrument XP balance used by guided practice. Configured rates apply to bounded active practice time. Correct knowledge answers are tracked separately from musical note accuracy and timing.</p></section>' +
+      '<section class="card qz-pcard"><div class="qz-pchead"><h3>Earned XP per day</h3><span class="muted small">Last 14 days · recorded instrument earnings</span></div><div class="qz-chart" id="qz-ch-xp"></div></section>' +
+      '<section class="card qz-pcard"><div class="qz-pchead"><h3>Engaged practice time</h3><span class="muted small">Minutes per day, last 14 days · canonical instrument history, counted once</span></div><div class="qz-chart" id="qz-ch-time"></div>' + areaRows() + '</section>' +
       '<section class="card qz-pcard"><div class="qz-pchead"><h3>Answer speed</h3><span class="muted small">Average seconds per right answer, by week · lower is faster</span></div><div class="qz-chart" id="qz-ch-speed"></div>' +
         '<div class="qz-tblwrap"><table class="qz-table qz-ttopic"><thead><tr><th scope="col">Topic</th><th scope="col">Answers</th><th scope="col">Right</th><th scope="col">Speed</th><th scope="col">Change</th></tr></thead><tbody>' +
-        topicSpeedRows() + '</tbody></table></div><p class="muted small qz-tnote">Speed is your average over the last 7 days. Change compares it with the 4 weeks before: up means faster.</p></section>' +
-      keysLessonsHTML() +
+        topicSpeedRows() + '</tbody></table></div><p class="muted small qz-tnote">Speed is your average over the last 7 days. Change compares it with the 4 weeks before: up means faster. A background or modal pause starts a fresh visible response attempt; covered time is excluded.</p></section>' +
+      keysLessonsHTML() + legacyHistoryHTML() +
       '<section class="card qz-pcard"><div class="qz-pchead"><h3>Records</h3><span class="muted small">Most right answers in a 60-second sprint, and in a row on an endless streak</span></div>' +
         (sk.length ? '<ul class="qz-recs">' + sk.map(function (k) {
           var rk = recKey(k), end = rk.end, nd = rk.node;
@@ -2043,14 +2194,14 @@
     if (days.some(function (d) { return d.x > 0; })) {
       barChart(hx, days.map(function (d, i) {
         return { v: d.x, x: dayLabel(d.key, true), lab: d.x + ' XP', tip: (i === days.length - 1 ? 'Today' : dayLabel(d.key)) + ': ' + d.x + ' XP · ' + d.l + ' level' + (d.l === 1 ? '' : 's') };
-      }), { goal: g, label: 'XP per day over the last 14 days', table: tableHTML(['Day', 'XP', 'Levels'], days.map(function (d) { return [dayLabel(d.key), d.x, d.l]; })) });
+      }), { label: 'Earned XP per day over the last 14 days', table: tableHTML(['Day', 'Earned XP', 'Exercises'], days.map(function (d) { return [dayLabel(d.key), d.x, d.l]; })) });
     } else hx.innerHTML = empty;
     var mins = function (sec) { return Math.round(sec / 6) / 10; };
-    if (days.some(function (d) { return d.s + d.p > 0; })) {
+    if (days.some(function (d) { return d.p > 0; })) {
       barChart(ht, days.map(function (d, i) {
-        var m = mins(d.s + d.p);
-        return { v: m, x: dayLabel(d.key, true), lab: m + ' min', tip: (i === days.length - 1 ? 'Today' : dayLabel(d.key)) + ': ' + m + ' min · ' + mins(d.p) + ' playing, ' + mins(d.s) + ' Exercises' };
-      }), { label: 'Practice minutes per day over the last 14 days', table: tableHTML(['Day', 'Minutes', 'Playing', 'Exercises'], days.map(function (d) { return [dayLabel(d.key), mins(d.s + d.p), mins(d.p), mins(d.s)]; })) });
+        var m = mins(d.p);
+        return { v: m, x: dayLabel(d.key, true), lab: m + ' min', tip: (i === days.length - 1 ? 'Today' : dayLabel(d.key)) + ': ' + m + ' measured engaged minutes' };
+      }), { goal: g, label: 'Engaged practice minutes per day over the last 14 days', table: tableHTML(['Day', 'Engaged minutes'], days.map(function (d) { return [dayLabel(d.key), mins(d.p)]; })) });
     } else ht.innerHTML = empty;
     var wk = X.speedWeeks(8);
     if (wk.some(function (w) { return w.n > 0; })) {
@@ -2089,9 +2240,11 @@
   // ---- sprints: 60 seconds, as many right answers as you can ----
   // endless: the same pick of level, questions until the first miss
   function startSprint(i, endless) {
-    var nd = NODES[i], p = prog(), lvl = nd.levels[0];
+    var nd = NODES[i];
+    if (!nd || !modeAllowed(nd.mode)) return false;
+    var p = prog(), lvl = nd.levels[0];
     nd.levels.forEach(function (l) { if (passed(p, l)) lvl = l; });
-    startLevel(lvl.id, { sprint: i, endless: !!endless });
+    return startLevel(lvl.id, { sprint: i, endless: !!endless });
   }
 
   function tickSprint() {
@@ -2126,6 +2279,7 @@
   // nothing ticks while the question is out of sight: another page, the app
   // in the background, a sheet (Lights & help, metronome) or a help tour on top
   function covered() { return document.hidden || App.active !== 'quiz' || !!App.sheet || !!(window.Help && Help.isOpen && Help.isOpen()); }
+  function pauseResponse() { if (cur && view === 'run' && !cur.answered) cur.responsePaused = true; }
   function startClock() {
     stopClock();
     var c = cur && cur.clock;
@@ -2147,7 +2301,11 @@
   }
   // back in sight: a fresh clock (and the sound, if it never got to play)
   function resumeQ() {
+    syncLumi();
     if (!cur || view !== 'run' || cur.answered || covered()) return;
+    // Start a fresh, contiguous visible observation after a modal/background
+    // pause. Do not infer an active interval across time spent covered.
+    if (cur.responsePaused) { cur.t0 = (window.performance || Date).now(); cur.responsePaused = false; }
     if (cur.q.auto && cur.autoPlayed !== cur.q) { cur.autoPlayed = cur.q; playQ(cur.q); }
     startClock();
   }
@@ -2172,7 +2330,8 @@
     clearTimeout(advT);
     var score = cur.res.filter(Boolean).length, rec = XP().sprintRecord(sp.key, score);
     cur.rec = rec;
-    cur.fin = XP().finishLevel({ record: rec.isBest && score > 0 });
+    cur.fin = XP().finishLevel({ instrument: cur.instrument, sessionId: cur.sessionId, status: 'complete', record: rec.isBest && score > 0 });
+    cur.finished = true;
     cur.xp += cur.fin.bonus;
     cur.score = score;
     view = 'done';
@@ -2202,7 +2361,7 @@
   function doneStats() {
     var avg = cur.times.length ? cur.times.reduce(function (a, b) { return a + b; }, 0) / cur.times.length : 0;
     return '<div class="qz-dstats">' +
-      tile('bolt', 'XP earned', '+' + cur.xp) +
+      tile('bolt', 'XP earned', '+' + cur.xp.toLocaleString(undefined, { maximumFractionDigits: 2 })) +
       (cur.sprint ? tile('star', 'Record', String((cur.rec || {}).best || cur.score)) : tile('clock', 'Time', fmtTime(cur.ms))) +
       tile('faster', 'Per right answer', avg ? secs(avg) : '–') + '</div>';
   }
@@ -2211,8 +2370,8 @@
     var X = XP(), f = cur.fin || {}, st = X.streak(), t = X.today(), g = X.goal(), out = [];
     if (f.extended && st.n) out.push([st.n === 1 ? 'Day 1 of a new streak.' : st.n + '-day streak. Keep it going tomorrow.', 'flame']);
     if (f.freezeEarned) out.push(['You earned a streak freeze. It covers one missed day.', 'snow']);
-    if (f.goalHit) out.push(['Daily goal reached: ' + t.x + ' XP today.', 'check']);
-    else if (t.x < g) out.push([t.x + ' of ' + g + ' XP toward today’s goal.', 'star']);
+    var minutes = (practiceSummary().today.engagedSeconds || 0) / 60;
+    out.push([minutes.toFixed(1) + ' of ' + g + ' engaged minutes toward today’s instrument goal.', 'star']);
     var avg = cur.times.length ? cur.times.reduce(function (a, b) { return a + b; }, 0) / cur.times.length : 0;
     if (avg >= 300 && cur.times.length >= 3 && cur.prevSpeed && cur.prevSpeed.n >= 5) {
       var d = (cur.prevSpeed.avg - avg) / 1000;
@@ -2259,6 +2418,11 @@
       return;
     }
     switch (t.id) {
+      case 'qz-retry-save': SLXP.retryPending(); render(); break;
+      case 'qz-export-pending':
+        var pendingURL = URL.createObjectURL(new Blob([SLXP.exportPending()], { type: 'application/json' })), pendingLink = document.createElement('a');
+        pendingLink.href = pendingURL; pendingLink.download = 'soundlab-unsaved-lesson-sessions.json'; pendingLink.click(); setTimeout(function () { URL.revokeObjectURL(pendingURL); }, 1000); break;
+      case 'qz-progress-settings': App.emit('learn:practice', { instrument: learnInstrument() }); App.switchTo('shed'); var progressHost = el('ws-progress'); if (progressHost) progressHost.scrollIntoView({ block: 'start' }); break;
       case 'qz-home': view = 'home'; render(); reveal(root); break;
       case 'qz-tohome': stopSprint(); toPath(cur ? cur.lvl.node.i : null); break;
       case 'qz-cont': break; // carries data-qzl (path frontier)
@@ -2284,8 +2448,9 @@
       inputNote(m, 'tap');
     } else {
       var s = +k.getAttribute('data-s'), f = +k.getAttribute('data-f');
-      sound(OPEN[s] + f, 0, 1.1, 0.5, true);
-      inputNote(OPEN[s] + f, 'tap', { s: s, f: f });
+      var note = neckContext().midi[s] + f;
+      sound(note, 0, 1.1, 0.5, true);
+      inputNote(note, 'tap', { s: s, f: f });
     }
   }
 
@@ -2569,14 +2734,43 @@
       e._t = setTimeout(function () { if (e.parentNode) e.parentNode.removeChild(e); }, 4000);
     });
     root.addEventListener('click', onClick);
-    document.addEventListener('visibilitychange', function () { if (document.hidden) stopClock(); else resumeQ(); });
-    App.on('sheet', function (d) { if (d && d.open) stopClock(); else resumeQ(); });
-    App.on('tour', function (d) { if (d && d.open) stopClock(); else resumeQ(); });
+    App.on('learn:instrument', function () {
+      if (cur && view === 'run') stopExercise();
+      else { cur = null; view = 'home'; selNode = -1; openMode = {}; render(); }
+    });
+    document.addEventListener('visibilitychange', function () { if (document.hidden) { pauseResponse(); stopClock(); clearLumi(); } else resumeQ(); });
+    App.on('sheet', function (d) { if (d && d.open) { pauseResponse(); stopClock(); clearLumi(); } else resumeQ(); });
+    App.on('tour', function (d) { if (d && d.open) { pauseResponse(); stopClock(); clearLumi(); } else resumeQ(); });
+    App.on('lights:master', function () { if (App.active === 'quiz') syncLumi(); });
     root.addEventListener('pointerdown', onPointer);
     // decode the piano bank on the first touch here, ahead of the first question
     root.addEventListener('pointerdown', function () { if (App.keys && App.keys.warm) App.keys.warm(); }, true);
+    inputRoute = App.midi ? App.midi.inputId : null;
+    App.on('midi:state', function () {
+      var m = App.midi, route = m ? m.inputId : null;
+      var changed = route !== inputRoute;
+      inputRoute = route;
+      var ports = m && m.ready ? m.inputs : null;
+      Object.keys(inputHeld).forEach(function (key) {
+        var h = inputHeld[key];
+        if (h.src !== 'midi') return;
+        if (changed || (ports && h.portId != null && !ports.some(function (p) { return String(p.id) === h.portId; }))) delete inputHeld[key];
+      });
+    });
     App.on('midi:note', function (d) {
-      if (d && d.on && App.active === 'quiz') inputNote(d.midi, d.silent ? 'tone' : 'midi');
+      if (!d || !Number.isInteger(d.midi) || d.midi < 0 || d.midi > 127) return;
+      var src = d.silent ? 'tone' : 'midi', portId = d.portId == null ? null : String(d.portId);
+      var port = portId == null ? ['name', d.port || ''] : ['id', portId];
+      var key = JSON.stringify([src, port, d.midi]), channel = d.chan == null ? 0 : d.chan;
+      var held = inputHeld[key];
+      if (!d.on) {
+        if (held) { delete held.channels[channel]; if (!Object.keys(held.channels).length) delete inputHeld[key]; }
+        return; // releases never answer a question
+      }
+      var fresh = !held;
+      if (!held) held = inputHeld[key] = { src: src, portId: portId, channels: {} };
+      held.channels[channel] = true; // record before inputNote can change question
+      if (fresh && App.active === 'quiz') inputNote(d.midi, src);
     });
     if (document.fonts && document.fonts.load) {
       document.fonts.load('48px SLMusic').then(function () { if (view === 'run' && cur) paintVis(); }, function () { /* fallback glyphs */ });
@@ -2596,14 +2790,15 @@
 
   // test + console hook
   window.SLQuiz = {
-    levels: function () { return LEVELS.map(function (l) { return l.id; }); },
+    levels: function (options) { return (options && options.all ? LEVELS : availableLevels()).map(function (l) { return l.id; }); },
     gen: function (lid) { var l = BY_ID[lid]; return l ? GEN[l.gen](l.o) : null; },
     start: startLevel,
+    stop: stopExercise,
     pick: answerChoice,
     get q() { return cur ? cur.q : null; },
     get view() { return view; },
     get cur() { return cur; },
-    nodes: function () { return NODES.map(function (n) { return n.id; }); },
+    nodes: function (options) { return (options && options.available ? availableNodes() : NODES).map(function (n) { return n.id; }); },
     node: function (i) { var n = NODES[i], p = prog(); return n ? { id: n.id, first: n.levels[0].id, open: unlocked(i, p), done: nodeDone(n, p), levels: n.levels.length } : null; },
     current: function () { return currentNode(prog()); },
     sprint: startSprint,
@@ -2611,6 +2806,12 @@
     clock: function (s) { if (s != null) App.store.set('qz.clock', s); return clockSetting(); },
     tab: setHomeTab,
     finishSprint: finishSprint,
+    lumiTargets: lumiTargets,
+    lumiState: function () {
+      var targets = cur && view === 'run' ? lumiTargets(cur.q) : [];
+      return { supported: !!targets.length, target: targets, active: !!targets.length && lumiOwned && !covered(),
+        reason: targets.length ? 'Structured answer pitches.' : 'This question has no structured playable pitch target.' };
+    },
     theory: { nt: nt, midiOf: midiOf, nm: nm, addIv: addIv, IV: IV, buildChord: buildChord, buildScale: buildScale, keyChords: keyChords, KEYS: KEYS }
   };
 
@@ -2628,7 +2829,8 @@
     onHide: function () {
       clearTimeout(advT);
       stopClock();
-      if (cur && cur.sprint && !cur.sprint.done && view === 'run') finishSprint();
+      clearLumi();
+      if (cur && view === 'run') stopExercise();
       if (App.midi && App.midi.hideLayout) App.midi.hideLayout('quiz', false);
     },
     onBack: function () {

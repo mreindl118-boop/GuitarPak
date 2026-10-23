@@ -30,8 +30,9 @@
  * (or Again / Next level / Go again); during a run they stop it, unless the
  * second strike was a right note of the lesson (a turnaround that repeats
  * that note never stops a run). Double-tapping empty space on the lesson
- * card does the same on a touchscreen. The LUMI DISPLAY chip mirrors
- * Lights & help (App.midi.display).
+ * card does the same on a touchscreen. The GUIDE COLORS chip mirrors
+ * the legacy guide-style setting (App.midi.display); the single LUMI Display
+ * master lives in the treble-clef menu.
  */
 (function () {
   'use strict';
@@ -66,7 +67,12 @@
   var BY_ID = {};
   LESSONS.forEach(function (l) { BY_ID[l.id] = l; });
 
-  var root = null, view = 'list', R = null, last = null, demo = null;
+  var root = null, view = 'list', R = null, last = null, demo = null, entryInstrument = null;
+  App.on('learn:lesson',function(e){if(e&&e.kind==='keys'){stopAll(true);entryInstrument=e.instrument==='synth'?'synth':'piano';if(root)paint();}});
+  App.on('learn:instrument',function(){entryInstrument=null;if(R)stopAll(false);else if(root)paint();});
+  function creditInstrument(){return R?R.instrument:entryInstrument||(App.active==='synth'?'synth':'piano');}
+  function measure(r){if(!r||r.demo)return;var at=Date.now(),delta=(at-r.xpLast)/1000;r.xpLast=at;if(r.ctx.currentTime>=r.first&&delta>0&&delta<=1&&r.xpActivity!=null&&at-r.xpActivity<=5000)r.xpSeconds+=delta;}
+  function recordRun(r,status){if(!r||r.demo||r.xpRecorded||!App.xp)return null;measure(r);r.xpRecorded=true;var hits=r.inf?r.inf.hits:r.targets.filter(function(t){return t.j&&t.j!=='miss';}).length,miss=r.inf?r.inf.miss:r.targets.filter(function(t){return t.j==='miss';}).length;return App.xp.finishLevel({sessionId:r.sessionId,instrument:r.instrument,status:status,mode:'keys:'+r.l.id,metrics:{engagedSeconds:r.xpSeconds,expected:r.inf?hits+miss:r.targets.length,matched:hits,missed:miss,extra:r.wrong,wrong:r.wrong}});}
 
   function K() { return App.keys; }
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -154,6 +160,7 @@
     stopAll(true);
     var l = sel(), p = prog(l.id);
     try { R = build(l, p.step, isDemo ? 1 : reps(), isDemo); } catch (e) { R = null; return; }
+    R.instrument=entryInstrument||(App.active==='synth'?'synth':'piano');R.sessionId='keys-'+Date.now()+'-'+Math.random().toString(36).slice(2);R.xpLast=Date.now();R.xpSeconds=0;R.xpActivity=null;R.xpRecorded=false;if(!R.demo&&App.xp)App.xp.beginSession({id:R.sessionId,instrument:R.instrument,source:'keys'});
     App.emit('transport:claim', { owner: 'keys' });
     App.wake.acquire('kl-run');
     if (R.demo) R.targets.forEach(function (tg) { K().play(tg.midi, tg.at - R.ctx.currentTime, Math.max(0.3, R.spn * 1.4), 0.5); });
@@ -211,6 +218,7 @@
 
   function tick() {
     if (!R) return;
+    measure(R);
     var now = R.ctx.currentTime, heard = now - R.lat, lastAt;
     if (R.inf) {
       var I = R.inf;
@@ -269,6 +277,7 @@
     if (!R || R.demo) return;
     var t = R.ctx.currentTime - cal(src) / 1000 - R.lat;
     if (t < R.first - R.spn * 0.6) return; // count-in noodling isn't judged
+    measure(R);R.xpActivity=Date.now();
     var pc = Theory.mod12(midi), best = null, bd = 1e9;
     R.targets.forEach(function (tg) {
       if (tg.j || tg.pc !== pc) return;
@@ -313,6 +322,7 @@
 
   function finish() {
     var r = R;
+    var credited=recordRun(r,'complete');
     stopAll(true);
     if (r.demo) { view = 'list'; paint(); return; }
     if (r.inf) { finishInfinite(r); return; }
@@ -324,11 +334,11 @@
     p.fails = pass ? 0 : p.fails + 1;
     var mastered = !p.mastered && pass && r.step >= MASTER_STEP && r.help <= MASTER_HELP;
     if (mastered) p.mastered = true;
-    p.runs.push({ d: App.xp ? App.xp.dayKey() : '', st: r.step, h: r.help, acc: Math.round(st.acc * 100), t: Math.round(st.meanAbs),
+    p.runs.push({ instrument:r.instrument,sessionId:r.sessionId,d: App.xp ? App.xp.dayKey() : '', st: r.step, h: r.help, acc: Math.round(st.acc * 100), t: Math.round(st.meanAbs),
       m: Math.round(st.mean), sd: Math.round(st.sd), sc: st.score });
     if (p.runs.length > 40) p.runs = p.runs.slice(-40);
     saveProg(r.l.id, p);
-    var fin = App.xp ? App.xp.finishLevel({ passed: pass, perfect: stars === 3 }) : null;
+    var fin = credited;
     last = { r: r, st: st, stars: stars, pass: pass, up: up, mastered: mastered, fin: fin, p: p };
     view = 'done';
     paint();
@@ -342,11 +352,11 @@
     var judged = I.hits + I.miss, acc = judged + r.wrong ? I.hits / (judged + r.wrong) : 0;
     var old = p.inf[key] || 0, isBest = I.best > old;
     if (isBest) p.inf[key] = I.best;
-    p.runs.push({ d: App.xp ? App.xp.dayKey() : '', st: r.step, h: r.help, acc: Math.round(acc * 100), t: Math.round(meanAbs),
+    p.runs.push({ instrument:r.instrument,sessionId:r.sessionId,d: App.xp ? App.xp.dayKey() : '', st: r.step, h: r.help, acc: Math.round(acc * 100), t: Math.round(meanAbs),
       m: Math.round(mean), sd: Math.round(sd), inf: I.best, bpm: I.bpm });
     if (p.runs.length > 40) p.runs = p.runs.slice(-40);
     saveProg(r.l.id, p);
-    var fin = judged && App.xp ? App.xp.finishLevel({ passed: I.best >= r.one.length, record: isBest && I.best > 0 }) : null;
+    var fin = recordRun(r,'complete');
     last = { r: r, inf: { best: I.best, old: old, isBest: isBest, acc: acc, meanAbs: meanAbs, mean: mean, sd: sd, bpm: I.bpm,
       loops: Math.floor(I.hits / r.one.length), notes: judged, wrong: r.wrong }, fin: fin, p: p };
     view = 'done';
@@ -356,6 +366,7 @@
   // stop the run (and the click) without scoring
   function stopAll(quiet) {
     if (!R) return;
+    recordRun(R,'stopped');
     clearInterval(R.timer);
     App.wake.release('kl-run');
     document.documentElement.classList.remove('kl-running');
@@ -378,7 +389,7 @@
 
   function card(inner) {
     return '<div class="card kl-card"><div class="kl-head"><h2>Scale lessons</h2>' +
-      '<span class="muted small">Play along with the click. Right notes on the beat level you up.</span></div>' + inner + '</div>';
+      '<span class="muted small">Credit: ' + esc(creditInstrument()) + '. Shared keyboard course. Play along with the click. Right notes on the beat level you up.</span></div>' + inner + '</div>';
   }
 
   function lessonLine(l) { return (l.oct === 2 ? '2 octaves' : '1 octave') + ' · up and down' + (l.pat === 'i3' ? ' in 3rds' : ''); }
@@ -415,7 +426,7 @@
         '<div class="kl-acts"><button type="button" class="btn primary" id="kl-start">' + App.icon('play', 13) + ' Start</button>' +
           '<button type="button" class="btn" id="kl-listen">Listen first</button></div>' +
         '<div class="kl-ctl">' +
-          '<button type="button" class="chip fb-chip' + (lumiDisplay() ? ' active' : '') + '" id="kl-disp" aria-pressed="' + lumiDisplay() + '" title="The LUMI lights only the keys to play, in their colors">LUMI Display</button>' +
+          '<button type="button" class="chip fb-chip' + (lumiDisplay() ? ' active' : '') + '" id="kl-disp" aria-pressed="' + lumiDisplay() + '" title="Legacy guide focus; pitch colors are shared, LUMI Display master is in the clef menu">Guide focus</button>' +
           '<button type="button" class="chip fb-chip' + (dblOn() ? ' active' : '') + '" id="kl-dbltap" aria-pressed="' + dblOn() + '" title="Start and stop with a double-tap">Double-tap</button>' +
           (dblOn() ? '<span class="muted small">Double-tap <b>' + ctrlName() + '</b> (your keyboard’s lowest key) or this card to start; again to stop.</span>' : '') +
         '</div>' +
@@ -700,19 +711,19 @@
       document.addEventListener('visibilitychange', function () { if (document.hidden) stopAll(false); });
       paint();
     },
-    stop: function () { stopAll(false); },
+    stop: function () { stopAll(false); entryInstrument=null; },
     // for the Exercises Progress tab: every lesson that has runs
-    summary: function () {
+    summary: function (instrument) {
       return LESSONS.map(function (l) {
-        var p = prog(l.id);
-        if (!p.runs.length) return null;
-        var lastRun = p.runs[p.runs.length - 1];
+        var p = prog(l.id), runs = instrument ? p.runs.filter(function (r) { return r.instrument === instrument; }) : p.runs;
+        if (!runs.length) return null;
+        var lastRun = runs[runs.length - 1];
         return { id: l.id, name: l.name, hand: handName(l.hand), level: p.step + 1, levels: STEPS.length, passed: p.passed + 1,
-          mastered: p.mastered, best: Math.max.apply(null, p.runs.map(function (u) { return u.sc || 0; })), runs: p.runs.length, last: lastRun.d, timing: lastRun.t,
-          streak: Math.max.apply(null, [0].concat(Object.keys(p.inf).map(function (k) { return p.inf[k] || 0; }))) };
+          mastered: p.mastered, curriculumShared: true, best: Math.max.apply(null, runs.map(function (u) { return u.sc || 0; })), runs: runs.length, last: lastRun.d, timing: lastRun.t,
+          streak: Math.max.apply(null, [0].concat(runs.map(function (r) { return r.inf || 0; }))) };
       }).filter(Boolean).sort(function (a, b) { return a.last < b.last ? 1 : -1; });
     },
-    open: function (id) { if (BY_ID[id]) { App.store.set('kl.sel', id); App.store.set('kl.tier', BY_ID[id].tier); view = 'list'; paint(); } },
+    open: function (id, instrument) { if (instrument==='piano'||instrument==='synth') {stopAll(true);entryInstrument=instrument;} if (BY_ID[id]) { App.store.set('kl.sel', id); App.store.set('kl.tier', BY_ID[id].tier); view = 'list'; paint(); } },
     // tests
     get run() { return R; },
     get view() { return view; },

@@ -166,9 +166,9 @@
     output.gain.value = p.gain;
     var voices = [];
 
-    return {
+    return DAW.guardPitched({
       output: output,
-      noteOn: function (pitch, vel, time, channel) {
+      noteOn: function (pitch, vel, time, channel, meta) {
         channel = channel || 0;
         var buffer = p.sampleId && samples[p.sampleId];
         if (!buffer) return;
@@ -192,19 +192,21 @@
         amp.connect(output);
         src.start(time, startSec);
         if (!p.loop) src.stop(time + (endSec - startSec) / src.playbackRate.value + p.env.r + 0.1);
-        var voice = { pitch: pitch, channel: channel, src: src, amp: amp, releaseAt: null };
+        var voice = { pitch: pitch, channel: channel, src: src, amp: amp, releaseAt: null,
+          audioClip: !!(meta && meta.audioClip === true) };
         src.onended = function () {
           voices = voices.filter(function (v) { return v !== voice; });
           try { src.disconnect(); amp.disconnect(); } catch (e) { /* ok */ }
         };
         voices.push(voice);
       },
-      noteOff: function (pitch, time, channel) {
+      noteOff: function (pitch, time, channel, meta) {
         channel = channel || 0;
         var r = Math.max(0.005, p.env.r);
         for (var i = 0; i < voices.length; i++) {
           var v = voices[i];
-          if (v.pitch === pitch && v.channel === channel && v.releaseAt === null) {
+          if (v.pitch === pitch && v.channel === channel && v.releaseAt === null &&
+              v.audioClip === !!(meta && meta.audioClip === true)) {
             v.releaseAt = time;
             v.amp.gain.cancelScheduledValues(time);
             v.amp.gain.setTargetAtTime(0, time, r / 3);
@@ -213,14 +215,15 @@
           }
         }
       },
-      allNotesOff: function () {
+      allNotesOff: function (pitchedOnly) {
         var t = ctx.currentTime;
         voices.forEach(function (v) {
+          if (pitchedOnly && v.audioClip) return;
           v.amp.gain.cancelScheduledValues(t);
           v.amp.gain.setTargetAtTime(0, t, 0.01);
           try { v.src.stop(t + 0.08); } catch (e) { /* ok */ }
         });
-        voices = [];
+        voices = pitchedOnly ? voices.filter(function (v) { return v.audioClip; }) : [];
       },
       pitchBend: function (semis, channel) {
         voices.forEach(function (v) {
@@ -231,7 +234,7 @@
       },
       update: function (next) { p = next; output.gain.value = p.gain; },
       dispose: function () { this.allNotesOff(); output.disconnect(); }
-    };
+    }, true);
   }
 
   // ---------------- effects (ported subset) ----------------
@@ -641,8 +644,8 @@
         if (clip.src === 'audio') {
           if (clip.start >= from && clip.start < to) {
             var root = (t.sampler && t.sampler.rootNote) || 60;
-            c.instrument.noteOn(root, 0.9, b2t(clip.start), 0);
-            c.instrument.noteOff(root, b2t(clip.start + clip.len), 0);
+            c.instrument.noteOn(root, 0.9, b2t(clip.start), 0, { audioClip: true });
+            c.instrument.noteOff(root, b2t(clip.start + clip.len), 0, { audioClip: true });
           }
           return;
         }
@@ -745,6 +748,13 @@
   }
 
   // offline render of the arrangement -> WAV blob
+  function disposeRenderChannels(chans) {
+    Object.keys(chans).forEach(function (id) {
+      var c = chans[id];
+      try { c.instrument.dispose(); c.chain.dispose(); c.gain.disconnect(); } catch (e) { /* render is finished */ }
+    });
+  }
+
   function renderSong() {
     var bd = beatDur();
     var end = songEnd();
@@ -755,7 +765,7 @@
     var chans = {};
     tracks.forEach(function (t) { chans[t.id] = buildChannel(off, t, off.destination); });
     scheduleClipWindow(0, end, chans, function (b) { return 0.05 + b * bd; });
-    return off.startRendering().then(audioBufferToWav);
+    return off.startRendering().then(audioBufferToWav).finally(function () { disposeRenderChannels(chans); });
   }
 
   // live play: route an armed track's input through its real channel
@@ -778,7 +788,7 @@
     scheduleLoop(0.02, off, chans);
     return off.startRendering().then(function (buf) {
       return audioBufferToWav(buf);
-    });
+    }).finally(function () { disposeRenderChannels(chans); });
   }
 
   window.DAW = window.DAW || {};

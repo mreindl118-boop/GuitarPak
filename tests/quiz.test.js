@@ -68,9 +68,9 @@ async function newPage(browser, seed, locked) {
 
   console.log('# generator sweep');
   const sweep = await page.evaluate(() => {
-    const out = { levels: SLQuiz.levels().length, bad: [], n: 0 };
+    const out = { levels: SLQuiz.levels({ all: true }).length, bad: [], n: 0 };
     const dbl = /♯♯|♭♭/;
-    for (const lid of SLQuiz.levels()) {
+    for (const lid of SLQuiz.levels({ all: true })) {
       for (let i = 0; i < 80; i++) {
         let q;
         try { q = SLQuiz.gen(lid); } catch (e) { out.bad.push(lid + ' threw ' + e.message); break; }
@@ -143,7 +143,7 @@ async function newPage(browser, seed, locked) {
       await wait(10);
     }
     return { view: SLQuiz.view, big: document.querySelector('.qz-big') && document.querySelector('.qz-big').textContent,
-      stars: document.querySelector('.qz-stars').textContent, prog: JSON.parse(localStorage.getItem('guitarlab.qz.prog')), svgs };
+      stars: document.querySelector('.qz-stars').textContent, prog: JSON.parse(localStorage.getItem('guitarlab.qz.instrumentProg')).piano, svgs };
   });
   ok(run1.view === 'done' && run1.big === '10/10' && run1.stars === '★★★', 'done view 10/10 ★★★: ' + JSON.stringify([run1.view, run1.big, run1.stars]));
   ok(run1.prog['notes/nat/treble/1'] && run1.prog['notes/nat/treble/1'].s === 3, 'progress saved with 3 stars');
@@ -232,6 +232,7 @@ async function newPage(browser, seed, locked) {
 
   console.log('# neck find (string must match)');
   const neck = await page.evaluate(() => {
+    App.practiceInstrument.set('guitar');
     SLQuiz.start('notes/acc/neck/2');
     const q = SLQuiz.q, spot = q.reveal.neck[0];
     const other = (q.string + 1) % 6;
@@ -352,7 +353,7 @@ async function newPage(browser, seed, locked) {
     App.switchTo('quiz'); await wait(150);
     return { onQuiz, onNeck, started, stopped: running === false };
   });
-  ok(ch.onQuiz === 'none' && ch.onNeck !== 'none', 'key/scale clef hidden on Exercises, shown on the neck: ' + JSON.stringify(ch));
+  ok(ch.onQuiz !== 'none' && ch.onNeck !== 'none', 'shared key/scale clef remains available on Exercises and the neck: ' + JSON.stringify(ch));
   ok(ch.started === true && ch.stopped, 'opening Exercises stops the metronome: ' + JSON.stringify(ch));
   await page.setViewportSize({ width: 1200, height: 520 });
   await page.evaluate(() => { App.switchTo('piano'); });

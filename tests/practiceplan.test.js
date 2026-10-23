@@ -6,7 +6,7 @@ let fails = 0;
 function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console.log('  FAIL', msg); } }
 
 async function open(browser, viewport) {
-  const ctx = await browser.newContext({ viewport: viewport || { width: 1200, height: 900 }, acceptDownloads: true });
+  const ctx = await browser.newContext({ viewport: viewport || { width: 1200, height: 900 }, acceptDownloads: true, serviceWorkers: 'block' });
   await ctx.addInitScript(() => {
     if (sessionStorage.getItem('__pp_seeded')) return;
     sessionStorage.setItem('__pp_seeded', '1');
@@ -16,7 +16,18 @@ async function open(browser, viewport) {
   page.on('pageerror', e => errs.push(e.message));
   await page.goto(env.URL);
   await page.waitForFunction(() => window.App && App.practicePlan && App.xp && App.active);
-  await page.evaluate(() => { App.switchTo('practiceplan'); document.querySelector('details.pp-notes').open = true; });
+  await page.evaluate(() => {
+    window.__ppClock = Date.now();
+    App.practiceProgress = new PracticeProgress({ store: App.store, now: () => __ppClock, timezone: () => 'UTC' });
+    window.__ppRecord = (id, instrument, mode, seconds, opts = {}) => {
+      __ppClock = Math.max(__ppClock, Date.now()); const startedAt = __ppClock; __ppClock += seconds * 1000;
+      const matched = opts.matched == null ? 1 : opts.matched;
+      return App.practiceProgress.recordSession({ id, instrument, mode, startedAt, endedAt: __ppClock, engagedSeconds: seconds,
+        status: opts.status || 'complete', expected: matched, matched, missed: 0, extra: 0, wrong: 0,
+        tempo: null, timingSamples: 0, sumAbsTimingMs: 0, sumTimingMs: 0 });
+    };
+    App.switchTo('practiceplan'); document.querySelector('details.pp-notes').open = true;
+  });
   return { ctx, page, errs };
 }
 
@@ -24,6 +35,7 @@ async function open(browser, viewport) {
 // existing source, rather than by changing the planner's completion flags.
 async function plan(page, text, opts) {
   return page.evaluate(({ text, opts }) => {
+    App.practiceInstrument.set(opts.instrument === 'keys' ? 'piano' : opts.instrument || 'piano');
     App.switchTo('practiceplan');
     App.practicePlan.preview(text, opts);
     App.practicePlan.accept();
@@ -104,125 +116,163 @@ async function plan(page, text, opts) {
   ok(!inert.pwned && inert.nodes === 0 && inert.literal, 'pasted markup is displayed as source text and cannot execute');
   ok(docsRequests === 0, 'saving a Google Docs link does not request live or credentialed document access');
 
-  console.log('# exact lesson hook and measured completion');
+  console.log('# exact lesson hook and instrument-bound canonical completion');
   await plan(page, 'C major scale right hand');
   const lesson = await page.evaluate(() => {
     const item = App.practicePlan.state().plan.items.find(i => i.lessonId === 'c-r');
-    const old = { step: 2, passed: 1, best: { 1: 85 }, runs: [{ d: App.xp.dayKey(), st: 1, h: 3, acc: 95, t: 20, m: 0, sd: 10, sc: 85 }] };
-    App.store.set('kl.prog', { 'c-r': old });
-    const help = App.help.level();
-    App.practicePlan.launch(item.id);
-    App.practicePlan.refresh();
-    return { id: item.id, active: App.active, selected: App.store.get('kl.sel'), tempo: App.store.get('met.bpm'), help, afterHelp: App.help.level(),
-      done: !!App.practicePlan.state().session.items[item.id].done };
+    App.store.set('kl.prog', { 'c-r': { step: 2, runs: [{ d: App.xp.dayKey(), acc: 95, sc: 85 }] } });
+    __ppRecord('old-keys', 'piano', 'keys:c-r', 20);
+    const help = App.help.level(); App.practicePlan.launch(item.id); App.practicePlan.refresh();
+    return { id: item.id, active: App.active, selected: App.store.get('kl.sel'), help, afterHelp: App.help.level(),
+      running: App.store.get('pp.running'), done: !!App.practicePlan.state().session.items[item.id].done };
   });
-  ok(lesson.active === 'piano' && lesson.selected === 'c-r' && lesson.help === lesson.afterHelp, 'launch selects the exact Keys lesson and uses the shared Help setting');
-  ok(!lesson.done, 'existing lesson history and opening a module do not complete a new block');
+  ok(lesson.active === 'piano' && lesson.selected === 'c-r' && lesson.help === lesson.afterHelp && lesson.running.instrument === 'piano',
+    'launch selects the exact Keys lesson with an explicit instrument snapshot and shared Help');
+  ok(!lesson.done, 'existing canonical and legacy lesson history cannot complete a newly launched block');
   const evidence = await page.evaluate(id => {
-    const all = App.store.get('kl.prog', {});
-    all['g-r'] = { step: 3, runs: [{ d: App.xp.dayKey(), st: 2, h: 3, sc: 95 }] };
-    App.store.set('kl.prog', all);
-    App.xp.practice(600, 'Jam');
-    App.practicePlan.refresh();
-    const unrelated = !!App.practicePlan.state().session.items[id].done;
-    all['c-r'].runs.push({ d: App.xp.dayKey(), st: 2, h: 3, acc: 98, t: 15, m: 0, sd: 9, sc: 92 });
-    App.store.set('kl.prog', all);
-    App.practicePlan.refresh();
-    return { unrelated, record: App.practicePlan.state().session.items[id] };
+    __ppRecord('other-lesson', 'piano', 'keys:g-r', 20);
+    __ppRecord('other-instrument', 'synth', 'keys:c-r', 20);
+    App.store.set('kl.prog', { 'c-r': { runs: [{ d: App.xp.dayKey(), acc: 100, sc: 99 }] } });
+    App.practicePlan.refresh(); const unrelated = !!App.practicePlan.state().session.items[id].done;
+    __ppRecord('stopped-keys', 'piano', 'keys:c-r', 5, { status: 'stopped' });
+    App.practicePlan.refresh(); const stopped = !!App.practicePlan.state().session.items[id].done;
+    const saved = __ppRecord('new-exact-keys', 'piano', 'keys:c-r', 20); App.practicePlan.refresh();
+    return { unrelated, stopped, saved: saved.ok, record: App.practicePlan.state().session.items[id] };
   }, lesson.id);
-  ok(!evidence.unrelated && evidence.record.done && evidence.record.reason, 'only a new run of the selected lesson completes that block, with an evidence explanation');
+  ok(!evidence.unrelated && !evidence.stopped && evidence.saved && evidence.record.done && evidence.record.sessionIds.includes('new-exact-keys'),
+    'only fresh completed canonical evidence for the same instrument and exact lesson completes the block');
 
-  await plan(page, 'C major scale right hand at 72 bpm');
-  const rollover = await page.evaluate(() => {
-    const item = App.practicePlan.state().plan.items.find(i => i.lessonId === 'c-r');
-    const old = { step: 2, runs: Array.from({ length: 40 }, (_, i) => ({ d: App.xp.dayKey(), st: 1, h: 3, sc: 60 + i / 2 })) };
-    App.store.set('kl.prog', { 'c-r': old });
-    App.practicePlan.launch(item.id);
-    const before = !!App.practicePlan.state().session.items[item.id].done;
-    old.runs.shift(); old.runs.push({ d: App.xp.dayKey(), st: 2, h: 3, sc: 97 });
-    App.store.set('kl.prog', { 'c-r': old });
-    App.practicePlan.refresh();
-    return { before, after: !!App.practicePlan.state().session.items[item.id].done };
+  console.log('# existing accepted plans retain context across Learn category changes');
+  const preserved = await page.evaluate(() => {
+    const original = JSON.stringify(App.practicePlan.state().plan);
+    App.practiceInstrument.set('guitar'); const changed = App.practicePlan.state();
+    const keys = changed.plan.items.find(i => i.lessonId === 'c-r');
+    const refused = App.practicePlan.launch(keys.id);
+    return { original, changed, refused, text: document.getElementById('pp-today').textContent,
+      foreignButtons: [...document.querySelectorAll('[data-pp-open]')].some(e => e.dataset.ppOpen === keys.id) };
   });
-  ok(!rollover.before && rollover.after, 'fresh evidence is recognized when the lesson history has reached its 40-run retention limit');
+  ok(JSON.stringify(preserved.changed.plan) === preserved.original && preserved.changed.preservedItems.length === 1 && !preserved.refused && !preserved.foreignButtons,
+    'switching Learn category preserves the accepted keyboard block but disables its foreign-context launch');
+  ok(/preserved|context/i.test(preserved.text) && !Object.keys(preserved.changed.session.items).length,
+    'preserved context is visible and another instrument inherits no earlier block completion');
 
-  await plan(page, 'C major scale right hand, 4 minutes');
-  const playedRun = await page.evaluate(() => {
-    const item = App.practicePlan.state().plan.items.find(i => i.lessonId === 'c-r');
-    const progress = { step: 0, runs: [] };
-    App.store.set('kl.prog', { 'c-r': progress });
-    App.practicePlan.launch(item.id);
-    progress.runs.push({ d: App.xp.dayKey(), st: 0, h: 3, acc: 0, t: 0, inf: 0 });
-    App.store.set('kl.prog', { 'c-r': progress }); App.practicePlan.refresh();
-    const empty = !!App.practicePlan.state().session.items[item.id].done;
-    progress.runs.push({ d: App.xp.dayKey(), st: 0, h: 3, acc: 80, t: 25, m: 0, sd: 20, inf: 1, bpm: 60 });
-    App.store.set('kl.prog', { 'c-r': progress }); App.practicePlan.refresh();
-    return { empty, played: !!App.practicePlan.state().session.items[item.id].done };
+  await plan(page, 'C major scale right hand, 4 minutes', { instrument: 'synth' });
+  const switched = await page.evaluate(() => {
+    const item = App.practicePlan.state().plan.items[0]; App.practicePlan.launch(item.id);
+    const original = App.store.get('pp.running'); App.practiceInstrument.set('piano');
+    const ended = App.store.get('pp.running');
+    __ppRecord('after-switch-synth', 'synth', 'keys:c-r', 25); App.practicePlan.refresh();
+    App.practiceInstrument.set('synth'); const restored = App.practicePlan.state();
+    return { original, ended, restored: restored.session.items[item.id], instrument: restored.instrument,
+      card: document.getElementById('pp-today').textContent };
   });
-  ok(!playedRun.empty && playedRun.played, 'an empty infinite run does not complete a Keys block, but a newly recorded played run does');
+  ok(switched.original.instrument === 'synth' && switched.ended === null && !switched.restored.done,
+    'category change ends the old planner tracker and later history cannot silently complete it');
+  ok(switched.instrument === 'synth' && /Synth/.test(switched.card), 'returning to the original category restores its own unfinished context');
 
-  console.log('# module setup and per-area minutes');
+  console.log('# casual tools never infer practice minutes or XP from an open page');
   await plan(page, 'G minor pentatonic guitar scale 2 minutes at 80 bpm', { instrument: 'guitar' });
   const guitar = await page.evaluate(() => {
-    const item = App.practicePlan.state().plan.items.find(i => i.page === 'fretboard');
-    if (!item) return { missing: true };
-    let event;
-    App.on('fb:practice', d => { event = d; });
-    App.practicePlan.launch(item.id);
-    const afterOpen = !!App.practicePlan.state().session.items[item.id].done;
-    App.xp.practice(60, 'Guitar'); App.practicePlan.refresh();
-    const half = !!App.practicePlan.state().session.items[item.id].done;
-    App.xp.practice(60, 'Guitar'); App.practicePlan.refresh();
-    return { active: App.active, event, minutes: item.minutes, tempo: App.store.get('met.bpm'), afterOpen, half, done: !!App.practicePlan.state().session.items[item.id].done };
+    const item = App.practicePlan.state().plan.items[0]; let event;
+    App.on('fb:practice', d => { event = d; }); App.practicePlan.launch(item.id);
+    const tracker = App.store.get('pp.running');
+    App.store.set('xp.days', { [App.xp.dayKey()]: { p: 600, a: { Guitar: 600 } } });
+    __ppRecord('unrelated-guitar-performance', 'guitar', 'wait', 120); App.practicePlan.refresh();
+    App.switchTo('practiceplan');
+    return { active: 'fretboard', event, tracker, minutes: item.minutes, tempo: App.store.get('met.bpm'),
+      record: App.practicePlan.state().session.items[item.id], text: document.getElementById('pp-today').textContent };
   });
-  ok(!guitar.missing && guitar.active === 'fretboard' && guitar.event.root === 7 && guitar.event.scale === 'minorPent' && guitar.event.bpm === 80 && guitar.tempo === 80, 'a guitar block starts the configured Fretboard runner through the shared hook');
-  ok(guitar.minutes === 2 && !guitar.afterOpen && !guitar.half && guitar.done, 'configured practice minutes, rather than wall time or launch, complete the guitar block');
-
+  ok(guitar.event.root === 7 && guitar.event.scale === 'minorPent' && guitar.event.bpm === 80 && guitar.tempo === 80,
+    'guitar block keeps the existing configured six-string Fretboard hook');
+  ok(guitar.tracker === null && !guitar.record.done && guitar.record.seconds === 0 && /No automated timer/.test(guitar.text),
+    'casual Fretboard has no invented minute tracker and cannot consume unrelated performance observations');
   const changedSetup = await page.evaluate(() => {
     const text = 'Guitar scale, 1 minute';
-    App.store.set('fb.root', 0); App.store.set('met.bpm', 80);
-    App.practicePlan.preview(text, { instrument: 'guitar' }); App.practicePlan.accept();
+    App.store.set('fb.root', 0); App.store.set('met.bpm', 80); App.practicePlan.preview(text, { instrument: 'guitar' }); App.practicePlan.accept();
     const before = App.practicePlan.state(), item = before.plan.items[0];
-    App.practicePlan.launch(item.id); App.xp.practice(60, 'Guitar'); App.practicePlan.refresh();
-    const finished = !!App.practicePlan.state().session.items[item.id].done;
-    App.store.set('fb.root', 7); App.store.set('met.bpm', 120);
-    App.practicePlan.preview(text, { instrument: 'guitar' }); App.practicePlan.accept();
+    App.store.set('fb.root', 7); App.store.set('met.bpm', 120); App.practicePlan.preview(text, { instrument: 'guitar' }); App.practicePlan.accept();
     const after = App.practicePlan.state(), changed = after.plan.items[0];
-    return { finished, oldPlan: before.plan.id, newPlan: after.plan.id, oldItem: item.id, newItem: changed.id,
+    return { oldPlan: before.plan.id, newPlan: after.plan.id, oldItem: item.id, newItem: changed.id,
       root: changed.root, bpm: changed.bpm, inherited: !!(after.session.items[changed.id] || {}).done };
   });
-  ok(changedSetup.finished && changedSetup.oldPlan !== changedSetup.newPlan && changedSetup.oldItem !== changedSetup.newItem && changedSetup.root === 7 && changedSetup.bpm === 120 && !changedSetup.inherited,
-    'accepting the same words with a changed key/tempo creates a distinct plan without inherited completion');
+  ok(changedSetup.oldPlan !== changedSetup.newPlan && changedSetup.oldItem !== changedSetup.newItem && changedSetup.root === 7 && changedSetup.bpm === 120 && !changedSetup.inherited,
+    'changed key/tempo still creates a distinct plan with no inherited completion');
 
+  console.log('# quiz progress and answering minutes are scoped to the launched instrument');
   await plan(page, 'Ear training intervals 2 minutes');
   const exercise = await page.evaluate(() => {
-    const item = App.practicePlan.state().plan.items.find(i => i.page === 'quiz');
-    if (!item) return { missing: true };
-    App.store.set('qz.prog', { 'notes/nat/treble/1': { b: 10, s: 3 } });
-    App.practicePlan.launch(item.id); App.practicePlan.refresh();
-    const old = !!App.practicePlan.state().session.items[item.id].done;
-    App.xp.practice(300, 'Keys'); App.practicePlan.refresh();
+    const item = App.practicePlan.state().plan.items[0];
+    App.store.set('qz.instrumentProg', { piano: { 'notes/nat/treble/1': { b: 8 } } });
+    App.practicePlan.launch(item.id); App.practicePlan.refresh(); const old = !!App.practicePlan.state().session.items[item.id].done;
+    App.store.set('qz.prog', { 'notes/nat/treble/1': { b: 10 } });
+    App.store.set('qz.instrumentProg', { piano: { 'notes/nat/treble/1': { b: 8 } }, guitar: { 'notes/nat/treble/1': { b: 10 } } });
+    __ppRecord('other-knowledge', 'guitar', 'knowledge', 120, { matched: 0 }); App.practicePlan.refresh();
     const other = !!App.practicePlan.state().session.items[item.id].done;
-    App.xp.answer({ ok: true, kind: 'ear', ms: 30000 });
-    App.xp.answer({ ok: true, kind: 'ear', ms: 30000 });
-    App.xp.answer({ ok: true, kind: 'ear', ms: 30000 });
-    App.xp.answer({ ok: true, kind: 'ear', ms: 30000 });
-    App.practicePlan.refresh();
-    return { active: App.active, old, other, done: !!App.practicePlan.state().session.items[item.id].done };
+    __ppRecord('piano-answering', 'piano', 'knowledge', 120, { matched: 0 }); App.practicePlan.refresh();
+    return { old, other, record: App.practicePlan.state().session.items[item.id] };
   });
-  ok(!exercise.missing && exercise.active === 'quiz' && !exercise.old && !exercise.other && exercise.done, 'Exercises counts new answer time and ignores existing scores or another module’s minutes');
+  ok(!exercise.old && !exercise.other && exercise.record.done && exercise.record.seconds === 120 && exercise.record.instrument === 'piano',
+    'only new canonical answering time in the launched category reaches the quiz block goal');
+  await plan(page, 'Ear training intervals 3 minutes');
+  const passing = await page.evaluate(() => {
+    const item = App.practicePlan.state().plan.items[0]; App.practicePlan.launch(item.id);
+    const all = App.store.get('qz.instrumentProg'); all.piano['notes/nat/treble/1'].b = 9; App.store.set('qz.instrumentProg', all);
+    App.practicePlan.refresh(); return App.practicePlan.state().session.items[item.id];
+  });
+  ok(passing.done && /Piano/.test(passing.reason) && passing.seconds === 0, 'a fresh scoped passing score can complete shared theory without invented musical notes or time');
 
+  console.log('# Woodshed completion uses fresh canonical IDs, not legacy XP totals');
   await plan(page, 'Practice assigned piece, 3 minutes');
   const woodshed = await page.evaluate(() => {
-    const item = App.practicePlan.state().plan.items.find(i => i.page === 'shed');
-    if (!item) return { missing: true };
-    App.store.set('ws.xp', 100);
-    App.practicePlan.launch(item.id); App.practicePlan.refresh();
-    const old = !!App.practicePlan.state().session.items[item.id].done;
-    App.store.set('ws.xp', 110); App.practicePlan.refresh();
-    return { active: App.active, old, done: !!App.practicePlan.state().session.items[item.id].done };
+    const item = App.practicePlan.state().plan.items[0]; __ppRecord('old-woodshed', 'piano', 'wait', 10);
+    App.practicePlan.launch(item.id); App.practicePlan.refresh(); const old = !!App.practicePlan.state().session.items[item.id].done;
+    App.store.set('ws.xp', 999999); __ppRecord('foreign-woodshed', 'guitar', 'tempo', 10);
+    __ppRecord('stopped-woodshed', 'piano', 'woodshed', 5, { status: 'stopped' });
+    __ppRecord('empty-woodshed', 'piano', 'wait', 0, { matched: 0 }); App.practicePlan.refresh();
+    const unrelated = !!App.practicePlan.state().session.items[item.id].done;
+    const result = __ppRecord('fresh-woodshed', 'piano', 'tempo', 10); App.practicePlan.refresh();
+    return { old, unrelated, saved: result.ok, record: App.practicePlan.state().session.items[item.id] };
   });
-  ok(!woodshed.missing && woodshed.active === 'shed' && !woodshed.old && woodshed.done, 'Woodshed uses a fresh score/XP result instead of lifetime XP');
+  ok(!woodshed.old && !woodshed.unrelated && woodshed.saved && woodshed.record.done && woodshed.record.sessionIds.includes('fresh-woodshed'),
+    'only a fresh completed same-instrument Woodshed session completes the assigned-piece block');
+
+  console.log('# shared blocks and legacy mixed plans keep separate instrument histories');
+  await plan(page, 'Ear training 1 minute', { instrument: 'guitar' });
+  const shared = await page.evaluate(() => {
+    const item = App.practicePlan.state().plan.items[0]; App.practicePlan.launch(item.id);
+    __ppRecord('shared-guitar-knowledge', 'guitar', 'knowledge', 60, { matched: 0 }); App.practicePlan.refresh();
+    const guitar = App.practicePlan.state(); App.practiceInstrument.set('piano'); const piano = App.practicePlan.state();
+    return { guitar, piano };
+  });
+  ok(shared.guitar.session.items[shared.guitar.plan.items[0].id].done && shared.piano.availableItems.length === 1 && !Object.keys(shared.piano.session.items).length,
+    'shared theory stays available across categories without transferring another instrument’s completion');
+  const legacy = await page.evaluate(() => {
+    const active = App.practicePlan.state().student.id, students = App.store.get('pp.students');
+    const original = students.find(s => s.id === active).plan;
+    const mixed = { id: 'legacy-mixed', source: 'Earlier mixed plan', items: [
+      { id: 'legacy-key', title: 'Earlier keys', page: 'piano', lessonId: 'c-r', minutes: 5 },
+      { id: 'legacy-guitar', title: 'Earlier guitar', page: 'fretboard', minutes: 3 },
+      { id: 'legacy-theory', title: 'Earlier theory', page: 'quiz', minutes: 2 }
+    ], gaps: [] };
+    students.find(s => s.id === active).plan = mixed; App.store.set('pp.students', students);
+    const oldKey = active + '/' + App.xp.dayKey() + '/legacy-mixed';
+    const old = { key: oldKey, day: App.xp.dayKey(), student: active, plan: mixed.id, items: { 'legacy-key': { done: true, seconds: 300 } } };
+    const sessions = App.store.get('pp.sessions'); sessions[oldKey] = old; App.store.set('pp.sessions', sessions);
+    App.store.set('pp.running', { student: active, day: App.xp.dayKey(), plan: mixed.id, item: 'legacy-key' });
+    App.practicePlan.refresh(); const piano = App.practicePlan.state();
+    App.practiceInstrument.set('guitar'); const guitar = App.practicePlan.state();
+    App.practiceInstrument.set('bass'); const bass = App.practicePlan.state();
+    const refused = App.practicePlan.launch('legacy-guitar');
+    const oldAfter = App.store.get('pp.sessions')[oldKey], running = App.store.get('pp.running');
+    students.find(s => s.id === active).plan = original; App.store.set('pp.students', students); App.practiceInstrument.set('piano');
+    return { mixed, piano, guitar, bass, refused, old, oldAfter, running };
+  });
+  ok(legacy.piano.availableItems.map(i => i.id).join(',') === 'legacy-key,legacy-theory' && legacy.guitar.availableItems.map(i => i.id).join(',') === 'legacy-guitar,legacy-theory',
+    'legacy mixed plans filter genuine keyboard and six-string guitar contexts without rewriting their source blocks');
+  ok(JSON.stringify(legacy.bass.plan) === JSON.stringify(legacy.mixed) && legacy.bass.availableItems.length === 1 && !legacy.refused,
+    'Bass retains shared theory and preserved foreign blocks without launching the six-string guitar tool');
+  ok(JSON.stringify(legacy.old) === JSON.stringify(legacy.oldAfter) && !Object.keys(legacy.piano.session.items).length && legacy.running === null,
+    'old unassigned block history remains unchanged and is never migrated or resumed as current-instrument credit');
 
   console.log('# independent students and persistence');
   await plan(page, 'C major scale right hand');
@@ -244,7 +294,7 @@ async function plan(page, text, opts) {
   ok(await page.inputValue('#pp-student') === studentA && persisted === aItems, 'the selected student and accepted plan survive a reload');
 
   console.log('# text file import and gap export');
-  await page.selectOption('#pp-instrument', 'keys');
+  await page.evaluate(() => App.practiceInstrument.set('piano'));
   await page.setInputFiles('#pp-file', { name: 'lesson-notes.txt', mimeType: 'text/plain', buffer: Buffer.from('D major scale right hand\nMicrotonal prepared piano technique', 'utf8') });
   await page.waitForFunction(() => /D major/.test(document.getElementById('pp-notes').value));
   await page.click('#pp-review'); await page.click('#pp-accept');

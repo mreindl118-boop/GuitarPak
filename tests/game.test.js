@@ -1,4 +1,4 @@
-// soundLAB lesson game layer: XP, levels, goal, streak + freezes, path locks,
+// soundLAB lesson game layer: canonical instrument XP, goals, path locks,
 // jump tests, 60-second sprints, Progress charts, Learn-tab dot, phone taps.
 const { chromium } = require('playwright');
 const env = require('./env');
@@ -47,84 +47,58 @@ const PLAY = async (right) => {
 (async () => {
   const browser = await chromium.launch({ executablePath: env.CHROMIUM, args: ['--autoplay-policy=no-user-gesture-required'] });
 
-  console.log('# xp rules (SLXP)');
+  console.log('# canonical instrument XP and preserved legacy data');
   let { ctx, page, errs } = await newPage(browser);
   const rules = await page.evaluate(() => {
-    const X = SLXP, o = {};
-    o.lv = [0, 39, 40, 99, 100, 160].map(x => { const l = X.levelOf(x); return l.lv + ':' + l.into + '/' + l.need; });
-    o.title = [X.levelOf(0).title, X.levelOf(100).title, X.levelOf(5000).title];
-    o.fresh = X.total();
-    o.a = [X.answer({ unit: 'nat', ok: true, ms: 1500, combo: 1, kind: 'choice' }).xp,  // 2 + quick
-      X.answer({ unit: 'nat', ok: true, ms: 5000, combo: 2, kind: 'choice' }).xp,         // 2
-      X.answer({ unit: 'nat', ok: true, ms: 5000, combo: 5, kind: 'choice' }).xp,         // 2 + run of 5
-      X.answer({ unit: 'nat', ok: true, ms: 5000, combo: 5, kind: 'ear' }).xp,            // ear par 6.5 s: 2 + 1 + 1
-      X.answer({ unit: 'nat', ok: false, ms: 900, combo: 0, kind: 'choice' }).xp];        // 0
-    o.total = X.total();
-    o.today = JSON.parse(JSON.stringify(X.today()));
-    o.speed = Math.round(X.speed('nat').avg);
-    o.dotBefore = document.documentElement.classList.contains('goal-due');
-    o.badGoal = (X.setGoal(33), X.goal());
-    X.setGoal(20);
-    o.goal = X.goal();
-    o.dotAfter = document.documentElement.classList.contains('goal-due');
-    o.fin = X.finishLevel({ passed: true, perfect: true });
-    o.dotMet = document.documentElement.classList.contains('goal-due');
-    o.fin2 = X.finishLevel({ passed: true });
+    let tick = Date.parse('2026-10-23T12:00:00Z');
+    App.practiceProgress = new PracticeProgress({ store: App.store, now: () => tick, timezone: () => 'UTC' });
+    SLXP._now(() => new Date(tick));
+    const X = SLXP.forInstrument('piano'), o = { fresh: X.total(), oldKeys: Object.keys(localStorage).filter(k => /^guitarlab\.xp\./.test(k)) };
+    SLXP.beginSession({ id: 'game-canonical-rules', instrument: 'piano', source: 'knowledge' });
+    const rows = [[true, 1500, 'choice'], [true, 5000, 'choice'], [true, 5000, 'choice'], [true, 5000, 'ear'], [false, 900, 'choice']];
+    o.a = rows.map((r, i) => { tick += r[1]; return X.answer({ sessionId: 'game-canonical-rules', answerId: i, unit: 'nat', ok: r[0], ms: r[1], kind: r[2] }).xp; });
+    X.answer({ sessionId: 'game-canonical-rules', answerId: 0, unit: 'nat', ok: true, ms: 1500 });
+    o.questions = X.today(); o.speed = X.speed('nat').avg;
+    o.invalidGoal = (X.setGoal(-1), X.goal());
+    X.setGoal(20); o.goal = X.goal(); o.canonicalGoal = App.practiceProgress.getSettings().dailyMinutes;
+    o.fin = X.finishLevel({ instrument: 'piano', sessionId: 'game-canonical-rules', passed: true, perfect: true });
+    o.summary = App.practiceProgress.summary('piano');
+    o.xp = X.total(); o.level = X.level();
+    X.finishLevel({ instrument: 'piano', sessionId: 'game-canonical-rules', passed: true });
+    o.repeated = App.practiceProgress.summary('piano');
+    App.practiceInstrument.set('guitar'); o.selectedTotal = SLXP.total(); o.pianoTotal = X.total();
+    SLXP.practice(600, 'Guitar'); SLXP._tick();
+    o.noPassive = App.practiceProgress.summary('guitar').sessionCount;
+    o.legacyKeys = Object.keys(localStorage).filter(k => /^guitarlab\.xp\./.test(k));
+    o.streak = X.streak();
+    SLXP._now(null);
     return o;
   });
-  ok(rules.lv.join(' ') === '1:0/40 1:39/40 2:0/60 2:59/60 3:0/80 3:60/80', 'level curve 40, then +20 per level: ' + rules.lv.join(' '));
-  ok(rules.title.join(',') === 'Beginner,Learner,Maestro', 'level titles: ' + rules.title);
-  ok(rules.fresh === 0, 'a brand-new player starts at 0 XP');
-  ok(rules.a.join(',') === '3,2,3,4,0', 'XP per answer (quick +1, run of 5 +1, wrong 0): ' + rules.a);
-  ok(rules.total === 12 && rules.today.x === 12 && rules.today.q === 5 && rules.today.k === 4, 'answers add to total + today: ' + JSON.stringify(rules.today).slice(0, 80));
-  ok(rules.speed === 4125, 'unit speed averages right answers only: ' + rules.speed);
-  ok(rules.fin.bonus === 10 && rules.fin.streak === 1 && rules.fin.extended, 'finishing a level: +5 pass +5 perfect, day 1 of a streak: ' + JSON.stringify(rules.fin));
-  ok(rules.dotBefore === true && rules.dotAfter === true && rules.goal === 20 && rules.badGoal === 50, 'goal: invalid values ignored, dot shows until met: ' + JSON.stringify([rules.dotBefore, rules.badGoal, rules.goal, rules.dotAfter]));
-  ok(rules.fin.goalHit && !rules.dotMet, 'crossing the goal reports it and clears the Learn-tab dot');
-  ok(!rules.fin2.goalHit && !rules.fin2.extended && rules.fin2.bonus === 5, 'a later level the same day: no 2nd goal hit, streak already counted: ' + JSON.stringify(rules.fin2));
-
-  console.log('# streak + freezes (pinned clock)');
-  const st = await page.evaluate(() => {
-    const X = SLXP, out = {};
-    Object.keys(localStorage).filter(k => /^guitarlab\.xp\./.test(k)).forEach(k => localStorage.removeItem(k));
-    X._reload();
-    const at = d => X._now(() => new Date(2026, 0, d, 12));
-    const earned = [];
-    for (let d = 1; d <= 7; d++) { at(d); earned.push(X.finishLevel({ passed: true }).freezeEarned); }
-    out.after7 = X.streak();
-    out.earned = earned.map(Number).join('');
-    at(7); X.finishLevel({ passed: true }); out.sameDay = X.streak().freezes;     // 2nd level same day: no 2nd freeze
-    at(9); out.bridged = X.streak();                                              // day 8 missed -> freeze used
-    out.frozen = JSON.parse(localStorage.getItem('guitarlab.xp.frozen'));
-    X.finishLevel({ passed: true }); out.day9 = X.streak().n;
-    at(12); out.broken = X.streak();                                              // 2 missed, 0 freezes
-    // a 2-day gap is NOT bridged by a single freeze (the freeze stays banked)
-    localStorage.setItem('guitarlab.xp.freeze', '1');
-    at(13); X.finishLevel({ passed: true });
-    at(16); out.gap2 = X.streak();
-    out.hist = X.history(5).map(h => h.key.slice(8) + (h.l ? 'L' : '') + (h.frozen ? 'F' : '')).join(' ');
-    out.best = out.gap2.best;
-    X._now(null);
-    return out;
-  });
-  ok(st.after7.n === 7 && st.earned === '0000001' && st.after7.freezes === 1, '7 days in a row earns a freeze on day 7: ' + JSON.stringify(st.after7) + ' ' + st.earned);
-  ok(st.sameDay === 1, 'a second level on the same day earns no extra freeze');
-  ok(st.bridged.n === 7 && !st.bridged.today && st.bridged.freezes === 0 && st.frozen.join() === '2026-01-08', 'a missed day spends the freeze, streak lives: ' + JSON.stringify(st.bridged) + ' ' + st.frozen);
-  ok(st.day9 === 8, 'finishing a level the next day extends it to 8');
-  ok(st.broken.n === 0 && st.broken.best === 8, 'two missed days with no freeze break it (best kept): ' + JSON.stringify(st.broken));
-  ok(st.gap2.n === 0 && st.gap2.freezes === 1, 'one freeze cannot bridge a 2-day gap and stays banked: ' + JSON.stringify(st.gap2));
-  ok(st.hist === '12 13L 14 15 16', 'history walks the pinned days: ' + st.hist);
-  ok(errs.length === 0, 'no page errors (rules)' + (errs.length ? ': ' + errs.join(' | ') : ''));
+  ok(rules.fresh === 0, 'a new instrument starts at zero canonical XP');
+  ok(rules.a.every(x => x === 0), 'answers do not mint a second per-answer XP balance');
+  ok(rules.questions.q === 5 && rules.questions.k === 4, 'duplicate answer callback does not duplicate question observations');
+  ok(rules.speed === 4125, 'question response speed remains a separate observed metric: ' + rules.speed);
+  ok(rules.invalidGoal === 10 && rules.goal === 20 && rules.canonicalGoal === 20, 'goal validation and selected goal use the canonical settings');
+  ok(Math.abs(rules.xp - 0.58) < 0.00001 && Math.abs(rules.fin.bonus - rules.xp) < 0.00001, 'configured two XP/minute credits exactly 17.4 observed seconds once');
+  ok(rules.summary.sessionCount === 1 && rules.summary.matched === 0 && rules.summary.expected === 0 && rules.summary.timingSamples === 0, 'knowledge sessions do not invent musical note or timing observations');
+  ok(rules.repeated.sessionCount === 1 && rules.repeated.lifetimeEarnedXP === rules.summary.lifetimeEarnedXP, 'repeated finish cannot duplicate the award');
+  ok(rules.selectedTotal === 0 && rules.pianoTotal === rules.xp, 'changing the viewed instrument does not move an earlier award');
+  ok(rules.noPassive === 0 && rules.legacyKeys.length === rules.oldKeys.length, 'wake ticks and passive practice calls create no new session or legacy XP');
+  ok(rules.level.title === 'Consistency' && rules.level.lv === 1 && rules.level.need === 100, 'the course displays the canonical consistency level');
+  ok(rules.streak.n === 0 && !rules.streak.today && rules.streak.freezes === 0, 'a short completed lesson does not fabricate a qualifying daily goal or freeze');
+  ok(errs.length === 0, 'no page errors (canonical rules)' + (errs.length ? ': ' + errs.join(' | ') : ''));
   await ctx.close();
 
-  console.log('# first run seeds XP from course progress');
-  ({ ctx, page, errs } = await newPage(browser, { 'qz.prog': { 'notes/nat/treble/1': { b: 10, s: 3 }, 'notes/nat/treble/2': { b: 8, s: 1 }, 'notes/nat/bass/1': { b: 5, s: 0 } } }));
-  ok(await page.evaluate(() => SLXP.total()) === 25, 'seed: 10 per passed level, +5 for 3 stars, failed levels 0');
+  console.log('# legacy course history stays unassigned');
+  ({ ctx, page, errs } = await newPage(browser, { 'xp.total': 155, 'qz.prog': { 'notes/nat/treble/1': { b: 10, s: 3 }, 'notes/nat/treble/2': { b: 8, s: 1 }, 'notes/nat/bass/1': { b: 5, s: 0 } } }));
+  const legacy = await page.evaluate(() => ({ total: SLXP.total(), legacy: SLXP.legacy(), scoped: App.store.get('qz.instrumentProg', {}), original: App.store.get('qz.prog') }));
+  ok(legacy.total === 0 && legacy.legacy.total === 155 && legacy.legacy.label === 'Legacy / unassigned', 'existing global XP is retained without seeding new instrument awards');
+  ok(!legacy.scoped.piano && legacy.original['notes/nat/treble/1'].b === 10, 'historical completion is not copied into the new Piano course');
   await ctx.close();
 
   console.log('# the path: locks, current step, unlocking');
   ({ ctx, page, errs } = await newPage(browser));
-  const p0 = await page.evaluate(() => ({ view: SLQuiz.view, path: !!document.querySelector('.qz-path'), n: SLQuiz.nodes().length,
+  const p0 = await page.evaluate(() => ({ view: SLQuiz.view, path: !!document.querySelector('.qz-path'), n: SLQuiz.nodes({ available: true }).length,
     n0: SLQuiz.node(0), n1: SLQuiz.node(1), cur: SLQuiz.current(), start: !!document.querySelector('#qz-node-0 .qz-nstart'),
     locked: document.querySelectorAll('.qz-node.locked').length, cont: document.getElementById('qz-cont').getAttribute('data-qzl'), contTxt: document.getElementById('qz-cont').textContent.trim() }));
   ok(p0.view === 'home' && p0.path && p0.n > 30, 'home opens on the path: ' + p0.n + ' steps');
@@ -144,12 +118,12 @@ const PLAY = async (right) => {
   }, PLAY.toString());
   ok(run1.v === 'done' && run1.lid === 'notes/nat/treble/1', 'Continue runs level 1 to the results');
   ok(run1.n1.open && run1.cur === 1, 'passing it opens the next step and makes it current: ' + JSON.stringify(run1.n1));
-  ok(run1.xp >= 21 && /path/i.test(run1.back), 'results: XP earned (8 right + pass bonus) + back to the path: ' + run1.xp + ' ' + run1.back);
+  ok(run1.xp >= 0 && run1.xp < 1 && /path/i.test(run1.back), 'results: bounded observed-time XP and back to the path: ' + run1.xp + ' ' + run1.back);
   const dn = await page.evaluate(() => ({ tiles: [...document.querySelectorAll('.qz-dstats .qz-tile')].map(t => t.textContent.replace(/\s+/g, ' ').trim()), notes: [...document.querySelectorAll('.qz-dnotes li')].map(l => l.textContent) }));
   ok(dn.tiles.length === 3 && /XP earned/.test(dn.tiles[0]) && /Time/.test(dn.tiles[1]), 'results tiles: ' + dn.tiles.join(' | '));
-  ok(dn.notes.some(n => /Day 1 of a new streak/.test(n)) && !dn.notes.some(n => /faster|slower/.test(n)), 'streak note, no speed note from instant test taps: ' + dn.notes.join(' | '));
+  ok(dn.notes.some(n => /engaged minutes/.test(n)) && !dn.notes.some(n => /faster|slower/.test(n)), 'honest daily goal note, no speed claim from instant test taps: ' + dn.notes.join(' | '));
   const back = await page.evaluate(() => { document.getElementById('qz-back').click(); return { view: SLQuiz.view, path: !!document.querySelector('.qz-path'), streak: document.querySelector('.qz-strip .qz-stat b').textContent }; });
-  ok(back.view === 'home' && back.path && back.streak === '1', 'back on the path, strip shows a 1-day streak: ' + JSON.stringify(back));
+  ok(back.view === 'home' && back.path && back.streak === '0', 'back on the path, short answers have not met the engaged-minute goal: ' + JSON.stringify(back));
 
   console.log('# jump tests');
   const jump = await page.evaluate(async (PLAY) => {
@@ -157,7 +131,9 @@ const PLAY = async (right) => {
     const out = {};
     // a locked step whose first level is multiple choice
     let j = -1;
-    for (let i = 3; i < SLQuiz.nodes().length; i++) { const n = SLQuiz.node(i); if (!n.open && SLQuiz.gen(n.first).kind === 'choice') { j = i; break; } }
+    const visible = [...document.querySelectorAll('[data-qzn]')].map(e => +e.dataset.qzn);
+    for (const i of visible) { const n = SLQuiz.node(i); if (i >= 3 && !n.open && SLQuiz.gen(n.first).kind === 'choice') { j = i; break; } }
+    const position = visible.indexOf(j); out.next = visible[position + 1];
     out.j = j;
     SLQuiz.tab('path');
     document.querySelector('[data-qzn="' + j + '"]').click();
@@ -167,14 +143,14 @@ const PLAY = async (right) => {
     out.fail = { verdict: document.querySelector('.qz-verdict').textContent, open: SLQuiz.node(j).open, again: !!document.querySelector('[data-qzjump]') };
     document.querySelector('[data-qzjump]').click();
     await play(9);
-    out.pass = { verdict: document.querySelector('.qz-verdict').textContent, open: SLQuiz.node(j).open, before: SLQuiz.node(j - 1).open, after: SLQuiz.node(j + 1).open, after2: SLQuiz.node(j + 2).open, jump: SLXP.jump(), cur: SLQuiz.current() };
+    out.pass = { verdict: document.querySelector('.qz-verdict').textContent, open: SLQuiz.node(j).open, before: SLQuiz.node(visible[position - 1]).open, after: SLQuiz.node(visible[position + 1]).open, after2: SLQuiz.node(visible[position + 2]).open, jump: SLXP.jump(), cur: SLQuiz.current() };
     document.getElementById('qz-tohome').click();
     out.home = SLQuiz.view;
     return out;
   }, PLAY.toString());
   ok(jump.j > 0 && /jump/i.test(jump.tag || ''), 'jump test starts from a locked step: ' + jump.j + ' ' + jump.tag);
   ok(!jump.fail.open && jump.fail.again && /9 right/.test(jump.fail.verdict), '8/10 does not open the path (or the step): ' + jump.fail.verdict);
-  ok(jump.pass.open && jump.pass.before && jump.pass.after && !jump.pass.after2 && jump.pass.jump === jump.j && jump.pass.cur === jump.j + 1, '9/10 opens every step up to it, its level counts, the next step is current: ' + JSON.stringify(jump.pass));
+  ok(jump.pass.open && jump.pass.before && jump.pass.after && !jump.pass.after2 && jump.pass.jump === jump.j && jump.pass.cur === jump.next, '9/10 opens every step up to it, its level counts, the next step is current: ' + JSON.stringify(jump.pass));
   ok(jump.home === 'home', 'back to the path after a jump');
 
   console.log('# 60-second sprint');
@@ -196,7 +172,7 @@ const PLAY = async (right) => {
       tiles: [...document.querySelectorAll('.qz-dstats .qz-tile')].map(t => t.textContent.replace(/\s+/g, ' ').trim()) };
     out.rec = SLXP.sprintBest(SLQuiz.nodes()[0]);
     out.gained = SLXP.total() - xp0;
-    out.prog = JSON.parse(localStorage.getItem('guitarlab.qz.prog'))['notes/nat/treble/1'].b;
+    out.prog = App.store.get('qz.instrumentProg', {}).piano['notes/nat/treble/1'].b;
     // a slower second sprint is not a record
     document.querySelector('[data-qzsprint="0"]').click();
     await wait(20); SLQuiz.pick(SLQuiz.q.correct); await wait(400);
@@ -205,7 +181,7 @@ const PLAY = async (right) => {
     // leaving the page mid-sprint ends it
     document.querySelector('[data-qzsprint="0"]').click();
     App.switchTo('chords'); await wait(50);
-    out.left = { view: SLQuiz.view, timer: SLQuiz.cur.sprint.timer, done: SLQuiz.cur.sprint.done };
+    out.left = { view: SLQuiz.view, current: SLQuiz.cur };
     App.switchTo('quiz');
     return out;
   });
@@ -214,17 +190,17 @@ const PLAY = async (right) => {
   ok(sp.combo, 'run counter shows the streak of right answers: ' + sp.pill);
   ok(sp.done.view === 'done' && /^5/.test(sp.done.big) && /First record/.test(sp.done.verdict), 'time up -> results, first record: ' + JSON.stringify(sp.done));
   ok(sp.done.tiles.some(t => /Record\s*5/.test(t)), 'sprint results show the record: ' + sp.done.tiles.join(' | '));
-  ok(sp.rec === 5 && sp.gained >= 15, 'record stored + XP (answers + record bonus): ' + sp.rec + ' / +' + sp.gained);
+  ok(sp.rec === 5 && sp.gained >= 0 && sp.gained < 1, 'record stored with observed-time XP rather than a second record bonus: ' + sp.rec + ' / +' + sp.gained);
   ok(sp.prog === 8, 'sprints never overwrite level scores');
   ok(sp.second.rec === 5 && /Your record: 5/.test(sp.second.verdict), 'a lower score keeps the record: ' + sp.second.verdict);
-  ok(sp.left.done && !sp.left.timer, 'leaving the page ends a running sprint: ' + JSON.stringify(sp.left));
+  ok(sp.left.view === 'home' && !sp.left.current, 'leaving the page explicitly ends the old instrument sprint: ' + JSON.stringify(sp.left));
 
   console.log('# endless streak');
   const en = await page.evaluate(async () => {
     const wait = ms => new Promise(r => setTimeout(r, ms));
     const txt = s => (document.querySelector(s) || {}).textContent;
     const out = {};
-    document.getElementById('qz-tohome').click();
+    if (document.getElementById('qz-tohome')) document.getElementById('qz-tohome').click();
     SLQuiz.clock(0); // untimed here; the answer clock has its own checks below
     SLQuiz.tab('path');
     if (!document.querySelector('.qz-npop [data-qzendless="0"]')) document.querySelector('[data-qzn="0"]').click();
@@ -249,7 +225,7 @@ const PLAY = async (right) => {
     out.done = { view: SLQuiz.view, big: txt('.qz-big'), verdict: txt('.qz-verdict'), ended: txt('.qz-miss'), again: !!document.querySelector('.qz-done [data-qzendless="0"]') };
     out.rec = SLXP.sprintBest('end:' + SLQuiz.nodes()[0]);
     out.sprintRec = SLXP.sprintBest(SLQuiz.nodes()[0]);
-    out.prog = JSON.parse(localStorage.getItem('guitarlab.qz.prog'))['notes/nat/treble/1'].b;
+    out.prog = App.store.get('qz.instrumentProg', {}).piano['notes/nat/treble/1'].b;
     // End run keeps a shorter streak, not as the record
     document.querySelector('.qz-done [data-qzendless="0"]').click();
     for (let i = 0; i < 2; i++) { await wait(20); SLQuiz.pick(SLQuiz.q.correct); await wait(450); }
@@ -284,12 +260,14 @@ const PLAY = async (right) => {
     await wait(20); SLQuiz.pick(SLQuiz.q.correct);
     out.drill.now = SLQuiz.cur.clock.now; out.drill.stopped = !SLQuiz.cur.clock.timer;
     await wait(1500);
-    // leaving the page pauses it; coming back gives a fresh clock
+    // Navigation explicitly ends the old run; a new run has a new identity.
+    const prior = SLQuiz.cur.sessionId;
     App.switchTo('chords'); await wait(50);
-    out.hide = { timer: SLQuiz.cur.clock.timer, q: SLQuiz.q && !SLQuiz.cur.answered };
-    await wait(3200);
-    App.switchTo('quiz'); await wait(150);
-    out.show = { timer: !!SLQuiz.cur.clock.timer, answered: SLQuiz.cur.answered, left: SLQuiz.cur.clock.end - Date.now() };
+    out.hide = { view: SLQuiz.view, current: SLQuiz.cur, status: App.practiceProgress.history('piano').find(s => s.id === prior).status };
+    await wait(200);
+    App.switchTo('quiz');
+    SLQuiz.start(lid, { drill: [SLQuiz.gen(lid).item] }); await wait(100);
+    out.show = { newId: SLQuiz.cur.sessionId !== prior, timer: !!SLQuiz.cur.clock.timer, answered: SLQuiz.cur.answered, left: SLQuiz.cur.clock.end - Date.now() };
     // a sheet over the question pauses it; closing it gives a fresh clock
     document.getElementById('lights-btn').click(); await wait(50);
     out.sheet = { open: App.sheet, timer: SLQuiz.cur.clock.timer };
@@ -310,10 +288,11 @@ const PLAY = async (right) => {
     // an ear question's sound and clock wait until the quiz is on screen
     const ear = SLQuiz.levels().find(id => /\/ear\//.test(id));
     SLQuiz.start(ear, { drill: [SLQuiz.gen(ear).item] });
+    const earRun = SLQuiz.cur;
     App.switchTo('chords');
-    await wait(1800);
-    out.ear = { id: ear, timer: SLQuiz.cur.clock.timer, played: !!SLQuiz.cur.autoPlayed, answered: SLQuiz.cur.answered };
-    App.switchTo('quiz'); await wait(100);
+    await wait(400);
+    out.ear = { id: ear, timer: earRun.clock.timer, played: !!earRun.autoPlayed, ended: !SLQuiz.cur };
+    App.switchTo('quiz'); SLQuiz.start(ear, { drill: [SLQuiz.gen(ear).item] }); await wait(400);
     out.ear.after = !!SLQuiz.cur.clock.timer; out.ear.played2 = SLQuiz.cur.autoPlayed === SLQuiz.q;
     // timed endless: the clock tightens 0.1 s per right answer; running out ends it
     SLQuiz.endless(0);
@@ -335,10 +314,10 @@ const PLAY = async (right) => {
   ok(ck.pick[0] === 3 && ck.pick[1] === '3 s', 'pick the clock on the results: ' + JSON.stringify(ck.pick));
   ok(!ck.level.clock && !ck.level.bar, 'levels stay untimed');
   ok(ck.drill.base === 3 && ck.drill.bar && ck.drill.running && ck.drill.now === 3 && ck.drill.stopped, 'drills get the clock, it stops on an answer, no tightening: ' + JSON.stringify(ck.drill));
-  ok(ck.hide.timer === 0 && ck.hide.q && ck.show.timer && !ck.show.answered && ck.show.left > 2500, 'leaving the page pauses it; coming back gives a fresh clock: ' + JSON.stringify([ck.hide, ck.show]));
+  ok(ck.hide.view === 'home' && !ck.hide.current && ck.hide.status === 'stopped' && ck.show.newId && ck.show.timer && !ck.show.answered && ck.show.left > 2500, 'navigation stops old credit; restarting creates a fresh timed identity: ' + JSON.stringify([ck.hide, ck.show]));
   ok(ck.sheet.open === 'lights' && ck.sheet.timer === 0 && !ck.sheet.answered && ck.sheet.after && ck.sheet.left > 2500, 'a sheet on top pauses it; closing gives a fresh clock: ' + JSON.stringify(ck.sheet));
   ok(!ck.bg.answered && ck.bg.timer === 0 && !ck.bg.timedOut && ck.bg.after, 'a question that comes up while the app is hidden waits for you: ' + JSON.stringify(ck.bg));
-  ok(ck.ear.id && ck.ear.timer === 0 && !ck.ear.played && !ck.ear.answered && ck.ear.after && ck.ear.played2, 'an ear question plays and starts its clock only on the quiz page: ' + JSON.stringify(ck.ear));
+  ok(ck.ear.id && ck.ear.timer === 0 && !ck.ear.played && ck.ear.ended && ck.ear.after && ck.ear.played2, 'an abandoned ear question stays silent; a fresh run plays only on the quiz page: ' + JSON.stringify(ck.ear));
   ok(ck.run.bar && /3 s clock/.test(ck.run.tag) && /3\.0 s/.test(ck.run.count), 'timed endless: a clock bar, the clock in the tag + counter: ' + JSON.stringify(ck.run));
   ok(ck.now === 2.7 && /Streak 3 · 2\.7 s/.test(ck.count), 'each right answer takes 0.1 s off: ' + ck.count);
   ok(ck.drain[0] > 85 && ck.drain[1] < ck.drain[0] - 30, 'the bar drains: ' + JSON.stringify(ck.drain));
@@ -354,14 +333,14 @@ const PLAY = async (right) => {
     const q = s => document.querySelector(s);
     const out = { tiles: [...document.querySelectorAll('.qz-prog2 > .qz-tiles .qz-tile')].length,
       charts: ['qz-ch-xp', 'qz-ch-time', 'qz-ch-speed'].map(id => !!document.querySelector('#' + id + ' svg')),
-      goalLine: !!q('#qz-ch-xp .qz-goalline'), tables: document.querySelectorAll('details.qz-tbl').length,
+      goalLine: !!q('#qz-ch-time .qz-goalline'), tables: document.querySelectorAll('details.qz-tbl').length,
       topicRows: document.querySelectorAll('.qz-prog2 > section > .qz-tblwrap > .qz-table tbody tr').length,
       recs: document.querySelectorAll('.qz-recs li').length, week: document.querySelectorAll('.qz-wday').length,
       today: q('.qz-wday:last-child').className };
-    q('[data-qzgoal="100"]').click();
+    out.settings = !!q('#qz-progress-settings');
+    out.duplicateGoals = document.querySelectorAll('[data-qzgoal]').length;
     out.goal = SLXP.goal();
-    out.strip = q('.qz-strip').textContent.includes('/100');
-    out.active = q('[data-qzgoal="100"]').classList.contains('active');
+    out.strip = q('.qz-strip').textContent.includes('/' + out.goal);
     // hover tooltip
     const hit = document.querySelectorAll('#qz-ch-xp .qz-hit');
     hit[hit.length - 1].dispatchEvent(new PointerEvent('pointermove', { bubbles: true }));
@@ -369,11 +348,11 @@ const PLAY = async (right) => {
     out.tip = !tip.hidden && tip.textContent;
     return out;
   });
-  ok(pg.tiles === 4 && pg.week === 7 && /done/.test(pg.today), 'tiles + this-week strip (today practiced): ' + JSON.stringify([pg.tiles, pg.week, pg.today]));
+  ok(pg.tiles === 4 && pg.week === 7 && /today/.test(pg.today) && !/done/.test(pg.today), 'tiles + this-week strip retains unmet daily goal: ' + JSON.stringify([pg.tiles, pg.week, pg.today]));
   ok(pg.charts.every(Boolean) && pg.goalLine && pg.tables === 3, 'XP, time and speed charts drawn, goal line, table views: ' + JSON.stringify(pg));
   ok(pg.topicRows === 5 && pg.recs === 3, 'topic speed table + sprint and streak records (per clock): ' + pg.topicRows + ' / ' + pg.recs);
-  ok(pg.goal === 100 && pg.strip && pg.active, 'changing the daily goal updates the strip');
-  ok(/^Today: \d+ XP/.test(pg.tip || ''), 'chart hover tooltip: ' + pg.tip);
+  ok(pg.goal === 10 && pg.strip && pg.settings && !pg.duplicateGoals, 'shared progress settings replace duplicate conflicting goal buttons');
+  ok(/^Today: \d+(?:\.\d+)? XP/.test(pg.tip || ''), 'chart hover tooltip: ' + pg.tip);
   ok(errs.length === 0, 'no page errors (path/sprint/progress)' + (errs.length ? ': ' + errs.join(' | ') : ''));
   await ctx.close();
 
@@ -383,7 +362,8 @@ const PLAY = async (right) => {
   [[1, 60, 600, 30, 26, 2, 4200], [2, 45, 480, 24, 20, 2, 4800], [9, 50, 540, 28, 22, 2, 6100]].forEach(r => {
     days[key(r[0])] = { x: r[1], s: r[2], q: r[3], k: r[4], l: r[5], u: { nat: [r[4], r[4] * r[6], r[3]] } };
   });
-  ({ ctx, page, errs } = await newPage(browser, { 'qz.prog': { 'notes/nat/treble/1': { b: 9, s: 2 } }, 'xp.days': days, 'xp.total': 155 }, true));
+  ({ ctx, page, errs } = await newPage(browser, { 'qz.instrumentProg': { piano: { 'notes/nat/treble/1': { b: 9, s: 2 } } }, 'lesson.observations.v1': { piano: { days, sprints: {}, jump: -1 } }, 'xp.days': days, 'xp.total': 155 }, true));
+  await page.evaluate(() => { const end = Date.now(), id = 'phone-observed-practice'; App.practiceProgress.recordSession({ id, instrument: 'piano', startedAt: end - 60000, endedAt: end, engagedSeconds: 60, mode: 'wait', status: 'complete', expected: 1, matched: 1, missed: 0, extra: 0, wrong: 0, timingSamples: 0, sumAbsTimingMs: 0, sumTimingMs: 0, tempo: null }); SLXP.refresh(); App.switchTo('quiz'); });
   const covered = async (sel) => page.evaluate((sel) => {
     const e = document.querySelector(sel); e.scrollIntoView({ block: 'center' });
     const r = e.getBoundingClientRect(), h = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
@@ -413,7 +393,7 @@ const PLAY = async (right) => {
     cards: [...document.querySelectorAll('.qz-prog2 .card, .qz-prog2 .qz-tile')].filter(c => c.getBoundingClientRect().right > innerWidth + 0.5).length,
     svgs: [...document.querySelectorAll('.qz-svg')].map(s => s.getBoundingClientRect().right <= innerWidth) }));
   ok(!ov.doc && ov.cards === 0 && ov.svgs.length === 3 && ov.svgs.every(Boolean), 'progress fits the phone width: ' + JSON.stringify(ov));
-  ok(await covered('[data-qzgoal="150"]'), 'goal buttons tappable');
+  ok(await covered('#qz-progress-settings'), 'shared progress settings button is tappable');
   ok(errs.length === 0, 'no page errors (phone)' + (errs.length ? ': ' + errs.join(' | ') : ''));
   await ctx.close();
 

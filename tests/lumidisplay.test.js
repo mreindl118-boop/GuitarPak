@@ -56,7 +56,7 @@ async function newPage(browser, seed) {
   ok(d1.def === true && d1.lumi && d1.layout === 14, 'on by default for a LUMI; with no guide the scale shows (14 keys): ' + JSON.stringify(d1));
   ok(d1.guided.every(n => n === 62 || n === 64) && d1.guided.includes(62), 'guiding: only the note to play (and the blinking next one) are lit: ' + d1.guided);
   ok(d1.vD !== 127 && d1.vE !== 127 && d1.vD !== d1.vE, 'the note to play shows its own color, not white, and D and E differ (degree 2 vs 3): ' + d1.vD + ' / ' + d1.vE);
-  ok(d1.classic === 14 && d1.classicD === 127, 'Display off: the scale stays lit and the note to play is white');
+  ok(d1.classic === 14 && d1.classicD === d1.vD, 'legacy Guide focus off: the scale stays lit and the target retains its mapped pitch color');
   ok(d1.after === 14, 'the guide ends: the scale is back');
 
   console.log('# Interval vs Note colors');

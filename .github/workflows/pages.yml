@@ -1,4 +1,4 @@
-# Keeps GitHub Pages in lockstep with main by mirroring main into the
+# Keeps GitHub Pages in lockstep with main by appending snapshots to the
 # gh-pages branch on every push. Pages serves the gh-pages branch (the branch
 # was first pushed manually, which auto-enables Pages on user repos — the
 # Pages REST API is not callable with the workflow token, so branch mode it is).
@@ -10,23 +10,207 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: pages-sync
   cancel-in-progress: true
 
 jobs:
+  test:
+    uses: ./.github/workflows/tests.yml
+    permissions:
+      contents: read
+    with:
+      source_ref: main
   sync:
+    needs: test
+    if: ${{ needs.test.result == 'success' }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
-      - name: Mirror main to gh-pages
+        with:
+          # Deploy the exact tested commit even if main moved while tests ran.
+          ref: ${{ needs.test.outputs.source_sha }}
+      - name: Append main snapshot to gh-pages
+        shell: bash
         run: |
+          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          # .nojekyll: serve files verbatim, skip the Jekyll build
-          touch .nojekyll
-          git add .nojekyll
-          git -c commit.gpgsign=false commit -m "pages: mirror of main @ ${GITHUB_SHA}" --allow-empty
-          git push --force origin HEAD:gh-pages
+          source_commit=$(git rev-parse 'HEAD^{commit}')
+          # Build the exact source tree, including deletions, without changing
+          # the checkout or its index. .nojekyll serves these files verbatim.
+          deploy_index=$(mktemp)
+          trap 'rm -f "$deploy_index"' EXIT
+          rm -f "$deploy_index"
+          export GIT_INDEX_FILE="$deploy_index"
+          git read-tree "${source_commit}^{tree}"
+          nojekyll=$(git hash-object -w --stdin </dev/null)
+          git update-index --add --cacheinfo "100644,$nojekyll,.nojekyll"
+          deploy_tree=$(git write-tree)
+          unset GIT_INDEX_FILE
+          check_source() {
+            local current_main
+            current_main=$(git ls-remote --exit-code --heads origin refs/heads/main) || return 1
+            if [ "${current_main%%$'\t'*}" != "$source_commit" ]; then
+              echo "main moved beyond tested source $source_commit; refusing a stale deployment." >&2
+              return 1
+            fi
+          }
+
+          # A normal push cannot replace another deployment. If gh-pages moves
+          # after fetch, rebuild on its new tip and retry at most three times.
+          for attempt in 1 2 3; do
+            check_source || exit 1
+            parents=()
+            if git ls-remote --exit-code --heads origin refs/heads/gh-pages >/dev/null; then
+              git fetch --no-tags --depth=1 origin refs/heads/gh-pages
+              parent=$(git rev-parse 'FETCH_HEAD^{commit}')
+              parents=(-p "$parent")
+              if [ "$(git rev-parse "${parent}^{tree}")" = "$deploy_tree" ]; then
+                echo "gh-pages already contains the exact main snapshot $source_commit"
+                exit 0
+              fi
+            else
+              status=$?
+              # ls-remote exits 2 only when the reachable remote has no match.
+              [ "$status" -eq 2 ] || exit "$status"
+            fi
+            deployment=$(git -c commit.gpgsign=false commit-tree "$deploy_tree" "${parents[@]}" \
+              -m "pages: snapshot main @ $source_commit" \
+              -m "Source-commit: $source_commit")
+            check_source || exit 1
+            if git push origin "${deployment}:refs/heads/gh-pages"; then
+              exit 0
+            fi
+            echo "Deployment push failed (attempt $attempt of 3); refreshing gh-pages." >&2
+          done
+          echo "gh-pages did not accept a safe fast-forward deployment after three attempts." >&2
+          exit 1
+  release:
+    needs: [test, sync]
+    if: ${{ needs.test.result == 'success' && needs.sync.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    env:
+      # The existing built-in workflow credential, never a new stored secret.
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TESTED_SHA: ${{ needs.test.outputs.source_sha }}
+      PAGES_URL: https://mreindl118-boop.github.io/GuitarPak/
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.test.outputs.source_sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Publish immutable web 1.0.0 release
+        shell: bash
+        run: |
+          set -euo pipefail
+          web_version=$(node -e 'process.stdout.write(require("./version.json").web || "")')
+          if [ "$web_version" != 1.0.0 ]; then
+            echo "This source is not web 1.0.0; no tag or release is created."
+            exit 0
+          fi
+          : "${TESTED_SHA:?Missing successful test commit}"
+          [ "$(git rev-parse HEAD)" = "$TESTED_SHA" ] || { echo "Checkout does not match the tested commit." >&2; exit 1; }
+          tag=v1.0.0
+          notes=docs/RELEASE-NOTES-1.0.0.md
+          [ -s "$notes" ] || { echo "Committed release notes are missing or empty." >&2; exit 1; }
+          check_main() {
+            local current_main
+            current_main=$(git ls-remote --exit-code --heads origin refs/heads/main) || return 1
+            [ "${current_main%%$'\t'*}" = "$TESTED_SHA" ] || { echo "main moved beyond the tested release source." >&2; return 1; }
+          }
+          tag_exists=false
+          verify_tag() {
+            tag_exists=false
+            if git ls-remote --exit-code --refs origin "refs/tags/$tag" >/dev/null; then
+              git fetch --no-tags --depth=1 origin "refs/tags/$tag"
+              actual=$(git rev-parse 'FETCH_HEAD^{commit}')
+              [ "$actual" = "$TESTED_SHA" ] || { echo "$tag already points to a different commit; it will not be moved." >&2; return 1; }
+              tag_exists=true
+            else
+              status=$?
+              [ "$status" -eq 2 ] || return "$status"
+            fi
+          }
+          verify_tag || exit 1
+          # A successful paginated read distinguishes absence from an API/auth
+          # failure. Existing releases are immutable, including their notes.
+          release_state=$(gh api --paginate "repos/$GH_REPO/releases?per_page=100" \
+            --jq '.[] | select(.tag_name == "v1.0.0") | if .draft or .prerelease then "needs-review" else "published" end')
+          if [ -n "$release_state" ]; then
+            [ "$tag_exists" = true ] && [ "$release_state" = published ] || { echo "Existing release/tag state needs review; nothing will be changed." >&2; exit 1; }
+            echo "$tag is already published at the tested commit; leaving it unchanged."
+            exit 0
+          fi
+          # Publishing a branch is not proof that Pages serves the new bytes.
+          # Probe public files without credentials before creating either tag
+          # or release. Version alone cannot detect a partially stale deploy.
+          probe_dir=$(mktemp -d)
+          trap 'rm -rf "$probe_dir"' EXIT
+          # A GITHUB_TOKEN branch push does not trigger a Pages build. The
+          # existing authorized publisher must trigger it without new secrets
+          # or scopes; this gate waits for its independently observable result.
+          deadline=$(( $(date +%s) + 600 ))
+          probe=0
+          ready=false
+          asset_list=$(node <<'NODE'
+          const fs = require('fs'), html = fs.readFileSync('index.html', 'utf8');
+          const scripts = [...html.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["']/gi)].map(m => m[1]);
+          const styles = [...html.matchAll(/<link\b[^>]*>/gi)].map(m => m[0])
+            .filter(tag => /\brel=["']stylesheet["']/i.test(tag))
+            .map(tag => (/\bhref=["']([^"']+)["']/i.exec(tag) || [])[1]).filter(Boolean);
+          const local = scripts.concat(styles).filter(url => !/^(?:[a-z]+:|\/\/)/i.test(url));
+          if (local.some(url => !/^[a-z0-9_.\/-]+$/i.test(url) || url.startsWith('/') || url.split('/').includes('..'))) throw Error('Unsupported public asset path');
+          console.log([...new Set(['version.json','index.html','sw.js','manifest.webmanifest'].concat(local))].join('\n'));
+          NODE
+          )
+          mapfile -t public_assets <<< "$asset_list"
+          while [ "$(date +%s)" -lt "$deadline" ]; do
+            probe=$((probe + 1))
+            ready=true
+            for asset in "${public_assets[@]}"; do
+              remaining=$((deadline - $(date +%s)))
+              if [ "$remaining" -le 0 ]; then ready=false; break; fi
+              limit=$((remaining < 5 ? remaining : 5))
+              if ! curl --fail --silent --show-error --location --connect-timeout 3 --max-time "$limit" \
+                --header 'Cache-Control: no-cache' --header 'Pragma: no-cache' \
+                --output "$probe_dir/asset" "${PAGES_URL%/}/$asset?source=$TESTED_SHA&probe=$probe"; then
+                ready=false; break
+              fi
+              expected=$(sha256sum "$asset"); actual=$(sha256sum "$probe_dir/asset")
+              if [ "${expected%% *}" != "${actual%% *}" ]; then ready=false; break; fi
+            done
+            if [ "$ready" = true ]; then break; fi
+            remaining=$((deadline - $(date +%s)))
+            if [ "$remaining" -gt 0 ]; then
+              sleep "$((remaining < 5 ? remaining : 5))"
+            fi
+          done
+          [ "$ready" = true ] || { echo "Public Pages assets did not match the tested source within ten minutes; no new release tag or release created." >&2; exit 1; }
+          check_main || exit 1
+          if [ "$tag_exists" != true ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git -c tag.gpgsign=false tag --annotate "$tag" "$TESTED_SHA" \
+              -m "soundLAB 1.0.0" -m "Source-commit: $TESTED_SHA"
+            # A concurrent tag may win; verify it rather than forcing a retag.
+            if ! git push origin "refs/tags/$tag:refs/tags/$tag"; then
+              verify_tag || exit 1
+              [ "$tag_exists" = true ] || exit 1
+            fi
+          fi
+          verify_tag || exit 1
+          [ "$tag_exists" = true ] || exit 1
+          check_main || exit 1
+          gh release create "$tag" --repo "$GH_REPO" --verify-tag \
+            --target "$TESTED_SHA" --title "soundLAB 1.0.0" --notes-file "$notes"
