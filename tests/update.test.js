@@ -34,14 +34,14 @@ async function run(b, url, feed, shell) {
   x = await run(b, WEB, { version: OLD, web: V, apk });
   ok(x.r === null, 'web, up to date: no banner ' + JSON.stringify(x.r));
   x = await run(b, WEB, { version: OLD, web: NEWER, apk });
-  ok(x.r && new RegExp('v' + esc(NEWER) + ' is available').test(x.r.text) && x.r.btn === 'Update now', 'web, newer web build: Update now ' + JSON.stringify(x.r));
+  ok(x.r && new RegExp('v' + esc(NEWER) + ' is available').test(x.r.text) && x.r.btn === 'Save & update', 'web, newer web build: deliberate Save & update ' + JSON.stringify(x.r));
   x = await run(b, WEB, { version: BIG, apk });
   ok(x.r && /v9\.0\.0/.test(x.r.text), 'web, feed without a web field still works ' + JSON.stringify(x.r));
   console.log('# Android shell (live site + GuitarLabHost)');
   x = await run(b, WEB, { version: SHELL, web: V, apk }, SHELL);
   ok(x.r === null, 'shell, nothing new: no banner ' + JSON.stringify(x.r));
   x = await run(b, WEB, { version: SHELL, web: NEWER, apk }, SHELL);
-  ok(x.r && x.r.btn === 'Update now' && !/Android/.test(x.r.text), 'shell, newer web build: refreshes like the web, no APK download ' + JSON.stringify(x.r));
+  ok(x.r && x.r.btn === 'Save & update' && !/Android/.test(x.r.text), 'shell, newer web build: checkpoints before refresh, no APK download ' + JSON.stringify(x.r));
   x = await run(b, WEB, { version: BIG, web: BIG, apk }, SHELL);
   ok(x.r && /Android app \(v9\.0\.0\)/.test(x.r.text) && x.r.btn === 'Download', 'shell, genuinely newer APK: Download offered ' + JSON.stringify(x.r));
   console.log('# bundled offline copy (file://)');

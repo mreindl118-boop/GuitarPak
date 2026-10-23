@@ -830,7 +830,7 @@
     if (!section('a')) state.sections = defaultSections(state.genre);
 
     // one-time migration: an old jam.track progression becomes section A
-    if (!g('jam2.migr', false)) {
+    if (!g('jam2.migr', false) && secs === null) {
       var old = g('jam.track', null);
       if (Object.prototype.toString.call(old) === '[object Array]' && old.length) {
         var toks = old.filter(function (c) {
@@ -838,10 +838,11 @@
         }).map(function (c) {
           return { abs: { rootPc: Theory.mod12(Math.round(c.rootPc)), quality: c.quality } };
         });
-        if (toks.length) section('a').chords = toks;
+        if (toks.length) { section('a').chords = toks; App.store.set('jam2.sections', state.sections); }
       }
       App.store.set('jam2.migr', true);
-      saveState();
+      // Preserve existing settings and the old jam.track source exactly.
+      // Only the additive section conversion above needs to be persisted.
     }
     bpm = Math.max(30, Math.min(280, parseInt(g('met.bpm', 100), 10) || 100));
   }

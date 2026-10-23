@@ -585,6 +585,7 @@
     updateBestChip();
     renderEarStats();
     sessButtons();
+    App.on('sheet', function (event) { if (event && event.open) onHide(); });
   }
 
   function onShow() {

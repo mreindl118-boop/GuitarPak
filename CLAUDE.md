@@ -685,7 +685,9 @@ to main so the owner can review from their phone.
 ## Gotchas
 
 - The cloud integration on `codex/soundlab-lumi-consolidation-20261023` is a
-  web 1.0.0 release candidate. Publication is conditional on completed features,
+  published web 1.0.0 source (PR #87, merge `2077f3b`, immutable v1.0.0).
+  The separate `codex/soundlab-1.1-workflow-20261023` branch is an unpublished
+  candidate; read `docs/RELEASE-1.1.0-CHECKLIST.md`. Publication is conditional on completed features,
   independent review and software gates. A normal review-branch push may run
   hosted CI after the local feature freeze; main/tag/release/deployment wait
   for the agreed gates and reporting of unresolved conditions. No force push,

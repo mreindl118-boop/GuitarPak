@@ -19,7 +19,8 @@
   function normalizeScore(score, options) {
     score = score || {}; options = options || {};
     var transpose = Math.round(number(options.transpose, 0)), warnings = Array.isArray(score.importWarnings) ? score.importWarnings.slice() : [], notes = [], restEnd = 0;
-    if (score.timingOk === false) warnings.push('Source timing is approximate; timed results use the assumed beat positions.');
+    if (score.timingOk === false && score.rhythmKnown !== false) warnings.push('Source timing is approximate; timed results use the assumed beat positions.');
+    if (score.rhythmKnown === false) warnings.push('Rhythm has not been reviewed. Only Wait for Me is available; no tempo or timing score is inferred.');
     if (number(score.bpm, 80) < 20 || number(score.bpm, 80) > 300) warnings.push('Source tempo is outside the 20–300 BPM practice range; the nearest supported tempo is used.');
     (Array.isArray(score.notes) ? score.notes : []).forEach(function (n, i) {
       if (!n) return;
@@ -64,7 +65,7 @@
     this.clock = typeof options.clock === 'function' ? options.clock : function () { return Date.now() / 1000; };
     this.onChange = typeof options.onChange === 'function' ? options.onChange : function () {};
     this.score = options.score || {};
-    this.mode = options.mode === 'tempo' ? 'tempo' : 'wait';
+    this.mode = options.mode === 'tempo' && this.score.rhythmKnown !== false && options.rhythmKnown !== false ? 'tempo' : 'wait';
     this.transpose = Math.round(number(options.transpose, 0));
     this.normalized = normalizeScore(this.score, { transpose: this.transpose });
     this.tempo = clamp(number(options.tempo, this.normalized.bpm), 20, 300);

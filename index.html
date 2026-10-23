@@ -14,6 +14,8 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="css/style.css">
 <link rel="stylesheet" href="css/lumi-practice.css">
+<link rel="stylesheet" href="css/music-library.css">
+<link rel="stylesheet" href="css/score-review.css">
 </head>
 <body>
 <header class="topbar">
@@ -40,6 +42,7 @@
     <button type="button" class="btn sm icon-btn" id="help-btn" aria-label="Help for this page" title="What is this page?"></button>
     <button type="button" class="btn sm icon-btn" id="settings-btn" aria-label="Settings" title="Settings"></button>
     <button type="button" class="btn sm icon-btn" id="ctx-btn" aria-label="Key, scale and tempo" title="Key, scale &amp; tempo" aria-expanded="false" aria-controls="ctxbar"></button>
+    <button type="button" class="btn sm icon-btn" id="tuner-btn" aria-label="Tuner" title="Tuner" aria-haspopup="dialog" aria-expanded="false" aria-controls="sheet-tuner"></button>
     <button type="button" class="btn sm icon-btn" id="lights-btn" aria-label="Lights and help" title="Lights &amp; help" aria-haspopup="dialog" aria-expanded="false" aria-controls="sheet-lights"></button>
     <button type="button" class="btn sm icon-btn" id="met-btn" aria-label="Metronome" title="Metronome" aria-haspopup="dialog" aria-expanded="false" aria-controls="sheet-metronome"></button>
   </div>
@@ -81,6 +84,16 @@
     <section class="sheet-body" id="panel-lights"></section>
   </div>
 </div>
+<div class="sheet" id="sheet-tuner" hidden>
+  <div class="sheet-card" role="dialog" aria-modal="true" aria-labelledby="sheet-tuner-t">
+    <div class="sheet-head">
+      <h2 id="sheet-tuner-t">Tuner</h2>
+      <button type="button" class="btn sm icon-btn" data-sheet-help="tuner" aria-label="Help for the tuner" title="How it works"></button>
+      <button type="button" class="btn sm icon-btn" data-sheet-close aria-label="Close the tuner" title="Close (Esc)"></button>
+    </div>
+    <section class="sheet-body" id="panel-tuner"></section>
+  </div>
+</div>
 <div id="wipe" aria-hidden="true" style="display:none">
   <svg viewBox="0 0 512 512" width="120" height="120">
     <path d="M118 96 H206 V308 A44 44 0 0 1 118 308 Z M212 96 H300 V372 A44 44 0 0 1 212 372 Z M306 96 H394 V308 A44 44 0 0 1 306 308 Z" fill="#ffab47" opacity="0.9"/>
@@ -89,6 +102,10 @@
 <main>
   <section class="panel" id="panel-quiz"></section>
   <section class="panel" id="panel-practiceplan"></section>
+  <section class="panel" id="panel-freeplay"></section>
+  <section class="panel" id="panel-progress"></section>
+  <section class="panel" id="panel-musiclibrary"></section>
+  <section class="panel" id="panel-score"></section>
   <section class="panel" id="panel-fretboard"></section>
   <section class="panel" id="panel-tab"></section>
   <section class="panel" id="panel-notation"></section>
@@ -97,7 +114,6 @@
   <section class="panel" id="panel-synth"></section>
   <section class="panel" id="panel-songs"></section>
   <section class="panel" id="panel-jam"></section>
-  <section class="panel" id="panel-tuner"></section>
   <section class="panel" id="panel-trainer"></section>
   <section class="panel" id="panel-theory"></section>
   <section class="panel" id="panel-shed"></section>
@@ -115,6 +131,8 @@
 </footer>
 <script src="js/theory.js"></script>
 <script src="js/note-palette.js"></script>
+<script src="js/storage-manifest.js"></script>
+<script src="js/persistence.js"></script>
 <script src="js/app.js"></script>
 <script src="js/learn-instruments.js"></script>
 <script src="js/midi.js"></script>
@@ -141,6 +159,11 @@
 <script src="js/performance-engine.js"></script>
 <script src="js/performance-player.js"></script>
 <script src="js/woodshed.js"></script>
+<script src="js/score.js"></script>
+<script src="js/music-library.js"></script>
+<script src="js/score-review.js"></script>
+<script src="js/practice-material.js"></script>
+<script src="js/workflow.js"></script>
 <script src="js/arrange.js"></script>
 <script src="js/pads.js"></script>
 <script src="js/midihub.js"></script>
@@ -152,13 +175,87 @@
 <script src="js/plugins.js"></script>
 <script src="js/settings.js"></script>
 <script src="js/lights.js"></script>
+<script src="js/checkpoint.js"></script>
 <script>
-App.boot();
-// Offline support — only meaningful when served over http(s); file:// and
-// sandboxed embeds skip it silently.
-if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
-  navigator.serviceWorker.register('sw.js').catch(function () { /* non-fatal */ });
-}
+(function () {
+  'use strict';
+  var started = false, working = false, reloadRequired = false, card = null, blocked = [], observer = null;
+  function blockPage() {
+    if (card) return;
+    card = document.createElement('section'); card.id = 'startup-recovery';
+    card.setAttribute('role', 'alertdialog'); card.setAttribute('aria-modal', 'true');
+    card.setAttribute('aria-labelledby', 'startup-recovery-title'); card.tabIndex = -1;
+    card.innerHTML = '<div class="card"><h1 id="startup-recovery-title">Recover saved data</h1><p id="startup-recovery-message" role="status">Finishing an interrupted storage operation before opening soundLAB…</p><pre id="startup-recovery-error"></pre><p class="small muted">Your existing records are retained. The recovery download contains available raw records and recovery information; it is not a complete settings, sample or Music Library backup.</p><div class="row"><button type="button" class="btn" id="startup-recovery-retry">Retry recovery</button><button type="button" class="btn" id="startup-recovery-export">Download recovery JSON</button></div></div>';
+    Array.from(document.body.children).forEach(function (el) { if (el.tagName !== 'SCRIPT') { blocked.push([el, el.inert]); el.inert = true; } });
+    document.body.appendChild(card); card.focus();
+    observer = new MutationObserver(function (records) {
+      records.forEach(function (record) { Array.from(record.addedNodes).forEach(function (el) {
+        if (el.nodeType === 1 && el !== card && el.tagName !== 'SCRIPT') { blocked.push([el, el.inert]); el.inert = true; }
+      }); });
+      if (card && !card.contains(document.activeElement)) card.focus();
+    });
+    observer.observe(document.body, { childList: true });
+    card.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape') { event.preventDefault(); card.focus(); }
+      if (event.key !== 'Tab') return;
+      var controls = Array.from(card.querySelectorAll('button')).filter(function (button) { return !button.disabled; }), current = controls.indexOf(document.activeElement);
+      if (controls.length && (event.shiftKey && current <= 0 || !event.shiftKey && (current < 0 || current === controls.length - 1))) { event.preventDefault(); controls[event.shiftKey ? controls.length - 1 : 0].focus(); }
+    });
+    card.querySelector('#startup-recovery-retry').onclick = start;
+    card.querySelector('#startup-recovery-export').onclick = function () {
+      try {
+        var data = App.persistence.exportRecovery(), url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+        var a = document.createElement('a'); a.href = url; a.download = 'soundlab-storage-recovery.json'; a.click();
+        setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+      } catch (error) { card.querySelector('#startup-recovery-error').textContent = error.message || String(error); }
+    };
+  }
+  async function start() {
+    if (started || working) return;
+    if (reloadRequired) { location.reload(); return; }
+    working = true;
+    var persistence = App.persistence;
+    try {
+      var storageStatus = persistence && persistence.status && persistence.status();
+      if (storageStatus && storageStatus.needsReload && !storageStatus.recoveryRequired) {
+        // Another tab may finish recovery/import while scripts are loading.
+        // The vanished journal does not refresh already captured module state.
+        blockPage(); reloadRequired = true;
+        card.querySelector('#startup-recovery-title').textContent = 'Reload saved data';
+        card.querySelector('#startup-recovery-message').textContent = 'Saved data changed while the app was loading. Reload to open verified saved data. The app has not opened yet.';
+        card.querySelector('#startup-recovery-error').textContent = '';
+        card.querySelector('#startup-recovery-retry').textContent = 'Reload to open saved data';
+        card.querySelector('#startup-recovery-retry').disabled = false;
+        return;
+      }
+      if (storageStatus && storageStatus.recoveryRequired) {
+        blockPage(); card.querySelector('#startup-recovery-retry').disabled = true;
+        var result = await persistence.recover();
+        if (!result || result.ok !== true) throw new Error(result && result.errors && result.errors.join('\n') || 'Storage recovery could not be confirmed.');
+        if (result.requiresReload) {
+          // Modules read preferences/history while their scripts load. Those
+          // snapshots predate rollback, so only a fresh document may boot.
+          reloadRequired = true;
+          card.querySelector('#startup-recovery-title').textContent = 'Recovery saved';
+          card.querySelector('#startup-recovery-message').textContent = 'Reload to open restored data. The app has not opened yet.';
+          card.querySelector('#startup-recovery-error').textContent = '';
+          card.querySelector('#startup-recovery-retry').textContent = 'Reload to open restored data';
+          card.querySelector('#startup-recovery-retry').disabled = false;
+          return;
+        }
+      }
+      if (card) { if (observer) observer.disconnect(); observer = null; card.remove(); card = null; blocked.forEach(function (pair) { pair[0].inert = pair[1]; }); blocked = []; }
+      started = true; App.boot();
+      // Register offline support only after successful recovery and boot.
+      if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(function () { /* non-fatal */ });
+    } catch (error) {
+      blockPage(); card.querySelector('#startup-recovery-message').textContent = 'The app has not opened. Resolve or export recovery data before continuing.';
+      card.querySelector('#startup-recovery-error').textContent = error.message || String(error);
+      card.querySelector('#startup-recovery-retry').disabled = started;
+    } finally { working = false; }
+  }
+  start();
+})();
 </script>
 </body>
 </html>

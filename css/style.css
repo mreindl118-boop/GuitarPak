@@ -304,7 +304,8 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
 #space-btn { display: inline-flex; align-items: center; gap: 5px; padding: 0 12px; }
 #met-btn.on { color: var(--accent-ink); border-color: var(--accent-line); }
 #met-btn.tick { box-shadow: 0 0 14px var(--accent-glow), inset 0 0 6px var(--accent-glow); }
-#met-btn.active, #settings-btn.active, #lights-btn.active, #ctx-btn.active { color: var(--accent-ink); background: var(--accent-soft); border-color: var(--accent-line); }
+#met-btn.active, #settings-btn.active, #lights-btn.active, #tuner-btn.active, #ctx-btn.active { color: var(--accent-ink); background: var(--accent-soft); border-color: var(--accent-line); }
+.tb-tools #tuner-btn { width: 44px; height: 44px; min-width: 44px; min-height: 44px; }
 
 /* ---------- overlay sheets (the metronome) ---------- */
 .sheet {
@@ -987,6 +988,43 @@ button .ic, .chip .ic { display: inline-block; }
 @media (max-width: 380px) {
   .tb-tools .icon-btn { width: 34px; height: 34px; }
   #space-btn { padding: 0 8px; margin-right: 0; }
+}
+/* Seven useful controls cannot share a 360px row with the wordmark at a
+   usable touch size. Give the tool row its own space; keep every utility. */
+@media (max-width: 420px) {
+  .tb-tools { width: 100%; margin-left: 0; justify-content: space-between; gap: 2px; }
+  .tb-tools .icon-btn { width: 44px; height: 44px; min-width: 44px; min-height: 44px; }
+  #space-btn { min-height: 44px; height: 44px; padding: 0 8px; }
+}
+
+.subnav-tools { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--label); margin-left: auto; }
+.subnav-tools select { width: 145px; min-height: 44px; font-size: 13px; }
+.workflow-context { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); margin-bottom: 18px; }
+.workflow-context[hidden] { display: none; }
+.workflow-context > label { display: grid; gap: 5px; font-size: 12px; color: var(--label); }
+.workflow-context select { min-height: 44px; }
+.workflow-context p { flex: 1 1 220px; margin: 0; line-height: 1.5; }
+.workflow-links, .workflow-cards { display: flex; flex-wrap: wrap; gap: 8px; }
+.workflow-links { flex-basis: 100%; }
+.workflow-links .btn, .workflow-cards .btn, #workflow-context button { min-height: 44px; }
+.workflow-home, .workflow-progress { max-width: 1100px; margin-inline: auto; }
+.workflow-home h1, .workflow-progress h1 { margin: 0 0 12px; }
+.workflow-home .workflow-cards { margin: 18px 0; }
+.workflow-kicker { color: var(--accent-ink); font-weight: 600; margin: 0 0 8px; }
+#workflow-storage-status { position: fixed; bottom: 12px; left: 12px; right: 12px; z-index: 410; max-width: 760px; margin: auto; padding: 14px; display: flex; align-items: center; gap: 12px; background: var(--card); color: var(--warn); border: 1px solid var(--warn); border-radius: 12px; box-shadow: var(--shadow-1); }
+#workflow-storage-status[hidden] { display: none; }
+#startup-recovery { position: fixed; inset: 0; z-index: 2000; display: grid; place-items: center; padding: 20px; overflow: auto; background: var(--bg); }
+#startup-recovery > .card { width: min(760px, 100%); max-height: 90dvh; overflow: auto; }
+#startup-recovery pre { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--red); }
+#startup-recovery button { min-height: 44px; }
+@media (max-width: 900px) { #workflow-storage-status { bottom: calc(88px + env(safe-area-inset-bottom, 0px)); } }
+@media (max-width: 600px) {
+  .subnav { gap: 4px; }
+  .subtab { padding-left: 9px; padding-right: 9px; }
+  .subnav-tools { gap: 4px; }
+  .subnav-tools select { width: 125px; }
+  .workflow-context select { font-size: 16px; }
+  .workflow-links { display: grid; grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 640px) {
   /* the clef dropdown spans the screen: Key | Scale, then BPM | Time | ▶ */

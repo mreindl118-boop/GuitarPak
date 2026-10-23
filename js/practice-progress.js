@@ -115,17 +115,40 @@
       if (!storedValid(loaded)) throw new Error('Stored practice progress is invalid or unsupported; it was left unchanged.');
       this.data = clone(loaded);
     } else this.data = { version: 1, settings: Object.assign(clone(DEFAULTS), { timezone: zone }), sessions: [], ledgers: {}, goals: {} };
+    this._persistedRevision = typeof this.store.revision === 'function' ? this.store.revision(KEY) : null;
+    this.persistenceError = null;
   }
   PracticeProgress.instruments = IDS.slice(); PracticeProgress.storageKey = KEY;
   Object.defineProperty(PracticeProgress.prototype, 'instruments', { get: function () { return IDS.slice(); } });
   PracticeProgress.prototype.dayKey = function (ms) { return dayIn(ms, this.data.settings.timezone); };
-  PracticeProgress.prototype.getSettings = function () { return clone(this.data.settings); };
+  PracticeProgress.prototype._sync = function () {
+    if (typeof this.store.revision !== 'function') return { ok: true };
+    try {
+      var revision = this.store.revision(KEY);
+      if (revision === this._persistedRevision) return { ok: true };
+      var loaded = this.store.get(KEY, null);
+      if (!storedValid(loaded)) throw new Error('Stored progress changed to missing, corrupt or unsupported data. Export/recover it before recording more practice.');
+      // Refresh a stale tab before deriving awards. Never merge/reprice already
+      // awarded sessions or replace another instrument's observations.
+      this.data = clone(loaded); this._persistedRevision = revision; this.persistenceError = null;
+      return { ok: true };
+    } catch (error) {
+      this.persistenceError = error.message;
+      return { ok: false, errors: [error.message] };
+    }
+  };
+  PracticeProgress.prototype.getSettings = function () { this._sync(); return clone(this.data.settings); };
   PracticeProgress.prototype._commit = function (next, event) {
     try {
-      this.store.set(KEY, clone(next));
+      if (typeof this.store.write === 'function') {
+        var write = this.store.write(KEY, clone(next), { expectedRevision: this._persistedRevision });
+        if (!write || !write.ok) return { ok: false, errors: write && write.errors || ['Practice progress changed in another tab or could not be persisted. Retry the original session.'] };
+      } else this.store.set(KEY, clone(next));
       if (JSON.stringify(this.store.get(KEY, null)) !== JSON.stringify(next)) return { ok: false, errors: ['Practice progress could not be persisted.'] };
     } catch (e) { return { ok: false, errors: ['Practice progress could not be persisted: ' + e.message] }; }
     this.data = next;
+    this._persistedRevision = typeof this.store.revision === 'function' ? this.store.revision(KEY) : null;
+    this.persistenceError = null;
     try { this.onChange(event); } catch (e) { /* a view cannot undo a saved observation */ }
     return { ok: true };
   };
@@ -193,10 +216,12 @@
     return changed;
   };
   PracticeProgress.prototype.reconcile = function () {
+    var sync = this._sync(); if (!sync.ok) return sync;
     var next = clone(this.data), changed = this._reconcileData(next);
     return changed ? this._commit(next, { type: 'reconcile' }) : { ok: true, changed: false };
   };
   PracticeProgress.prototype.updateSettings = function (patch) {
+    var sync = this._sync(); if (!sync.ok) return sync;
     var errors = settingErrors(patch); if (errors.length) return { ok: false, errors: errors, settings: this.getSettings() };
     var next = clone(this.data); this._reconcileData(next);
     var oldZone = next.settings.timezone;
@@ -209,6 +234,7 @@
     var result = this._commit(next, { type: 'settings' }); result.settings = this.getSettings(); return result;
   };
   PracticeProgress.prototype.setVacation = function (range) {
+    var sync = this._sync(); if (!sync.ok) return sync;
     if (range == null) return this.updateSettings({ vacations: [] });
     if (!range || !dateValid(range.from) || !dateValid(range.to) || range.from > range.to) return { ok: false, errors: ['Vacation needs valid inclusive from/to dates.'] };
     return this.updateSettings({ vacations: this.data.settings.vacations.concat([{ from: range.from, to: range.to }]) });
@@ -278,6 +304,7 @@
     return { ok: true, session: normalized };
   };
   PracticeProgress.prototype.recordSession = function (input) {
+    var sync = this._sync(); if (!sync.ok) return sync;
     // IDs are authoritative across instruments; duplicate callbacks/imports are harmless.
     var previous = input && this.data.sessions.find(function (s) { return s.id === input.id; });
     if (previous) return { ok: true, accepted: false, duplicate: true, session: clone(previous), summary: this.summary(previous.instrument) };
@@ -320,6 +347,7 @@
     return a;
   }
   PracticeProgress.prototype.history = function (id, options) {
+    this._sync();
     instrument(id); options = options || {};
     if (options.days != null && (!Number.isInteger(options.days) || options.days < 1 || options.days > 3660)) throw new RangeError('History days must be 1–3660 calendar days.');
     var to = options.to || (options.days ? this.dayKey(this.now()) : '9999-12-31'), from = options.from || (options.days ? addDay(to, 1 - options.days) : '0000-01-01');

@@ -105,7 +105,7 @@
     lastTap = { midi: midi, at: now };
     return false;
   }
-  function onKeysPage() { return App.active === 'piano' || App.active === 'synth'; }
+  function onKeysPage() { return !App.sheet && !App.interactionBlocked && (App.active === 'piano' || App.active === 'synth'); }
   // start from the list / results view, stop a run
   function tapControl() {
     if (R) { if (R.inf && !R.demo) finish(); else stopAll(false); return true; }
@@ -707,6 +707,7 @@
       App.on('midi:range', function () { if (view === 'list') paint(); });
       App.on('note:input', function (d) { if (d && d.on && R) judge(d.midi, d.src === 'touch' ? 'touch' : 'qwerty'); });
       App.on('transport:claim', function (d) { if (R && d && d.owner !== 'keys') stopAll(false); });
+      App.on('sheet', function (d) { if (d && d.open && R) stopAll(false); });
       App.on('help:level', function () { if (view === 'list') paint(); });
       document.addEventListener('visibilitychange', function () { if (document.hidden) stopAll(false); });
       paint();

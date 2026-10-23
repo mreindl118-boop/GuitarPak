@@ -32,21 +32,24 @@ const tabs = sel => [...document.querySelectorAll(sel + ' .tabbar-btn')].map(b =
     noSelect: !document.getElementById('nav-select'),
     metTab: [...document.querySelectorAll('.tabbar-btn, .subtab')].some(x => /metronome/i.test(x.textContent))
   }));
-  ok(d1.tabs.join('|') === 'Learn|Guitar|Keys|Play|Practice' && d1.active === 'Learn', 'sections: ' + d1.tabs.join('|') + ' (active ' + d1.active + ')');
+  ok(d1.tabs.join('|') === 'Learn|Free Play|Library|Progress' && d1.active === 'Learn', 'sections: ' + d1.tabs.join('|') + ' (active ' + d1.active + ')');
   ok(d1.topShown && !d1.botShown && d1.noSelect && !d1.metTab, 'top tab bar on desktop, no drop-down, no metronome tab: ' + JSON.stringify(d1));
   const clickTab = async (label, sel) => { await page.click((sel || '#tabbar') + ' .tabbar-btn:has-text("' + label + '")'); await page.waitForTimeout(120); return page.evaluate(() => App.active); };
-  ok(await clickTab('Keys') === 'piano', 'Keys tab opens the piano');
-  ok((await page.evaluate(() => [...document.querySelectorAll('#subnav .subtab')].map(b => b.textContent).join('|'))) === 'Piano|Synth|Pads|MIDI|LUMI', 'Keys pills include LUMI alongside Piano, Synth, Pads and MIDI');
+  ok(await clickTab('Free Play') === 'piano', 'Free Play opens the selected piano instrument');
+  ok((await page.evaluate(() => [...document.querySelectorAll('#subnav .subtab')].map(b => b.textContent).join('|'))) === 'Piano|Synth|Pads', 'Free Play shows the current instrument tools');
   await page.click('#subnav .subtab:has-text("Synth")'); await page.waitForTimeout(150);
-  ok(await clickTab('Guitar') === 'fretboard', 'Guitar tab opens the neck');
+  await page.selectOption('#workflow-instrument', 'guitar'); await page.waitForTimeout(150);
+  ok(await page.evaluate(() => App.active) === 'fretboard', 'changing the Free Play instrument opens its guitar neck');
   ok((await page.evaluate(() => [...document.querySelectorAll('#subnav .subtab')].map(b => b.textContent).join('|'))) === 'Neck|Tab|Notation', 'Guitar pills: Neck | Tab | Notation');
-  ok(await clickTab('Keys') === 'synth', 'Keys remembers the last page (Synth)');
-  ok(await clickTab('Practice') === 'shed', 'Practice opens the Woodshed');
-  ok((await page.evaluate(() => [...document.querySelectorAll('#subnav .subtab')].map(b => b.textContent).join('|'))) === 'Woodshed|Trainer|Tuner', 'Practice pills: Woodshed | Trainer | Tuner');
-  await page.click('#subnav .subtab:has-text("Tuner")'); await page.waitForTimeout(200);
-  ok(await page.evaluate(() => App.active) === 'tuner', 'Tuner is a page under Practice');
-  await clickTab('Keys'); await page.evaluate(() => window.scrollTo(0, 600)); await page.waitForTimeout(150);
-  await clickTab('Keys'); await page.waitForTimeout(700);
+  await page.selectOption('#workflow-tools', 'midihub'); await page.waitForTimeout(150);
+  ok(await page.evaluate(() => App.active) === 'midihub', 'all-tools picker preserves the MIDI Hub');
+  ok(await clickTab('Library') === 'musiclibrary', 'Library opens retained source files');
+  ok((await page.evaluate(() => [...document.querySelectorAll('#subnav .subtab')].map(b => b.textContent).join('|'))) === 'My files|Review|Woodshed', 'Library retains review and all Woodshed tools');
+  await page.click('#tuner-btn'); await page.waitForTimeout(150);
+  ok(await page.evaluate(() => App.sheet === 'tuner' && App.active === 'musiclibrary'), 'Tuner is a global sheet over the current route');
+  await page.keyboard.press('Escape');
+  await clickTab('Free Play'); await page.evaluate(() => window.scrollTo(0, 600)); await page.waitForTimeout(150);
+  await clickTab('Free Play'); await page.waitForTimeout(700);
   ok(await page.evaluate(() => window.pageYOffset) < 5, 'tapping the open tab scrolls back to the top');
 
   console.log('# metronome sheet');
@@ -86,7 +89,7 @@ const tabs = sel => [...document.querySelectorAll(sel + ' .tabbar-btn')].map(b =
   await page.keyboard.press('Escape'); await page.waitForTimeout(100);
   const cx0 = { open: await shown(), order: await page.evaluate(() => [...document.querySelectorAll('.tb-tools .icon-btn')].map(b => b.id).join(',')),
     label: await page.evaluate(() => document.getElementById('ctx-btn').getAttribute('aria-label')) };
-  ok(!cx0.open && cx0.order === 'help-btn,settings-btn,ctx-btn,lights-btn,met-btn' && /A Minor Pentatonic · 120 BPM|· \d+ BPM/.test(cx0.label),
+  ok(!cx0.open && cx0.order === 'help-btn,settings-btn,ctx-btn,tuner-btn,lights-btn,met-btn' && /A Minor Pentatonic · 120 BPM|· \d+ BPM/.test(cx0.label),
     'key / scale / tempo are tucked away behind the clef, beside the lights and metronome: ' + JSON.stringify(cx0));
   await page.click('#ctx-btn'); await page.waitForTimeout(150);
   const cx1 = { open: await shown(), exp: await page.evaluate(() => document.getElementById('ctx-btn').getAttribute('aria-expanded')) };
@@ -130,8 +133,8 @@ const tabs = sel => [...document.querySelectorAll(sel + ' .tabbar-btn')].map(b =
       barBottom: Math.round(bar.bottom), vh: window.innerHeight, n: document.querySelectorAll('#tabbar-m .tabbar-btn').length,
       oneRow: Math.abs(met.top - brand.top) < 24, metRight: Math.round(window.innerWidth - met.right) };
   });
-  ok(m1.botShown && !m1.topShown && m1.barBottom === m1.vh && m1.n === 5, 'phone: tabs fixed along the bottom: ' + JSON.stringify(m1));
-  ok(m1.oneRow && m1.metRight < 20, 'phone: logo and corner icons share one row, metronome in the corner: ' + JSON.stringify(m1));
+  ok(m1.botShown && !m1.topShown && m1.barBottom === m1.vh && m1.n === 4, 'phone: four focused sections fixed along the bottom: ' + JSON.stringify(m1));
+  ok(!m1.oneRow && m1.metRight < 20, 'phone: utilities have their own reachable row, metronome in the corner: ' + JSON.stringify(m1));
   await page.evaluate(() => App.switchTo('fretboard')); await page.waitForTimeout(150);
   await page.tap('#ctx-btn'); await page.waitForTimeout(200);
   const m3 = await page.evaluate(() => { const c = document.getElementById('ctxbar').getBoundingClientRect(); return { open: App.ctx(), l: Math.round(c.left), r: Math.round(innerWidth - c.right), over: document.documentElement.scrollWidth > innerWidth }; });
@@ -140,7 +143,7 @@ const tabs = sel => [...document.querySelectorAll(sel + ' .tabbar-btn')].map(b =
   ok(m3.open && m3.l === 12 && m3.r === 12 && !m3.over && !m3.back, 'phone: the clef dropdown spans the screen; Back tucks it away: ' + JSON.stringify(m3));
   await page.evaluate(() => App.switchTo('quiz')); await page.waitForTimeout(150);
   await page.tap('#tabbar-m .tabbar-btn:has-text("Play")'); await page.waitForTimeout(200);
-  ok(await page.evaluate(() => App.active) === 'songs', 'phone: bottom tab navigates');
+  ok(await page.evaluate(() => App.active) === 'piano', 'phone: Free Play opens the selected instrument');
   await page.tap('#met-btn'); await page.waitForTimeout(300);
   const m2 = await page.evaluate(() => { const c = document.querySelector('#sheet-metronome .sheet-card').getBoundingClientRect(); return { bottom: Math.round(c.bottom), vh: window.innerHeight, w: Math.round(c.width) }; });
   ok(m2.bottom === m2.vh && m2.w === 390, 'phone: metronome opens as a bottom sheet: ' + JSON.stringify(m2));

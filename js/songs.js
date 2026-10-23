@@ -692,6 +692,9 @@
     plPause();
   }
 
+  App.on('sheet', function (event) { if (event && event.open) plPause(); });
+  App.on('transport:claim', function (event) { if (event && event.owner !== 'songs') plPause(); });
+
   App.register('songs', {
     init: init,
     onHide: onHide

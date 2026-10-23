@@ -441,6 +441,7 @@
   function recordRun(status){if(!S||!S.xpSession||S.xpRecorded||!App.xp)return;measureRun();S.xpRecorded=true;var hits=S.counts.perfect+S.counts.great+S.counts.good,miss=S.counts.miss;S.xpResult=App.xp.finishLevel({sessionId:S.xpSession,instrument:S.creditInstrument,status:status,mode:'woodshed',metrics:{engagedSeconds:S.xpSeconds,expected:S.targets.filter(function(t){return t.judged!=='grace';}).length,matched:hits,missed:miss,extra:S.strays,wrong:S.strays}});}
   App.on('learn:practice',function(e){if(!e)return;if(S)endRun(false);if(window.PerformancePlayer)PerformancePlayer.close();App.store.set('ws.performance.instrument',e.instrument);view='lib';if(els&&els.root)renderLib();});
   App.on('learn:instrument',function(){if(S)endRun(false);if(view==='lib'&&els&&els.root)renderLib();});
+  App.on('sheet',function(event){if(event&&event.open){if(S)endRun(false);micStop();lightsOff();}});
 
   function calFor(src) {
     var c = App.store.get('ws.cal', {});
@@ -1526,6 +1527,7 @@
     importTrack: importTrack,
     guidedScore: guidedScore,
     performanceStart: performanceStart
+    ,checkpoint:function(){if(S)endRun(false);micStop();lightsOff();return {ok:true};}
   };
 
   App.register('shed', {

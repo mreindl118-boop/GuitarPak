@@ -1,0 +1,55 @@
+%PDF-1.4
+% SoundLab authored fixture
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R 5 0 R] /Count 2 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 7 0 R >> >> /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 349 >>
+stream
+BT /F1 20 Tf 48 730 Td (Original SoundLab cloud study) Tj ET
+BT /F1 11 Tf 48 705 Td (Authored test score - no automatic recognition) Tj ET
+48 430 m 560 430 l S
+48 440 m 560 440 l S
+48 450 m 560 450 l S
+48 460 m 560 460 l S
+48 470 m 560 470 l S
+90 445 10 8 re f
+180 455 10 8 re f
+270 465 10 8 re f
+BT /F1 14 Tf 86 410 Td (C4       E4       G4) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 7 0 R >> >> /Contents 6 0 R >>
+endobj
+6 0 obj
+<< /Length 161 >>
+stream
+BT /F1 20 Tf 48 730 Td (Original second page - rests and practice notes) Tj ET
+BT /F1 14 Tf 48 650 Td (Manual targets must be checked against the source.) Tj ET
+endstream
+endobj
+7 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 8
+0000000000 65535 f 
+0000000037 00000 n 
+0000000086 00000 n 
+0000000149 00000 n 
+0000000275 00000 n 
+0000000674 00000 n 
+0000000800 00000 n 
+0000001011 00000 n 
+trailer
+<< /Size 8 /Root 1 0 R >>
+startxref
+1081
+%%EOF

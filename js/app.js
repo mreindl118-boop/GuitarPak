@@ -32,7 +32,7 @@ window.App = (function () {
   // Settings is deliberately in NEITHER list: it's an overlay page opened by
   // the ever-present gear in the header, from any page in either space.
   var SPACES = {
-    practice: ['quiz', 'practiceplan', 'fretboard', 'tab', 'notation', 'chords', 'piano', 'synth', 'pads', 'midihub', 'lumipractice', 'songs', 'jam', 'shed', 'tuner', 'trainer', 'theory'],
+    practice: ['quiz', 'practiceplan', 'freeplay', 'fretboard', 'tab', 'notation', 'chords', 'piano', 'synth', 'pads', 'midihub', 'lumipractice', 'songs', 'jam', 'musiclibrary', 'score', 'shed', 'trainer', 'theory', 'progress'],
     studio: ['arrange', 'tracks', 'song', 'ideas']
   };
   var SPACE_LABELS = {
@@ -40,22 +40,22 @@ window.App = (function () {
     chords: 'Chords', piano: 'Piano', songs: 'Songs', jam: 'Jam', tuner: 'Tuner',
     trainer: 'Trainer', theory: 'Theory', settings: 'Settings', shed: 'Shed', synth: 'Synth',
     song: 'Song', arrange: 'Arrange', tracks: 'Tracks', pads: 'Pads', ideas: 'Ideas',
-    quiz: 'Exercises', midihub: 'MIDI Hub', lumipractice: 'LUMI practice', practiceplan: 'Practice plan'
+    quiz: 'Exercises', midihub: 'MIDI Hub', lumipractice: 'LUMI practice', practiceplan: 'Practice plan',
+    freeplay: 'Free Play', musiclibrary: 'Music Library', score: 'Score review', progress: 'Progress'
   };
   // overlays live outside both page sets: the metronome opens as a SHEET over
   // whatever page you're on (corner icon), settings toggles in place (gear)
-  var PANEL_ORDER = SPACES.practice.concat(SPACES.studio).concat(['metronome', 'lights', 'settings']);
+  var PANEL_ORDER = SPACES.practice.concat(SPACES.studio).concat(['metronome', 'lights', 'tuner', 'settings']);
   // Tab GROUPS: related pages share one entry in the page menu; the members
   // show as a sub-tab strip under the context bar. Pages/modules are untouched
   // — this is navigation only, so cross-links (fb:practice, st:edit, plugin
   // pages) keep addressing pages by id and the owning group follows along.
   var GROUPS = {
     practice: [
-      { id: 'gtheory', label: 'Learn', icon: 'learn', pages: ['quiz', 'chords', 'theory', 'practiceplan'] }, // Exercises = the home
-      { id: 'ginst', label: 'Guitar', icon: 'guitar', pages: ['fretboard', 'tab', 'notation'] },
-      { id: 'gkeys', label: 'Keys', icon: 'keys', pages: ['piano', 'synth', 'pads', 'midihub', 'lumipractice'] },
-      { id: 'gplay', label: 'Play', icon: 'note', pages: ['songs', 'jam'] },
-      { id: 'gprac', label: 'Practice', icon: 'target', pages: ['shed', 'trainer', 'tuner'] } // the game first
+      { id: 'gtheory', label: 'Learn', icon: 'learn', pages: ['quiz', 'chords', 'theory', 'practiceplan', 'trainer'] },
+      { id: 'gfree', label: 'Free Play', icon: 'keys', pages: ['freeplay', 'piano', 'synth', 'pads', 'fretboard', 'tab', 'notation', 'songs', 'jam', 'midihub', 'lumipractice'] },
+      { id: 'glibrary', label: 'Library', icon: 'idea', pages: ['musiclibrary', 'score', 'shed'] },
+      { id: 'gprogress', label: 'Progress', icon: 'target', pages: ['progress'] }
     ],
     studio: [
       { id: 'gstudio', label: 'Studio', icon: 'sliders', pages: ['arrange', 'tracks'] }, // the DAW home
@@ -68,7 +68,8 @@ window.App = (function () {
     chords: 'Chords', theory: 'Circle', songs: 'Songs', jam: 'Jam',
     trainer: 'Trainer', shed: 'Woodshed', metronome: 'Metronome', tuner: 'Tuner',
     song: 'Song', ideas: 'Ideas', tracks: 'Editor', arrange: 'Timeline', pads: 'Pads', synth: 'Synth',
-    quiz: 'Exercises', midihub: 'MIDI', lumipractice: 'LUMI', practiceplan: 'Plan'
+    quiz: 'Exercises', midihub: 'MIDI', lumipractice: 'LUMI', practiceplan: 'Plan',
+    freeplay: 'Overview', musiclibrary: 'My files', score: 'Review', progress: 'Progress'
   };
 
   function groupOf(name) {
@@ -89,7 +90,7 @@ window.App = (function () {
   //            when an APK is actually built. Older APKs read nothing else, so
   //            this must never run ahead of the real file: when it did, the
   //            Android app kept downloading the same old APK in a loop.
-  var APP_VERSION = '1.0.0';
+  var APP_VERSION = '1.1.0';
   var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
 
   function verNum(v) {
@@ -150,18 +151,8 @@ window.App = (function () {
         location.href = info.apk;
       };
     } else {
-      go.textContent = 'Update now';
-      go.onclick = function () {
-        if ('serviceWorker' in navigator) {
-          navigator.serviceWorker.getRegistration().then(function (reg) {
-            if (reg) reg.update();
-            // controllerchange triggers the reload; fall back if it doesn't
-            setTimeout(function () { location.reload(); }, 1500);
-          });
-        } else {
-          location.reload();
-        }
-      };
+      go.textContent = 'Save & update';
+      go.onclick = function () { if(App.updates)App.updates.request(); };
     }
     var later = document.createElement('button');
     later.className = 'btn sm';
@@ -210,6 +201,8 @@ window.App = (function () {
     idea: '<path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"/><path d="M2 6h4"/><path d="M2 10h4"/><path d="M2 14h4"/><path d="M2 18h4"/><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/>',
     lights: '<path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/>',
     metronome: '<path d="M12 11.4V9.1"/><path d="m12 17 6.59-6.59"/><path d="m15.05 5.7-.218-.691a3 3 0 0 0-5.663 0L4.418 19.695A1 1 0 0 0 5.37 21h13.253a1 1 0 0 0 .951-1.31L18.45 16.2"/><circle cx="20" cy="9" r="2"/>',
+    // Lucide audio-lines, ISC; global chromatic tuner utility.
+    tuner: '<path d="M2 10v3"/><path d="M6 6v11"/><path d="M10 3v18"/><path d="M14 8v7"/><path d="M18 5v13"/><path d="M22 10v3"/>',
     help: '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>',
     gear: '<path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/>',
     bolt: '<path d="M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z"/>',
@@ -513,7 +506,7 @@ window.App = (function () {
     osc.stop(t + dur + 0.05);
   }
 
-  var store = {
+  var legacyStore = {
     get: function (key, fallback) {
       try {
         var v = localStorage.getItem('guitarlab.' + key);
@@ -528,6 +521,9 @@ window.App = (function () {
       } catch (e) { /* storage unavailable — settings just won't persist */ }
     }
   };
+  // The durable facade verifies canonical writes and reports recovery errors.
+  // Its default storage lookup also catches a denied localStorage accessor.
+  var store = window.SLPersistence ? SLPersistence.create({ manifest: window.SLStorageManifest, prefix: 'guitarlab.' }) : legacyStore;
 
   // ---- tiny event bus (cross-module links, e.g. shared tempo) ----
   var busListeners = {};
@@ -705,6 +701,8 @@ window.App = (function () {
       if (gs[i].id !== gid) continue;
       if (groupOf(active) === gs[i]) { window.scrollTo({ top: 0, behavior: 'smooth' }); return; } // tap the open tab: back to the top
       var pg = store.get('app.gtab.' + gid, gs[i].pages[0]);
+      if (gid === 'gfree' && window.App && App.workflow) pg = App.workflow.freePlayDefault();
+      if (gid === 'glibrary') pg = 'musiclibrary';
       if (gs[i].pages.indexOf(pg) === -1) pg = gs[i].pages[0];
       switchTo(pg);
       return;
@@ -716,11 +714,19 @@ window.App = (function () {
     if (!el) return;
     var g = groupOf(name);
     if (!g || g.pages.length < 2) { el.hidden = true; el.innerHTML = ''; return; }
-    var h = '';
-    g.pages.forEach(function (p) {
+    var h = '', pages = g.pages;
+    if (g.id === 'gfree' && window.App && App.workflow) {
+      pages = App.workflow.freePlayPages();
+      if (pages.indexOf(name) < 0) pages = pages.concat([name]);
+    }
+    pages.forEach(function (p) {
       h += '<button type="button" class="subtab' + (p === name ? ' active' : '')
         + '" data-page="' + p + '">' + (SUB_LABELS[p] || SPACE_LABELS[p] || p) + '</button>';
     });
+    if (g.id === 'gfree') {
+      h += '<label class="subnav-tools">All tools<select id="workflow-tools" aria-label="All Free Play tools">' +
+        g.pages.map(function (p) { return '<option value="' + p + '"' + (p === name ? ' selected' : '') + '>' + (SPACE_LABELS[p] || p) + '</option>'; }).join('') + '</select></label>';
+    }
     el.innerHTML = h;
     el.hidden = false;
   }
@@ -731,6 +737,7 @@ window.App = (function () {
   }
 
   function switchTo(name) {
+    if (window.App && App.interactionBlocked) return;
     if (sheet && !SHEETS[name]) closeSheet(); // going somewhere: the overlay steps aside
     if (name === active) return;
     // settings is space-agnostic: overlay in place, no wipe, no nav entry
@@ -755,6 +762,8 @@ window.App = (function () {
     }
     // overlay utilities open over the current page instead of replacing it
     if (SHEETS[name]) { openSheet(name); return; }
+    // Ignore invalid saved/plugin links without hiding the current page.
+    if (PANEL_ORDER.indexOf(name) < 0) return;
     // crossing into the other workspace? go through the wipe
     if (spaceOf(name) !== space) { setSpace(spaceOf(name), name); return; }
     if (active && modules[active] && modules[active].onHide) {
@@ -794,6 +803,7 @@ window.App = (function () {
     showBar();
     syncContextAvailability();
     if (window.App && App.learnInstruments && typeof App.learnInstruments.refresh === 'function') App.learnInstruments.refresh();
+    if (window.App && App.workflow && typeof App.workflow.refresh === 'function') App.workflow.refresh();
   }
 
   // the clef button's dropdown (key / scale / mode / tempo / time + the
@@ -915,7 +925,7 @@ window.App = (function () {
   // The page underneath stays active (its runner, scroll and state are
   // untouched) and the sheet closes straight back to it: the corner icon,
   // the X, a tap outside the card, or Esc. Today: the metronome.
-  var SHEETS = { metronome: 'met-btn', lights: 'lights-btn' };
+  var SHEETS = { metronome: 'met-btn', lights: 'lights-btn', tuner: 'tuner-btn' };
   var sheet = null, sheetReturn = null;
 
   function openSheet(name) {
@@ -1085,6 +1095,7 @@ window.App = (function () {
   var backWired = false;
   function goBackTo(p) { backNav = true; try { switchTo(p); } finally { backNav = false; } }
   function backStep() {
+    if (window.App && App.interactionBlocked) return true;
     if (window.Help && Help.isOpen && Help.isOpen()) { Help.close(); return true; }
     if (ctxIsOpen()) { closeCtx(); return true; }
     if (sheet) { closeSheet(); return true; }
@@ -1540,6 +1551,7 @@ window.App = (function () {
       });
     });
     var subEl = document.getElementById('subnav');
+    if (subEl) subEl.addEventListener('change', function (e) { if (e.target.id === 'workflow-tools') switchTo(e.target.value); });
     if (subEl) {
       subEl.addEventListener('click', function (e) {
         var b = e.target.closest('.subtab');
@@ -1555,6 +1567,7 @@ window.App = (function () {
     }
 
     document.addEventListener('keydown', function (e) {
+      if (App.interactionBlocked) return;
       if (sheet) {
         if (e.key === 'Escape') { e.preventDefault(); closeSheet(); return; }
         if (e.key === 'Tab') { // keep focus inside the open sheet
@@ -1581,6 +1594,8 @@ window.App = (function () {
     wireAutoHideBar();
     wireSheets();
     wireBack();
+    on('learn:instrument', function () { paintSubnav(active); });
+    if (store.subscribe) store.subscribe(function (status) { emit('store:status', status); });
 
     var spaceBtn = document.getElementById('space-btn');
     if (spaceBtn) {
@@ -1610,22 +1625,21 @@ window.App = (function () {
     }
     populateNav();
     var startTab = store.get(tabStoreKey(space), SPACES[space][0]);
+    // A pre-1.1 saved Tuner page now opens its one utility sheet over home.
+    var startSheet = startTab === 'tuner' ? 'tuner' : null;
     if (SPACES[space].indexOf(startTab) === -1) startTab = SPACES[space][0];
     switchTo(startTab);
+    if (startSheet) openSheet(startSheet);
 
     var foot = document.querySelector('.foot');
     if (foot) foot.textContent += ' · v' + APP_VERSION;
 
-    // silent web auto-update: when an updated service worker takes control of
-    // a page that already had one, reload once to pick up the new assets
+    // A new worker must not reload over an unrecorded run or score edit.
+    // Activation offers a deliberate save/checkpoint/reload in 1.1.
     if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
       var hadController = !!navigator.serviceWorker.controller;
-      var reloaded = false;
       navigator.serviceWorker.addEventListener('controllerchange', function () {
-        if (hadController && !reloaded) {
-          reloaded = true;
-          location.reload();
-        }
+        if (hadController && App.updates) App.updates.ready();
       });
     }
 
@@ -1664,6 +1678,7 @@ window.App = (function () {
     get pluckTone() { return pluckTonePref(); },
     get pluckSampled() { return pluckReadyN.steel + pluckReadyN.electric + pluckReadyN.nylon > 0; },
     store: store,
+    persistence: store,
     on: on,
     emit: emit,
     injectCSS: injectCSS,

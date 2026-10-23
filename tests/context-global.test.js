@@ -4,7 +4,7 @@ const { chromium } = require('playwright');
 const fs = require('fs'), path = require('path'), env = require('./env');
 let checks = 0;
 function ok(value, message) { if (!value) throw new Error(message); checks++; console.log('  PASS', message); }
-const practice = ['quiz', 'practiceplan', 'fretboard', 'tab', 'notation', 'chords', 'piano', 'synth', 'pads', 'midihub', 'lumipractice', 'songs', 'jam', 'shed', 'tuner', 'trainer', 'theory', 'settings'];
+const practice = ['quiz', 'practiceplan', 'freeplay', 'fretboard', 'tab', 'notation', 'chords', 'piano', 'synth', 'pads', 'midihub', 'lumipractice', 'songs', 'jam', 'musiclibrary', 'score', 'shed', 'trainer', 'theory', 'progress', 'settings'];
 const studio = ['arrange', 'tracks', 'song', 'ideas', 'settings'];
 async function switchTo(page, name) {
   await page.evaluate(name => App.switchTo(name), name);
@@ -95,7 +95,7 @@ async function contextSnapshot(page) {
       ok(await page.evaluate(() => !App.ctx()), 'moving focus out closes the nonmodal disclosure');
 
       console.log('# modal boundaries, persistence, and contrast');
-      for (const modal of ['metronome', 'lights']) {
+      for (const modal of ['metronome', 'lights', 'tuner']) {
         await page.locator('#ctx-btn').click();
         await page.evaluate(modal => App.openSheet(modal), modal);
         const state = await page.evaluate(modal => {

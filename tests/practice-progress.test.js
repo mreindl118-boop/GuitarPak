@@ -251,4 +251,32 @@ console.log('# browser attachment uses the same tested core');
   root.App.practiceProgress.updateSettings({ decayEnabled: false });
   ok(events.some(e => e.name === 'practice:progress'), 'browser singleton emits the documented persisted-change event');
 }
+console.log('# stale-tab revisions and retryable immutable observations');
+{
+  const store = memory(); let revision = 0, conflict = null;
+  const originalSet = store.set;
+  store.revision = () => revision;
+  store.set = function (key, value) { originalSet(key, value); revision++; };
+  store.write = function (key, value, options) {
+    if (conflict) { const fn = conflict; conflict = null; fn(); }
+    if (options.expectedRevision !== revision) return { ok: false, errors: ['Revision conflict'] };
+    this.set(key, value); return { ok: true };
+  };
+  const a = fixture('2026-10-19T12:00:00Z', 'UTC', store), b = fixture('2026-10-19T12:00:00Z', 'UTC', store);
+  const piano = a.session({ id: 'tab-a', instrument: 'piano' }), guitar = b.session({ id: 'tab-b', instrument: 'guitar' });
+  ok(a.core.recordSession(piano).ok && b.core.recordSession(guitar).ok, 'stale tab refreshes before recording another instrument');
+  eq(a.core.history('guitar').map(s => s.id), ['tab-b'], 'already open tab sees the other instrument session');
+  eq(b.core.history('piano')[0].earnedXP, 20, 'refresh preserves the first immutable award');
+  const later = b.session({ id: 'tab-b-later', instrument: 'bass' });
+  conflict = () => a.core.recordSession(a.session({ id: 'tab-a-race', instrument: 'voice' }));
+  ok(!b.core.recordSession(later).ok, 'revision change between derive and commit rejects the stale write');
+  ok(b.core.recordSession(later).accepted, 'retry uses fresh state and original session ID');
+  eq(b.core.exportData().sessions.map(s => s.id).sort(), ['tab-a', 'tab-a-race', 'tab-b', 'tab-b-later'], 'retry preserves all distinct observations without duplicate awards');
+  const before = structuredClone(store.values[Progress.storageKey]);
+  store.set(Progress.storageKey, { version: 999 });
+  ok(!b.record({ id: 'unsupported' }).ok, 'unsupported external data blocks recording instead of replacing it');
+  eq(store.values[Progress.storageKey], { version: 999 }, 'unsupported raw record remains unchanged');
+  store.set(Progress.storageKey, before);
+  ok(b.core.recordSession(later).duplicate, 'restored known state retains duplicate-session protection');
+}
 console.log('ALL PASS (' + checks + ' checks; deterministic observations and local calendars only)');

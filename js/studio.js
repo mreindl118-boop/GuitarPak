@@ -442,47 +442,35 @@
 
   // ---- sampler bytes live in IndexedDB (too big for localStorage) ----
 
+  var pendingSamples = new Map(), sampleError = '';
+  function sampleStatus(){ if(App.persistence && App.persistence.refresh)App.persistence.refresh(); }
   function idb() {
     return new Promise(function (res, rej) {
       var rq = indexedDB.open('guitarlab-daw', 1);
-      rq.onupgradeneeded = function () { rq.result.createObjectStore('samples'); };
-      rq.onsuccess = function () { res(rq.result); };
+      rq.onupgradeneeded = function () { if(!rq.result.objectStoreNames.contains('samples'))rq.result.createObjectStore('samples'); };
+      rq.onblocked = function(){rej(new Error('Sampler storage is blocked by another app tab.'));};
+      rq.onsuccess = function () { var db=rq.result;db.onversionchange=function(){db.close();};res(db); };
       rq.onerror = function () { rej(rq.error); };
     });
   }
-
-  function idbPut(key, val) {
-    return idb().then(function (db) {
-      return new Promise(function (res, rej) {
-        var tx = db.transaction('samples', 'readwrite');
-        tx.objectStore('samples').put(val, key);
-        tx.oncomplete = res;
-        tx.onerror = function () { rej(tx.error); };
-      });
-    });
-  }
-
-  function idbGet(key) {
-    return idb().then(function (db) {
-      return new Promise(function (res, rej) {
-        var rq = db.transaction('samples').objectStore('samples').get(key);
-        rq.onsuccess = function () { res(rq.result); };
-        rq.onerror = function () { rej(rq.error); };
-      });
-    });
-  }
-
-  function idbDel(key) {
-    return idb().then(function (db) {
-      db.transaction('samples', 'readwrite').objectStore('samples').delete(key);
-    });
-  }
+  function sameBytes(a,b){if(!(a instanceof ArrayBuffer)||!(b instanceof ArrayBuffer)||a.byteLength!==b.byteLength)return false;var x=new Uint8Array(a),y=new Uint8Array(b);for(var i=0;i<x.length;i++)if(x[i]!==y[i])return false;return true;}
+  function idbGet(key) {return idb().then(function(db){return new Promise(function(res,rej){var rq=db.transaction('samples').objectStore('samples').get(key);rq.onsuccess=function(){db.close();res(rq.result);};rq.onerror=function(){db.close();rej(rq.error);};});});}
+  function idbPut(key,val){return idb().then(function(db){return new Promise(function(res,rej){var tx=db.transaction('samples','readwrite');tx.objectStore('samples').put(val,key);tx.oncomplete=function(){db.close();res();};tx.onerror=tx.onabort=function(){db.close();rej(tx.error||new Error('Sampler write failed.'));};});}).then(function(){return idbGet(key);}).then(function(saved){if(!sameBytes(saved,val))throw new Error('Sampler bytes could not be verified.');});}
+  function idbDel(key){return idb().then(function(db){return new Promise(function(res,rej){var tx=db.transaction('samples','readwrite');tx.objectStore('samples').delete(key);tx.oncomplete=function(){db.close();res();};tx.onerror=tx.onabort=function(){db.close();rej(tx.error||new Error('Sampler delete failed.'));};});});}
+  function sampleMutation(work){return App.persistence&&App.persistence.withMutation?App.persistence.withMutation(work):Promise.resolve().then(work);}
+  function samplePut(key,bytes){var snapshot=bytes.slice(0);pendingSamples.set(String(key),snapshot);sampleStatus();return sampleMutation(function(){return idbPut(String(key),snapshot);}).then(function(){if(pendingSamples.get(String(key))===snapshot)pendingSamples.delete(String(key));sampleError='';sampleStatus();return {ok:true};}).catch(function(e){sampleError=e.message;sampleStatus();throw e;});}
+  function sampleEntries(options){return idb().then(function(db){return new Promise(function(res,rej){var out=[],tx=db.transaction('samples'),rq=tx.objectStore('samples').openCursor();rq.onsuccess=function(){var c=rq.result;if(c){if(!(c.value instanceof ArrayBuffer)){db.close();rej(new Error('Unsupported sampler record '+c.key+' was retained.'));return;}out.push({key:String(c.key),bytes:c.value});c.continue();}};tx.oncomplete=function(){db.close();if(options&&options.includePending){var map=new Map(out.map(function(r){return [r.key,r];}));pendingSamples.forEach(function(v,k){map.set(k,{key:k,bytes:v.slice(0)});});out=Array.from(map.values());}res(out);};tx.onerror=tx.onabort=function(){db.close();rej(tx.error||new Error('Sampler export failed.'));};});});}
+  function sampleApply(entries,replace){return idb().then(function(db){return new Promise(function(res,rej){var tx=db.transaction('samples','readwrite'),store=tx.objectStore('samples');if(replace)store.clear();entries.forEach(function(e){store.put(e.bytes,e.key);});tx.oncomplete=function(){db.close();res();};tx.onerror=tx.onabort=function(){db.close();rej(tx.error||new Error('Sampler restore failed.'));};});}).then(function(){return Promise.all(entries.map(function(e){return idbGet(e.key).then(function(v){if(!sameBytes(v,e.bytes))throw new Error('Sampler restore readback failed.');});}));});}
+  var samplerStorage={id:'sampler',export:sampleEntries,apply:function(entries){return sampleApply(entries,false);},restore:function(entries){return sampleApply(entries,true);},pending:function(){return pendingSamples.size;},pendingEntries:function(){return Array.from(pendingSamples.entries()).map(function(p){return {key:p[0],bytes:p[1].slice(0)};});},flush:function(){return Promise.all(Array.from(pendingSamples.entries()).map(function(p){return samplePut(p[0],p[1]);}));},put:samplePut,get:idbGet,remove:function(key){return sampleMutation(function(){return idbDel(key);});},get error(){return sampleError;}};
+  App.samplerStorage=samplerStorage;
+  if(App.persistence&&App.persistence.registerBlobAdapter)App.persistence.registerBlobAdapter(samplerStorage);
 
   function loadSampleFile(t, f) {
+    if(App.persistence&&(App.persistence.status().busy||App.persistence.status().recoveryRequired)){var status=document.getElementById('st-sinfo');if(status)status.textContent='Finish storage recovery/import before loading a sample.';return;}
     var rd = new FileReader();
     rd.onload = function () {
       var bytes = rd.result;
-      idbPut(t.id, bytes.slice(0)).catch(function () { /* idb unavailable — session-only */ });
+      samplePut(t.id, bytes.slice(0)).catch(function () { var status=document.getElementById('st-sinfo');if(status)status.textContent='Sample is usable this session but was not saved. Retry or export it in Settings before closing.'; });
       App.getAudio().decodeAudioData(bytes, function (buf) {
         DAW.samples[t.id] = buf;
         t.sampler.name = f.name.replace(/\.[^.]+$/, '').slice(0, 24);
@@ -499,9 +487,10 @@
   }
 
   function loadSampleBuffers() {
+    if(App.persistence&&(App.persistence.status().busy||App.persistence.status().recoveryRequired||App.persistence.status().needsReload))return;
     tracksList().forEach(function (t) {
       if (t.kind !== 'sampler' || DAW.samples[t.id]) return;
-      idbGet(t.id).then(function (bytes) {
+      (pendingSamples.has(t.id)?Promise.resolve(pendingSamples.get(t.id)):idbGet(t.id)).then(function (bytes) {
         if (!bytes) return;
         var ctx = App.getAudio();
         ctx.decodeAudioData(bytes.slice(0), function (buf) {
@@ -985,7 +974,7 @@
         var id2 = del.getAttribute('data-stdel');
         DAW.engine.tracks = tracksList().filter(function (t) { return t.id !== id2; });
         if (App.store.get('st.armed', null) === id2) App.store.set('st.armed', null);
-        idbDel(id2).catch(function () { /* ok */ });
+        samplerStorage.remove(id2).catch(function () { /* ok */ });
         delete DAW.samples[id2];
         if (trk.sel === id2) trk.sel = tracksList().length ? tracksList()[0].id : null;
         saveTracks(); renderTracks(); renderEditor2();

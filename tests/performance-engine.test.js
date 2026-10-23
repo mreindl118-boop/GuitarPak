@@ -294,4 +294,12 @@ for (const latency of [0, 200]) {
   ok(h.state.results.matched === 1 && close(h.state.results.meanTimingMs, -10), 'a delayed frame captured just before a short pause uses its original timing segment');
 }
 
+{
+  const unknown = fixture([{m:60,t:0,d:1}],{mode:'tempo',score:{len:1,rhythmKnown:false}});
+  ok(unknown.engine.mode==='wait','unreviewed rhythm cannot enter Tempo even through the engine API');
+  unknown.engine.start();unknown.advance(60);
+  ok(unknown.state.results.missed===0&&unknown.state.status==='running','unknown rhythm waits indefinitely without fabricated timing misses');
+  unknown.engine.input({midi:60,on:true,source:'test'});
+  ok(unknown.state.results.matched===1&&unknown.state.mode==='wait'&&unknown.state.results.durationSamples===0,'unknown rhythm grades pitch without timed hold samples');
+}
 console.log('ALL PASS (' + checks + ' checks)');

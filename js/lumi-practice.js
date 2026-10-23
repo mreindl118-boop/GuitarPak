@@ -2,13 +2,27 @@
  * Recovered from b8ccb55 (origin/codex/midi-hub-release-0.78.0-20261019).
  * No global MIDI selection, Thru, SysEx, or note event bus. A temporary
  * exact-output keybed lease renders target/correct/wrong instructional frames.
- * Registers 'lumipractice'; all state is intentionally session-only.
+ * Registers 'lumipractice'; setup preferences survive updates. Running,
+ * observed hardware tests, Local Control acknowledgement and arming never do.
  */
 (function () {
   'use strict';
   var root, els = {}, visible = false, running = false, mode = 'simulated';
   var inputId = '', outputId = '', low = 48, channel = 0, kind = 'note', flow = 'guided';
   var synthOutputId = '', localControlOff = false;
+  var savedPreferences = App.store.get('lumi.practice.preferences.v1', {}), lastPreferences = '';
+  if(savedPreferences&&typeof savedPreferences==='object'){
+    mode=savedPreferences.mode==='hardware'?'hardware':'simulated';
+    inputId=typeof savedPreferences.inputId==='string'?savedPreferences.inputId:'';
+    outputId=typeof savedPreferences.outputId==='string'?savedPreferences.outputId:'';
+    synthOutputId=typeof savedPreferences.synthOutputId==='string'?savedPreferences.synthOutputId:'';
+    low=Number.isInteger(savedPreferences.low)&&savedPreferences.low>=0&&savedPreferences.low<=104?savedPreferences.low:48;
+    channel=Number.isInteger(savedPreferences.channel)&&savedPreferences.channel>=0&&savedPreferences.channel<16?savedPreferences.channel:0;
+    kind=['note','major','minor'].indexOf(savedPreferences.kind)>=0?savedPreferences.kind:'note';
+    flow=savedPreferences.flow==='manual'?'manual':'guided';
+  }
+  function preferences(){return {version:1,mode:mode,inputId:inputId,outputId:outputId,synthOutputId:synthOutputId,low:low,channel:channel,kind:kind,flow:flow};}
+  lastPreferences=JSON.stringify(preferences());
   var advanceTimer = null, feedback = 'waiting', feedbackText = 'Waiting for an answer.';
   var held = {}, target = [], serial = 0, correct = 0, attempts = 0, answered = false;
   var unsubscribe = null, armed = false, tested = null, pending = [], outputTimer = null;
@@ -263,6 +277,7 @@
   function fillPorts(id, type, selected, label) {
     var list = ports(type), html = '<option value="">' + label + '</option>';
     list.forEach(function (p) { html += '<option value="' + esc(p.id) + '">' + esc(p.name || p.id) + ' [' + esc(p.id) + ']</option>'; });
+    if(selected&&!list.some(function(p){return p.id===selected;}))html+='<option value="'+esc(selected)+'">Saved device disconnected ['+esc(selected)+']</option>';
     if (els[id].innerHTML !== html) els[id].innerHTML = html;
     els[id].value = selected;
   }
@@ -271,8 +286,7 @@
     var lostInput = inputId && !hasPort('inputs', inputId), lostOutput = outputId && !hasPort('outputs', outputId);
     if (mode === 'hardware' && running && (!supportsPorts() || lostInput || lostOutput)) stop('Device connection changed. Session stopped and output disarmed; choose ports and start again.');
     else if (mode === 'hardware' && running && !attachInput()) stop('Answer input is unavailable. Session stopped and output disarmed.');
-    if (lostInput) inputId = '';
-    if (lostOutput) { outputId = ''; tested = null; armed = false; }
+    if (lostOutput) { tested = null; armed = false; }
     fillPorts('input', 'inputs', inputId, 'Choose LUMI or MODX answer input…');
     fillPorts('output', 'outputs', outputId, 'None — display output OFF');
     text('ports-status', supportsPorts() ? 'Independent Web MIDI ports available. Synth answer inputs and LUMI display outputs are independent; LUMI input is optional; mixed and virtual names are excluded. Other ROLI devices do not qualify. Both choices apply only to this page.' :
@@ -284,6 +298,7 @@
     var router = App.practiceRouter, list = router ? (midi().outputs || []).filter(function (p) { return router.validPort('outputs', p); }) : [];
     var html = '<option value="">None — synth sound routing OFF</option>';
     list.forEach(function (p) { html += '<option value="' + esc(p.id) + '">' + esc(p.name || p.id) + ' [' + esc(p.id) + ']</option>'; });
+    if(synthOutputId&&!list.some(function(p){return p.id===synthOutputId;}))html+='<option value="'+esc(synthOutputId)+'">Saved synth disconnected ['+esc(synthOutputId)+']</option>';
     if (els['sound-output'].innerHTML !== html) els['sound-output'].innerHTML = html;
     els['sound-output'].value = synthOutputId;
     var scale = App.store ? App.store.get('fb.scale', 'minorPent') : 'minorPent', key = App.store ? App.store.get('fb.root', 9) : 9;
@@ -323,6 +338,7 @@
   }
   function paint() {
     if (!root) return;
+    var nextPreferences=JSON.stringify(preferences());if(nextPreferences!==lastPreferences){App.store.set('lumi.practice.preferences.v1',preferences());lastPreferences=nextPreferences;}
     text('mode-badge', mode === 'simulated' ? 'SIMULATED — NO DEVICE I/O' : 'HARDWARE — EXPERIMENTAL / UNVERIFIED');
     els['mode-badge'].classList.toggle('lp-live', mode === 'hardware');
     els.simulated.hidden = mode !== 'simulated';
@@ -387,6 +403,7 @@
       '<div class="lp-mock-output"><b>Simulated LUMI display output</b><button id="lp-preview" class="btn sm" type="button">Preview simulated display</button><p id="lp-mock-status" class="small" role="status"></p></div></div>' +
       '<div class="card lp-answer"><p id="lp-source" class="lp-eyebrow"></p><p id="lp-heard"></p><div class="lp-actions"><button id="lp-check" class="btn primary" type="button">Check answer</button><button id="lp-next" class="btn" type="button">Next target</button></div><p id="lp-result" role="status" aria-live="polite"></p></div>';
     root.querySelectorAll('[id^="lp-"]').forEach(function (node) { els[node.id.slice(3)] = node; });
+    els.mode.value=mode;els.flow.value=flow;els.kind.value=kind;els.low.value=low;els.channel.value=channel;
     els.mode.addEventListener('change', function () { changed('Mode changed.'); mode = els.mode.value === 'hardware' ? 'hardware' : 'simulated'; refreshPorts(); });
     els.flow.addEventListener('change', function () { changed('Progression changed.'); flow = els.flow.value === 'manual' ? 'manual' : 'guided'; paint(); });
     els.kind.addEventListener('change', function () { changed('Exercise changed.'); kind = els.kind.value; paint(); });
@@ -426,6 +443,7 @@
     });
     els.disarm.addEventListener('click', function () { failOutput('Disarmed. A new test is required to arm again.'); });
     App.on('colors', function () { if (root) { updateFeedback(); paint(); } });
+    App.on('sheet', function (event) { if(event&&event.open&&(running||armed))stop('Practice stopped for '+event.name+'. Start again when ready; output is disarmed.'); });
     App.on('lights:master', function (state) {
       if (state && state.enabled === false) {
         var clean = releaseOutput(); releaseLease(); armed = false; tested = null;

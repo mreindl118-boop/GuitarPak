@@ -17,15 +17,15 @@
   var chipEls = [];
   var chipMidis = [];
 
-  var stream = null;      // MediaStream (mic)
-  var source = null;      // MediaStreamAudioSourceNode
+  var CAPTURE_TAG = 'tuner-analysis';
+  var source = null;      // shared audio-in source; never owned by the tuner
   var analyser = null;    // AnalyserNode, fftSize 2048
   var timeBuf = null;     // Float32Array for time-domain samples
-  var det = null;         // scratch Float32Array for NSDF values
   var rafId = 0;
   var listening = false;
   var pendingMic = false; // getUserMedia request in flight (permission prompt open)
-  var startReq = 0;       // token so a stale getUserMedia resolve can't re-arm
+  var startReq = 0, heldReq = 0, toneSuspended = false;
+  var deviceId = '', lastPitch = null, lastAnnouncement = '', lastAnnouncedAt = -Infinity;
   var sampleRate = 48000;
   var recent = [];        // last raw detections (Hz) for median smoothing
 
@@ -65,6 +65,8 @@
     '.tun-stat { font-size: 11.5px; font-weight: 600; letter-spacing: 1.4px; text-transform: uppercase; color: var(--label); }' +
     '#tun-streak, #tun-best { color: var(--text); margin-left: 6px; letter-spacing: 1px; }' +
     '#tun-freq { font-variant-numeric: tabular-nums; margin-bottom: 2px; }' +
+    '#tun-direction{font-weight:650;min-height:1.5em;text-align:center}.tun-announcement{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}' +
+    '#sheet-tuner .grid2{grid-template-columns:1fr}#sheet-tuner .tun-row{flex-wrap:wrap}#sheet-tuner .tun-row .field{flex:1;min-width:120px}#sheet-tuner #tun-toggle{min-height:44px}#sheet-tuner .tun-chip{min-height:44px}#sheet-tuner #tun-game-card{margin-bottom:0}' +
     '#tun-chips { margin: 10px 0; }' +
     '.tun-chip { cursor: pointer; }' +
     '.tun-chip .tun-check { color: var(--green); display: none; }' +
@@ -149,10 +151,12 @@
       '<label class="field">String guide tuning' +
       '<select id="tun-tuning"></select></label>' +
       '</div>' +
-      '<div id="tun-err" class="error" hidden></div>' +
+      '<p class="small muted">Uses the audio input selected in Settings. Listening does not enable Hear Input.</p>' +
+      '<div id="tun-err" class="error" role="alert" hidden></div>' +
       '<div class="tun-readout">' +
       '<div class="big-display tun-note tun-idle" id="tun-note">—</div>' +
-      '<div class="muted" id="tun-freq">mic off — press Start listening</div>' +
+      '<div class="muted" id="tun-freq">Listening is off — press Start listening</div>' +
+      '<div id="tun-direction">Listening is off</div><span class="tun-announcement" id="tun-announcement" role="status" aria-live="polite" aria-atomic="true"></span>' +
       '</div>' +
       gaugeSVG() +
       '<div class="row tight" id="tun-chips"></div>' +
@@ -231,6 +235,7 @@
   }
 
   function renderPitch(note, freq) {
+    lastPitch = note ? { midi: note.midi, frequency: freq, cents: note.cents, name: note.name + note.octave } : null;
     if (!note) {
       els.note.textContent = '—';
       els.note.style.color = '';
@@ -239,6 +244,8 @@
       setNeedle(0, 'var(--muted)');
       els.cents.textContent = '— ¢';
       els.cents.setAttribute('fill', 'var(--muted)');
+      els.direction.textContent = 'Waiting for a clear note';
+      announce('Waiting for a clear note');
       clearChips();
       return;
     }
@@ -251,14 +258,20 @@
     setNeedle(Math.max(-50, Math.min(50, note.cents)), col);
     els.cents.textContent = (note.cents >= 0 ? '+' : '') + note.cents.toFixed(1) + ' ¢';
     els.cents.setAttribute('fill', col);
+    var direction = abs <= 5 ? 'In tune' : note.cents < 0 ? 'Flat — tune up' : 'Sharp — tune down';
+    els.direction.textContent = direction;
+    announce(note.name + note.octave + ', ' + direction + ', ' + Math.abs(note.cents).toFixed(1) + ' cents');
     highlightChips(note);
   }
 
   function renderIdle() {
+    lastPitch = null;
     els.note.textContent = '—';
     els.note.style.color = '';
     els.note.classList.add('tun-idle');
-    els.freq.textContent = 'mic off — press Start listening';
+    els.freq.textContent = 'Listening is off — press Start listening';
+    els.direction.textContent = 'Listening is off';
+    announce('Listening is off');
     setNeedle(0, 'var(--muted)');
     els.cents.textContent = '— ¢';
     els.cents.setAttribute('fill', 'var(--muted)');
@@ -269,11 +282,20 @@
 
   function showErr(msg) { els.err.textContent = msg; els.err.hidden = false; }
   function hideErr() { els.err.hidden = true; }
+  function visible() { return App.sheet === 'tuner' && !document.hidden; }
+  function announce(text) {
+    var now = performance.now();
+    if (!els.announcement || text === lastAnnouncement || now - lastAnnouncedAt < 750) return;
+    lastAnnouncement = text; lastAnnouncedAt = now; els.announcement.textContent = text;
+  }
 
-  function frame() {
-    rafId = requestAnimationFrame(frame);
+  function frame(token) {
+    if (token !== startReq || !listening) return;
+    if (!visible()) { stopMic(); return; }
+    rafId = requestAnimationFrame(function () { frame(token); });
     if (!analyser || !timeBuf) return;
-    analyser.getFloatTimeDomainData(timeBuf);
+    try { analyser.getFloatTimeDomainData(timeBuf); }
+    catch (error) { stopMic(); showErr('The input became unavailable. Start listening again when ready.'); return; }
     var f = detectPitch(timeBuf, sampleRate);
     var now = performance.now();
     if (f > 0) {
@@ -291,74 +313,42 @@
   }
 
   function startMic() {
-    if (listening || pendingMic) return;
+    if (listening || pendingMic || !visible()) return;
     hideErr();
-    var ctx;
-    try {
-      ctx = App.getAudio();
-    } catch (e) {
-      showErr('Audio engine failed to start: ' + e.message);
+    var input = App.audioIn;
+    if (!input || !input.supported || !input.hold || !input.tap || !input.release) {
+      showErr('Audio input is unavailable here. Use a supported browser on HTTPS or localhost.');
       return;
     }
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      showErr('This browser does not expose the microphone API on this page. ' +
-        'Chrome and Edge allow mic access even when soundLAB is opened from file:// — ' +
-        'Firefox and Safari need the app served over http(s) or localhost.');
-      return;
-    }
-    startReq += 1;
-    var token = startReq;
+    App.emit('transport:claim', { owner: 'tuner' });
+    if (!visible()) return;
+    var token = ++startReq, selected = App.store.get('audio.inId', '');
     pendingMic = true;
-    els.toggle.disabled = true;
-    els.toggle.textContent = 'Requesting mic…';
-    // first try with tuner-friendly raw audio; if the device refuses to open
-    // with processing disabled (some Android WebViews do), retry plain
-    tryOpenMic({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } }, false);
-
-    function micFail(err) {
-      pendingMic = false;
-      els.toggle.disabled = false;
-      els.toggle.textContent = 'Start listening';
-      var name = err && err.name ? err.name : 'error';
-      if (name === 'NotReadableError' || name === 'AbortError') {
-        showErr('The microphone exists but could not be opened (' + name + '). Usually another app is ' +
-          'holding the mic, or the system blocked the audio device — close recorder/voice apps, check ' +
-          'Settings › Apps › soundLAB › Permissions › Microphone, then press Start again.');
-      } else if (name === 'NotAllowedError' || name === 'SecurityError') {
-        showErr('Mic permission was denied (' + name + '). In the Android app: allow the microphone prompt, ' +
-          'or enable it under Settings › Apps › soundLAB › Permissions. In a browser: click the ' +
-          'mic icon in the address bar and choose Allow, then press Start again.');
-      } else if (name === 'NotFoundError') {
-        showErr('No microphone was found on this device.');
-      } else {
-        showErr('Microphone unavailable (' + name + (err && err.message ? ': ' + err.message : '') + '). ' +
-          'Check the mic permission and try again.');
+    els.toggle.disabled = false;
+    els.toggle.textContent = 'Cancel listening';
+    els.direction.textContent = 'Opening the selected input…';
+    if (App.tonein && App.tonein.suspend) { toneSuspended = true; App.tonein.suspend(CAPTURE_TAG, true); }
+    heldReq = token;
+    Promise.resolve().then(function () {
+      if (token !== startReq) return null;
+      if (!visible()) { stopMic(); return null; }
+      return input.hold(CAPTURE_TAG, { exact: true });
+    }).then(function (state) {
+      // A canceled request has already released its lease. In particular it
+      // must not remove the same-tag hold acquired by a newer Start.
+      if (token !== startReq) return;
+      if (!visible()) { stopMic(); return; }
+      var tap = input.tap(CAPTURE_TAG);
+      if (!tap || !state || !state.on || state.fell || selected && state.device !== selected) {
+        throw new Error(state && (state.error || state.msg) || 'The selected input could not be opened; no replacement input was chosen.');
       }
-    }
-
-    function tryOpenMic(constraints, isRetry) {
-      navigator.mediaDevices.getUserMedia(constraints).then(function (s) {
-        onMicStream(s);
-      }).catch(function (err) {
-        if (token !== startReq) return;
-        if (!isRetry) { tryOpenMic({ audio: true }, true); return; }
-        micFail(err);
-      });
-    }
-
-    function onMicStream(s) {
-      if (token !== startReq) {
-        // user hid the tab / pressed stop while the permission prompt was open
-        s.getTracks().forEach(function (tr) { tr.stop(); });
-        return;
-      }
-      pendingMic = false;
-      stream = s;
-      sampleRate = ctx.sampleRate;
-      source = ctx.createMediaStreamSource(stream);
-      analyser = ctx.createAnalyser();
+      source = tap.source;
+      analyser = tap.context.createAnalyser();
       analyser.fftSize = 2048;
-      source.connect(analyser);                 // never routed to speakers — no feedback
+      source.connect(analyser); // analysis only; shared service owns the stream
+      sampleRate = tap.context.sampleRate;
+      deviceId = tap.deviceId || state.device || '';
+      pendingMic = false;
       timeBuf = new Float32Array(analyser.fftSize);
       recent.length = 0;
       game.matchSince = 0;
@@ -369,28 +359,29 @@
       els.toggle.classList.remove('primary');
       els.toggle.classList.add('danger');
       updateGameUI();
-      rafId = requestAnimationFrame(frame);
-    }
+      rafId = requestAnimationFrame(function () { frame(token); });
+    }).catch(function (error) {
+      if (token !== startReq) return;
+      stopMic();
+      showErr(error && error.message || 'The selected audio input could not be opened. Start listening again when ready.');
+    });
   }
 
   function stopMic() {
-    startReq += 1;                               // invalidates any pending permission request
+    startReq += 1;
     pendingMic = false;
+    listening = false;
     if (rafId) { cancelAnimationFrame(rafId); rafId = 0; }
-    if (stream) {
-      stream.getTracks().forEach(function (tr) { tr.stop(); });
-      stream = null;
-    }
-    if (source) {
-      try { source.disconnect(); } catch (e) { /* already gone */ }
-      source = null;
-    }
+    if (source && analyser) { try { source.disconnect(analyser); } catch (e) { /* only this owner's edge */ } }
+    source = null;
     if (analyser) {
       try { analyser.disconnect(); } catch (e) { /* not connected */ }
       analyser = null;
     }
     timeBuf = null;
-    listening = false;
+    deviceId = '';
+    if (heldReq) { heldReq = 0; if (App.audioIn) App.audioIn.release(CAPTURE_TAG); }
+    if (toneSuspended) { toneSuspended = false; if (App.tonein && App.tonein.suspend) App.tonein.suspend(CAPTURE_TAG, false); }
     App.wake.release('tun-mic');
     recent.length = 0;
     game.matchSince = 0;
@@ -619,6 +610,7 @@
       toggle: $('tun-toggle'), a4: $('tun-a4'), tuning: $('tun-tuning'),
       err: $('tun-err'), note: $('tun-note'), freq: $('tun-freq'),
       needle: $('tun-needle'), cents: $('tun-cents'), chips: $('tun-chips'),
+      direction: $('tun-direction'), announcement: $('tun-announcement'),
       gameCard: $('tun-game-card'), hint: $('tun-hint'), target: $('tun-target'),
       eq: $('tun-eq'), answer: $('tun-answer'), reveal: $('tun-reveal'),
       hear: $('tun-hear'), skip: $('tun-skip'), status: $('tun-status'),
@@ -683,6 +675,18 @@
     newTarget();
     renderIdle();
     updateGameUI();
+    App.on('audioin:device', function () {
+      if (!listening && !pendingMic) return;
+      stopMic(); showErr('The audio input changed. Start listening again when ready.');
+    });
+    App.on('audioin:state', function (state) {
+      if (!listening) return;
+      var tap = App.audioIn && App.audioIn.tap(CAPTURE_TAG);
+      if (!state.on || !tap || tap.source !== source) { stopMic(); showErr('The audio input disconnected. Reconnect and start listening again.'); }
+    });
+    App.on('transport:claim', function (event) { if (event && event.owner !== 'tuner' && (listening || pendingMic)) stopMic(); });
+    document.addEventListener('visibilitychange', function () { if (document.hidden) onHide(); });
+    window.addEventListener('pagehide', onHide);
   }
 
   function onShow() {
@@ -705,7 +709,9 @@
   }
 
   function onKey(e) {
-    if (e.repeat) return;
+    if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+    var target = e.target;
+    if (target && (target.isContentEditable || target.closest && target.closest('button,a,input,select,textarea,summary'))) return;
     var k = e.key;
     if (k === ' ' || e.code === 'Space') {
       e.preventDefault();
@@ -728,4 +734,6 @@
     onHide: onHide,
     onKey: onKey
   });
+  App.tuner = { stop: stopMic, get state() { return { listening: listening, pending: pendingMic, deviceId: deviceId,
+    visible: visible(), a4: a4, tuning: tuningId, pitch: lastPitch && Object.assign({}, lastPitch), error: els.err && !els.err.hidden ? els.err.textContent : '' }; } };
 })();

@@ -221,20 +221,31 @@ async function plan(page, text, opts) {
   });
   ok(passing.done && /Piano/.test(passing.reason) && passing.seconds === 0, 'a fresh scoped passing score can complete shared theory without invented musical notes or time');
 
-  console.log('# Woodshed completion uses fresh canonical IDs, not legacy XP totals');
+  console.log('# structured material requires selection and exact canonical evidence');
   await plan(page, 'Practice assigned piece, 3 minutes');
   const woodshed = await page.evaluate(() => {
-    const item = App.practicePlan.state().plan.items[0]; __ppRecord('old-woodshed', 'piano', 'wait', 10);
+    const setup = App.practicePlan.state().plan.items[0]; App.practicePlan.launch(setup.id);
+    const unresolved = App.store.get('pp.running') === null && setup.status === 'needsSetup';
+    const score = { id: 'pp-material-fixture', title: 'Original planner material fixture', bpm: 80, len: 1,
+      notes: [{ m: 60, t: 0, d: 1, v: 90 }], timingOk: true, source: 'test' };
+    App.store.set('ws.lib', [score]); App.switchTo('practiceplan'); App.practicePlan.editAccepted();
+    const edit = App.practicePlan.editStep(App.practicePlan.draft().items[0].id, { action: 'guidedScore', materialId: score.id });
+    App.practicePlan.accept(); const item = App.practicePlan.state().plan.items[0];
+    const material = { kind: 'legacy', id: score.id, fingerprint: PracticeMaterial.fingerprint(score) };
+    function save(id, instrument, mode, seconds, opts) { const result = __ppRecord(id, instrument, mode, seconds, opts); App.emit('performance:session', { material, session: result.session, recorded: true }); return result; }
+    save('old-woodshed', 'piano', 'wait', 10);
     App.practicePlan.launch(item.id); App.practicePlan.refresh(); const old = !!App.practicePlan.state().session.items[item.id].done;
-    App.store.set('ws.xp', 999999); __ppRecord('foreign-woodshed', 'guitar', 'tempo', 10);
-    __ppRecord('stopped-woodshed', 'piano', 'woodshed', 5, { status: 'stopped' });
-    __ppRecord('empty-woodshed', 'piano', 'wait', 0, { matched: 0 }); App.practicePlan.refresh();
+    App.store.set('ws.xp', 999999); save('foreign-woodshed', 'guitar', 'tempo', 10);
+    save('stopped-woodshed', 'piano', 'woodshed', 5, { status: 'stopped' });
+    save('empty-woodshed', 'piano', 'wait', 0, { matched: 0 });
+    __ppRecord('unrelated-material', 'piano', 'wait', 10); App.practicePlan.refresh();
     const unrelated = !!App.practicePlan.state().session.items[item.id].done;
-    const result = __ppRecord('fresh-woodshed', 'piano', 'tempo', 10); App.practicePlan.refresh();
-    return { old, unrelated, saved: result.ok, record: App.practicePlan.state().session.items[item.id] };
+    const result = save('fresh-woodshed', 'piano', 'tempo', 10); App.practicePlan.refresh();
+    return { unresolved, edited: edit.ok, old, unrelated, saved: result.ok, record: App.practicePlan.state().session.items[item.id] };
   });
-  ok(!woodshed.old && !woodshed.unrelated && woodshed.saved && woodshed.record.done && woodshed.record.sessionIds.includes('fresh-woodshed'),
-    'only a fresh completed same-instrument Woodshed session completes the assigned-piece block');
+  ok(woodshed.unresolved && woodshed.edited, 'an unresolved piece opens setup without a tracker until a real structured material is chosen');
+  ok(!woodshed.old && !woodshed.unrelated && woodshed.saved && woodshed.record.done && woodshed.record.sessionIds.includes('fresh-woodshed') && !woodshed.record.sessionIds.includes('unrelated-material'),
+    'only fresh canonical evidence for the same material fingerprint and instrument completes the assigned-piece block');
 
   console.log('# shared blocks and legacy mixed plans keep separate instrument histories');
   await plan(page, 'Ear training 1 minute', { instrument: 'guitar' });

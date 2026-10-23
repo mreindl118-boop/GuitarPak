@@ -1415,6 +1415,7 @@
       perf.chords = ['off', 'triad', '7th'].indexOf(pf.chords) !== -1 ? pf.chords : 'off';
       perf.bass = !!pf.bass;
       perf.strum = (pf.strum >= 0 && pf.strum <= 1) ? pf.strum : 0;
+      perf.arp = !!pf.arp;
       perf.rate = [2, 3, 4].indexOf(pf.rate) !== -1 ? pf.rate : 4;
       perf.dir = ['up', 'down', 'updown'].indexOf(pf.dir) !== -1 ? pf.dir : 'up';
       perf.oct = pf.oct === 2 ? 2 : 1;

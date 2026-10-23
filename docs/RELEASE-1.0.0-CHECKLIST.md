@@ -2,7 +2,7 @@
 
 Publication is conditionally authorized only after the agreed software features
 are functional and independently reviewed. This file is a working checklist,
-not evidence of a release. Source branches must be preserved. No force pushes,
+not the sole evidence of a release. Source branches must be preserved. No force pushes,
 credential changes, paid services, hardware settings or unrelated repositories.
 
 ## Implementation and review
@@ -29,7 +29,12 @@ credential changes, paid services, hardware settings or unrelated repositories.
 - [x] Session instrument snapshots, no cross-instrument duplicate credit, preserved legacy totals.
 - [x] Readable global clef control on every tab, accessible desktop/mobile and light/dark checks.
 - [x] Frozen runtime local regression and offline/mobile/color-mode evidence.
-- [ ] Exact final source hosted regression, authorized review/main publication and remote release verification.
+- [x] Exact final source hosted regression, authorized review/main publication and remote release verification.
+  Published 2026-10-23 17:03:15 UTC: PR #87, main `2077f3b`, annotated
+  `v1.0.0` object `a092bb9a8d93ac519d7e07964e6676ded0349895`, Pages
+  run 39991768834 and main/release run 39990316516 succeeded. Main passed all
+  45 suites; the fresh release passed the 45-public-asset byte gate before tagging.
+  Direct public cloud HTTP remained CONNECT 403; no physical-device claim.
 
 ## Intended release surface and process
 

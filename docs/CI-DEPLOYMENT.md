@@ -5,11 +5,17 @@ It no longer force-pushes. Local deployment/release fixtures perform no remote
 operations. A normal review-branch push of the implementation started hosted
 CI before the publication hold below; this does not establish a main release.
 
-**Current publication hold:** automatic approval review blocked creation of a
-public non-draft PR, citing the earlier no-publication restriction. No PR was
-created. Explicit approval is pending; main/tag/release and the publisher
-handoff below remain on hold. Preparing these local workflows does not bypass
-that denial or authorize another remote route.
+**1.0 publication completed:** explicit user approval on 2026-10-23 at 16:46 UTC
+resolved the earlier public-PR approval rejection. PR #87 merged at
+`2077f3bbe663d30ea228e7d3beebcedb4b2baf93`; all 45 main suites, Pages build
+39991768834 and the hosted 45-public-asset hash gate passed. Immutable
+[v1.0.0](https://github.com/mreindl118-boop/GuitarPak/releases/tag/v1.0.0)
+was published at 17:03:15 UTC. The original denial was known not to execute;
+it was retried only with the new explicit approval, initially as a draft PR.
+
+The 1.1 branch is a separate unpublished candidate. Its scope and publication
+gates are in [the 1.1 checklist](RELEASE-1.1.0-CHECKLIST.md). The release job
+below remains intentionally limited to web 1.0.0.
 
 ## Required test job
 

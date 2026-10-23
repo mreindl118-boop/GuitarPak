@@ -56,11 +56,9 @@
     if (Theory.TUNINGS[tu]) state.tuning = tu;
     var fr = App.store.get('fb.frets', 24);
     if (fr === 12 || fr === 15 || fr === 22 || fr === 24) state.frets = fr;
-    // one-time migration: settings saved before 24 frets existed stay pinned
-    // at the old maximum — bump everyone to the full neck once
+    // 24 frets is the fallback for a new installation. An absent old migration
+    // flag is not permission to replace a person's saved 12/15/22-fret choice.
     if (!App.store.get('fb.migr24', false)) {
-      state.frets = 24;
-      App.store.set('fb.frets', 24);
       App.store.set('fb.migr24', true);
     }
     var d = App.store.get('fb.display', 'notes');
@@ -2156,6 +2154,9 @@
     if (maxMode) setMax(false);
     if (els.settings) els.settings.classList.remove('open');
   }
+
+  App.on('sheet', function (event) { if (event && event.open) { prPause(); prGuideOff(); clearFlash(); } });
+  App.on('transport:claim', function (event) { if (event && event.owner !== 'fretboard') { prPause(); prGuideOff(); } });
 
   App.register('fretboard', {
     init: init,

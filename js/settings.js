@@ -4,6 +4,7 @@
 (function () {
   'use strict';
 
+  var refreshStorage = null;
   var audioUI = null; // the Sound input card's meter (set by init)
 
   function init(rootEl) {
@@ -127,16 +128,17 @@
         '</div>' +
         '<div class="muted small set-theme-note">The studio synth preset ideas play back on (full ROLI slide/pressure expression).</div>' +
       '</div>' +
-      '<div class="card">' +
-        '<h2>Backup</h2>' +
-        '<div class="muted small">Updates NEVER clear your settings &mdash; they live on this device and survive every version. ' +
-          'If things ever look reset, you are probably in a different install (a Chrome tab vs the desktop app, or another browser profile). ' +
-          'Export moves everything &mdash; preferences, palettes, jam songs, studio tracks &mdash; between installs.</div>' +
-        '<div class="row tight" style="margin-top:12px">' +
-          '<button type="button" class="btn sm" id="set-backup-out">Export settings</button>' +
-          '<label class="btn sm" style="cursor:pointer">Import settings<input type="file" id="set-backup-in" accept=".json" style="display:none"></label>' +
-          '<span class="muted small" id="set-backup-msg"></span>' +
-        '</div>' +
+      '<div class="card" id="set-storage-card">' +
+        '<h2>Settings, sampler &amp; recovery</h2>' +
+        '<p class="small muted">Preferences, palettes, legacy and instrument history, plans, songs, Studio tracks and original sampler files stay in this browser installation when storage is available. This archive includes unknown saved settings. The Music Library has its own archive. Native Bluetooth preferences and browser permissions are excluded. Clearing site data, reinstalling or OS eviction can remove local data; keep a separate backup.</p>' +
+        '<p id="set-storage-health" role="status"></p><div class="row tight">' +
+          '<button type="button" class="btn sm" id="set-backup-out">Export settings + sampler</button>' +
+          '<label class="btn sm" style="cursor:pointer">Review archive<input type="file" id="set-backup-in" accept=".json" style="display:none"></label>' +
+          '<button type="button" class="btn sm" id="set-storage-library">Music Library archive</button>' +
+        '</div><p class="small" id="set-backup-msg" role="status"></p>' +
+        '<div id="set-backup-preview" hidden><p id="set-backup-summary"></p><button class="btn primary sm" id="set-backup-apply" type="button">Apply reviewed archive</button> <button class="btn sm" id="set-backup-cancel" type="button">Cancel preview</button></div>' +
+        '<div class="row tight" style="margin-top:12px"><button class="btn sm" id="set-storage-retry" type="button">Retry unsaved changes</button><button class="btn sm" id="set-storage-pending" type="button">Export unsaved changes</button><button class="btn sm" id="set-storage-recover" type="button">Finish rollback recovery</button><button class="btn sm" id="set-storage-before" type="button">Export before-import snapshot</button><button class="btn sm" id="set-storage-reload" type="button">Reload saved settings</button></div>' +
+        '<details style="margin-top:12px"><summary>Raw data recovery</summary><p class="small muted">Unreadable or unsupported data is retained. Export recovery records before editing a replacement. A different practice-history schema requires a compatible app version; it is never downgraded here.</p><button class="btn sm" id="set-storage-raw-out" type="button">Export raw recovery records</button><label class="field">Record<select id="set-storage-key"></select></label><label class="field">Replacement JSON<textarea id="set-storage-raw" rows="5" style="width:100%;box-sizing:border-box" spellcheck="false"></textarea></label><button class="btn sm" id="set-storage-repair" type="button">Validate and save repaired record</button></details>' +
       '</div>' +
       '<div class="card">' +
         '<h2>Screen &amp; battery</h2>' +
@@ -859,40 +861,55 @@
       if (App.active === 'settings') meterStart();
     });
 
-    document.getElementById('set-backup-out').addEventListener('click', function () {
-      var out = {};
-      for (var i = 0; i < localStorage.length; i++) {
-        var k = localStorage.key(i);
-        if (k && k.indexOf('guitarlab.') === 0) out[k] = localStorage.getItem(k);
-      }
-      var blob = new Blob([JSON.stringify({ app: 'soundLAB', keys: out }, null, 1)], { type: 'application/json' });
-      var a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = 'soundlab-settings.json';
-      a.click();
-      setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
-    });
-    document.getElementById('set-backup-in').addEventListener('change', function () {
-      var f = this.files && this.files[0];
-      var msg = document.getElementById('set-backup-msg');
-      if (!f) return;
-      var rd = new FileReader();
-      rd.onload = function () {
-        try {
-          var d = JSON.parse(rd.result);
-          if (!d || d.app !== 'soundLAB' || !d.keys) throw new Error('not a soundLAB backup');
-          var n = 0;
-          Object.keys(d.keys).forEach(function (k) {
-            if (k.indexOf('guitarlab.') === 0) { localStorage.setItem(k, d.keys[k]); n++; }
-          });
-          msg.textContent = n + ' settings restored — reloading…';
-          setTimeout(function () { location.reload(); }, 900);
-        } catch (e) {
-          msg.textContent = 'Import failed: ' + e.message;
-        }
-      };
-      rd.readAsText(f);
-    });
+    var persistence=App.persistence, preview=null, applyingImport=false;
+    function storageEl(id){return document.getElementById('set-'+id);}
+    function storageMessage(text){storageEl('backup-msg').textContent=text;}
+    function downloadStorage(data,name){var url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'})),link=document.createElement('a');link.href=url;link.download=name;link.click();setTimeout(function(){URL.revokeObjectURL(url);},5000);}
+    function describeFailure(result){return result&&result.errors?result.errors.join(' '):'The storage operation could not be verified.';}
+    refreshStorage=function(){
+      if(!persistence){storageEl('storage-health').textContent='Persistence service is unavailable. Current data has not been cleared.';return;}
+      var status=persistence.status(),pending=status.pendingKeys.length+(status.pendingStrictKeys||[]).length,issues=status.issues||[];
+      storageEl('storage-health').textContent=status.recoveryRequired?'An import or recovery is active or incomplete. Original settings are retained in its journal.':!status.available?'Storage is unavailable. Unsaved session choices need a separate export.':pending||status.pendingBlobs?pending+' unsaved setting records and '+status.pendingBlobs+' sampler files. Retry or export them before closing.'+(status.needsReload?' Reload is also required to apply imported settings.':''):status.needsReload?'Saved settings are ready. Reload to apply them to every module.':issues.length?issues.length+' unreadable or unsupported records were retained. Review raw data recovery.':'Saved settings are available on this installation. No unsaved changes are reported.';
+      storageEl('storage-recover').disabled=!status.recoveryRequired||status.localBusy;
+      storageEl('storage-retry').disabled=status.busy;
+      storageEl('storage-reload').disabled=status.busy;
+      storageEl('backup-apply').disabled=!preview||status.busy||applyingImport;
+      var select=storageEl('storage-key'),old=select.value;select.innerHTML='';issues.filter(function(i){return i.status==='corrupt'||i.status==='unsupported';}).forEach(function(issue){var option=document.createElement('option');option.value=issue.key;option.textContent=issue.key+' · '+issue.status;select.appendChild(option);});if(Array.from(select.options).some(function(o){return o.value===old;}))select.value=old;
+      if(select.value!==old||!storageEl('storage-raw').value)storageEl('storage-raw').value=select.value?persistence.read(select.value).raw||'':'';
+      storageEl('storage-repair').disabled=!select.value||status.busy;
+    };
+    if(persistence)persistence.subscribe(refreshStorage);else refreshStorage();
+    storageEl('storage-key').addEventListener('change',function(){storageEl('storage-raw').value=persistence.read(this.value).raw||'';});
+    storageEl('storage-library').onclick=function(){App.switchTo('musiclibrary');};
+    storageEl('backup-out').onclick=async function(){try{if(!persistence)throw new Error('Persistence service is unavailable.');storageMessage('Preparing settings and sampler archive…');var archive=await persistence.exportArchive({includePending:true});downloadStorage(archive,'soundlab-settings-sampler.json');storageMessage('Archive downloaded: '+archive.records.length+' setting records and '+archive.blobs.length+' sampler files. Music Library/native preferences are separate. Unsaved session preference/sample choices, if present, are included.');}catch(e){storageMessage('Export failed: '+e.message);}};
+    storageEl('backup-in').onchange=async function(){var file=this.files&&this.files[0];this.value='';if(!file)return;preview=null;storageEl('backup-preview').hidden=true;try{if(file.size>128*1024*1024)throw new Error('Keep settings archives under 128 MB.');var candidate=await persistence.prepareImport(JSON.parse(await file.text()));if(!candidate.ok)throw new Error(describeFailure(candidate));preview=candidate;storageEl('backup-summary').textContent=candidate.changed+' changed records ('+candidate.added+' new, '+candidate.replaced+' replaced), '+candidate.samples+' sampler files. '+candidate.policy+' '+candidate.warnings.join(' ');storageEl('backup-preview').hidden=false;storageMessage('Archive validated for preview. No settings have changed.');refreshStorage();}catch(e){storageMessage('Import preview rejected: '+e.message);}};
+    storageEl('backup-cancel').onclick=function(){preview=null;storageEl('backup-preview').hidden=true;storageMessage('Preview cancelled. No settings were changed.');};
+    storageEl('backup-apply').onclick=async function(){
+      if(!preview||applyingImport)return;
+      var release=null;applyingImport=true;
+      try{
+        if(typeof App.blockInteraction!=='function')throw new Error('The safe restore interaction guard is unavailable. Reload the app before applying this archive.');
+        release=App.blockInteraction('Saving current practice and applying the reviewed settings archive. Please wait before editing or starting practice.');
+        refreshStorage();storageMessage('Checkpointing current practice and preparing a verified before-snapshot…');
+        var checkpoint=App.checkpoint?await App.checkpoint({reason:'settings-import'}):await persistence.checkpoint();
+        if(!checkpoint.ok)throw new Error(describeFailure(checkpoint));
+        var rebased=await persistence.rebaseImport(preview);
+        if(!rebased.ok)throw new Error(describeFailure(rebased));
+        var result=await persistence.commitImport(preview);
+        if(!result.ok)throw new Error(describeFailure(result)+(result.rolledBack?' Original settings and sampler bytes were rolled back.':''));
+        preview=null;storageEl('backup-preview').hidden=true;
+        var saved=persistence.status(),pending=saved.pendingKeys.length+(saved.pendingStrictKeys||[]).length+saved.pendingBlobs;
+        storageMessage('Settings and sampler import verified. The before-import snapshot is retained. '+(pending?'New changes remain unsaved. Retry or export them before reloading.':'Reload saved settings to apply the imported choices.'));
+      }catch(e){storageMessage('Import did not complete: '+e.message);}
+      finally{if(release)release();applyingImport=false;refreshStorage();}
+    };
+    storageEl('storage-retry').onclick=async function(){var result=App.checkpoint?await App.checkpoint({reason:'storage-retry'}):await persistence.checkpoint();storageMessage(result.ok?'Pending changes were verified.':describeFailure(result));refreshStorage();};
+    storageEl('storage-pending').onclick=async function(){try{downloadStorage(await persistence.exportPendingArchive(),'soundlab-unsaved-settings-sampler.json');storageMessage('Unsaved preference/sample bundle downloaded. Unconfirmed canonical candidates are diagnostic records, not newly earned XP.');}catch(e){storageMessage('Unsaved export failed: '+e.message);}};
+    storageEl('storage-recover').onclick=async function(){var result=await persistence.recover();storageMessage(result.ok?'Original settings and sampler bytes were recovered. Reload saved settings.':describeFailure(result));refreshStorage();};
+    storageEl('storage-before').onclick=async function(){try{downloadStorage(await persistence.beforeSnapshot(),'soundlab-before-import.json');storageMessage('Verified before-import snapshot downloaded.');}catch(e){storageMessage(e.message);}};
+    storageEl('storage-reload').onclick=async function(){var result=App.checkpoint?await App.checkpoint({reason:'settings-reload'}):await persistence.checkpoint();if(result.ok)location.reload();else storageMessage(describeFailure(result));};
+    storageEl('storage-raw-out').onclick=function(){try{downloadStorage(persistence.exportRecovery(),'soundlab-raw-recovery.json');storageMessage('Raw recovery records downloaded. Original unreadable bytes were retained.');}catch(e){storageMessage(e.message);}};
+    storageEl('storage-repair').onclick=function(){var result=persistence.repair(storageEl('storage-key').value,storageEl('storage-raw').value);storageMessage(result.ok?'Repaired record verified. Original bytes are retained in raw recovery. Reload saved settings.':describeFailure(result));refreshStorage();};
 
     paintMidi();
   }
@@ -901,6 +918,7 @@
     init: init,
     onHide: function () { if (audioUI) audioUI.hide(); },
     onShow: function () {
+      if(refreshStorage)refreshStorage();
       if (audioUI) audioUI.show();
       // dynamic prefs may have changed elsewhere (pads click chip, wake from
       // code, volume) — re-read them when the page opens
