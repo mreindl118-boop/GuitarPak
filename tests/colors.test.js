@@ -13,8 +13,9 @@ const env = require('./env');
 let fails = 0;
 function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console.log('  FAIL', msg); } }
 
-const DEG = ['#ffab47', '#e8d44d', '#7ad97a', '#4cc9b0', '#6ea8fe', '#b48ef0', '#ff85b3'];
-const NOTE = ['#ff7583', '#ee9468', '#edb75a', '#f2de5f', '#c6f047', '#82ef6c', '#6cefad', '#39efef', '#6cb8ef', '#849bf5', '#a392f6', '#d27efc'];
+const DEG = ['#ffaa2e', '#ffd429', '#7dfc74', '#41eab4', '#439af5', '#7e58f5', '#ff6460'];
+const NOTE = ['#ff6460', '#ff8944', '#ffb12d', '#ffd429', '#caf945', '#85fc6f', '#4df2a2', '#29dbd9', '#35b2ef', '#4f86f9', '#7160f9', '#9746ec'];
+const BLUE = '#5e6dff'; // custom #2040ff quantized to the shared supported palette
 // C major on the LUMI (C3-B4): velocity = LUMI color table index
 const DEG_VEL = { 0: 23, 2: 34, 4: 60, 5: 74, 7: 97, 9: 116, 11: 6 };   // today's degree colors
 const NOTE_VEL = { 0: 6, 2: 25, 4: 50, 5: 59, 7: 82, 9: 101, 11: 124 }; // NOTE_DEFAULTS, nearest LUMI color
@@ -80,6 +81,15 @@ const litMatches = (lit, vel) => {
   const browser = await chromium.launch({ executablePath: env.CHROMIUM, args: ['--autoplay-policy=no-user-gesture-required'] });
   let { ctx, page, errs } = await newPage(browser);
 
+  console.log('# sole clef color control');
+  const clef = await page.evaluate(() => {
+    const all = [...document.querySelectorAll('[data-cxcolormode]')], note = all.find(b => b.dataset.cxcolormode === 'note');
+    note.click(); const noteActive = note.getAttribute('aria-pressed') === 'true' && App.colors.mode() === 'note';
+    all.find(b => b.dataset.cxcolormode === 'interval').click();
+    return { labels: all.map(b => b.textContent), noteActive, interval: App.colors.mode() === 'interval', count: document.querySelectorAll('.cx-colors').length };
+  });
+  ok(clef.labels.join() === 'Intervals,Note Names' && clef.count === 1 && clef.noteActive && clef.interval, 'clef offers one live two-state Intervals / Note Names control');
+
   console.log('# the service');
   const sv = await page.evaluate(() => {
     App.emit('fb:set', { source: 't', root: 0, scale: 'major', mode: 1 });
@@ -93,7 +103,7 @@ const litMatches = (lit, vel) => {
   ok(JSON.stringify(sv.deg) === JSON.stringify(DEG), 'degrees() = the degree defaults');
   ok(JSON.stringify(sv.notes) === JSON.stringify(NOTE) && JSON.stringify(sv.defs) === JSON.stringify(NOTE), 'notes() = NOTE_DEFAULTS (12, C..B)');
   ok(sv.lumiDistinct === 12, 'all 12 note defaults land on 12 different LUMI colors');
-  ok(sv.e === DEG[2] && sv.out === null && sv.outStep === null && sv.wrap === DEG[2], 'interval: forNote(pc, step) = degree color, out of scale = null, step wraps % 7');
+  ok(sv.e === DEG[2] && sv.out === '#ffbd2b' && sv.outStep === '#ffbd2b' && sv.wrap === DEG[2], 'interval: all twelve chromatic steps have root-relative pitch colors; obsolete step argument cannot alter identity');
 
   console.log('# interval mode keeps today\'s colors');
   await page.evaluate(() => App.switchTo('fretboard'));
@@ -181,7 +191,7 @@ const litMatches = (lit, vel) => {
     App.midi.guide(null, null); o.clear = __lit()[61];
     return o;
   });
-  ok(gd.now === 127 && gd.note === 14 && gd.int === DEG_VEL[0] && gd.clear === undefined, 'LUMI next note C# (off the scale) blinks in C#’s note color (14), by interval in the root’s (23): ' + JSON.stringify(gd));
+  ok(gd.now === NOTE_VEL[0] && gd.note === 15 && gd.int === 28 && gd.clear === undefined, 'LUMI current and next notes preserve mapped pitch identity; C# uses its derived note/interval blend: ' + JSON.stringify(gd));
 
   // chord tones outside the key: their note color by note, NON_KEY grey by interval
   const chd = await page.evaluate(() => {
@@ -198,7 +208,7 @@ const litMatches = (lit, vel) => {
   });
   ok(chd.names.length === 4 && /F#$/.test(chd.names[1]), 'Chords: D7 loaded in C major: ' + chd.names.join(' '));
   ok(chd.note[0] === NOTE[2] && chd.note[1] === NOTE[6] && chd.iiN === NOTE[2], 'Note mode: D7’s F# (out of the key) in F#’s note color, D and the ii chip in D’s: ' + chd.note.join(' '));
-  ok(chd.int[0] === DEG[1] && chd.int[1] === '#8f867c' && chd.iiI === DEG[1], 'Interval mode: the F# outside the key is grey, D = degree 2: ' + chd.int.join(' '));
+  ok(chd.int[0] === DEG[1] && chd.int[1] === '#2fbced' && chd.iiI === DEG[1], 'Interval mode: F# uses the chromatic flat-five blend, D = degree 2: ' + chd.int.join(' '));
 
   // Studio piano roll: the same service (a fresh install now gets the degree
   // defaults there too — before v0.79 it had its own fallback palette)
@@ -226,7 +236,7 @@ const litMatches = (lit, vel) => {
   });
   await goTo('fretboard');
   ok(roll.note.join() === [NOTE[2], NOTE[6]].join(), 'Studio piano roll, Note mode: D and F# in their note colors: ' + roll.note.join(' '));
-  ok(roll.int.join() === [DEG[1], '#8a8a92'].join(), 'Interval mode: D = degree 2 (the shared default, not the old #ffd166), F# off the key grey: ' + roll.int.join(' '));
+  ok(roll.int.join() === [DEG[1], '#2fbced'].join(), 'Interval mode: D = degree 2, F# uses the same chromatic blend as every other view: ' + roll.int.join(' '));
 
   console.log('# Fretboard settings editor');
   const ed = await page.evaluate(() => {
@@ -235,7 +245,7 @@ const litMatches = (lit, vel) => {
     const act = document.querySelector('#fb-colmode [data-fbcolmode].active');
     o.seg = act && act.textContent;
     const pick = Array.from(document.querySelectorAll('#fb-colors input[data-fbncol]'));
-    o.pickers = pick.length;
+    o.pickers = pick.length; o.derived = pick.filter(e => e.disabled).length;
     o.degPickers = document.querySelectorAll('#fb-colors input[data-fbcol]').length;
     o.labels = Array.from(document.querySelectorAll('#fb-colors .fb-colpick')).map(l => l.textContent.trim());
     const e = document.querySelector('#fb-colors input[data-fbncol="4"]');
@@ -245,11 +255,11 @@ const litMatches = (lit, vel) => {
     o.notesE = App.colors.notes()[4];
     return o;
   });
-  ok(ed.seg === 'Note' && ed.pickers === 12 && ed.degPickers === 0, 'the editor mirrors the store: Note mode, 12 note pickers: ' + ed.pickers);
+  ok(ed.seg === 'Note' && ed.pickers === 12 && ed.derived === 5 && ed.degPickers === 0, 'the editor mirrors the store: Note mode, seven editable naturals and five derived accidental swatches: ' + ed.pickers);
   ok(ed.labels[0] === 'C' && ed.labels[1] === 'C#/Db' && ed.labels[11] === 'B', 'pickers labelled C, C#/Db … B: ' + ed.labels.join(' '));
-  ok(ed.notesE === '#2040ff' && Array.isArray(ed.stored) && ed.stored.length === 12, 'a custom note color is stored (fb.noteColors)');
+  ok(ed.notesE === BLUE && Array.isArray(ed.stored) && ed.stored.length === 12 && ed.stored[4] === '#2040ff' && ed.stored[1] === '#ee9468', 'custom natural source persists without overwriting a legacy accidental source entry (fb.noteColors)');
   const c = await snapshot(page);
-  ok(c.fbE === '#2040ff' && c.pnE === '#2040ff' && c.thE === '#2040ff', 'the custom E color reaches the fretboard, the Keys page and Theory');
+  ok(c.fbE === BLUE && c.pnE === BLUE && c.thE === BLUE, 'the custom E color reaches the fretboard, the Keys page and Theory');
   ok(c.lit[52] === 106 && c.lit[64] === 106 && c.lit[48] === NOTE_VEL[0], 'and the LUMI (E keys -> its nearest blue): ' + c.lit[64]);
 
   console.log('# persistence');
@@ -261,8 +271,8 @@ const litMatches = (lit, vel) => {
     return { mode: App.colors.mode(), e: App.colors.notes()[4] };
   });
   const pr = await snapshot(page);
-  ok(p.mode === 'note' && p.e === '#2040ff', 'mode and custom color survive a reload');
-  ok(pr.fbE === '#2040ff' && pr.fbC === NOTE[0] && pr.pnE === '#2040ff', 'pages paint note colors right from boot');
+  ok(p.mode === 'note' && p.e === BLUE, 'mode and custom color survive a reload');
+  ok(pr.fbE === BLUE && pr.fbC === NOTE[0] && pr.pnE === BLUE, 'pages paint note colors right from boot');
   ok(pr.lit[60] === NOTE_VEL[0] && pr.lit[62] === NOTE_VEL[2] && !pr.lit[61], 'the LUMI too, after reconnect: ' + JSON.stringify(pr.lit));
 
   console.log('# the LUMI’s own display (app lights off) follows the mode');
@@ -273,7 +283,7 @@ const litMatches = (lit, vel) => {
       c = '#' + [r, g, bl].map(v => v.toString(16).padStart(2, '0')).join(''); } }); return c; };
     __sent.length = 0;
     App.midi.setLightsOn(false);
-    const o = { root: slot(0x30), scale: slot(0x20) };
+    const o = { root: slot(0x30), scale: slot(0x20), offKeys: Object.keys(__lit()).length, offOns: __sent.filter(b => b[0] === 0x90).length };
     __sent.length = 0;
     App.colors.setMode('interval');
     o.iRoot = slot(0x30); o.iScale = slot(0x20); o.iNotes = __sent.filter(b => b[0] === 0x90).length;
@@ -282,8 +292,8 @@ const litMatches = (lit, vel) => {
     o.back = __lit()[64];
     return o;
   });
-  ok(nat.root === NOTE[0] && nat.scale === NOTE[7], 'note mode: the LUMI’s root slot = C’s note color, scale slot = G (degree 5): ' + [nat.root, nat.scale]);
-  ok(nat.iRoot === DEG[0] && nat.iScale === DEG[4] && nat.iNotes === 0, 'a mode switch with lights off re-sends its two colors (degree 1 + 5), no key lights: ' + [nat.iRoot, nat.iScale]);
+  ok(nat.offKeys === 0 && nat.offOns === 0, 'master OFF releases every owned pitch note without new note-ons: ' + [nat.root, nat.scale]);
+  ok(nat.iNotes === 0, 'a mode switch with master OFF cannot relight pitch notes: ' + [nat.iRoot, nat.iScale]);
   ok(nat.back === 106, 'lights on again: back to the app’s per-key note colors');
 
   // a page that owns the keybed (Pads: night mode + its 8 keys) keeps it, lights off or not
@@ -338,7 +348,7 @@ const litMatches = (lit, vel) => {
     o.reset = App.colors.degrees()[2]; o.litReset = __lit()[64];
     return o;
   });
-  ok(dg.deg === '#2040ff' && dg.lit === 106 && dg.dc === '#2040ff', 'a custom degree color still applies everywhere (Interval mode)');
+  ok(dg.deg === BLUE && dg.lit === 106 && dg.dc === BLUE, 'a custom degree color still applies everywhere (Interval mode)');
   ok(dg.reset === DEG[2] && dg.litReset === DEG_VEL[4], 'and its Reset restores the degree defaults');
 
   console.log('# storage that refuses writes (private window, full quota)');
@@ -360,7 +370,7 @@ const litMatches = (lit, vel) => {
     return o;
   });
   ok(nb.mode === 'note' && nb.stored === 'interval' && nb.fbE === NOTE[4], 'the switch still holds for the session (not stored) and repaints: ' + JSON.stringify(nb));
-  ok(nb.e === '#2040ff' && nb.pnE === '#2040ff' && nb.back === 'interval' && nb.backE === NOTE[4], 'a color edit applies too, and switching back works');
+  ok(nb.e === BLUE && nb.pnE === BLUE && nb.back === 'interval' && nb.backE === NOTE[4], 'a color edit applies too, and switching back works');
 
   const nl = await page.evaluate(() => {
     App.store.set('midi.lumi', false); // another keyboard: no LUMI color row

@@ -59,33 +59,36 @@ const keys = o => Object.keys(o).map(Number).sort((a, b) => a - b);
   ok(lv[2].mode === 3 && lv[2].lit.join() === '48,60' && lv[1].lit.join() === '48,60' && lv[1].vel[48] === 23, 'Target / Tonic: only the home keys, in the home color: ' + lv[1].lit);
   ok(lv[0].mode === 3 && lv[0].lit.length === 0, 'None: nothing lit');
 
-  console.log('# LED scale + scale lock (the clef dropdown)');
+  console.log('# sole LUMI Display master + scale lock (the clef dropdown)');
   const led = await page.evaluate(() => {
     const o = {}, b = () => document.getElementById('cx-led');
-    App.help.set(1); // Tonic: normally only the home keys
-    App.switchTo('fretboard');
-    App.ctx(true);
-    o.before = { pressed: b().getAttribute('aria-pressed'), n: Object.keys(__lit()).length };
+    App.help.set(1); // Untouched legacy settings still show only home keys.
+    App.switchTo('fretboard'); App.ctx(true);
+    o.before = { enabled: App.midi.displayEnabled, pressed: b().getAttribute('aria-pressed'), n: Object.keys(__lit()).length };
     b().click();
-    o.scale = { mode: App.midi.ledMode, n: Object.keys(__lit()).length, lumi: __mode(), pressed: b().getAttribute('aria-pressed') };
-    App.help.set(0);
-    o.scale.none = Object.keys(__lit()).length;
-    b().click();
-    o.off = { mode: App.midi.ledMode, n: Object.keys(__lit()).length, lumi: __mode(), on: App.midi.lightsOn, pressed: b().getAttribute('aria-pressed') };
-    App.help.set(1);
+    o.off = { enabled: App.midi.displayEnabled, n: Object.keys(__lit()).length, lumi: __mode(), pressed: b().getAttribute('aria-pressed') };
+    // The historical advanced preference cannot override the sole master.
     App.midi.setLightsOn(true);
-    o.sheet = { mode: App.midi.ledMode, n: Object.keys(__lit()).length };
-    App.help.set(4);
+    o.advancedCannotEnable = !App.midi.displayEnabled && Object.keys(__lit()).length === 0;
+    b().click(); App.help.set(0);
+    o.on = { enabled: App.midi.displayEnabled, n: Object.keys(__lit()).length, lumi: __mode(), pressed: b().getAttribute('aria-pressed'), connected: App.midi.displayState.connected };
+    b().click();
+    o.offAgain = { enabled: App.midi.displayEnabled, n: Object.keys(__lit()).length, pressed: b().getAttribute('aria-pressed') };
+    // Isolate the older Help/guide-color compatibility checks below. Master
+    // persistence and every explicit ON/OFF combination have their own suite.
+    App.store.set('lights.displayEnabled', null);
+    App.store.set('lights.outputId', null); // legacy selected-output behavior, separate from persisted-master tests
+    App.midi.guide(null, null); App.midi.setLightsOn(true); App.help.set(4);
     return o;
   });
-  ok(led.before.pressed === 'false' && led.before.n === 2, 'Tonic level: the toggle reads off, only the home keys lit: ' + JSON.stringify(led.before));
-  ok(led.scale.mode === 'scale' && led.scale.n === 14 && led.scale.lumi === 3 && led.scale.pressed === 'true' && led.scale.none === 14,
-    'LED scale on: the whole selected scale lights, at any Help level: ' + JSON.stringify(led.scale));
-  ok(led.off.mode === 'off' && led.off.n === 0 && led.off.lumi === 3 && !led.off.on && led.off.pressed === 'false', 'LED scale off: the keyboard goes dark (no LUMI scale mode either): ' + JSON.stringify(led.off));
-  ok(led.sheet.mode === 'auto' && led.sheet.n === 2, 'Lights & help On returns to the Help level: ' + JSON.stringify(led.sheet));
+  ok(led.before.enabled && led.before.pressed === 'true' && led.before.n === 2, 'legacy Tonic layout remains enabled and the master truthfully reads On: ' + JSON.stringify(led.before));
+  ok(!led.off.enabled && led.off.n === 0 && led.off.lumi === 3 && led.off.pressed === 'false', 'LUMI Display Off darkens the keyboard and keeps its background dark: ' + JSON.stringify(led.off));
+  ok(led.advancedCannotEnable, 'advanced legacy lighting preference cannot override the master Off state');
+  ok(led.on.enabled && led.on.n === 14 && led.on.lumi === 3 && led.on.pressed === 'true' && led.on.connected, 'explicit master On shows the selected scale even at Help None: ' + JSON.stringify(led.on));
+  ok(!led.offAgain.enabled && led.offAgain.n === 0 && led.offAgain.pressed === 'false', 'the same authoritative master turns all owned scale lights off again');
   const lock = await page.evaluate(() => {
     const seen = [], o = {};
-    App.on('midi:note', d => seen.push((d.on ? '+' : '-') + d.midi));
+    App.on('midi:note', d => seen.push((d.on ? (d.blocked ? 'x' : '+') : '-') + d.midi));
     App.switchTo('fretboard'); // C major
     document.getElementById('cx-lock').click();
     o.state = { on: App.scaleLock.on, active: App.scaleLock.active, cls: document.documentElement.classList.contains('scale-locked'),
@@ -108,12 +111,12 @@ const keys = o => Object.keys(o).map(Number).sort((a, b) => a - b);
     __play(61); o.after = seen.join(); o.off = !App.scaleLock.on && !document.documentElement.classList.contains('scale-locked');
     return o;
   });
-  ok(lock.state.on && lock.state.active && lock.state.cls && lock.state.pressed === 'true' && /Only C Major notes play/.test(lock.state.note), 'Scale lock on: ' + JSON.stringify(lock.state));
-  ok(lock.locked === '-61,+62,-62', 'a keyboard note outside the scale never plays (its note-off still passes); in-scale notes do: ' + lock.locked);
-  ok(lock.quiz === '+61,-61' && !lock.quizActive, 'Exercises need every note: the lock pauses there: ' + lock.quiz);
+  ok(lock.state.on && lock.state.active && lock.state.cls && lock.state.pressed === 'true' && /Only C Major pitched notes play/.test(lock.state.note), 'Scale lock on globally: ' + JSON.stringify(lock.state));
+  ok(lock.locked === 'x61,-61,+62,-62', 'blocked incoming notes remain visible for grading with paired offs; allowed notes remain playable: ' + lock.locked);
+  ok(lock.quiz === 'x61,-61' && lock.quizActive, 'Exercises retain blocked answers for grading while their sound stays locked: ' + lock.quiz);
   ok(lock.touch === 1 && /brightness/.test(lock.dim), 'on-screen keys outside the scale are dimmed and do not play: ' + JSON.stringify([lock.touch, lock.dim]));
   ok(lock.off && lock.after.endsWith('+61,-61'), 'unlocked: every note plays again: ' + lock.after);
-  ok(lock.shed === '+61,-61' && lock.songs === false, 'Woodshed and Songs judge their own material: the lock pauses there: ' + JSON.stringify([lock.shed, lock.songs]));
+  ok(lock.shed === 'x61,-61' && lock.songs === true, 'Woodshed and Songs share the global pitched-note lock: ' + JSON.stringify([lock.shed, lock.songs]));
   const studio = await page.evaluate(async () => {
     const wait = ms => new Promise(r => setTimeout(r, ms));
     App.scaleLock.set(true);
@@ -133,7 +136,7 @@ const keys = o => Object.keys(o).map(Number).sort((a, b) => a - b);
     App.switchTo('quiz'); await wait(900);
     return o;
   });
-  ok(studio.space === 'studio' && studio.melodic && studio.drums === false, 'Studio: the lock holds for melodic tracks, not an armed drum track: ' + JSON.stringify(studio));
+  ok(studio.space === 'studio' && studio.melodic && studio.drums === true, 'Studio: arming drums does not unlock other pitched tracks; drum voice factories are exempt explicitly: ' + JSON.stringify(studio));
   ok(studio.toast && studio.toastShown, 'Ideas page messages show in a toast while the clef dropdown is tucked away: ' + studio.toast);
   const col = await page.evaluate(() => {
     App.help.set(4); const from = __sent.length; App.store.set('lights.bright', 40); App.midi.repaint();
@@ -150,8 +153,8 @@ const keys = o => Object.keys(o).map(Number).sort((a, b) => a - b);
     App.midi.guide(null, null); o.clear = __lit();
     return o;
   });
-  ok(gd[4][64] === 127 && gd[4][65] === 74 && gd[4][60] === 23, 'Full: the note to play white, the next one blinking in its color, the rest of the scale stays colored');
-  ok(gd[2][64] === 127 && !gd[2][65], 'Target: only the note to play');
+  ok(gd[4][64] === 60 && gd[4][65] === 74 && gd[4][60] === 23, 'Full: the note to play in its mapped pitch color, the next one blinking in its color, the rest of the scale stays colored');
+  ok(gd[2][64] === 60 && !gd[2][65], 'Target: only the note to play');
   ok(!gd[1][64] && keys(gd[1]).join() === '48,60', 'Tonic: no guide, home keys only');
   const blink = await page.evaluate(async () => { App.help.set(4); App.midi.guide(64, 65); const a = __lit()[65]; await new Promise(r => setTimeout(r, 350)); const b = __lit()[65]; App.midi.guide(null, null); App.help.set(1); return [a, b]; });
   ok(blink[0] === 74 && blink[1] === undefined, 'the next note really blinks (color, off): ' + JSON.stringify(blink));
@@ -188,7 +191,7 @@ const keys = o => Object.keys(o).map(Number).sort((a, b) => a - b);
     App.help.set(2);
     App.switchTo('quiz');
     SLQuiz.start('notes/nat/treble/3');                        // play the note you see
-    const o = { q: SLQuiz.q.kind, during: Object.keys(__lit()).length, mode: __mode() };
+    const o = { q: SLQuiz.q.kind, during: Object.keys(__lit()).map(Number), mode: __mode(), targets: SLQuiz.lumiTargets().map(n => App.midi.fold(n)) };
     const want = SLQuiz.q.pc, wrong = (want + 1) % 12;
     __play(60 + wrong);
     o.reveal = Object.keys(__lit()).map(Number).filter(m => m % 12 === want).length;
@@ -200,7 +203,7 @@ const keys = o => Object.keys(o).map(Number).sort((a, b) => a - b);
     o.after = Object.keys(__lit()).map(Number).sort((a, b) => a - b).join();
     return o;
   });
-  ok(ex.q === 'single' && ex.during === 0 && ex.mode === 3, 'an Exercises question darkens the keybed (no hints from the layout)');
+  ok(ex.q === 'single' && ex.mode === 3 && ex.during.length === 1 && ex.during.join() === ex.targets.join(), 'an Exercises question shows only its structured target; unrelated scale keys remain dark');
   ok(ex.reveal === 2 && ex.revealOnly, 'after you play, the right note lights in both octaves (Help: Target)');
   ok(ex.noRevealAtTonic === 0, 'at Tonic and below the answer is not shown');
   ok(ex.after === '48,60', 'back on the path, the layout returns: ' + ex.after);
@@ -219,13 +222,15 @@ const keys = o => Object.keys(o).map(Number).sort((a, b) => a - b);
     App.emit('fb:set', { source: 't', root: 7, scale: 'major' });
     App.midi.guide(60, 62);
     o.offSent = __sent.length;
+    o.offNoteOns = __sent.filter(b => (b[0] & 0xf0) === 0x90 && b[2] > 0).length;
     App.midi.setLightsOn(true);
     o.onMode = __mode();
+    App.midi.guide(null, null); // do not leak this test's blinking guide into later recovery checks
     return o;
   });
   ok(pd.mode === 3 && pd.lit === 8 && pd.noScale, 'Pads own the keybed: LUMI dark, its 8 pad keys lit, no scale pushes meanwhile');
   ok(pd.back === 3, 'leaving Pads hands the keybed back to the app');
-  ok(pd.offSent === 0 && pd.onMode === 3 && pd.offMode === 1, 'lights off: the LUMI gets its own scale display back and is left alone; on again repaints');
+  ok(pd.offNoteOns === 0 && pd.onMode === 3 && pd.offMode === 3, 'lighting off keeps a dark LUMI and sends no new note-ons; dark-background configuration is harmless, and On repaints');
 
   console.log('# control center');
   const cc = await page.evaluate(() => {
@@ -278,6 +283,7 @@ const keys = o => Object.keys(o).map(Number).sort((a, b) => a - b);
   console.log('# reconnecting and re-sending the physical keybed');
   const recovery = await page.evaluate(() => {
     App.switchTo('piano');
+    App.midi.guide(null, null);
     App.help.set(4);
     App.emit('fb:set', { source: 't', root: 0, scale: 'major', mode: 1 });
     App.switchTo('lights');

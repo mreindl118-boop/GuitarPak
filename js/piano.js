@@ -302,7 +302,21 @@
     if (sel.value !== pnVoice) { sel.value = 'piano'; pnVoice = 'piano'; } // preset gone
   }
 
+  var pianoSources = [];
+  function trackPianoSource(src, gain) {
+    var v = { src: src, gain: gain }; pianoSources.push(v);
+    src.onended = function () { var i = pianoSources.indexOf(v); if (i >= 0) pianoSources.splice(i, 1); };
+  }
+  function clearPianoSound() {
+    arpStop();
+    if (pnSyn) { try { pnSyn.allNotesOff(); } catch (e) {} }
+    pianoSources.splice(0).forEach(function (v) {
+      try { v.gain.gain.cancelScheduledValues(0); v.gain.gain.value = 0; v.src.stop(0); } catch (e) { /* ended */ }
+    });
+    heldVoices = {}; heldSynth = {}; perfHeld = {};
+  }
   function noteOnRaw(midi, vel, chan, when) {
+    if (App.scaleLock && !App.scaleLock.allows(midi)) return;
     var ctx;
     try { ctx = App.getAudio(); } catch (e) { return; }
     var syn = synthVoice();
@@ -331,6 +345,7 @@
     g.gain.linearRampToValueAtTime(gain, t + 0.0025);
     src.connect(g);
     g.connect(ctx.destination);
+    trackPianoSource(src, g);
     src.start(t, App.sampleLead(src.buffer)); // skip the MP3 lead-in silence
     var key = chan + '-' + midi;
     if (heldVoices[key]) noteOffRaw(midi, chan); // retrigger
@@ -502,6 +517,7 @@
   function savePerf() { App.store.set('pn.perf', perf); }
 
   function bendChan(chan, semis) {
+    if (App.scaleLock && App.scaleLock.on) semis = 0;
     if (pnSyn && pnVoice !== 'piano') { try { pnSyn.pitchBend(semis, chan); } catch (e) { /* ok */ } }
     for (var k in heldVoices) {
       var v = heldVoices[k];
@@ -522,6 +538,7 @@
   }
 
   function play(midi, when, dur, gain) {
+    if (App.scaleLock && !App.scaleLock.allows(midi)) return;
     var ctx;
     try { ctx = App.getAudio(); } catch (e) { return; }
     decodeAll(ctx);
@@ -549,6 +566,7 @@
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.06);
     src.connect(g);
     g.connect(ctx.destination);
+    trackPianoSource(src, g);
     src.start(t, App.sampleLead(src.buffer));
     src.stop(t + dur + 0.1);
   }
@@ -752,12 +770,17 @@
   // LED guidance on a connected MIDI keyboard: the sounding note bright, the
   // upcoming note blinking — "play this, this is next". The keybed engine
   // (App.midi.guide) applies the Help level and the keyboard's octave range.
+  var ledGuided = false;
   function ledGuide(cur, next) {
-    if (App.midi && App.midi.guide) App.midi.guide(cur === -1 ? null : cur, next === -1 ? null : next);
+    if (App.midi && App.midi.guide) {
+      App.midi.guide(cur === -1 ? null : cur, next === -1 ? null : next);
+      ledGuided = cur != null && cur !== -1;
+    }
   }
 
   function ledClear() {
-    if (App.midi && App.midi.guide) App.midi.guide(null, null);
+    if (ledGuided && App.midi && App.midi.guide) App.midi.guide(null, null);
+    ledGuided = false;
   }
 
   function ppSeq(path, pattern, dir) {
@@ -908,6 +931,7 @@
   // keyboard or tapping it on screen. Wrong notes flash the status. ----
 
   function guideTarget() {
+    if (!pp.seq || !pp.seq.length) { ppPause(); ppStatus('no notes'); return; }
     var pathIdx = pp.seq[pp.idx % pp.seq.length];
     var node = pp.path[pathIdx];
     var nxt = pp.path[pp.seq[(pp.idx + 1) % pp.seq.length]];
@@ -919,7 +943,9 @@
     var fing = fingerFor(pathIdx, pp.path);
     ppStatus('play ' + Theory.midiName(node.midi, pf) +
       (fing ? ' · finger ' + fing : '') + ' · ' +
-      ((pp.idx % pp.seq.length) + 1) + ' / ' + pp.seq.length);
+      ((pp.idx % pp.seq.length) + 1) + ' / ' + pp.seq.length +
+      (App.midi && App.midi.fold && App.midi.fold(node.midi) !== node.midi
+        ? ' · display shows pitch class; play the named octave on your synth' : ''));
   }
 
   // big fingering readout next to the strip while the exercise runs
@@ -934,7 +960,7 @@
 
   function guideStart() {
     pp.path = practicePath();
-    if (!pp.path.length) { ppStatus('no notes'); return; }
+    if (!pp.path.length) { ledClear(); ppStatus('no notes'); return; }
     pp.seq = ppSeq(pp.path, pp.pattern, pp.dir);
     pp.guiding = true;
     App.wake.acquire('pn-run');
@@ -946,10 +972,13 @@
     if (!pp.guiding) return;
     if (midi === pp.target) {
       pressKey(midi, 160);
+      flashKey(midi, 'ok');
       pp.idx++;
       guideTarget();
-    } else if (Theory.mod12(midi) !== Theory.mod12(pp.target)) {
-      ppStatus('not that one — play ' + Theory.midiName(pp.target, preferFlat()));
+    } else {
+      flashKey(midi, 'bad');
+      ppStatus((Theory.mod12(midi) === Theory.mod12(pp.target) ? 'Wrong octave' : 'Wrong note') +
+        ' · play ' + Theory.midiName(pp.target, preferFlat()));
     }
   }
 
@@ -963,7 +992,7 @@
   function ppStart() {
     if (pp.guide) { guideStart(); return; }
     pp.path = practicePath();
-    if (!pp.path.length) { ppStatus('no notes'); return; }
+    if (!pp.path.length) { ledClear(); ppStatus('no notes'); return; }
     pp.seq = ppSeq(pp.path, pp.pattern, pp.dir);
     try { pp.ctx = App.getAudio(); } catch (e) { ppStatus('audio unavailable'); return; }
     pp.vis.length = 0;
@@ -976,6 +1005,8 @@
       pp.nextT += pp.pause * b0;
     }
     pp.running = true;
+    var first = pp.path[pp.seq[pp.idx % pp.seq.length]], next = pp.path[pp.seq[(pp.idx + 1) % pp.seq.length]];
+    ledGuide(first.midi, next ? next.midi : -1);
     App.wake.acquire('pn-run');
     pp.timer = setInterval(ppTick, 25);
     ppTick();
@@ -1011,7 +1042,13 @@
   function ppRebuild() {
     pp.idx = 0;
     pp.pausedAtIdx = -1;
-    if (pp.running) { pp.path = practicePath(); pp.seq = ppSeq(pp.path, pp.pattern, pp.dir); }
+    if (pp.running) {
+      pp.path = practicePath(); pp.seq = ppSeq(pp.path, pp.pattern, pp.dir);
+      pp.vis.length = 0; // no queued instruction from the previous key/pattern
+      if (!pp.seq.length) { ppPause(); ppStatus('no notes'); return; }
+      pp.nextT = pp.ctx.currentTime + 0.15;
+      ledGuide(pp.path[pp.seq[0]].midi, pp.path[pp.seq[1 % pp.seq.length]].midi);
+    }
     if (pp.guiding) { pp.path = practicePath(); pp.seq = ppSeq(pp.path, pp.pattern, pp.dir); guideTarget(); }
   }
 
@@ -1653,10 +1690,13 @@
         pressKeyHold(d.midi, true);
         guideCheck(d.midi);
       } else {
-        if (!padsOwn && !d.silent && !d.mute) noteOff(d.midi, d.chan);
+        if (!padsOwn && !d.silent) noteOff(d.midi, d.chan); // releases survive mute/lock changes
         pressKeyHold(d.midi, false);
       }
     }, true); // sound first, visuals after
+    App.on('scale:boundary', clearPianoSound);
+    App.on('midi:state', clearPianoSound);
+    App.on('performance:cleanup', clearPianoSound);
     App.on('midi:bend', function (d) { if (d) bendChan(d.chan, d.semis); }, true);
     App.on('midi:pressure', function (d) { if (d) pressChan(d.chan, d.val); }, true);
 
@@ -1720,6 +1760,7 @@
     var seg = document.getElementById('pn-handseg');
     if (seg) seg.querySelectorAll('button').forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-pnhand') === hand); });
     render();
+    ppRebuild();
   }
 
   // lesson feedback on a key: 'ok' | 'meh' | 'bad' outline for a moment

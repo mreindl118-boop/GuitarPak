@@ -25,7 +25,7 @@
     ],
     fretboard: [
       { t: 'Fretboard', x: 'Every dot is a note in your key. Its color follows Color notes by (in the Fretboard’s settings, or in Lights & help): by Interval each scale degree has its color and amber is the root; by Note every C is one color in every key. The Piano and the Studio’s note editor use the same colors.' },
-      { sel: '#ctx-btn', t: 'Pick your key and scale', x: 'Tap the clef: key, scale, mode, tempo and time signature drop down here and follow you everywhere. Change them and the whole neck re-colors; tap anywhere else to tuck them away. LED scale lights the scale on your keyboard; Scale lock lets only the scale’s notes play.' },
+      { sel: '#ctx-btn', t: 'Pick your key and scale', x: 'Tap the clef for the shared key and scale. Scale Lock blocks out-of-scale pitched notes across tools, playback and MIDI; drums and recorded/live audio keep their own sound. LUMI Display independently shows the selected scale and practice targets on the configured LUMI. Its connection status appears here.' },
       { t: 'Practice runner', x: 'Below the neck: pick a pattern and press play — it walks the scale in time, shows what to play next, and can pause at turnarounds while you catch up.' }
     ],
     tab: [

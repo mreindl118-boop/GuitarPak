@@ -24,7 +24,15 @@ Sound starts after your first click anywhere (browser autoplay policy). The Tune
 | **Jam** | Backing track builder: pick a key, build or load a progression, choose a vibe (rock, pop, blues shuffle, funk, ballad, latin) and instruments — synthesized drums, bass, and guitar/pad/keys comping. Tracks are savable, tempo is shared app-wide, and it keeps playing while you use other tabs. On the Fretboard, the current chord's tones glow with smooth transitions and each chord suggests a mode to solo with (tap to apply, or auto-switch). |
 | **Tuner** | Microphone tuner with autocorrelation pitch detection: note + cents needle + Hz, adjustable A4 calibration, per-string guide. Includes a **note finder game** — it names a string and fret, you play it, real pitch detection scores your streak. |
 | **MIDI Hub** (Keys › MIDI) | Read, write and reshape MIDI for any device on the cable — a hardware synth (Yamaha MODX, Roland…), a controller, a DAW port. On-screen keys and expression, bank/program select, a wall of CC sliders, transport + MIDI clock at the app tempo, **rules** (remap, transpose, force channel, convert, block — on Thru, on what soundLAB hears, with MIDI Learn), SysEx builders per device profile plus raw hex, and a live decoded monitor of everything in and out. Generic profile works with anything; profiles add names and templates. |
+| **LUMI practice** (Keys › LUMI) | Guided single-note and major/minor triad practice: see what to play, get correct/wrong feedback, and advance when the exact notes match. An on-screen 24-key preview works with simulated answers; optional Web MIDI listens to a selected LUMI or MODX and uses the LUMI key LEDs as the display. Physical lighting remains unverified. See [the practice guide](docs/LUMI-PRACTICE.md). |
+| **Guided performance** (Practice › Woodshed) | **Wait for Me** follows exact notes/chords; **Play at Tempo** keeps time and reports accuracy, missed/wrong/extra notes, timing and hold measurements. Piano roll, target keyboard and upcoming notes work with touch/typing keys or MIDI, with optional shared LUMI cues. Includes original scale-based melody/chord exercises, MIDI/Studio/ASCII score sources, count-in, pause/resume, tempo, transpose and section looping. See [the player guide](docs/GUIDED-PERFORMANCE.md). |
 | **Trainer** | Practice session timer with a persistent log, random practice prompt generator, the classic one-minute chord-change drill with best scores, and an interval ear trainer. |
+
+For separate synth practice, LUMI targets and the synth's sound output are independently selected. The optional [scale-locked sound route](docs/PRACTICE-ROUTER.md) blocks out-of-scale MIDI notes without remapping and tracks note/pedal cleanup. The synth must have Local Control off for its own keyboard-to-engine sound to pass through the filter; soundLAB does not change that hardware setting. Physical lighting and audio behavior remain unverified.
+
+The existing treble-clef dropdown contains the independent **Scale Lock** and **LUMI Display** switches, plus **Intervals / Note Names** colors. They share its root/scale across built-in pitched sound paths and instructional displays. Screen and LED pitch identities use the same [quantized LUMI program palette](docs/NOTE-PALETTE.md); physical color appearance depends on the board program/firmware and is unverified. [Coverage and explicit exclusions](docs/FEATURE-COVERAGE-2026-10-23.md) include recorded audio, arbitrary plugins, unsupported score formats and hardware Local Control.
+
+Guitar and other pitched instruments can use [monophonic audio practice](docs/PRACTICE-INPUTS.md) through a deliberately enabled microphone, USB-audio or direct interface. MIDI pickups support chord input; audio chords require the clearly labeled arpeggio adaptation. Capture is local and does not mute direct instrument sound. [Per-instrument progress](docs/PRACTICE-PROGRESS.md) records measured engagement, accuracy and timing, daily goals/streaks, immutable earned XP and adjustable consistency decay, with charts and JSON export.
 
 ## The prompt that defines this app (refined spec)
 
@@ -49,6 +57,8 @@ Font License 1.1 and renamed as that license requires for modified versions —
 see [fonts/OFL-Bravura.txt](fonts/OFL-Bravura.txt).
 
 ## Architecture
+
+The [2026-10-23 branch audit](docs/BRANCH-AUDIT-2026-10-23.md) records the related repositories, release baselines, recovered features and remaining candidates. Cloud checks and their hardware limits are recorded in [validation notes](docs/VALIDATION-2026-10-23.md).
 
 ```
 index.html          tab shell, loads everything

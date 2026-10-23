@@ -26,6 +26,25 @@
   var els = {};
   var ctx = null;
   var noiseBuf = null;
+  var melodicSources = [];
+
+  function pitchAllowed(note) { return !App.scaleLock || App.scaleLock.allows(note); }
+  function trackMelodic(source) {
+    melodicSources.push(source);
+    var remove = function () {
+      var i = melodicSources.indexOf(source);
+      if (i !== -1) melodicSources.splice(i, 1);
+    };
+    if (source.addEventListener) source.addEventListener('ended', remove, { once: true });
+    else source.onended = remove;
+  }
+  function clearMelodic() {
+    var sources = melodicSources; melodicSources = [];
+    sources.forEach(function (source) {
+      try { source.stop(ctx.currentTime); } catch (e) { /* already ended */ }
+    });
+  }
+  App.on('scale:boundary', clearMelodic);
 
   // ---------------- state ----------------
 
@@ -290,6 +309,7 @@
   var SET_TRIM = { guitar: 0.25, eguitar: 0.48, nylon: 0.18, bass: 0.35, bassp: 1.0, keys: 1, pad: 1 };
 
   function playSample(setId, midi, t, dur, gain, attack, release) {
+    if (!pitchAllowed(midi)) return true; // deliberately handled: do not fall back to another voice
     var anchor = nearestSample(setId, midi);
     if (anchor == null) return false;
     gain *= SET_TRIM[setId] || 1;
@@ -308,6 +328,7 @@
     g.connect(ctx.destination);
     src.start(t, App.sampleLead ? App.sampleLead(src.buffer) : 0);
     src.stop(t + dur + 0.05);
+    trackMelodic(src);
     return true;
   }
 
@@ -408,6 +429,7 @@
   }
 
   function bassSynth(t, midi, dur, gain) {
+    if (!pitchAllowed(midi)) return;
     var o = ctx.createOscillator(), lp = ctx.createBiquadFilter(), g = ctx.createGain();
     o.type = 'triangle';
     o.frequency.value = Theory.noteFreq(midi);
@@ -418,6 +440,7 @@
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     o.connect(lp); lp.connect(g); g.connect(ctx.destination);
     o.start(t); o.stop(t + dur + 0.05);
+    trackMelodic(o);
   }
 
   function padChord(t, midis, dur, gain, setId) {
@@ -434,6 +457,7 @@
 
   function padSynth(t, midis, dur, gain) {
     for (var i = 0; i < midis.length; i++) {
+      if (!pitchAllowed(midis[i])) continue;
       var o = ctx.createOscillator(), lp = ctx.createBiquadFilter(), g = ctx.createGain();
       o.type = 'sawtooth';
       o.frequency.value = Theory.noteFreq(midis[i]);
@@ -445,6 +469,7 @@
       g.gain.linearRampToValueAtTime(0.0001, t + dur);
       o.connect(lp); lp.connect(g); g.connect(ctx.destination);
       o.start(t); o.stop(t + dur + 0.05);
+      trackMelodic(o);
     }
   }
 
@@ -462,6 +487,7 @@
 
   function keysSynth(t, midis, gain) {
     for (var i = 0; i < midis.length; i++) {
+      if (!pitchAllowed(midis[i])) continue;
       var o = ctx.createOscillator(), g = ctx.createGain();
       o.type = 'triangle';
       o.frequency.value = Theory.noteFreq(midis[i]);
@@ -470,6 +496,7 @@
       g.gain.exponentialRampToValueAtTime(0.0001, t + 0.42);
       o.connect(g); g.connect(ctx.destination);
       o.start(t); o.stop(t + 0.5);
+      trackMelodic(o);
     }
   }
 
@@ -742,6 +769,7 @@
   function stop() {
     if (timer) { clearInterval(timer); timer = null; }
     if (stopTimer) { clearTimeout(stopTimer); stopTimer = null; }
+    clearMelodic();
     playing = false;
     finishing = false;
     override = null;

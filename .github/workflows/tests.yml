@@ -1,0 +1,66 @@
+name: Test soundLAB
+
+on:
+  pull_request:
+  push:
+    # Main runs this same workflow through the required Pages test job.
+    branches: [codex/soundlab-lumi-consolidation-20261023]
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      source_ref:
+        description: Source ref to test; empty uses the triggering commit.
+        required: false
+        type: string
+        default: ''
+    outputs:
+      source_sha:
+        description: Exact commit that passed the complete test suite.
+        value: ${{ jobs.test.outputs.source_sha }}
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    # A cold hosted install took 9 minutes; retain time for all UI contexts.
+    timeout-minutes: 30
+    outputs:
+      source_sha: ${{ steps.source.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_ref || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Identify source
+        id: source
+        run: |
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "SL_LOG_DIR=$RUNNER_TEMP/soundlab-test-logs" >> "$GITHUB_ENV"
+      - name: Install the verified Playwright version and Chromium
+        shell: bash
+        run: |
+          set -euo pipefail
+          ci_deps="$RUNNER_TEMP/soundlab-ci"
+          npm install --prefix "$ci_deps" --no-save --ignore-scripts playwright@1.62.1
+          npx --prefix "$ci_deps" --no-install playwright install --with-deps chromium
+          export NODE_PATH="$ci_deps/node_modules"
+          echo "NODE_PATH=$NODE_PATH" >> "$GITHUB_ENV"
+          echo "CHROMIUM=$(node -e 'process.stdout.write(require("playwright").chromium.executablePath())')" >> "$GITHUB_ENV"
+      - name: Run every regression suite
+        run: bash tests/run.sh
+      - name: Show suite logs on failure
+        if: failure()
+        shell: bash
+        run: |
+          for log in "${SL_LOG_DIR:-$RUNNER_TEMP/soundlab-test-logs}"/sl-*.out; do
+            [ -f "$log" ] || continue
+            if grep -Eq 'FAIL|Error' "$log"; then
+              printf '\n%s\n' "$log"
+              tail -100 "$log"
+            fi
+          done
