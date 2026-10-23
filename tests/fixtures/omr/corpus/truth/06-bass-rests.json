@@ -1,0 +1,110 @@
+{
+  "schemaVersion": 1,
+  "id": "06-bass-rests",
+  "originalComposition": true,
+  "truthOrigin": "authored-composition-events-before-rendering",
+  "label": "Bass: half rest and quarter rest",
+  "tags": [
+    "bass",
+    "rest",
+    "half"
+  ],
+  "parts": [
+    {
+      "id": "P1",
+      "clef": "bass",
+      "keyFifths": 0,
+      "meter": {
+        "beats": 4,
+        "beatType": 4
+      },
+      "events": [
+        {
+          "type": "rest",
+          "partId": "P1",
+          "measure": 1,
+          "onsetBeats": 0,
+          "durationBeats": 2,
+          "midi": null
+        },
+        {
+          "type": "note",
+          "pitch": "F2",
+          "partId": "P1",
+          "measure": 1,
+          "onsetBeats": 2,
+          "durationBeats": 1,
+          "midi": 41
+        },
+        {
+          "type": "rest",
+          "partId": "P1",
+          "measure": 1,
+          "onsetBeats": 3,
+          "durationBeats": 1,
+          "midi": null
+        },
+        {
+          "type": "note",
+          "pitch": "C3",
+          "partId": "P1",
+          "measure": 2,
+          "onsetBeats": 4,
+          "durationBeats": 2,
+          "midi": 48
+        },
+        {
+          "type": "note",
+          "pitch": "B2",
+          "partId": "P1",
+          "measure": 2,
+          "onsetBeats": 6,
+          "durationBeats": 1,
+          "midi": 47
+        },
+        {
+          "type": "note",
+          "pitch": "A2",
+          "partId": "P1",
+          "measure": 2,
+          "onsetBeats": 7,
+          "durationBeats": 1,
+          "midi": 45
+        }
+      ],
+      "playback": [
+        {
+          "midi": 41,
+          "pitch": "F2",
+          "onsetBeats": 2,
+          "durationBeats": 1
+        },
+        {
+          "midi": 48,
+          "pitch": "C3",
+          "onsetBeats": 4,
+          "durationBeats": 2
+        },
+        {
+          "midi": 47,
+          "pitch": "B2",
+          "onsetBeats": 6,
+          "durationBeats": 1
+        },
+        {
+          "midi": 45,
+          "pitch": "A2",
+          "onsetBeats": 7,
+          "durationBeats": 1
+        }
+      ],
+      "lengthBeats": 8
+    }
+  ],
+  "repeat": null,
+  "repeatExpanded": false,
+  "tempoVisible": false,
+  "tempoBpm": null,
+  "unsupportedForInitialSingleVoiceModel": [],
+  "acceptance": "candidate-for-human-review"
+}

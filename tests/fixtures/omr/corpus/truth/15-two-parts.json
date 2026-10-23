@@ -1,0 +1,126 @@
+{
+  "schemaVersion": 1,
+  "id": "15-two-parts",
+  "originalComposition": true,
+  "truthOrigin": "authored-composition-events-before-rendering",
+  "label": "Two simultaneous independent treble/bass parts",
+  "tags": [
+    "treble",
+    "bass",
+    "multipart",
+    "unsupported-structure"
+  ],
+  "parts": [
+    {
+      "id": "P1",
+      "clef": "treble",
+      "keyFifths": 0,
+      "meter": {
+        "beats": 4,
+        "beatType": 4
+      },
+      "events": [
+        {
+          "type": "note",
+          "pitch": "E4",
+          "partId": "P1",
+          "measure": 1,
+          "onsetBeats": 0,
+          "durationBeats": 1,
+          "midi": 64
+        },
+        {
+          "type": "note",
+          "pitch": "F4",
+          "partId": "P1",
+          "measure": 1,
+          "onsetBeats": 1,
+          "durationBeats": 1,
+          "midi": 65
+        },
+        {
+          "type": "note",
+          "pitch": "G4",
+          "partId": "P1",
+          "measure": 1,
+          "onsetBeats": 2,
+          "durationBeats": 2,
+          "midi": 67
+        }
+      ],
+      "playback": [
+        {
+          "midi": 64,
+          "pitch": "E4",
+          "onsetBeats": 0,
+          "durationBeats": 1
+        },
+        {
+          "midi": 65,
+          "pitch": "F4",
+          "onsetBeats": 1,
+          "durationBeats": 1
+        },
+        {
+          "midi": 67,
+          "pitch": "G4",
+          "onsetBeats": 2,
+          "durationBeats": 2
+        }
+      ],
+      "lengthBeats": 4
+    },
+    {
+      "id": "P2",
+      "clef": "bass",
+      "keyFifths": 0,
+      "meter": {
+        "beats": 4,
+        "beatType": 4
+      },
+      "events": [
+        {
+          "type": "note",
+          "pitch": "C3",
+          "partId": "P2",
+          "measure": 1,
+          "onsetBeats": 0,
+          "durationBeats": 2,
+          "midi": 48
+        },
+        {
+          "type": "note",
+          "pitch": "G2",
+          "partId": "P2",
+          "measure": 1,
+          "onsetBeats": 2,
+          "durationBeats": 2,
+          "midi": 43
+        }
+      ],
+      "playback": [
+        {
+          "midi": 48,
+          "pitch": "C3",
+          "onsetBeats": 0,
+          "durationBeats": 2
+        },
+        {
+          "midi": 43,
+          "pitch": "G2",
+          "onsetBeats": 2,
+          "durationBeats": 2
+        }
+      ],
+      "lengthBeats": 4
+    }
+  ],
+  "repeat": null,
+  "repeatExpanded": false,
+  "tempoVisible": false,
+  "tempoBpm": null,
+  "unsupportedForInitialSingleVoiceModel": [
+    "multipart-selection-required"
+  ],
+  "acceptance": "review-required-unsupported"
+}

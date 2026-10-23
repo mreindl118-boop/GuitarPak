@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "id": "11-bass-key-eb",
+  "originalComposition": true,
+  "truthOrigin": "authored-composition-events-before-rendering",
+  "label": "Bass: three-flat key signature",
+  "tags": [
+    "bass",
+    "key-signature",
+    "flat"
+  ],
+  "parts": [
+    {
+      "id": "P1",
+      "clef": "bass",
+      "keyFifths": -3,
+      "meter": {
+        "beats": 4,
+        "beatType": 4
+      },
+      "events": [
+        {
+          "type": "note",
+          "pitch": "Eb3",
+          "partId": "P1",
+          "measure": 1,
+          "onsetBeats": 0,
+          "durationBeats": 1,
+          "midi": 51
+        },
+        {
+          "type": "note",
+          "pitch": "F3",
+          "partId": "P1",
+          "measure": 1,
+          "onsetBeats": 1,
+          "durationBeats": 1,
+          "midi": 53
+        },
+        {
+          "type": "note",
+          "pitch": "G3",
+          "partId": "P1",
+          "measure": 1,
+          "onsetBeats": 2,
+          "durationBeats": 1,
+          "midi": 55
+        },
+        {
+          "type": "note",
+          "pitch": "Ab3",
+          "partId": "P1",
+          "measure": 1,
+          "onsetBeats": 3,
+          "durationBeats": 1,
+          "midi": 56
+        }
+      ],
+      "playback": [
+        {
+          "midi": 51,
+          "pitch": "Eb3",
+          "onsetBeats": 0,
+          "durationBeats": 1
+        },
+        {
+          "midi": 53,
+          "pitch": "F3",
+          "onsetBeats": 1,
+          "durationBeats": 1
+        },
+        {
+          "midi": 55,
+          "pitch": "G3",
+          "onsetBeats": 2,
+          "durationBeats": 1
+        },
+        {
+          "midi": 56,
+          "pitch": "Ab3",
+          "onsetBeats": 3,
+          "durationBeats": 1
+        }
+      ],
+      "lengthBeats": 4
+    }
+  ],
+  "repeat": null,
+  "repeatExpanded": false,
+  "tempoVisible": false,
+  "tempoBpm": null,
+  "unsupportedForInitialSingleVoiceModel": [],
+  "acceptance": "candidate-for-human-review"
+}

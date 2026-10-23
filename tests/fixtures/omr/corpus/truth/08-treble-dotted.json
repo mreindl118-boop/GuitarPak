@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "id": "08-treble-dotted",
+  "originalComposition": true,
+  "truthOrigin": "authored-composition-events-before-rendering",
+  "label": "Treble: dotted quarter and eighth",
+  "tags": [
+    "treble",
+    "dotted",
+    "eighth"
+  ],
+  "parts": [
+    {
+      "id": "P1",
+      "clef": "treble",
+      "keyFifths": 0,
+      "meter": {
+        "beats": 4,
+        "beatType": 4
+      },
+      "events": [
+        {
+          "type": "note",
+          "pitch": "C4",
+          "partId": "P1",
+          "measure": 1,
+          "onsetBeats": 0,
+          "durationBeats": 1.5,
+          "midi": 60
+        },
+        {
+          "type": "note",
+          "pitch": "E4",
+          "partId": "P1",
+          "measure": 1,
+          "onsetBeats": 1.5,
+          "durationBeats": 0.5,
+          "midi": 64
+        },
+        {
+          "type": "note",
+          "pitch": "F4",
+          "partId": "P1",
+          "measure": 1,
+          "onsetBeats": 2.0,
+          "durationBeats": 1,
+          "midi": 65
+        },
+        {
+          "type": "note",
+          "pitch": "G4",
+          "partId": "P1",
+          "measure": 1,
+          "onsetBeats": 3.0,
+          "durationBeats": 1,
+          "midi": 67
+        }
+      ],
+      "playback": [
+        {
+          "midi": 60,
+          "pitch": "C4",
+          "onsetBeats": 0,
+          "durationBeats": 1.5
+        },
+        {
+          "midi": 64,
+          "pitch": "E4",
+          "onsetBeats": 1.5,
+          "durationBeats": 0.5
+        },
+        {
+          "midi": 65,
+          "pitch": "F4",
+          "onsetBeats": 2.0,
+          "durationBeats": 1
+        },
+        {
+          "midi": 67,
+          "pitch": "G4",
+          "onsetBeats": 3.0,
+          "durationBeats": 1
+        }
+      ],
+      "lengthBeats": 4
+    }
+  ],
+  "repeat": null,
+  "repeatExpanded": false,
+  "tempoVisible": false,
+  "tempoBpm": null,
+  "unsupportedForInitialSingleVoiceModel": [],
+  "acceptance": "candidate-for-human-review"
+}

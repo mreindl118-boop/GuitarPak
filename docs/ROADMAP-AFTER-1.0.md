@@ -1,5 +1,14 @@
 # After 1.0: user song library and PDF learning
 
+**Current status (2026-10-23):** 1.0 is published. The separate 1.1 candidate
+implements the local library, persistent settings, teacher-text drafts, navigation
+and global tuner. Actual browser-local monophonic recognition is integrated and
+under final evaluation; general polyphonic/multistaff/scanned PDF recognition
+is not established. Automatic recognition remains a required release gate. See
+[the current checklist](RELEASE-1.1.0-CHECKLIST.md),
+[workflow](WORKFLOW-1.1.md) and [recognition limits](LOCAL-RECOGNITION.md).
+The staged design below records the original post-1.0 plan.
+
 Authorized next-version development, queued after SoundLab 1.0 has passed its
 release gates. This is not part of the 1.0 feature gate. Start a separate branch
 from the verified 1.0 source; if release remains blocked, report that blocker
@@ -51,7 +60,7 @@ Browser persistence cannot survive a user clearing site data, loss of the device
 or every browser eviction policy; provide export/backup and state these limits.
 Cross-device sync is a separate, unimplemented capability.
 
-## Navigation discussion, not an approved refactor
+## Original navigation discussion (subsequently authorized for 1.1)
 
 The current Play group contains Songs (MIDI/tab library and looping playback)
 and Jam (auto-band, arrangement/mixer and live vamping). Practice contains
@@ -61,8 +70,9 @@ chord changes and ear drills) and Tuner (tuning and note-finder game).
 A future workflow could launch Practice from material, keep Jam/free playing
 inside instrument workspaces, and place measured history under instrument
 Progress. Preserve `sg.lib`, `jam2.*`, `ws.*`, `tr.*`, `tun.*` and existing route
-and bus contracts. Moving or combining these areas is discussion only; no such
-navigation refactor is included in the 1.0 addendum or this queued file work.
+and bus contracts. These moves were subsequently authorized for 1.1 and implemented with preserved
+module IDs and old-route adapters. They were excluded from the 1.0 release.
 
-The separate teacher Google Doc/text lesson aide remains deferred; see
-[its bounded design](FUTURE-LESSON-AIDE.md).
+The simple pasted-text lesson aide was subsequently authorized for 1.1; direct
+Google Docs access remains deferred. See [the design](FUTURE-LESSON-AIDE.md)
+and [implemented teacher drafts](TEACHER-DRAFTS.md).

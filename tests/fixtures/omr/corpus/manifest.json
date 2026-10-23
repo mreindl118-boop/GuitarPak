@@ -1,0 +1,1026 @@
+{
+  "schemaVersion": 1,
+  "name": "SoundLab original engraving OMR corpus",
+  "license": "CC0-1.0 original composition and generator; third-party engraving tooling separately licensed",
+  "generator": "Verovio 6.3.0-425dd7b",
+  "renderer": "CairoSVG native CSS pixels, Pillow controlled degradation",
+  "imageOnlyRule": "Recognizer receives images/*.png or raster-only images/*.pdf ONLY. Never pass sources/, rendered SVG, truth/, or this manifest with truth to the inference engine.",
+  "limits": "Synthetic engraving and mild synthetic degradation; no real scanner, camera or handwritten-music claims. Does not establish general accuracy.",
+  "compositions": 20,
+  "cases": [
+    {
+      "id": "01-treble-quarters-clean",
+      "compositionId": "01-treble-quarters",
+      "variant": "clean",
+      "image": "images/01-treble-quarters-clean.png",
+      "pdf": "images/01-treble-quarters-clean.pdf",
+      "groundTruth": "truth/01-treble-quarters.json",
+      "source": "sources/01-treble-quarters.musicxml",
+      "svg": "rendered/01-treble-quarters.svg",
+      "width": 424,
+      "height": 260,
+      "sha256": "c43724e7d9f0360aa002c4ed45f8d431a47425f4decabb56b63de078b352146b",
+      "pdfSha256": "1f304766b7038a16f864773aea6dac8a567271f0e5ed2892daed7ff9886ba7e6",
+      "tags": [
+        "treble",
+        "quarter",
+        "single-melody"
+      ],
+      "unsupported": [],
+      "degradation": null
+    },
+    {
+      "id": "01-treble-quarters-scan",
+      "compositionId": "01-treble-quarters",
+      "variant": "scan",
+      "image": "images/01-treble-quarters-scan.png",
+      "pdf": "images/01-treble-quarters-scan.pdf",
+      "groundTruth": "truth/01-treble-quarters.json",
+      "source": "sources/01-treble-quarters.musicxml",
+      "svg": "rendered/01-treble-quarters.svg",
+      "width": 428,
+      "height": 266,
+      "sha256": "82290cfe0b9c06fe8844d1bc48c45f158e3a266341fc14958878f0ff3c52d9ba",
+      "pdfSha256": "b17a9769963a540958bed57869f1f36366f7d7a12dd84130aa6d48f03d2b65b2",
+      "tags": [
+        "treble",
+        "quarter",
+        "single-melody"
+      ],
+      "unsupported": [],
+      "degradation": {
+        "rotationDegrees": 0.65,
+        "contrast": 0.86,
+        "blurSigmaPixels": 0.28,
+        "noiseSigma": 2.0,
+        "jpegQuality": 73,
+        "seed": 20261024
+      }
+    },
+    {
+      "id": "02-treble-rhythm-clean",
+      "compositionId": "02-treble-rhythm",
+      "variant": "clean",
+      "image": "images/02-treble-rhythm-clean.png",
+      "pdf": "images/02-treble-rhythm-clean.pdf",
+      "groundTruth": "truth/02-treble-rhythm.json",
+      "source": "sources/02-treble-rhythm.musicxml",
+      "svg": "rendered/02-treble-rhythm.svg",
+      "width": 440,
+      "height": 260,
+      "sha256": "9415124c9d47e516a3f0ebf290402d111e39d1e861a799b47e3d1ccd0e4d2d89",
+      "pdfSha256": "db746d1fb08a11e6978f6a145451c378b7659f5c6d25a17a555a678898eac0fc",
+      "tags": [
+        "treble",
+        "quarter",
+        "eighth",
+        "half"
+      ],
+      "unsupported": [],
+      "degradation": null
+    },
+    {
+      "id": "02-treble-rhythm-scan",
+      "compositionId": "02-treble-rhythm",
+      "variant": "scan",
+      "image": "images/02-treble-rhythm-scan.png",
+      "pdf": "images/02-treble-rhythm-scan.pdf",
+      "groundTruth": "truth/02-treble-rhythm.json",
+      "source": "sources/02-treble-rhythm.musicxml",
+      "svg": "rendered/02-treble-rhythm.svg",
+      "width": 444,
+      "height": 266,
+      "sha256": "d310abf939d64f7e82c1e1f9dd7a5266ec081fe8de1cd6da2da0ed362e1ce7a3",
+      "pdfSha256": "ac00a56102e020f540091486fb57d56c1c6f1115bdd1436aec18997f8b7f7d6b",
+      "tags": [
+        "treble",
+        "quarter",
+        "eighth",
+        "half"
+      ],
+      "unsupported": [],
+      "degradation": {
+        "rotationDegrees": 0.65,
+        "contrast": 0.86,
+        "blurSigmaPixels": 0.28,
+        "noiseSigma": 2.0,
+        "jpegQuality": 73,
+        "seed": 20261025
+      }
+    },
+    {
+      "id": "03-bass-quarters-clean",
+      "compositionId": "03-bass-quarters",
+      "variant": "clean",
+      "image": "images/03-bass-quarters-clean.png",
+      "pdf": "images/03-bass-quarters-clean.pdf",
+      "groundTruth": "truth/03-bass-quarters.json",
+      "source": "sources/03-bass-quarters.musicxml",
+      "svg": "rendered/03-bass-quarters.svg",
+      "width": 427,
+      "height": 260,
+      "sha256": "7550ae06d8a30565029845b6127dc6fa7884b1b8e21683becfddd22b4ff9bbc3",
+      "pdfSha256": "92f9d3496a265a2b19b19a3760e1ceda88a48e8f084ae6650d04f54280c6e7b4",
+      "tags": [
+        "bass",
+        "quarter",
+        "single-melody"
+      ],
+      "unsupported": [],
+      "degradation": null
+    },
+    {
+      "id": "03-bass-quarters-scan",
+      "compositionId": "03-bass-quarters",
+      "variant": "scan",
+      "image": "images/03-bass-quarters-scan.png",
+      "pdf": "images/03-bass-quarters-scan.pdf",
+      "groundTruth": "truth/03-bass-quarters.json",
+      "source": "sources/03-bass-quarters.musicxml",
+      "svg": "rendered/03-bass-quarters.svg",
+      "width": 431,
+      "height": 266,
+      "sha256": "e64845685c41cd7c05b6bb9a15450db09a9ac9af56c7b9c31d2bab125f637b85",
+      "pdfSha256": "8a7e3ccb19f5e87aec5b7997ad0aa998bd7009e247d7ac8f6711bd57e0731ff5",
+      "tags": [
+        "bass",
+        "quarter",
+        "single-melody"
+      ],
+      "unsupported": [],
+      "degradation": {
+        "rotationDegrees": 0.65,
+        "contrast": 0.86,
+        "blurSigmaPixels": 0.28,
+        "noiseSigma": 2.0,
+        "jpegQuality": 73,
+        "seed": 20261026
+      }
+    },
+    {
+      "id": "04-bass-rhythm-clean",
+      "compositionId": "04-bass-rhythm",
+      "variant": "clean",
+      "image": "images/04-bass-rhythm-clean.png",
+      "pdf": "images/04-bass-rhythm-clean.pdf",
+      "groundTruth": "truth/04-bass-rhythm.json",
+      "source": "sources/04-bass-rhythm.musicxml",
+      "svg": "rendered/04-bass-rhythm.svg",
+      "width": 388,
+      "height": 260,
+      "sha256": "8821231d821480355511447694e3b192a2be0ace2ee919c9600f2632aae2544c",
+      "pdfSha256": "802ed3803288e4ff555521c7ffe57e4531438be4adf93c3b9c786f02385ee38a",
+      "tags": [
+        "bass",
+        "half",
+        "quarter"
+      ],
+      "unsupported": [],
+      "degradation": null
+    },
+    {
+      "id": "04-bass-rhythm-scan",
+      "compositionId": "04-bass-rhythm",
+      "variant": "scan",
+      "image": "images/04-bass-rhythm-scan.png",
+      "pdf": "images/04-bass-rhythm-scan.pdf",
+      "groundTruth": "truth/04-bass-rhythm.json",
+      "source": "sources/04-bass-rhythm.musicxml",
+      "svg": "rendered/04-bass-rhythm.svg",
+      "width": 392,
+      "height": 266,
+      "sha256": "c1b08e1de534cf93cf338e729b23b0c0b34945389398ab85ab7ed7e84285bb1a",
+      "pdfSha256": "626892f0a1b38ebe20bc3e473c6d6d5bbfddbce18618de21606f227c9f0104ec",
+      "tags": [
+        "bass",
+        "half",
+        "quarter"
+      ],
+      "unsupported": [],
+      "degradation": {
+        "rotationDegrees": 0.65,
+        "contrast": 0.86,
+        "blurSigmaPixels": 0.28,
+        "noiseSigma": 2.0,
+        "jpegQuality": 73,
+        "seed": 20261027
+      }
+    },
+    {
+      "id": "05-treble-rests-clean",
+      "compositionId": "05-treble-rests",
+      "variant": "clean",
+      "image": "images/05-treble-rests-clean.png",
+      "pdf": "images/05-treble-rests-clean.pdf",
+      "groundTruth": "truth/05-treble-rests.json",
+      "source": "sources/05-treble-rests.musicxml",
+      "svg": "rendered/05-treble-rests.svg",
+      "width": 496,
+      "height": 260,
+      "sha256": "8b422ae4a000788de4effd211f85c97dec2fc6b928df98f487c8caee0dcfeb12",
+      "pdfSha256": "40b3ae1c5297d5fde57541ef448c10577e6bc50de7f6649542efdb6207a4acb2",
+      "tags": [
+        "treble",
+        "rest",
+        "half",
+        "whole"
+      ],
+      "unsupported": [],
+      "degradation": null
+    },
+    {
+      "id": "05-treble-rests-scan",
+      "compositionId": "05-treble-rests",
+      "variant": "scan",
+      "image": "images/05-treble-rests-scan.png",
+      "pdf": "images/05-treble-rests-scan.pdf",
+      "groundTruth": "truth/05-treble-rests.json",
+      "source": "sources/05-treble-rests.musicxml",
+      "svg": "rendered/05-treble-rests.svg",
+      "width": 500,
+      "height": 266,
+      "sha256": "7151dbf3fcae6063d8f910f9f4cd1dffaf33362698a4979038ce79c1a637b2ea",
+      "pdfSha256": "cac04b1301625915f0a8d3f7c644ec26f9db84ecc8c23f53a9b0487d5154a3ec",
+      "tags": [
+        "treble",
+        "rest",
+        "half",
+        "whole"
+      ],
+      "unsupported": [],
+      "degradation": {
+        "rotationDegrees": 0.65,
+        "contrast": 0.86,
+        "blurSigmaPixels": 0.28,
+        "noiseSigma": 2.0,
+        "jpegQuality": 73,
+        "seed": 20261028
+      }
+    },
+    {
+      "id": "06-bass-rests-clean",
+      "compositionId": "06-bass-rests",
+      "variant": "clean",
+      "image": "images/06-bass-rests-clean.png",
+      "pdf": "images/06-bass-rests-clean.pdf",
+      "groundTruth": "truth/06-bass-rests.json",
+      "source": "sources/06-bass-rests.musicxml",
+      "svg": "rendered/06-bass-rests.svg",
+      "width": 591,
+      "height": 260,
+      "sha256": "b7501986da394ef1c5e39d21ee6c47e7b23b85db3db7eabbec2c3924f9762125",
+      "pdfSha256": "742a37ba1b9fd70a11050bbfa262805b08f6777167b6506a888912d3248a93d9",
+      "tags": [
+        "bass",
+        "rest",
+        "half"
+      ],
+      "unsupported": [],
+      "degradation": null
+    },
+    {
+      "id": "06-bass-rests-scan",
+      "compositionId": "06-bass-rests",
+      "variant": "scan",
+      "image": "images/06-bass-rests-scan.png",
+      "pdf": "images/06-bass-rests-scan.pdf",
+      "groundTruth": "truth/06-bass-rests.json",
+      "source": "sources/06-bass-rests.musicxml",
+      "svg": "rendered/06-bass-rests.svg",
+      "width": 595,
+      "height": 268,
+      "sha256": "5e10b5b4a90b26f81aecc06616b5f3edc5349d132ca6f061a25d769742301b1b",
+      "pdfSha256": "31669070b76d9ec0c5c49cc25f46cff66f411046d7995f841c22ad5298b1bc74",
+      "tags": [
+        "bass",
+        "rest",
+        "half"
+      ],
+      "unsupported": [],
+      "degradation": {
+        "rotationDegrees": 0.65,
+        "contrast": 0.86,
+        "blurSigmaPixels": 0.28,
+        "noiseSigma": 2.0,
+        "jpegQuality": 73,
+        "seed": 20261029
+      }
+    },
+    {
+      "id": "07-treble-eighths-clean",
+      "compositionId": "07-treble-eighths",
+      "variant": "clean",
+      "image": "images/07-treble-eighths-clean.png",
+      "pdf": "images/07-treble-eighths-clean.pdf",
+      "groundTruth": "truth/07-treble-eighths.json",
+      "source": "sources/07-treble-eighths.musicxml",
+      "svg": "rendered/07-treble-eighths.svg",
+      "width": 548,
+      "height": 260,
+      "sha256": "e438a9c2769ccc1471542126a566d9e1e86dde3f54ddf386461fdd9f0c524917",
+      "pdfSha256": "5ca21737762c4fb7679264235dc3ab122e09a4b2d3918e12b14734bc70d687c5",
+      "tags": [
+        "treble",
+        "eighth",
+        "beam"
+      ],
+      "unsupported": [],
+      "degradation": null
+    },
+    {
+      "id": "07-treble-eighths-scan",
+      "compositionId": "07-treble-eighths",
+      "variant": "scan",
+      "image": "images/07-treble-eighths-scan.png",
+      "pdf": "images/07-treble-eighths-scan.pdf",
+      "groundTruth": "truth/07-treble-eighths.json",
+      "source": "sources/07-treble-eighths.musicxml",
+      "svg": "rendered/07-treble-eighths.svg",
+      "width": 552,
+      "height": 268,
+      "sha256": "0e51e615a546e46ce56363ddf6e9ce908314f94db55eb492f118955756c91c28",
+      "pdfSha256": "25da9e93371ba2d2be0fdc5e3a30901573a6237b937f82a8aa1aa90bff6a5cb0",
+      "tags": [
+        "treble",
+        "eighth",
+        "beam"
+      ],
+      "unsupported": [],
+      "degradation": {
+        "rotationDegrees": 0.65,
+        "contrast": 0.86,
+        "blurSigmaPixels": 0.28,
+        "noiseSigma": 2.0,
+        "jpegQuality": 73,
+        "seed": 20261030
+      }
+    },
+    {
+      "id": "08-treble-dotted-clean",
+      "compositionId": "08-treble-dotted",
+      "variant": "clean",
+      "image": "images/08-treble-dotted-clean.png",
+      "pdf": "images/08-treble-dotted-clean.pdf",
+      "groundTruth": "truth/08-treble-dotted.json",
+      "source": "sources/08-treble-dotted.musicxml",
+      "svg": "rendered/08-treble-dotted.svg",
+      "width": 433,
+      "height": 260,
+      "sha256": "7863af8218e9f415130826cfa10cbbf86ddb79b9f79151fad3cd104d12a48f32",
+      "pdfSha256": "370660e510eef51afe31ee747cd0c8e1727942fcbe4b96422a41b836c1ff8da0",
+      "tags": [
+        "treble",
+        "dotted",
+        "eighth"
+      ],
+      "unsupported": [],
+      "degradation": null
+    },
+    {
+      "id": "08-treble-dotted-scan",
+      "compositionId": "08-treble-dotted",
+      "variant": "scan",
+      "image": "images/08-treble-dotted-scan.png",
+      "pdf": "images/08-treble-dotted-scan.pdf",
+      "groundTruth": "truth/08-treble-dotted.json",
+      "source": "sources/08-treble-dotted.musicxml",
+      "svg": "rendered/08-treble-dotted.svg",
+      "width": 437,
+      "height": 266,
+      "sha256": "2045937307a2c85beffc8d57b5d75c2574492f8f1a83988da6f35183cee93c0f",
+      "pdfSha256": "bdc9e4bdf0dbdc803aab778d6ccb9f69b8adb457fd4db0d35f3c1c5f7b0ad71f",
+      "tags": [
+        "treble",
+        "dotted",
+        "eighth"
+      ],
+      "unsupported": [],
+      "degradation": {
+        "rotationDegrees": 0.65,
+        "contrast": 0.86,
+        "blurSigmaPixels": 0.28,
+        "noiseSigma": 2.0,
+        "jpegQuality": 73,
+        "seed": 20261031
+      }
+    },
+    {
+      "id": "09-treble-accidentals-clean",
+      "compositionId": "09-treble-accidentals",
+      "variant": "clean",
+      "image": "images/09-treble-accidentals-clean.png",
+      "pdf": "images/09-treble-accidentals-clean.pdf",
+      "groundTruth": "truth/09-treble-accidentals.json",
+      "source": "sources/09-treble-accidentals.musicxml",
+      "svg": "rendered/09-treble-accidentals.svg",
+      "width": 445,
+      "height": 260,
+      "sha256": "faf5e40cb6357caee93152d1b1b9b29b29a203b71269d8640a3ad835da577de1",
+      "pdfSha256": "5d78ce9804086b4b32f31e637b52c998883d1a52a44f62f2349e34fe94dd40a1",
+      "tags": [
+        "treble",
+        "accidental",
+        "natural"
+      ],
+      "unsupported": [],
+      "degradation": null
+    },
+    {
+      "id": "09-treble-accidentals-scan",
+      "compositionId": "09-treble-accidentals",
+      "variant": "scan",
+      "image": "images/09-treble-accidentals-scan.png",
+      "pdf": "images/09-treble-accidentals-scan.pdf",
+      "groundTruth": "truth/09-treble-accidentals.json",
+      "source": "sources/09-treble-accidentals.musicxml",
+      "svg": "rendered/09-treble-accidentals.svg",
+      "width": 449,
+      "height": 266,
+      "sha256": "23f93c5020bd7ace2ad439b02a20a2bf351c53047868543869b4221bd90f1c72",
+      "pdfSha256": "5a7513d0d24796dc53c22e7f74754e8240d2a4df7182616df6fabf8a126663f3",
+      "tags": [
+        "treble",
+        "accidental",
+        "natural"
+      ],
+      "unsupported": [],
+      "degradation": {
+        "rotationDegrees": 0.65,
+        "contrast": 0.86,
+        "blurSigmaPixels": 0.28,
+        "noiseSigma": 2.0,
+        "jpegQuality": 73,
+        "seed": 20261032
+      }
+    },
+    {
+      "id": "10-treble-key-d-clean",
+      "compositionId": "10-treble-key-d",
+      "variant": "clean",
+      "image": "images/10-treble-key-d-clean.png",
+      "pdf": "images/10-treble-key-d-clean.pdf",
+      "groundTruth": "truth/10-treble-key-d.json",
+      "source": "sources/10-treble-key-d.musicxml",
+      "svg": "rendered/10-treble-key-d.svg",
+      "width": 479,
+      "height": 260,
+      "sha256": "d65142c425c19b9f6092236a1a70b2180b5ef172cd37b754c94171ee5fe82e61",
+      "pdfSha256": "dd12471497a0da98197251882c562356a38a1393092db56636c85e8403fca772",
+      "tags": [
+        "treble",
+        "key-signature",
+        "sharp"
+      ],
+      "unsupported": [],
+      "degradation": null
+    },
+    {
+      "id": "10-treble-key-d-scan",
+      "compositionId": "10-treble-key-d",
+      "variant": "scan",
+      "image": "images/10-treble-key-d-scan.png",
+      "pdf": "images/10-treble-key-d-scan.pdf",
+      "groundTruth": "truth/10-treble-key-d.json",
+      "source": "sources/10-treble-key-d.musicxml",
+      "svg": "rendered/10-treble-key-d.svg",
+      "width": 483,
+      "height": 266,
+      "sha256": "7fda1e15737fee26b7d43bcf8e3ceb1e7fbcc8713613bbbca268369a30eefaf1",
+      "pdfSha256": "513652f58cbd5120ed0f21caefc7f7b543b01e889148eaf33bcb3e6400acdc02",
+      "tags": [
+        "treble",
+        "key-signature",
+        "sharp"
+      ],
+      "unsupported": [],
+      "degradation": {
+        "rotationDegrees": 0.65,
+        "contrast": 0.86,
+        "blurSigmaPixels": 0.28,
+        "noiseSigma": 2.0,
+        "jpegQuality": 73,
+        "seed": 20261033
+      }
+    },
+    {
+      "id": "11-bass-key-eb-clean",
+      "compositionId": "11-bass-key-eb",
+      "variant": "clean",
+      "image": "images/11-bass-key-eb-clean.png",
+      "pdf": "images/11-bass-key-eb-clean.pdf",
+      "groundTruth": "truth/11-bass-key-eb.json",
+      "source": "sources/11-bass-key-eb.musicxml",
+      "svg": "rendered/11-bass-key-eb.svg",
+      "width": 503,
+      "height": 260,
+      "sha256": "c9a6afa8a37824691b834758c507cc6ad74dd3961c9ea0a8d2d205c5048e2248",
+      "pdfSha256": "bb6b0b43184b1df2cdeb2da13c679fe04383cfa770a0005f31f577ba6ef002ac",
+      "tags": [
+        "bass",
+        "key-signature",
+        "flat"
+      ],
+      "unsupported": [],
+      "degradation": null
+    },
+    {
+      "id": "11-bass-key-eb-scan",
+      "compositionId": "11-bass-key-eb",
+      "variant": "scan",
+      "image": "images/11-bass-key-eb-scan.png",
+      "pdf": "images/11-bass-key-eb-scan.pdf",
+      "groundTruth": "truth/11-bass-key-eb.json",
+      "source": "sources/11-bass-key-eb.musicxml",
+      "svg": "rendered/11-bass-key-eb.svg",
+      "width": 507,
+      "height": 266,
+      "sha256": "2518e313107e74acb734b625c5a702298467b73a0ce91b8ee42a5fab004e143d",
+      "pdfSha256": "a1797d11098cdf20bfd61d544c0cd1186512815ec0beb61b1ba4a2990016f5e6",
+      "tags": [
+        "bass",
+        "key-signature",
+        "flat"
+      ],
+      "unsupported": [],
+      "degradation": {
+        "rotationDegrees": 0.65,
+        "contrast": 0.86,
+        "blurSigmaPixels": 0.28,
+        "noiseSigma": 2.0,
+        "jpegQuality": 73,
+        "seed": 20261034
+      }
+    },
+    {
+      "id": "12-treble-chords-clean",
+      "compositionId": "12-treble-chords",
+      "variant": "clean",
+      "image": "images/12-treble-chords-clean.png",
+      "pdf": "images/12-treble-chords-clean.pdf",
+      "groundTruth": "truth/12-treble-chords.json",
+      "source": "sources/12-treble-chords.musicxml",
+      "svg": "rendered/12-treble-chords.svg",
+      "width": 346,
+      "height": 260,
+      "sha256": "f4b2409aea7e723b5ac1616828fbbc3603b6b7d13fe248eccc826427b07e3f11",
+      "pdfSha256": "c6bef72046ff27e0483518c6500c23508180bd9f649a92d80730496ef3982da8",
+      "tags": [
+        "treble",
+        "chord",
+        "polyphonic-onsets"
+      ],
+      "unsupported": [
+        "single-voice-model-chords"
+      ],
+      "degradation": null
+    },
+    {
+      "id": "12-treble-chords-scan",
+      "compositionId": "12-treble-chords",
+      "variant": "scan",
+      "image": "images/12-treble-chords-scan.png",
+      "pdf": "images/12-treble-chords-scan.pdf",
+      "groundTruth": "truth/12-treble-chords.json",
+      "source": "sources/12-treble-chords.musicxml",
+      "svg": "rendered/12-treble-chords.svg",
+      "width": 350,
+      "height": 264,
+      "sha256": "bb811a49a8a7a6f559064bd60dab1cae3c083dc3664b4a49d487d4ca59e99f47",
+      "pdfSha256": "56f1b6ad5072ac37fdd321913ae9918d76b434eb616a1062d9e0203849b20e31",
+      "tags": [
+        "treble",
+        "chord",
+        "polyphonic-onsets"
+      ],
+      "unsupported": [
+        "single-voice-model-chords"
+      ],
+      "degradation": {
+        "rotationDegrees": 0.65,
+        "contrast": 0.86,
+        "blurSigmaPixels": 0.28,
+        "noiseSigma": 2.0,
+        "jpegQuality": 73,
+        "seed": 20261035
+      }
+    },
+    {
+      "id": "13-treble-tie-clean",
+      "compositionId": "13-treble-tie",
+      "variant": "clean",
+      "image": "images/13-treble-tie-clean.png",
+      "pdf": "images/13-treble-tie-clean.pdf",
+      "groundTruth": "truth/13-treble-tie.json",
+      "source": "sources/13-treble-tie.musicxml",
+      "svg": "rendered/13-treble-tie.svg",
+      "width": 385,
+      "height": 260,
+      "sha256": "609f13975f3e924f3c91c4f1eda4cfc0233fa5576ba67f7e0636f80cd54bc354",
+      "pdfSha256": "8c032bbc23d2090f27154f4ec3e0b2ae33e11e6e2d763287548566fb16a98adb",
+      "tags": [
+        "treble",
+        "tie",
+        "duration"
+      ],
+      "unsupported": [],
+      "degradation": null
+    },
+    {
+      "id": "13-treble-tie-scan",
+      "compositionId": "13-treble-tie",
+      "variant": "scan",
+      "image": "images/13-treble-tie-scan.png",
+      "pdf": "images/13-treble-tie-scan.pdf",
+      "groundTruth": "truth/13-treble-tie.json",
+      "source": "sources/13-treble-tie.musicxml",
+      "svg": "rendered/13-treble-tie.svg",
+      "width": 389,
+      "height": 266,
+      "sha256": "118ba9b7c9d78cce2babe1e0bb824c56859e06a1187d7a9b78bfc3fe6686a5e9",
+      "pdfSha256": "8d89d1985e44272cf488a998faddba6db9ba24bbb95a2c2c9914ed9740e346c7",
+      "tags": [
+        "treble",
+        "tie",
+        "duration"
+      ],
+      "unsupported": [],
+      "degradation": {
+        "rotationDegrees": 0.65,
+        "contrast": 0.86,
+        "blurSigmaPixels": 0.28,
+        "noiseSigma": 2.0,
+        "jpegQuality": 73,
+        "seed": 20261036
+      }
+    },
+    {
+      "id": "14-repeat-bars-clean",
+      "compositionId": "14-repeat-bars",
+      "variant": "clean",
+      "image": "images/14-repeat-bars-clean.png",
+      "pdf": "images/14-repeat-bars-clean.pdf",
+      "groundTruth": "truth/14-repeat-bars.json",
+      "source": "sources/14-repeat-bars.musicxml",
+      "svg": "rendered/14-repeat-bars.svg",
+      "width": 648,
+      "height": 260,
+      "sha256": "eee1b767c867bac321a46be0a74b89a21980beefdc9b8df824f6d8ea69532b27",
+      "pdfSha256": "a5b244c4c89a500fed4f78541d767a4187094cf576964b6b31707f4eeb1e8219",
+      "tags": [
+        "treble",
+        "repeat",
+        "unsupported-structure"
+      ],
+      "unsupported": [
+        "repeat-playback-expansion"
+      ],
+      "degradation": null
+    },
+    {
+      "id": "14-repeat-bars-scan",
+      "compositionId": "14-repeat-bars",
+      "variant": "scan",
+      "image": "images/14-repeat-bars-scan.png",
+      "pdf": "images/14-repeat-bars-scan.pdf",
+      "groundTruth": "truth/14-repeat-bars.json",
+      "source": "sources/14-repeat-bars.musicxml",
+      "svg": "rendered/14-repeat-bars.svg",
+      "width": 652,
+      "height": 268,
+      "sha256": "99aa401e48bc17381bf1e7897d103685f6c49a377db537023335505959ef43cd",
+      "pdfSha256": "e76f354bf4620b84a62c5b87d4e35ca42e18910833e81571672842b06986fc87",
+      "tags": [
+        "treble",
+        "repeat",
+        "unsupported-structure"
+      ],
+      "unsupported": [
+        "repeat-playback-expansion"
+      ],
+      "degradation": {
+        "rotationDegrees": 0.65,
+        "contrast": 0.86,
+        "blurSigmaPixels": 0.28,
+        "noiseSigma": 2.0,
+        "jpegQuality": 73,
+        "seed": 20261037
+      }
+    },
+    {
+      "id": "15-two-parts-clean",
+      "compositionId": "15-two-parts",
+      "variant": "clean",
+      "image": "images/15-two-parts-clean.png",
+      "pdf": "images/15-two-parts-clean.pdf",
+      "groundTruth": "truth/15-two-parts.json",
+      "source": "sources/15-two-parts.musicxml",
+      "svg": "rendered/15-two-parts.svg",
+      "width": 392,
+      "height": 460,
+      "sha256": "fbb97a0452ddcbe6d15a793a20118b5a0677674a2d25f1e6ad64f6e6abb39c15",
+      "pdfSha256": "bb361d02c28d1bf813e6863c426c62ba1ea016f0f4d0c0d50080d1536fa9a03b",
+      "tags": [
+        "treble",
+        "bass",
+        "multipart",
+        "unsupported-structure"
+      ],
+      "unsupported": [
+        "multipart-selection-required"
+      ],
+      "degradation": null
+    },
+    {
+      "id": "15-two-parts-scan",
+      "compositionId": "15-two-parts",
+      "variant": "scan",
+      "image": "images/15-two-parts-scan.png",
+      "pdf": "images/15-two-parts-scan.pdf",
+      "groundTruth": "truth/15-two-parts.json",
+      "source": "sources/15-two-parts.musicxml",
+      "svg": "rendered/15-two-parts.svg",
+      "width": 398,
+      "height": 466,
+      "sha256": "09238dd085848256568d7c5be9404ebfca37f1405db14a8451fc1224d8625722",
+      "pdfSha256": "551bc587569a8b57df066bba54ab6e0379ecf863c04d462375b01b65847fad07",
+      "tags": [
+        "treble",
+        "bass",
+        "multipart",
+        "unsupported-structure"
+      ],
+      "unsupported": [
+        "multipart-selection-required"
+      ],
+      "degradation": {
+        "rotationDegrees": 0.65,
+        "contrast": 0.86,
+        "blurSigmaPixels": 0.28,
+        "noiseSigma": 2.0,
+        "jpegQuality": 73,
+        "seed": 20261038
+      }
+    },
+    {
+      "id": "16-treble-triplet-clean",
+      "compositionId": "16-treble-triplet",
+      "variant": "clean",
+      "image": "images/16-treble-triplet-clean.png",
+      "pdf": "images/16-treble-triplet-clean.pdf",
+      "groundTruth": "truth/16-treble-triplet.json",
+      "source": "sources/16-treble-triplet.musicxml",
+      "svg": "rendered/16-treble-triplet.svg",
+      "width": 534,
+      "height": 260,
+      "sha256": "75862a2f6777c6ef42ffa0abd557880a480821134eae38dff867936e79bc9f8c",
+      "pdfSha256": "cbb9837c90988fc9069e03b7a4f17721776b38a10fb3f7b64e9091b35708e1f7",
+      "tags": [
+        "treble",
+        "tuplet",
+        "unsupported-structure"
+      ],
+      "unsupported": [
+        "tuplet-rhythm"
+      ],
+      "degradation": null
+    },
+    {
+      "id": "16-treble-triplet-scan",
+      "compositionId": "16-treble-triplet",
+      "variant": "scan",
+      "image": "images/16-treble-triplet-scan.png",
+      "pdf": "images/16-treble-triplet-scan.pdf",
+      "groundTruth": "truth/16-treble-triplet.json",
+      "source": "sources/16-treble-triplet.musicxml",
+      "svg": "rendered/16-treble-triplet.svg",
+      "width": 538,
+      "height": 268,
+      "sha256": "f09b298f5ed910b13605bd9e9b27af9980706b2a1d04e8ee18df237d11ed50c7",
+      "pdfSha256": "7553596da62e3fbcdb81cca9bd28b9456bea0f3725f5c8d6eadefd0cfdd4f221",
+      "tags": [
+        "treble",
+        "tuplet",
+        "unsupported-structure"
+      ],
+      "unsupported": [
+        "tuplet-rhythm"
+      ],
+      "degradation": {
+        "rotationDegrees": 0.65,
+        "contrast": 0.86,
+        "blurSigmaPixels": 0.28,
+        "noiseSigma": 2.0,
+        "jpegQuality": 73,
+        "seed": 20261039
+      }
+    },
+    {
+      "id": "17-page-treble-quarters-clean",
+      "compositionId": "17-page-treble-quarters",
+      "variant": "clean",
+      "image": "images/17-page-treble-quarters-clean.png",
+      "pdf": "images/17-page-treble-quarters-clean.pdf",
+      "groundTruth": "truth/17-page-treble-quarters.json",
+      "source": "sources/17-page-treble-quarters.musicxml",
+      "svg": "rendered/17-page-treble-quarters.svg",
+      "width": 1800,
+      "height": 500,
+      "sha256": "961866dcced5926de7e4d8f7d38659aa24f4055c54febd63f7bfe541af797e0d",
+      "pdfSha256": "4ee35529c94362f92b100048818a2ad43670a719141977b90da8ab8909b680bb",
+      "tags": [
+        "treble",
+        "quarter",
+        "page-layout"
+      ],
+      "unsupported": [],
+      "degradation": null
+    },
+    {
+      "id": "17-page-treble-quarters-scan",
+      "compositionId": "17-page-treble-quarters",
+      "variant": "scan",
+      "image": "images/17-page-treble-quarters-scan.png",
+      "pdf": "images/17-page-treble-quarters-scan.pdf",
+      "groundTruth": "truth/17-page-treble-quarters.json",
+      "source": "sources/17-page-treble-quarters.musicxml",
+      "svg": "rendered/17-page-treble-quarters.svg",
+      "width": 1806,
+      "height": 522,
+      "sha256": "0e49415ef34f10bd80317e4ce3bf3765f2f8fad371d5ba3e123e2d5ea0aa062b",
+      "pdfSha256": "b21d11f8752b0c7e8c2aec237547e9157328633c6d4ca27273bc0c2b71ff19a8",
+      "tags": [
+        "treble",
+        "quarter",
+        "page-layout"
+      ],
+      "unsupported": [],
+      "degradation": {
+        "rotationDegrees": 0.65,
+        "contrast": 0.86,
+        "blurSigmaPixels": 0.28,
+        "noiseSigma": 2.0,
+        "jpegQuality": 73,
+        "seed": 20261040
+      }
+    },
+    {
+      "id": "18-page-bass-quarters-clean",
+      "compositionId": "18-page-bass-quarters",
+      "variant": "clean",
+      "image": "images/18-page-bass-quarters-clean.png",
+      "pdf": "images/18-page-bass-quarters-clean.pdf",
+      "groundTruth": "truth/18-page-bass-quarters.json",
+      "source": "sources/18-page-bass-quarters.musicxml",
+      "svg": "rendered/18-page-bass-quarters.svg",
+      "width": 1800,
+      "height": 500,
+      "sha256": "043943060205607f33ba538b10c0e99fbcb3f8958557d7473504cfe26ded4e56",
+      "pdfSha256": "4a6f9f583e1ad9a90e599e8ad30871a8eec88c94068f3c264c2f611229f51d98",
+      "tags": [
+        "bass",
+        "quarter",
+        "page-layout"
+      ],
+      "unsupported": [],
+      "degradation": null
+    },
+    {
+      "id": "18-page-bass-quarters-scan",
+      "compositionId": "18-page-bass-quarters",
+      "variant": "scan",
+      "image": "images/18-page-bass-quarters-scan.png",
+      "pdf": "images/18-page-bass-quarters-scan.pdf",
+      "groundTruth": "truth/18-page-bass-quarters.json",
+      "source": "sources/18-page-bass-quarters.musicxml",
+      "svg": "rendered/18-page-bass-quarters.svg",
+      "width": 1806,
+      "height": 522,
+      "sha256": "4006dd6f41e33934dbf0100336d8c750177fda851537a9e3cf8f1ba20d08f8d1",
+      "pdfSha256": "ec1c3b6c5715d9f2fba07cc144ccaa2c967e4dd0285e32a8d91def6e99644fc7",
+      "tags": [
+        "bass",
+        "quarter",
+        "page-layout"
+      ],
+      "unsupported": [],
+      "degradation": {
+        "rotationDegrees": 0.65,
+        "contrast": 0.86,
+        "blurSigmaPixels": 0.28,
+        "noiseSigma": 2.0,
+        "jpegQuality": 73,
+        "seed": 20261041
+      }
+    },
+    {
+      "id": "19-page-treble-rhythm-clean",
+      "compositionId": "19-page-treble-rhythm",
+      "variant": "clean",
+      "image": "images/19-page-treble-rhythm-clean.png",
+      "pdf": "images/19-page-treble-rhythm-clean.pdf",
+      "groundTruth": "truth/19-page-treble-rhythm.json",
+      "source": "sources/19-page-treble-rhythm.musicxml",
+      "svg": "rendered/19-page-treble-rhythm.svg",
+      "width": 1800,
+      "height": 260,
+      "sha256": "cf3991b616e816f4763d589a178061a8378972290c562235b7165e6807536c27",
+      "pdfSha256": "70c21b62d75539f359f20ab55a2ab31086195fd246fc3e696bbf518020cabda1",
+      "tags": [
+        "treble",
+        "half",
+        "whole",
+        "eighth",
+        "dotted",
+        "rest",
+        "page-layout"
+      ],
+      "unsupported": [],
+      "degradation": null
+    },
+    {
+      "id": "19-page-treble-rhythm-scan",
+      "compositionId": "19-page-treble-rhythm",
+      "variant": "scan",
+      "image": "images/19-page-treble-rhythm-scan.png",
+      "pdf": "images/19-page-treble-rhythm-scan.pdf",
+      "groundTruth": "truth/19-page-treble-rhythm.json",
+      "source": "sources/19-page-treble-rhythm.musicxml",
+      "svg": "rendered/19-page-treble-rhythm.svg",
+      "width": 1804,
+      "height": 282,
+      "sha256": "92bfb3fe228cd97929829ee3f7c32da39ec1bf3ad1a926469b6966f977f59b33",
+      "pdfSha256": "12feb64e770db11940d0badd5c606b71bee2e0c11226b5c6769ae83bbae36e58",
+      "tags": [
+        "treble",
+        "half",
+        "whole",
+        "eighth",
+        "dotted",
+        "rest",
+        "page-layout"
+      ],
+      "unsupported": [],
+      "degradation": {
+        "rotationDegrees": 0.65,
+        "contrast": 0.86,
+        "blurSigmaPixels": 0.28,
+        "noiseSigma": 2.0,
+        "jpegQuality": 73,
+        "seed": 20261042
+      }
+    },
+    {
+      "id": "20-page-bass-key-eb-clean",
+      "compositionId": "20-page-bass-key-eb",
+      "variant": "clean",
+      "image": "images/20-page-bass-key-eb-clean.png",
+      "pdf": "images/20-page-bass-key-eb-clean.pdf",
+      "groundTruth": "truth/20-page-bass-key-eb.json",
+      "source": "sources/20-page-bass-key-eb.musicxml",
+      "svg": "rendered/20-page-bass-key-eb.svg",
+      "width": 1800,
+      "height": 500,
+      "sha256": "0620652fb8f58bd170f716c4c0d055bbb5eb14f4e76b4714758126fdcd27fb2c",
+      "pdfSha256": "366050bb5ed08d06c1e733c752b8004f348c4170acabad11e4c25eaa511c34d3",
+      "tags": [
+        "bass",
+        "flat",
+        "key-signature",
+        "half",
+        "page-layout"
+      ],
+      "unsupported": [],
+      "degradation": null
+    },
+    {
+      "id": "20-page-bass-key-eb-scan",
+      "compositionId": "20-page-bass-key-eb",
+      "variant": "scan",
+      "image": "images/20-page-bass-key-eb-scan.png",
+      "pdf": "images/20-page-bass-key-eb-scan.pdf",
+      "groundTruth": "truth/20-page-bass-key-eb.json",
+      "source": "sources/20-page-bass-key-eb.musicxml",
+      "svg": "rendered/20-page-bass-key-eb.svg",
+      "width": 1806,
+      "height": 522,
+      "sha256": "645d5f26fca90cb1c0b21d1c81a0fc7389ff7afd4cf6ddc34b6cea0324663a1e",
+      "pdfSha256": "5b5e706230a3bb89ed58df68e6ae0e40eb803815606155bde88b07f530caa130",
+      "tags": [
+        "bass",
+        "flat",
+        "key-signature",
+        "half",
+        "page-layout"
+      ],
+      "unsupported": [],
+      "degradation": {
+        "rotationDegrees": 0.65,
+        "contrast": 0.86,
+        "blurSigmaPixels": 0.28,
+        "noiseSigma": 2.0,
+        "jpegQuality": 73,
+        "seed": 20261043
+      }
+    }
+  ]
+}

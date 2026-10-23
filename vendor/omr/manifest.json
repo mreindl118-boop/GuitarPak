@@ -1,0 +1,109 @@
+{
+  "schemaVersion": 1,
+  "model": {
+    "name": "satb-line-omr/model-public-domain/fp16",
+    "license": "MIT",
+    "source": "https://github.com/alexanderalber/satb-line-omr",
+    "sourceCommit": "c60823117a5c92b0c29f921dbca023e94026d279",
+    "sha256": "0edeb8f9a8103405239d7edbf48aa372158eb3e0cbbe696ec7dbaf768a75c39d",
+    "gitBlobSha1": "1fe32f92c939fa1f91fc74d3a0b668cd6f0704df"
+  },
+  "runtime": {
+    "name": "onnxruntime-web",
+    "version": "1.30.0",
+    "license": "MIT",
+    "tarball": "https://registry.npmjs.org/onnxruntime-web/-/onnxruntime-web-1.30.0.tgz",
+    "integrity": "sha512-q0y+JrrtukXSzsBWEMccVfqX25LRmosXHF+CaRJmg8pZClzcV7svNc4rKY3jL02Vb7QmRMDs1SigqR4CXAfKYQ==",
+    "licenseSource": "https://github.com/microsoft/onnxruntime/blob/v1.30.0/LICENSE"
+  },
+  "configuration": {
+    "threads": 1,
+    "graphOptimizationLevel": "disabled",
+    "executionProviders": [
+      "wasm"
+    ],
+    "calibratedConfidence": false
+  },
+  "files": [
+    {
+      "path": "vendor/omr/satb-line-omr/LICENSE",
+      "bytes": 1072,
+      "sha256": "78af845eb82191a187ac27f54468b0d8442882ef05248adfaae3f5a516386bee"
+    },
+    {
+      "path": "vendor/omr/satb-line-omr/MANIFEST.md",
+      "bytes": 3290,
+      "sha256": "39b55809b59d622096ffdcae4a6d0bbea37d2c9cc188fdd5654a2dcc0223d1a0"
+    },
+    {
+      "path": "vendor/omr/satb-line-omr/omr-preprocess.js",
+      "bytes": 15346,
+      "sha256": "91b6f3f26fa12fb57f679c85027ff66261e0858002792ae2ad54b5e4f3dd8d65"
+    },
+    {
+      "path": "vendor/omr/satb-line-omr/omr-decode.js",
+      "bytes": 17353,
+      "sha256": "e2564f11d2ef5bd7f6dd9b4c90821eb2f2edc4389bdb5d263904d42f44f78840"
+    },
+    {
+      "path": "vendor/omr/satb-line-omr/omr-reject.js",
+      "bytes": 6664,
+      "sha256": "7ac6e911997c42eb903d994d9afa4d9e0033ea0d9169d026a0ddb7da3f565ee4"
+    },
+    {
+      "path": "vendor/omr/model-public-domain/LICENSE",
+      "bytes": 1072,
+      "sha256": "78af845eb82191a187ac27f54468b0d8442882ef05248adfaae3f5a516386bee"
+    },
+    {
+      "path": "vendor/omr/model-public-domain/MODEL-CARD.md",
+      "bytes": 5400,
+      "sha256": "b7410fd8f1f099c33901da74086a3a07001956c3aba23b291a2f02ac42160b8e"
+    },
+    {
+      "path": "vendor/omr/model-public-domain/model-io.json",
+      "bytes": 3648,
+      "sha256": "5ddd02071239cfd6b69a46182bb5357958855acb3ab4df31a96d76b4e7cb0baf"
+    },
+    {
+      "path": "vendor/omr/model-public-domain/vocab.json",
+      "bytes": 1436,
+      "sha256": "7e0139c90b0572aaf7f679c7fd1d127ae9b02f9bd33bb9b7ac971ac0482061ca"
+    },
+    {
+      "path": "vendor/omr/model-public-domain/omr-line.fp16.onnx",
+      "bytes": 6422567,
+      "sha256": "0edeb8f9a8103405239d7edbf48aa372158eb3e0cbbe696ec7dbaf768a75c39d"
+    },
+    {
+      "path": "vendor/omr/runtime/LICENSE",
+      "bytes": 1073,
+      "sha256": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c"
+    },
+    {
+      "path": "vendor/omr/runtime/ThirdPartyNotices.txt",
+      "bytes": 338088,
+      "sha256": "143764b952fdb1a7c69ce653bfba74a7744d6a8a573bfb73e235fba356c83de3"
+    },
+    {
+      "path": "vendor/omr/runtime/package.json",
+      "bytes": 4593,
+      "sha256": "16f69f755509990539aeb1c8445884960e91adcacab2e8dca8e44ee43601df5c"
+    },
+    {
+      "path": "vendor/omr/runtime/dist/ort.wasm.min.mjs",
+      "bytes": 50126,
+      "sha256": "219e6a1fc8a9938268d18efca3c91d310bd2f4a59bbd13744df5b2b7fc6cee3b"
+    },
+    {
+      "path": "vendor/omr/runtime/dist/ort-wasm-simd-threaded.mjs",
+      "bytes": 24381,
+      "sha256": "e13f7f94fc51b4ca72b12faeb1ee95f4ace6dfbc8939bc718aabdc0a27c4299b"
+    },
+    {
+      "path": "vendor/omr/runtime/dist/ort-wasm-simd-threaded.wasm",
+      "bytes": 14239897,
+      "sha256": "3398c10d07d229bd91b364548e130e0e51a8e5704b88c7c083ebbeb78842dee2"
+    }
+  ]
+}

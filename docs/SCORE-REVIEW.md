@@ -8,9 +8,13 @@ revision. File loading, viewing and editing do not award practice time or XP.
 PDF pages render locally with pinned PDF.js. Use previous/next page and fit/zoom;
 the source stays beside the editable target table on a wide screen and above it
 on a phone. A PDF being visible does **not** mean notes have been recognized.
-Automatic PDF/image music recognition is not implemented. General browser OMR
-quality and model distribution remain unresolved; see the cloud research report
-`soundlab-evidence/1.1-pdf-omr-research.md` outside the source repository.
+Choose **Recognize notation locally** to find staff regions on the current page,
+select a supported single voice and run the bundled model. Actual decoded notes
+become an unverified derivative with raw tokens, source boxes and model hashes.
+The supported scope is selected clear monophonic treble/bass engraving; general
+piano polyphony, simultaneous staves, repeat expansion and arbitrary scans are
+not established. See [the workflow and limits](LOCAL-RECOGNITION.md) and
+[engine/runtime provenance](OMR-ENGINE.md).
 
 Enter pitches with octaves (`C4`, `F#4`, `Bb3`), explicit `MIDI:0`–`MIDI:127`,
 spaces or commas for a chord, and `R` for a rest. Beats start at zero. Each target has a beat, duration, named part,
@@ -86,12 +90,14 @@ PDF.js 6.4.299 is vendored in `vendor/pdfjs`. Its official npm tarball was verif
 against the registry SHA-512 integrity value. `manifest.json` records provenance,
 individual SHA-256 hashes and byte sizes. Preserve Apache-2.0 and the support
 asset notices. The display module, exact matching worker, CMaps, standard fonts
-and WASM assets must be served/cached together. No CDN or OMR model is fetched.
-Only the current visible page is rendered, capped at 12 million canvas pixels;
+and WASM assets must be served/cached together. No CDN is used. Recognition separately loads its pinned same-origin model only
+after a deliberate recognition request.
+The visible page and an on-demand offscreen recognition raster are capped at
+12 million pixels and 8,192 pixels per side;
 the viewer bounds page count to 500. Library file/capacity bounds apply first.
 These bounds do not establish native/mobile device performance.
 
-Run `tests/run.sh score score-review` with the local HTTP runner and Chromium.
+Run `tests/run.sh score score-review omr-engine omr-review omr-seam omr-staff-detection` with the local HTTP runner and Chromium.
 Fixtures are authored test material. Tests cover pure strict notation/XML/MIDI
 roundtrips, actual local PDF rendering, real IndexedDB revisions, exact source
 bytes, review/launch limits, checkpoint failures, part selection and phone layout.

@@ -1,0 +1,129 @@
+{
+  "schemaVersion": 1,
+  "id": "16-treble-triplet",
+  "originalComposition": true,
+  "truthOrigin": "authored-composition-events-before-rendering",
+  "label": "Treble: eighth-note triplet and three quarters",
+  "tags": [
+    "treble",
+    "tuplet",
+    "unsupported-structure"
+  ],
+  "parts": [
+    {
+      "id": "P1",
+      "clef": "treble",
+      "keyFifths": 0,
+      "meter": {
+        "beats": 4,
+        "beatType": 4
+      },
+      "events": [
+        {
+          "type": "note",
+          "pitch": "C4",
+          "tuplet": "start",
+          "partId": "P1",
+          "measure": 1,
+          "onsetBeats": 0,
+          "durationBeats": 0.3333333333333333,
+          "midi": 60
+        },
+        {
+          "type": "note",
+          "pitch": "D4",
+          "tuplet": "continue",
+          "partId": "P1",
+          "measure": 1,
+          "onsetBeats": 0.3333333333333333,
+          "durationBeats": 0.3333333333333333,
+          "midi": 62
+        },
+        {
+          "type": "note",
+          "pitch": "E4",
+          "tuplet": "stop",
+          "partId": "P1",
+          "measure": 1,
+          "onsetBeats": 0.6666666666666666,
+          "durationBeats": 0.3333333333333333,
+          "midi": 64
+        },
+        {
+          "type": "note",
+          "pitch": "F4",
+          "partId": "P1",
+          "measure": 1,
+          "onsetBeats": 1.0,
+          "durationBeats": 1,
+          "midi": 65
+        },
+        {
+          "type": "note",
+          "pitch": "G4",
+          "partId": "P1",
+          "measure": 1,
+          "onsetBeats": 2.0,
+          "durationBeats": 1,
+          "midi": 67
+        },
+        {
+          "type": "note",
+          "pitch": "A4",
+          "partId": "P1",
+          "measure": 1,
+          "onsetBeats": 3.0,
+          "durationBeats": 1,
+          "midi": 69
+        }
+      ],
+      "playback": [
+        {
+          "midi": 60,
+          "pitch": "C4",
+          "onsetBeats": 0,
+          "durationBeats": 0.3333333333333333
+        },
+        {
+          "midi": 62,
+          "pitch": "D4",
+          "onsetBeats": 0.3333333333333333,
+          "durationBeats": 0.3333333333333333
+        },
+        {
+          "midi": 64,
+          "pitch": "E4",
+          "onsetBeats": 0.6666666666666666,
+          "durationBeats": 0.3333333333333333
+        },
+        {
+          "midi": 65,
+          "pitch": "F4",
+          "onsetBeats": 1.0,
+          "durationBeats": 1
+        },
+        {
+          "midi": 67,
+          "pitch": "G4",
+          "onsetBeats": 2.0,
+          "durationBeats": 1
+        },
+        {
+          "midi": 69,
+          "pitch": "A4",
+          "onsetBeats": 3.0,
+          "durationBeats": 1
+        }
+      ],
+      "lengthBeats": 4
+    }
+  ],
+  "repeat": null,
+  "repeatExpanded": false,
+  "tempoVisible": false,
+  "tempoBpm": null,
+  "unsupportedForInitialSingleVoiceModel": [
+    "tuplet-rhythm"
+  ],
+  "acceptance": "review-required-unsupported"
+}

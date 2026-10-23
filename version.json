@@ -2,5 +2,5 @@
   "version": "0.75.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/soundLAB-alpha.apk",
   "web": "1.1.0",
-  "notes": "Local song library and PDF score review, instrument-focused workflow, global tuner, editable practice plans and recoverable settings backups. PDF music recognition is not automatic; review targets before practice. Web release candidate; APK channel unchanged."
+  "notes": "Persistent song library/settings, instrument-focused workflow, global tuner and editable practice plans. Local automatic recognition creates unverified drafts from selected monophonic staff regions; correct and review before practice. General piano polyphony, repeats and arbitrary scans remain unsupported or unvalidated. Web candidate; APK unchanged."
 }

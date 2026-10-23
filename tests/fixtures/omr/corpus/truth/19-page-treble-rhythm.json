@@ -1,0 +1,369 @@
+{
+  "schemaVersion": 1,
+  "id": "19-page-treble-rhythm",
+  "originalComposition": true,
+  "truthOrigin": "authored-composition-events-before-rendering",
+  "label": "Eight-measure treble rhythm page",
+  "tags": [
+    "treble",
+    "half",
+    "whole",
+    "eighth",
+    "dotted",
+    "rest",
+    "page-layout"
+  ],
+  "parts": [
+    {
+      "id": "P1",
+      "clef": "treble",
+      "keyFifths": 0,
+      "meter": {
+        "beats": 4,
+        "beatType": 4
+      },
+      "events": [
+        {
+          "type": "note",
+          "pitch": "C4",
+          "partId": "P1",
+          "measure": 1,
+          "onsetBeats": 0,
+          "durationBeats": 2,
+          "midi": 60
+        },
+        {
+          "type": "note",
+          "pitch": "E4",
+          "partId": "P1",
+          "measure": 1,
+          "onsetBeats": 2,
+          "durationBeats": 1,
+          "midi": 64
+        },
+        {
+          "type": "note",
+          "pitch": "G4",
+          "partId": "P1",
+          "measure": 1,
+          "onsetBeats": 3,
+          "durationBeats": 1,
+          "midi": 67
+        },
+        {
+          "type": "rest",
+          "partId": "P1",
+          "measure": 2,
+          "onsetBeats": 4,
+          "durationBeats": 1,
+          "midi": null
+        },
+        {
+          "type": "note",
+          "pitch": "F4",
+          "partId": "P1",
+          "measure": 2,
+          "onsetBeats": 5,
+          "durationBeats": 1,
+          "midi": 65
+        },
+        {
+          "type": "note",
+          "pitch": "E4",
+          "partId": "P1",
+          "measure": 2,
+          "onsetBeats": 6,
+          "durationBeats": 2,
+          "midi": 64
+        },
+        {
+          "type": "note",
+          "pitch": "D4",
+          "partId": "P1",
+          "measure": 3,
+          "onsetBeats": 8,
+          "durationBeats": 1.5,
+          "midi": 62
+        },
+        {
+          "type": "note",
+          "pitch": "E4",
+          "partId": "P1",
+          "measure": 3,
+          "onsetBeats": 9.5,
+          "durationBeats": 0.5,
+          "midi": 64
+        },
+        {
+          "type": "note",
+          "pitch": "F4",
+          "partId": "P1",
+          "measure": 3,
+          "onsetBeats": 10.0,
+          "durationBeats": 1,
+          "midi": 65
+        },
+        {
+          "type": "note",
+          "pitch": "A4",
+          "partId": "P1",
+          "measure": 3,
+          "onsetBeats": 11.0,
+          "durationBeats": 1,
+          "midi": 69
+        },
+        {
+          "type": "note",
+          "pitch": "G4",
+          "partId": "P1",
+          "measure": 4,
+          "onsetBeats": 12,
+          "durationBeats": 4,
+          "midi": 67
+        },
+        {
+          "type": "note",
+          "pitch": "E4",
+          "partId": "P1",
+          "measure": 5,
+          "onsetBeats": 16,
+          "durationBeats": 1,
+          "midi": 64
+        },
+        {
+          "type": "note",
+          "pitch": "G4",
+          "partId": "P1",
+          "measure": 5,
+          "onsetBeats": 17,
+          "durationBeats": 0.5,
+          "midi": 67
+        },
+        {
+          "type": "note",
+          "pitch": "F4",
+          "partId": "P1",
+          "measure": 5,
+          "onsetBeats": 17.5,
+          "durationBeats": 0.5,
+          "midi": 65
+        },
+        {
+          "type": "note",
+          "pitch": "D4",
+          "partId": "P1",
+          "measure": 5,
+          "onsetBeats": 18.0,
+          "durationBeats": 2,
+          "midi": 62
+        },
+        {
+          "type": "rest",
+          "partId": "P1",
+          "measure": 6,
+          "onsetBeats": 20,
+          "durationBeats": 2,
+          "midi": null
+        },
+        {
+          "type": "note",
+          "pitch": "C4",
+          "partId": "P1",
+          "measure": 6,
+          "onsetBeats": 22,
+          "durationBeats": 1,
+          "midi": 60
+        },
+        {
+          "type": "note",
+          "pitch": "D4",
+          "partId": "P1",
+          "measure": 6,
+          "onsetBeats": 23,
+          "durationBeats": 1,
+          "midi": 62
+        },
+        {
+          "type": "note",
+          "pitch": "E4",
+          "partId": "P1",
+          "measure": 7,
+          "onsetBeats": 24,
+          "durationBeats": 2,
+          "midi": 64
+        },
+        {
+          "type": "note",
+          "pitch": "F4",
+          "partId": "P1",
+          "measure": 7,
+          "onsetBeats": 26,
+          "durationBeats": 2,
+          "midi": 65
+        },
+        {
+          "type": "note",
+          "pitch": "G4",
+          "partId": "P1",
+          "measure": 8,
+          "onsetBeats": 28,
+          "durationBeats": 1,
+          "midi": 67
+        },
+        {
+          "type": "note",
+          "pitch": "E4",
+          "partId": "P1",
+          "measure": 8,
+          "onsetBeats": 29,
+          "durationBeats": 1,
+          "midi": 64
+        },
+        {
+          "type": "note",
+          "pitch": "C4",
+          "partId": "P1",
+          "measure": 8,
+          "onsetBeats": 30,
+          "durationBeats": 2,
+          "midi": 60
+        }
+      ],
+      "playback": [
+        {
+          "midi": 60,
+          "pitch": "C4",
+          "onsetBeats": 0,
+          "durationBeats": 2
+        },
+        {
+          "midi": 64,
+          "pitch": "E4",
+          "onsetBeats": 2,
+          "durationBeats": 1
+        },
+        {
+          "midi": 67,
+          "pitch": "G4",
+          "onsetBeats": 3,
+          "durationBeats": 1
+        },
+        {
+          "midi": 65,
+          "pitch": "F4",
+          "onsetBeats": 5,
+          "durationBeats": 1
+        },
+        {
+          "midi": 64,
+          "pitch": "E4",
+          "onsetBeats": 6,
+          "durationBeats": 2
+        },
+        {
+          "midi": 62,
+          "pitch": "D4",
+          "onsetBeats": 8,
+          "durationBeats": 1.5
+        },
+        {
+          "midi": 64,
+          "pitch": "E4",
+          "onsetBeats": 9.5,
+          "durationBeats": 0.5
+        },
+        {
+          "midi": 65,
+          "pitch": "F4",
+          "onsetBeats": 10.0,
+          "durationBeats": 1
+        },
+        {
+          "midi": 69,
+          "pitch": "A4",
+          "onsetBeats": 11.0,
+          "durationBeats": 1
+        },
+        {
+          "midi": 67,
+          "pitch": "G4",
+          "onsetBeats": 12,
+          "durationBeats": 4
+        },
+        {
+          "midi": 64,
+          "pitch": "E4",
+          "onsetBeats": 16,
+          "durationBeats": 1
+        },
+        {
+          "midi": 67,
+          "pitch": "G4",
+          "onsetBeats": 17,
+          "durationBeats": 0.5
+        },
+        {
+          "midi": 65,
+          "pitch": "F4",
+          "onsetBeats": 17.5,
+          "durationBeats": 0.5
+        },
+        {
+          "midi": 62,
+          "pitch": "D4",
+          "onsetBeats": 18.0,
+          "durationBeats": 2
+        },
+        {
+          "midi": 60,
+          "pitch": "C4",
+          "onsetBeats": 22,
+          "durationBeats": 1
+        },
+        {
+          "midi": 62,
+          "pitch": "D4",
+          "onsetBeats": 23,
+          "durationBeats": 1
+        },
+        {
+          "midi": 64,
+          "pitch": "E4",
+          "onsetBeats": 24,
+          "durationBeats": 2
+        },
+        {
+          "midi": 65,
+          "pitch": "F4",
+          "onsetBeats": 26,
+          "durationBeats": 2
+        },
+        {
+          "midi": 67,
+          "pitch": "G4",
+          "onsetBeats": 28,
+          "durationBeats": 1
+        },
+        {
+          "midi": 64,
+          "pitch": "E4",
+          "onsetBeats": 29,
+          "durationBeats": 1
+        },
+        {
+          "midi": 60,
+          "pitch": "C4",
+          "onsetBeats": 30,
+          "durationBeats": 2
+        }
+      ],
+      "lengthBeats": 32
+    }
+  ],
+  "repeat": null,
+  "repeatExpanded": false,
+  "tempoVisible": false,
+  "tempoBpm": null,
+  "unsupportedForInitialSingleVoiceModel": [],
+  "acceptance": "candidate-for-human-review"
+}

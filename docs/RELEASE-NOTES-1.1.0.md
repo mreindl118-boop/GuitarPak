@@ -18,11 +18,15 @@ unsaved-data recovery. The song library has a separate full archive. App
 updates checkpoint practice and drafts before a deliberate reload. Editable
 teacher-text plans produce short actionable steps using actual app tools.
 
-Automatic PDF notation recognition is a **required, unfinished release gate**.
-An actual browser-local model is being integrated with source-linked review
-and correction; its supported notation and measured limits must be documented
-before publication. PDF viewing alone and manual entry do not complete this
-gate. Unknown rhythm uses Wait-only practice. Unsupported MusicXML and audio
+Automatic recognition now runs locally on selected monophonic treble/bass staff
+regions from PDF pages or images. It creates source-linked unverified drafts
+with retained model evidence for correction and review. It works offline after
+the approximately 21 MB of bundled model/runtime assets are cached. General piano
+polyphony, simultaneous staves, repeat expansion, whole multipage songs and
+arbitrary scans are unsupported or unvalidated. The model can omit unsupported
+symbols without detecting them. The measured limits and material release scope
+remain explicit gates in [the checklist](RELEASE-1.1.0-CHECKLIST.md).
+Unknown or unconfirmed rhythm uses Wait-only practice. Unsupported MusicXML and audio
 chords are explained rather than graded as invented notes. No Google Docs connection, private-file upload,
 cross-device sync or new APK is included. Same-origin browser storage can be
 lost when site data is cleared or evicted. Physical MIDI/LUMI/audio behavior

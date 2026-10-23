@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "id": "03-bass-quarters",
+  "originalComposition": true,
+  "truthOrigin": "authored-composition-events-before-rendering",
+  "label": "Bass: four stepwise quarters",
+  "tags": [
+    "bass",
+    "quarter",
+    "single-melody"
+  ],
+  "parts": [
+    {
+      "id": "P1",
+      "clef": "bass",
+      "keyFifths": 0,
+      "meter": {
+        "beats": 4,
+        "beatType": 4
+      },
+      "events": [
+        {
+          "type": "note",
+          "pitch": "C3",
+          "partId": "P1",
+          "measure": 1,
+          "onsetBeats": 0,
+          "durationBeats": 1,
+          "midi": 48
+        },
+        {
+          "type": "note",
+          "pitch": "D3",
+          "partId": "P1",
+          "measure": 1,
+          "onsetBeats": 1,
+          "durationBeats": 1,
+          "midi": 50
+        },
+        {
+          "type": "note",
+          "pitch": "E3",
+          "partId": "P1",
+          "measure": 1,
+          "onsetBeats": 2,
+          "durationBeats": 1,
+          "midi": 52
+        },
+        {
+          "type": "note",
+          "pitch": "F3",
+          "partId": "P1",
+          "measure": 1,
+          "onsetBeats": 3,
+          "durationBeats": 1,
+          "midi": 53
+        }
+      ],
+      "playback": [
+        {
+          "midi": 48,
+          "pitch": "C3",
+          "onsetBeats": 0,
+          "durationBeats": 1
+        },
+        {
+          "midi": 50,
+          "pitch": "D3",
+          "onsetBeats": 1,
+          "durationBeats": 1
+        },
+        {
+          "midi": 52,
+          "pitch": "E3",
+          "onsetBeats": 2,
+          "durationBeats": 1
+        },
+        {
+          "midi": 53,
+          "pitch": "F3",
+          "onsetBeats": 3,
+          "durationBeats": 1
+        }
+      ],
+      "lengthBeats": 4
+    }
+  ],
+  "repeat": null,
+  "repeatExpanded": false,
+  "tempoVisible": false,
+  "tempoBpm": null,
+  "unsupportedForInitialSingleVoiceModel": [],
+  "acceptance": "candidate-for-human-review"
+}

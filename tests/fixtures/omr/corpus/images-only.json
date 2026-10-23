@@ -1,0 +1,325 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "id": "01-treble-quarters-clean",
+      "image": "images/01-treble-quarters-clean.png",
+      "pdf": "images/01-treble-quarters-clean.pdf",
+      "width": 424,
+      "height": 260,
+      "sha256": "c43724e7d9f0360aa002c4ed45f8d431a47425f4decabb56b63de078b352146b"
+    },
+    {
+      "id": "01-treble-quarters-scan",
+      "image": "images/01-treble-quarters-scan.png",
+      "pdf": "images/01-treble-quarters-scan.pdf",
+      "width": 428,
+      "height": 266,
+      "sha256": "82290cfe0b9c06fe8844d1bc48c45f158e3a266341fc14958878f0ff3c52d9ba"
+    },
+    {
+      "id": "02-treble-rhythm-clean",
+      "image": "images/02-treble-rhythm-clean.png",
+      "pdf": "images/02-treble-rhythm-clean.pdf",
+      "width": 440,
+      "height": 260,
+      "sha256": "9415124c9d47e516a3f0ebf290402d111e39d1e861a799b47e3d1ccd0e4d2d89"
+    },
+    {
+      "id": "02-treble-rhythm-scan",
+      "image": "images/02-treble-rhythm-scan.png",
+      "pdf": "images/02-treble-rhythm-scan.pdf",
+      "width": 444,
+      "height": 266,
+      "sha256": "d310abf939d64f7e82c1e1f9dd7a5266ec081fe8de1cd6da2da0ed362e1ce7a3"
+    },
+    {
+      "id": "03-bass-quarters-clean",
+      "image": "images/03-bass-quarters-clean.png",
+      "pdf": "images/03-bass-quarters-clean.pdf",
+      "width": 427,
+      "height": 260,
+      "sha256": "7550ae06d8a30565029845b6127dc6fa7884b1b8e21683becfddd22b4ff9bbc3"
+    },
+    {
+      "id": "03-bass-quarters-scan",
+      "image": "images/03-bass-quarters-scan.png",
+      "pdf": "images/03-bass-quarters-scan.pdf",
+      "width": 431,
+      "height": 266,
+      "sha256": "e64845685c41cd7c05b6bb9a15450db09a9ac9af56c7b9c31d2bab125f637b85"
+    },
+    {
+      "id": "04-bass-rhythm-clean",
+      "image": "images/04-bass-rhythm-clean.png",
+      "pdf": "images/04-bass-rhythm-clean.pdf",
+      "width": 388,
+      "height": 260,
+      "sha256": "8821231d821480355511447694e3b192a2be0ace2ee919c9600f2632aae2544c"
+    },
+    {
+      "id": "04-bass-rhythm-scan",
+      "image": "images/04-bass-rhythm-scan.png",
+      "pdf": "images/04-bass-rhythm-scan.pdf",
+      "width": 392,
+      "height": 266,
+      "sha256": "c1b08e1de534cf93cf338e729b23b0c0b34945389398ab85ab7ed7e84285bb1a"
+    },
+    {
+      "id": "05-treble-rests-clean",
+      "image": "images/05-treble-rests-clean.png",
+      "pdf": "images/05-treble-rests-clean.pdf",
+      "width": 496,
+      "height": 260,
+      "sha256": "8b422ae4a000788de4effd211f85c97dec2fc6b928df98f487c8caee0dcfeb12"
+    },
+    {
+      "id": "05-treble-rests-scan",
+      "image": "images/05-treble-rests-scan.png",
+      "pdf": "images/05-treble-rests-scan.pdf",
+      "width": 500,
+      "height": 266,
+      "sha256": "7151dbf3fcae6063d8f910f9f4cd1dffaf33362698a4979038ce79c1a637b2ea"
+    },
+    {
+      "id": "06-bass-rests-clean",
+      "image": "images/06-bass-rests-clean.png",
+      "pdf": "images/06-bass-rests-clean.pdf",
+      "width": 591,
+      "height": 260,
+      "sha256": "b7501986da394ef1c5e39d21ee6c47e7b23b85db3db7eabbec2c3924f9762125"
+    },
+    {
+      "id": "06-bass-rests-scan",
+      "image": "images/06-bass-rests-scan.png",
+      "pdf": "images/06-bass-rests-scan.pdf",
+      "width": 595,
+      "height": 268,
+      "sha256": "5e10b5b4a90b26f81aecc06616b5f3edc5349d132ca6f061a25d769742301b1b"
+    },
+    {
+      "id": "07-treble-eighths-clean",
+      "image": "images/07-treble-eighths-clean.png",
+      "pdf": "images/07-treble-eighths-clean.pdf",
+      "width": 548,
+      "height": 260,
+      "sha256": "e438a9c2769ccc1471542126a566d9e1e86dde3f54ddf386461fdd9f0c524917"
+    },
+    {
+      "id": "07-treble-eighths-scan",
+      "image": "images/07-treble-eighths-scan.png",
+      "pdf": "images/07-treble-eighths-scan.pdf",
+      "width": 552,
+      "height": 268,
+      "sha256": "0e51e615a546e46ce56363ddf6e9ce908314f94db55eb492f118955756c91c28"
+    },
+    {
+      "id": "08-treble-dotted-clean",
+      "image": "images/08-treble-dotted-clean.png",
+      "pdf": "images/08-treble-dotted-clean.pdf",
+      "width": 433,
+      "height": 260,
+      "sha256": "7863af8218e9f415130826cfa10cbbf86ddb79b9f79151fad3cd104d12a48f32"
+    },
+    {
+      "id": "08-treble-dotted-scan",
+      "image": "images/08-treble-dotted-scan.png",
+      "pdf": "images/08-treble-dotted-scan.pdf",
+      "width": 437,
+      "height": 266,
+      "sha256": "2045937307a2c85beffc8d57b5d75c2574492f8f1a83988da6f35183cee93c0f"
+    },
+    {
+      "id": "09-treble-accidentals-clean",
+      "image": "images/09-treble-accidentals-clean.png",
+      "pdf": "images/09-treble-accidentals-clean.pdf",
+      "width": 445,
+      "height": 260,
+      "sha256": "faf5e40cb6357caee93152d1b1b9b29b29a203b71269d8640a3ad835da577de1"
+    },
+    {
+      "id": "09-treble-accidentals-scan",
+      "image": "images/09-treble-accidentals-scan.png",
+      "pdf": "images/09-treble-accidentals-scan.pdf",
+      "width": 449,
+      "height": 266,
+      "sha256": "23f93c5020bd7ace2ad439b02a20a2bf351c53047868543869b4221bd90f1c72"
+    },
+    {
+      "id": "10-treble-key-d-clean",
+      "image": "images/10-treble-key-d-clean.png",
+      "pdf": "images/10-treble-key-d-clean.pdf",
+      "width": 479,
+      "height": 260,
+      "sha256": "d65142c425c19b9f6092236a1a70b2180b5ef172cd37b754c94171ee5fe82e61"
+    },
+    {
+      "id": "10-treble-key-d-scan",
+      "image": "images/10-treble-key-d-scan.png",
+      "pdf": "images/10-treble-key-d-scan.pdf",
+      "width": 483,
+      "height": 266,
+      "sha256": "7fda1e15737fee26b7d43bcf8e3ceb1e7fbcc8713613bbbca268369a30eefaf1"
+    },
+    {
+      "id": "11-bass-key-eb-clean",
+      "image": "images/11-bass-key-eb-clean.png",
+      "pdf": "images/11-bass-key-eb-clean.pdf",
+      "width": 503,
+      "height": 260,
+      "sha256": "c9a6afa8a37824691b834758c507cc6ad74dd3961c9ea0a8d2d205c5048e2248"
+    },
+    {
+      "id": "11-bass-key-eb-scan",
+      "image": "images/11-bass-key-eb-scan.png",
+      "pdf": "images/11-bass-key-eb-scan.pdf",
+      "width": 507,
+      "height": 266,
+      "sha256": "2518e313107e74acb734b625c5a702298467b73a0ce91b8ee42a5fab004e143d"
+    },
+    {
+      "id": "12-treble-chords-clean",
+      "image": "images/12-treble-chords-clean.png",
+      "pdf": "images/12-treble-chords-clean.pdf",
+      "width": 346,
+      "height": 260,
+      "sha256": "f4b2409aea7e723b5ac1616828fbbc3603b6b7d13fe248eccc826427b07e3f11"
+    },
+    {
+      "id": "12-treble-chords-scan",
+      "image": "images/12-treble-chords-scan.png",
+      "pdf": "images/12-treble-chords-scan.pdf",
+      "width": 350,
+      "height": 264,
+      "sha256": "bb811a49a8a7a6f559064bd60dab1cae3c083dc3664b4a49d487d4ca59e99f47"
+    },
+    {
+      "id": "13-treble-tie-clean",
+      "image": "images/13-treble-tie-clean.png",
+      "pdf": "images/13-treble-tie-clean.pdf",
+      "width": 385,
+      "height": 260,
+      "sha256": "609f13975f3e924f3c91c4f1eda4cfc0233fa5576ba67f7e0636f80cd54bc354"
+    },
+    {
+      "id": "13-treble-tie-scan",
+      "image": "images/13-treble-tie-scan.png",
+      "pdf": "images/13-treble-tie-scan.pdf",
+      "width": 389,
+      "height": 266,
+      "sha256": "118ba9b7c9d78cce2babe1e0bb824c56859e06a1187d7a9b78bfc3fe6686a5e9"
+    },
+    {
+      "id": "14-repeat-bars-clean",
+      "image": "images/14-repeat-bars-clean.png",
+      "pdf": "images/14-repeat-bars-clean.pdf",
+      "width": 648,
+      "height": 260,
+      "sha256": "eee1b767c867bac321a46be0a74b89a21980beefdc9b8df824f6d8ea69532b27"
+    },
+    {
+      "id": "14-repeat-bars-scan",
+      "image": "images/14-repeat-bars-scan.png",
+      "pdf": "images/14-repeat-bars-scan.pdf",
+      "width": 652,
+      "height": 268,
+      "sha256": "99aa401e48bc17381bf1e7897d103685f6c49a377db537023335505959ef43cd"
+    },
+    {
+      "id": "15-two-parts-clean",
+      "image": "images/15-two-parts-clean.png",
+      "pdf": "images/15-two-parts-clean.pdf",
+      "width": 392,
+      "height": 460,
+      "sha256": "fbb97a0452ddcbe6d15a793a20118b5a0677674a2d25f1e6ad64f6e6abb39c15"
+    },
+    {
+      "id": "15-two-parts-scan",
+      "image": "images/15-two-parts-scan.png",
+      "pdf": "images/15-two-parts-scan.pdf",
+      "width": 398,
+      "height": 466,
+      "sha256": "09238dd085848256568d7c5be9404ebfca37f1405db14a8451fc1224d8625722"
+    },
+    {
+      "id": "16-treble-triplet-clean",
+      "image": "images/16-treble-triplet-clean.png",
+      "pdf": "images/16-treble-triplet-clean.pdf",
+      "width": 534,
+      "height": 260,
+      "sha256": "75862a2f6777c6ef42ffa0abd557880a480821134eae38dff867936e79bc9f8c"
+    },
+    {
+      "id": "16-treble-triplet-scan",
+      "image": "images/16-treble-triplet-scan.png",
+      "pdf": "images/16-treble-triplet-scan.pdf",
+      "width": 538,
+      "height": 268,
+      "sha256": "f09b298f5ed910b13605bd9e9b27af9980706b2a1d04e8ee18df237d11ed50c7"
+    },
+    {
+      "id": "17-page-treble-quarters-clean",
+      "image": "images/17-page-treble-quarters-clean.png",
+      "pdf": "images/17-page-treble-quarters-clean.pdf",
+      "width": 1800,
+      "height": 500,
+      "sha256": "961866dcced5926de7e4d8f7d38659aa24f4055c54febd63f7bfe541af797e0d"
+    },
+    {
+      "id": "17-page-treble-quarters-scan",
+      "image": "images/17-page-treble-quarters-scan.png",
+      "pdf": "images/17-page-treble-quarters-scan.pdf",
+      "width": 1806,
+      "height": 522,
+      "sha256": "0e49415ef34f10bd80317e4ce3bf3765f2f8fad371d5ba3e123e2d5ea0aa062b"
+    },
+    {
+      "id": "18-page-bass-quarters-clean",
+      "image": "images/18-page-bass-quarters-clean.png",
+      "pdf": "images/18-page-bass-quarters-clean.pdf",
+      "width": 1800,
+      "height": 500,
+      "sha256": "043943060205607f33ba538b10c0e99fbcb3f8958557d7473504cfe26ded4e56"
+    },
+    {
+      "id": "18-page-bass-quarters-scan",
+      "image": "images/18-page-bass-quarters-scan.png",
+      "pdf": "images/18-page-bass-quarters-scan.pdf",
+      "width": 1806,
+      "height": 522,
+      "sha256": "4006dd6f41e33934dbf0100336d8c750177fda851537a9e3cf8f1ba20d08f8d1"
+    },
+    {
+      "id": "19-page-treble-rhythm-clean",
+      "image": "images/19-page-treble-rhythm-clean.png",
+      "pdf": "images/19-page-treble-rhythm-clean.pdf",
+      "width": 1800,
+      "height": 260,
+      "sha256": "cf3991b616e816f4763d589a178061a8378972290c562235b7165e6807536c27"
+    },
+    {
+      "id": "19-page-treble-rhythm-scan",
+      "image": "images/19-page-treble-rhythm-scan.png",
+      "pdf": "images/19-page-treble-rhythm-scan.pdf",
+      "width": 1804,
+      "height": 282,
+      "sha256": "92bfb3fe228cd97929829ee3f7c32da39ec1bf3ad1a926469b6966f977f59b33"
+    },
+    {
+      "id": "20-page-bass-key-eb-clean",
+      "image": "images/20-page-bass-key-eb-clean.png",
+      "pdf": "images/20-page-bass-key-eb-clean.pdf",
+      "width": 1800,
+      "height": 500,
+      "sha256": "0620652fb8f58bd170f716c4c0d055bbb5eb14f4e76b4714758126fdcd27fb2c"
+    },
+    {
+      "id": "20-page-bass-key-eb-scan",
+      "image": "images/20-page-bass-key-eb-scan.png",
+      "pdf": "images/20-page-bass-key-eb-scan.pdf",
+      "width": 1806,
+      "height": 522,
+      "sha256": "645d5f26fca90cb1c0b21d1c81a0fc7389ff7afd4cf6ddc34b6cea0324663a1e"
+    }
+  ]
+}

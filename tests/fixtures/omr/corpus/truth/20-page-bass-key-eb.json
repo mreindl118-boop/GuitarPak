@@ -1,0 +1,396 @@
+{
+  "schemaVersion": 1,
+  "id": "20-page-bass-key-eb",
+  "originalComposition": true,
+  "truthOrigin": "authored-composition-events-before-rendering",
+  "label": "Eight-measure bass flat-key page",
+  "tags": [
+    "bass",
+    "flat",
+    "key-signature",
+    "half",
+    "page-layout"
+  ],
+  "parts": [
+    {
+      "id": "P1",
+      "clef": "bass",
+      "keyFifths": -3,
+      "meter": {
+        "beats": 4,
+        "beatType": 4
+      },
+      "events": [
+        {
+          "type": "note",
+          "pitch": "Eb3",
+          "partId": "P1",
+          "measure": 1,
+          "onsetBeats": 0,
+          "durationBeats": 1,
+          "midi": 51
+        },
+        {
+          "type": "note",
+          "pitch": "F3",
+          "partId": "P1",
+          "measure": 1,
+          "onsetBeats": 1,
+          "durationBeats": 1,
+          "midi": 53
+        },
+        {
+          "type": "note",
+          "pitch": "G3",
+          "partId": "P1",
+          "measure": 1,
+          "onsetBeats": 2,
+          "durationBeats": 1,
+          "midi": 55
+        },
+        {
+          "type": "note",
+          "pitch": "Ab3",
+          "partId": "P1",
+          "measure": 1,
+          "onsetBeats": 3,
+          "durationBeats": 1,
+          "midi": 56
+        },
+        {
+          "type": "note",
+          "pitch": "Bb2",
+          "partId": "P1",
+          "measure": 2,
+          "onsetBeats": 4,
+          "durationBeats": 2,
+          "midi": 46
+        },
+        {
+          "type": "note",
+          "pitch": "Eb3",
+          "partId": "P1",
+          "measure": 2,
+          "onsetBeats": 6,
+          "durationBeats": 2,
+          "midi": 51
+        },
+        {
+          "type": "note",
+          "pitch": "Ab2",
+          "partId": "P1",
+          "measure": 3,
+          "onsetBeats": 8,
+          "durationBeats": 1,
+          "midi": 44
+        },
+        {
+          "type": "note",
+          "pitch": "Bb2",
+          "partId": "P1",
+          "measure": 3,
+          "onsetBeats": 9,
+          "durationBeats": 1,
+          "midi": 46
+        },
+        {
+          "type": "note",
+          "pitch": "C3",
+          "partId": "P1",
+          "measure": 3,
+          "onsetBeats": 10,
+          "durationBeats": 1,
+          "midi": 48
+        },
+        {
+          "type": "note",
+          "pitch": "D3",
+          "partId": "P1",
+          "measure": 3,
+          "onsetBeats": 11,
+          "durationBeats": 1,
+          "midi": 50
+        },
+        {
+          "type": "note",
+          "pitch": "Eb3",
+          "partId": "P1",
+          "measure": 4,
+          "onsetBeats": 12,
+          "durationBeats": 4,
+          "midi": 51
+        },
+        {
+          "type": "note",
+          "pitch": "G2",
+          "partId": "P1",
+          "measure": 5,
+          "onsetBeats": 16,
+          "durationBeats": 1,
+          "midi": 43
+        },
+        {
+          "type": "note",
+          "pitch": "Bb2",
+          "partId": "P1",
+          "measure": 5,
+          "onsetBeats": 17,
+          "durationBeats": 1,
+          "midi": 46
+        },
+        {
+          "type": "note",
+          "pitch": "Eb3",
+          "partId": "P1",
+          "measure": 5,
+          "onsetBeats": 18,
+          "durationBeats": 1,
+          "midi": 51
+        },
+        {
+          "type": "note",
+          "pitch": "F3",
+          "partId": "P1",
+          "measure": 5,
+          "onsetBeats": 19,
+          "durationBeats": 1,
+          "midi": 53
+        },
+        {
+          "type": "note",
+          "pitch": "G3",
+          "partId": "P1",
+          "measure": 6,
+          "onsetBeats": 20,
+          "durationBeats": 2,
+          "midi": 55
+        },
+        {
+          "type": "note",
+          "pitch": "F3",
+          "partId": "P1",
+          "measure": 6,
+          "onsetBeats": 22,
+          "durationBeats": 1,
+          "midi": 53
+        },
+        {
+          "type": "note",
+          "pitch": "Eb3",
+          "partId": "P1",
+          "measure": 6,
+          "onsetBeats": 23,
+          "durationBeats": 1,
+          "midi": 51
+        },
+        {
+          "type": "note",
+          "pitch": "D3",
+          "partId": "P1",
+          "measure": 7,
+          "onsetBeats": 24,
+          "durationBeats": 1,
+          "midi": 50
+        },
+        {
+          "type": "note",
+          "pitch": "C3",
+          "partId": "P1",
+          "measure": 7,
+          "onsetBeats": 25,
+          "durationBeats": 1,
+          "midi": 48
+        },
+        {
+          "type": "note",
+          "pitch": "Bb2",
+          "partId": "P1",
+          "measure": 7,
+          "onsetBeats": 26,
+          "durationBeats": 1,
+          "midi": 46
+        },
+        {
+          "type": "note",
+          "pitch": "Ab2",
+          "partId": "P1",
+          "measure": 7,
+          "onsetBeats": 27,
+          "durationBeats": 1,
+          "midi": 44
+        },
+        {
+          "type": "note",
+          "pitch": "Bb2",
+          "partId": "P1",
+          "measure": 8,
+          "onsetBeats": 28,
+          "durationBeats": 2,
+          "midi": 46
+        },
+        {
+          "type": "note",
+          "pitch": "Eb3",
+          "partId": "P1",
+          "measure": 8,
+          "onsetBeats": 30,
+          "durationBeats": 2,
+          "midi": 51
+        }
+      ],
+      "playback": [
+        {
+          "midi": 51,
+          "pitch": "Eb3",
+          "onsetBeats": 0,
+          "durationBeats": 1
+        },
+        {
+          "midi": 53,
+          "pitch": "F3",
+          "onsetBeats": 1,
+          "durationBeats": 1
+        },
+        {
+          "midi": 55,
+          "pitch": "G3",
+          "onsetBeats": 2,
+          "durationBeats": 1
+        },
+        {
+          "midi": 56,
+          "pitch": "Ab3",
+          "onsetBeats": 3,
+          "durationBeats": 1
+        },
+        {
+          "midi": 46,
+          "pitch": "Bb2",
+          "onsetBeats": 4,
+          "durationBeats": 2
+        },
+        {
+          "midi": 51,
+          "pitch": "Eb3",
+          "onsetBeats": 6,
+          "durationBeats": 2
+        },
+        {
+          "midi": 44,
+          "pitch": "Ab2",
+          "onsetBeats": 8,
+          "durationBeats": 1
+        },
+        {
+          "midi": 46,
+          "pitch": "Bb2",
+          "onsetBeats": 9,
+          "durationBeats": 1
+        },
+        {
+          "midi": 48,
+          "pitch": "C3",
+          "onsetBeats": 10,
+          "durationBeats": 1
+        },
+        {
+          "midi": 50,
+          "pitch": "D3",
+          "onsetBeats": 11,
+          "durationBeats": 1
+        },
+        {
+          "midi": 51,
+          "pitch": "Eb3",
+          "onsetBeats": 12,
+          "durationBeats": 4
+        },
+        {
+          "midi": 43,
+          "pitch": "G2",
+          "onsetBeats": 16,
+          "durationBeats": 1
+        },
+        {
+          "midi": 46,
+          "pitch": "Bb2",
+          "onsetBeats": 17,
+          "durationBeats": 1
+        },
+        {
+          "midi": 51,
+          "pitch": "Eb3",
+          "onsetBeats": 18,
+          "durationBeats": 1
+        },
+        {
+          "midi": 53,
+          "pitch": "F3",
+          "onsetBeats": 19,
+          "durationBeats": 1
+        },
+        {
+          "midi": 55,
+          "pitch": "G3",
+          "onsetBeats": 20,
+          "durationBeats": 2
+        },
+        {
+          "midi": 53,
+          "pitch": "F3",
+          "onsetBeats": 22,
+          "durationBeats": 1
+        },
+        {
+          "midi": 51,
+          "pitch": "Eb3",
+          "onsetBeats": 23,
+          "durationBeats": 1
+        },
+        {
+          "midi": 50,
+          "pitch": "D3",
+          "onsetBeats": 24,
+          "durationBeats": 1
+        },
+        {
+          "midi": 48,
+          "pitch": "C3",
+          "onsetBeats": 25,
+          "durationBeats": 1
+        },
+        {
+          "midi": 46,
+          "pitch": "Bb2",
+          "onsetBeats": 26,
+          "durationBeats": 1
+        },
+        {
+          "midi": 44,
+          "pitch": "Ab2",
+          "onsetBeats": 27,
+          "durationBeats": 1
+        },
+        {
+          "midi": 46,
+          "pitch": "Bb2",
+          "onsetBeats": 28,
+          "durationBeats": 2
+        },
+        {
+          "midi": 51,
+          "pitch": "Eb3",
+          "onsetBeats": 30,
+          "durationBeats": 2
+        }
+      ],
+      "lengthBeats": 32
+    }
+  ],
+  "repeat": null,
+  "repeatExpanded": false,
+  "tempoVisible": false,
+  "tempoBpm": null,
+  "unsupportedForInitialSingleVoiceModel": [],
+  "acceptance": "candidate-for-human-review"
+}

@@ -1,0 +1,3572 @@
+{
+  "schemaVersion": 1,
+  "reportId": "soundlab-browser-omr-original-corpus-v1-2026-10-23",
+  "description": "Post-inference, hash-paired original synthetic corpus; all failures and unsupported cases retained. No general accuracy claim.",
+  "corpus": {
+    "directory": "../corpus",
+    "manifestSha256": "22a4115cd19e126cd69125b1a9f93ee7e4032cfd2fd087d388e0ccbeb2b5e4f6",
+    "freezeManifestSha256": "b6ea5afee974abb2fa7e0c4198782666be6d1459452184c653be33d45665d8de",
+    "archiveSha256": "b0e29ade0fef6d57665a8a89044d143aae02132d8f3bfbf1c9a0393e50fa54f8",
+    "compositions": 20,
+    "cases": 40,
+    "supportedMonophonicCases": 32,
+    "unsupportedCases": 8,
+    "license": "CC0-1.0 original compositions and generator; tooling licenses separate",
+    "renderer": "Verovio6.3.0-425dd7b/CairoSVG/Pillow",
+    "imageOnlyInference": true,
+    "groundTruthUsedOnlyAfterInference": true,
+    "portableFilesManifestSha256": "8bcefd51d33fb7b043f439faa552732b3cf368f2c770d5d15d6abdc2e609bc10"
+  },
+  "engine": {
+    "name": "satb-line-omr/model-public-domain/fp16",
+    "license": "MIT",
+    "source": "https://github.com/alexanderalber/satb-line-omr",
+    "sourceCommit": "c60823117a5c92b0c29f921dbca023e94026d279",
+    "sha256": "0edeb8f9a8103405239d7edbf48aa372158eb3e0cbbe696ec7dbaf768a75c39d",
+    "gitBlobSha1": "1fe32f92c939fa1f91fc74d3a0b668cd6f0704df"
+  },
+  "runtime": {
+    "name": "onnxruntime-web",
+    "version": "1.30.0",
+    "license": "MIT",
+    "tarball": "https://registry.npmjs.org/onnxruntime-web/-/onnxruntime-web-1.30.0.tgz",
+    "integrity": "sha512-q0y+JrrtukXSzsBWEMccVfqX25LRmosXHF+CaRJmg8pZClzcV7svNc4rKY3jL02Vb7QmRMDs1SigqR4CXAfKYQ==",
+    "licenseSource": "https://github.com/microsoft/onnxruntime/blob/v1.30.0/LICENSE"
+  },
+  "configuration": {
+    "threads": 1,
+    "graphOptimizationLevel": "disabled",
+    "executionProviders": [
+      "wasm"
+    ],
+    "calibratedConfidence": false
+  },
+  "vendorManifestSha256": "bd3b94021390844c46a0908d5e49b613fcc45ab23b24c2494657e16ae0ff0c23",
+  "vendorFiles": [
+    {
+      "path": "vendor/omr/satb-line-omr/LICENSE",
+      "bytes": 1072,
+      "sha256": "78af845eb82191a187ac27f54468b0d8442882ef05248adfaae3f5a516386bee"
+    },
+    {
+      "path": "vendor/omr/satb-line-omr/MANIFEST.md",
+      "bytes": 3290,
+      "sha256": "39b55809b59d622096ffdcae4a6d0bbea37d2c9cc188fdd5654a2dcc0223d1a0"
+    },
+    {
+      "path": "vendor/omr/satb-line-omr/omr-preprocess.js",
+      "bytes": 15346,
+      "sha256": "91b6f3f26fa12fb57f679c85027ff66261e0858002792ae2ad54b5e4f3dd8d65"
+    },
+    {
+      "path": "vendor/omr/satb-line-omr/omr-decode.js",
+      "bytes": 17353,
+      "sha256": "e2564f11d2ef5bd7f6dd9b4c90821eb2f2edc4389bdb5d263904d42f44f78840"
+    },
+    {
+      "path": "vendor/omr/satb-line-omr/omr-reject.js",
+      "bytes": 6664,
+      "sha256": "7ac6e911997c42eb903d994d9afa4d9e0033ea0d9169d026a0ddb7da3f565ee4"
+    },
+    {
+      "path": "vendor/omr/model-public-domain/LICENSE",
+      "bytes": 1072,
+      "sha256": "78af845eb82191a187ac27f54468b0d8442882ef05248adfaae3f5a516386bee"
+    },
+    {
+      "path": "vendor/omr/model-public-domain/MODEL-CARD.md",
+      "bytes": 5400,
+      "sha256": "b7410fd8f1f099c33901da74086a3a07001956c3aba23b291a2f02ac42160b8e"
+    },
+    {
+      "path": "vendor/omr/model-public-domain/model-io.json",
+      "bytes": 3648,
+      "sha256": "5ddd02071239cfd6b69a46182bb5357958855acb3ab4df31a96d76b4e7cb0baf"
+    },
+    {
+      "path": "vendor/omr/model-public-domain/vocab.json",
+      "bytes": 1436,
+      "sha256": "7e0139c90b0572aaf7f679c7fd1d127ae9b02f9bd33bb9b7ac971ac0482061ca"
+    },
+    {
+      "path": "vendor/omr/model-public-domain/omr-line.fp16.onnx",
+      "bytes": 6422567,
+      "sha256": "0edeb8f9a8103405239d7edbf48aa372158eb3e0cbbe696ec7dbaf768a75c39d"
+    },
+    {
+      "path": "vendor/omr/runtime/LICENSE",
+      "bytes": 1073,
+      "sha256": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c"
+    },
+    {
+      "path": "vendor/omr/runtime/ThirdPartyNotices.txt",
+      "bytes": 338088,
+      "sha256": "143764b952fdb1a7c69ce653bfba74a7744d6a8a573bfb73e235fba356c83de3"
+    },
+    {
+      "path": "vendor/omr/runtime/package.json",
+      "bytes": 4593,
+      "sha256": "16f69f755509990539aeb1c8445884960e91adcacab2e8dca8e44ee43601df5c"
+    },
+    {
+      "path": "vendor/omr/runtime/dist/ort.wasm.min.mjs",
+      "bytes": 50126,
+      "sha256": "219e6a1fc8a9938268d18efca3c91d310bd2f4a59bbd13744df5b2b7fc6cee3b"
+    },
+    {
+      "path": "vendor/omr/runtime/dist/ort-wasm-simd-threaded.mjs",
+      "bytes": 24381,
+      "sha256": "e13f7f94fc51b4ca72b12faeb1ee95f4ace6dfbc8939bc718aabdc0a27c4299b"
+    },
+    {
+      "path": "vendor/omr/runtime/dist/ort-wasm-simd-threaded.wasm",
+      "bytes": 14239897,
+      "sha256": "3398c10d07d229bd91b364548e130e0e51a8e5704b88c7c083ebbeb78842dee2"
+    }
+  ],
+  "measuredRuntimeSourceHashes": {
+    "js/omr/recognizer.js": "5f957643c9194ff30d66b316a1b60401c668a45c2e44cd753e948f708e1a78cd",
+    "js/omr/recognizer.worker.js": "3d46442b740aaa5e69652de31338d75a8a5a8e075623dc89f41490d0194089c3",
+    "js/omr/token-parser.js": "640030be7d30905c5fb00d083c90ec06bd678a19f622d645d65c83886af9a385",
+    "js/omr/staff-detection.js": "95823ae89d3ad5752ea7af0134978c3df72de6bf3b37e46c9df34d18fa504962"
+  },
+  "rawRunSha256": "1beca6fd5bed32d72bfb22d97bb979c1bea4f73ee6b7d819e770c9449a95600c",
+  "normalizedRunSha256": "791307ed1b514f6c69a13e0a207f7f59b5a144566927baad2472a0b894851ba8",
+  "fullEvaluationSha256": "214be9d5dbd6d4a6680185600ea4c9b66c16af9aaceec8156d3f985e2a9b9a03",
+  "evaluatorSha256": "482c4b02593315e9246c32633ec66a461ddd899ea5c19e77c489aa0f1517e38d",
+  "normalizationSha256": "1c80ace35aad3c86769a52ed8c1c774fa74225b4d26c11bb6d03e9624e9d5a2f",
+  "method": {
+    "path": "Actual staff detection, optional skew rectification, cropped pixels, local ONNX/WASM, strict token parsing",
+    "selectedReadingOrder": "Single-voice regions in declared reading order; multipart kept separate; no gap filled from truth",
+    "alignment": "Unit-cost Levenshtein pitch alignment plus full note/rest/onset/duration alignment; source part ordinals are fixed",
+    "eventDifferenceTuple": [
+      "MIDI or R",
+      "onsetBeats",
+      "durationBeats"
+    ],
+    "fullExactCase": "Supported source only; zero full event edits; initial clef/key/meter and part count correct",
+    "durationAndOnsetDenominator": "Expected notes312 in supported stratum; correct values counted only among pitch matches; unmatched/extra notes also reported",
+    "rests": "Rest identity, onset and duration are included in full event alignment",
+    "notMeasured": [
+      "later clef/key/meter changes",
+      "repeat playback expansion",
+      "general polyphonic score structure",
+      "handwriting",
+      "real scanner/camera input",
+      "native/mobile performance",
+      "physical LUMI behavior",
+      "source enharmonic spelling and articulation"
+    ],
+    "draftState": "All automatic targets unverified; no Tempo/held scoring before explicit rhythm verification"
+  },
+  "strata": {
+    "allSupportedMonophonic": {
+      "cases": 32,
+      "pairedCases": 32,
+      "unpairedOrNotRunCases": 0,
+      "inferenceErrors": 0,
+      "exactCases": 20,
+      "expectedNotes": 312,
+      "recognizedNotes": 312,
+      "pitchMatches": 312,
+      "pitchSubstitutions": 0,
+      "pitchDeletions": 0,
+      "pitchInsertions": 0,
+      "expectedRests": 12,
+      "recognizedRests": 12,
+      "fullNoteRestEventEdits": 47,
+      "onsetsCorrectAmongPitchMatches": 275,
+      "durationsCorrectAmongPitchMatches": 302,
+      "jointPitchOnsetDurationMatches": 265,
+      "expectedParts": 32,
+      "clefsCorrect": 32,
+      "keysCorrect": 32,
+      "metersCorrect": 32
+    },
+    "unsupportedNeverClaimedSupportedExact": {
+      "cases": 8,
+      "pairedCases": 8,
+      "unpairedOrNotRunCases": 0,
+      "inferenceErrors": 0,
+      "exactCases": 0,
+      "expectedNotes": 46,
+      "recognizedNotes": 33,
+      "pitchMatches": 32,
+      "pitchSubstitutions": 1,
+      "pitchDeletions": 13,
+      "pitchInsertions": 0,
+      "expectedRests": 0,
+      "recognizedRests": 0,
+      "fullNoteRestEventEdits": 24,
+      "onsetsCorrectAmongPitchMatches": 24,
+      "durationsCorrectAmongPitchMatches": 26,
+      "jointPitchOnsetDurationMatches": 22,
+      "expectedParts": 10,
+      "clefsCorrect": 8,
+      "keysCorrect": 8,
+      "metersCorrect": 8
+    },
+    "supportedClean": {
+      "cases": 16,
+      "pairedCases": 16,
+      "unpairedOrNotRunCases": 0,
+      "inferenceErrors": 0,
+      "exactCases": 8,
+      "expectedNotes": 156,
+      "recognizedNotes": 156,
+      "pitchMatches": 156,
+      "pitchSubstitutions": 0,
+      "pitchDeletions": 0,
+      "pitchInsertions": 0,
+      "expectedRests": 6,
+      "recognizedRests": 6,
+      "fullNoteRestEventEdits": 40,
+      "onsetsCorrectAmongPitchMatches": 123,
+      "durationsCorrectAmongPitchMatches": 149,
+      "jointPitchOnsetDurationMatches": 116,
+      "expectedParts": 16,
+      "clefsCorrect": 16,
+      "keysCorrect": 16,
+      "metersCorrect": 16
+    },
+    "supportedSyntheticDegradation": {
+      "cases": 16,
+      "pairedCases": 16,
+      "unpairedOrNotRunCases": 0,
+      "inferenceErrors": 0,
+      "exactCases": 12,
+      "expectedNotes": 156,
+      "recognizedNotes": 156,
+      "pitchMatches": 156,
+      "pitchSubstitutions": 0,
+      "pitchDeletions": 0,
+      "pitchInsertions": 0,
+      "expectedRests": 6,
+      "recognizedRests": 6,
+      "fullNoteRestEventEdits": 7,
+      "onsetsCorrectAmongPitchMatches": 152,
+      "durationsCorrectAmongPitchMatches": 153,
+      "jointPitchOnsetDurationMatches": 149,
+      "expectedParts": 16,
+      "clefsCorrect": 16,
+      "keysCorrect": 16,
+      "metersCorrect": 16
+    },
+    "supportedTreble": {
+      "cases": 20,
+      "pairedCases": 20,
+      "unpairedOrNotRunCases": 0,
+      "inferenceErrors": 0,
+      "exactCases": 13,
+      "expectedNotes": 170,
+      "recognizedNotes": 170,
+      "pitchMatches": 170,
+      "pitchSubstitutions": 0,
+      "pitchDeletions": 0,
+      "pitchInsertions": 0,
+      "expectedRests": 8,
+      "recognizedRests": 8,
+      "fullNoteRestEventEdits": 11,
+      "onsetsCorrectAmongPitchMatches": 166,
+      "durationsCorrectAmongPitchMatches": 163,
+      "jointPitchOnsetDurationMatches": 159,
+      "expectedParts": 20,
+      "clefsCorrect": 20,
+      "keysCorrect": 20,
+      "metersCorrect": 20
+    },
+    "supportedBass": {
+      "cases": 12,
+      "pairedCases": 12,
+      "unpairedOrNotRunCases": 0,
+      "inferenceErrors": 0,
+      "exactCases": 7,
+      "expectedNotes": 142,
+      "recognizedNotes": 142,
+      "pitchMatches": 142,
+      "pitchSubstitutions": 0,
+      "pitchDeletions": 0,
+      "pitchInsertions": 0,
+      "expectedRests": 4,
+      "recognizedRests": 4,
+      "fullNoteRestEventEdits": 36,
+      "onsetsCorrectAmongPitchMatches": 109,
+      "durationsCorrectAmongPitchMatches": 139,
+      "jointPitchOnsetDurationMatches": 106,
+      "expectedParts": 12,
+      "clefsCorrect": 12,
+      "keysCorrect": 12,
+      "metersCorrect": 12
+    },
+    "supportedPrintablePage": {
+      "cases": 8,
+      "pairedCases": 8,
+      "unpairedOrNotRunCases": 0,
+      "inferenceErrors": 0,
+      "exactCases": 5,
+      "expectedNotes": 218,
+      "recognizedNotes": 218,
+      "pitchMatches": 218,
+      "pitchSubstitutions": 0,
+      "pitchDeletions": 0,
+      "pitchInsertions": 0,
+      "expectedRests": 4,
+      "recognizedRests": 4,
+      "fullNoteRestEventEdits": 31,
+      "onsetsCorrectAmongPitchMatches": 188,
+      "durationsCorrectAmongPitchMatches": 217,
+      "jointPitchOnsetDurationMatches": 187,
+      "expectedParts": 8,
+      "clefsCorrect": 8,
+      "keysCorrect": 8,
+      "metersCorrect": 8
+    },
+    "supportedShortLine": {
+      "cases": 24,
+      "pairedCases": 24,
+      "unpairedOrNotRunCases": 0,
+      "inferenceErrors": 0,
+      "exactCases": 15,
+      "expectedNotes": 94,
+      "recognizedNotes": 94,
+      "pitchMatches": 94,
+      "pitchSubstitutions": 0,
+      "pitchDeletions": 0,
+      "pitchInsertions": 0,
+      "expectedRests": 8,
+      "recognizedRests": 8,
+      "fullNoteRestEventEdits": 16,
+      "onsetsCorrectAmongPitchMatches": 87,
+      "durationsCorrectAmongPitchMatches": 85,
+      "jointPitchOnsetDurationMatches": 78,
+      "expectedParts": 24,
+      "clefsCorrect": 24,
+      "keysCorrect": 24,
+      "metersCorrect": 24
+    }
+  },
+  "privacy": {
+    "loggedRequests": 483,
+    "externalRequests": 0,
+    "truthSourceManifestRequests": 0,
+    "browserErrors": 0,
+    "modelInputs": "Pixels, dimensions, crop transform/offset and page only; no filename/source text/truth supplied to model",
+    "runtimeExternalUpload": false,
+    "inferenceThreads": 1,
+    "crossOriginIsolatedRequired": false
+  },
+  "actualModelAdapterProbe": {
+    "fixture": "01-treble-quarters-clean",
+    "modelSha256": "0edeb8f9a8103405239d7edbf48aa372158eb3e0cbbe696ec7dbaf768a75c39d",
+    "resultFlags": {
+      "rhythmParsed": true,
+      "rhythmKnown": false,
+      "rhythmVerified": false
+    },
+    "modelDurations": [
+      1,
+      1,
+      1,
+      0.5
+    ],
+    "editorDurations": [
+      1,
+      1,
+      1,
+      0.5
+    ],
+    "editorBeats": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "editorRhythmKnown": false,
+    "capabilities": {
+      "wait": true,
+      "tempo": false,
+      "holdScoring": false
+    },
+    "rowsUnverified": true,
+    "preservesPredictedDurations": true,
+    "reviewAdapterSha256": "f828062eddcebdbdb4136d6bccaffce124dc547134a6815699bf56bf39f8f998"
+  },
+  "browserRoundtripStatus": {
+    "status": "PASS",
+    "checks": 50,
+    "test": "tests/omr-review.test.js",
+    "testSha256": "7f3ff952d78edbfd30c227512cd079a6e488d8642210d54ad04c7452606024f6",
+    "reviewAdapterSha256": "f828062eddcebdbdb4136d6bccaffce124dc547134a6815699bf56bf39f8f998",
+    "coverage": "Actual PNG and raster-only PDF inference/save; predicted duration retained; completed selection/order/support inputs locked until explicit discard; explicit correction/review; simulated MIDI Wait/Tempo; canonical per-instrument sessions; reload/provenance. Controlled replies separately test lifecycle failures.",
+    "hardwareVerified": false
+  },
+  "cpuAlternatives": {
+    "audiveris": {
+      "task": "Whole raster to MusicXML, stricter written-score structure metric; not the selected-region browser path",
+      "rasterCases": 40,
+      "exactWrittenScoreCases": 8,
+      "incorrectGeneratedScores": 0,
+      "engineErrors": 32,
+      "evaluatedOutputMetrics": {
+        "expectedNotes": 218,
+        "recognizedNotes": 218,
+        "expectedRests": 4,
+        "recognizedRests": 4,
+        "missingEvents": 0,
+        "extraEvents": 0,
+        "pitchCorrectAligned": 218,
+        "onsetCorrectAligned": 218,
+        "durationCorrectAligned": 218,
+        "spellingCorrectAligned": 218,
+        "restCorrectAligned": 4
+      },
+      "exactCaseIds": [
+        "17-page-treble-quarters-clean",
+        "17-page-treble-quarters-scan",
+        "18-page-bass-quarters-clean",
+        "18-page-bass-quarters-scan",
+        "19-page-treble-rhythm-clean",
+        "19-page-treble-rhythm-scan",
+        "20-page-bass-key-eb-clean",
+        "20-page-bass-key-eb-scan"
+      ],
+      "incorrectCaseIds": [],
+      "engineErrorCaseIds": [
+        "01-treble-quarters-clean",
+        "01-treble-quarters-scan",
+        "02-treble-rhythm-clean",
+        "02-treble-rhythm-scan",
+        "03-bass-quarters-clean",
+        "03-bass-quarters-scan",
+        "04-bass-rhythm-clean",
+        "04-bass-rhythm-scan",
+        "05-treble-rests-clean",
+        "05-treble-rests-scan",
+        "06-bass-rests-clean",
+        "06-bass-rests-scan",
+        "07-treble-eighths-clean",
+        "07-treble-eighths-scan",
+        "08-treble-dotted-clean",
+        "08-treble-dotted-scan",
+        "09-treble-accidentals-clean",
+        "09-treble-accidentals-scan",
+        "10-treble-key-d-clean",
+        "10-treble-key-d-scan",
+        "11-bass-key-eb-clean",
+        "11-bass-key-eb-scan",
+        "12-treble-chords-clean",
+        "12-treble-chords-scan",
+        "13-treble-tie-clean",
+        "13-treble-tie-scan",
+        "14-repeat-bars-clean",
+        "14-repeat-bars-scan",
+        "15-two-parts-clean",
+        "15-two-parts-scan",
+        "16-treble-triplet-clean",
+        "16-treble-triplet-scan"
+      ],
+      "exactPageResources": {
+        "exactCases": 8,
+        "secondsMin": 3.8369930449989624,
+        "secondsMedian": 4.539552373000333,
+        "secondsMax": 4.939924190000966,
+        "peakRssKiBMin": 265552,
+        "peakRssKiBMax": 292296
+      },
+      "version": "5.11.0",
+      "license": "AGPL-3.0",
+      "distributionSha256": "ae714594f40e54b1a4951fc3f914f08ae38fe5d07b7f2283b1a904fdb6e0a318",
+      "officialRelease": "https://github.com/Audiveris/audiveris/releases/tag/5.11.0",
+      "licenseSource": "https://github.com/Audiveris/audiveris/blob/5.11.0/LICENSE",
+      "shippingStatus": "Not bundled or deployed; Java/native CLI does not run unchanged on static Pages"
+    },
+    "homr": {
+      "task": "Whole raster to MusicXML, stricter written-score structure metric; not the selected-region browser path",
+      "rasterCases": 40,
+      "exactWrittenScoreCases": 8,
+      "incorrectGeneratedScores": 3,
+      "engineErrors": 29,
+      "evaluatedOutputMetrics": {
+        "expectedNotes": 234,
+        "recognizedNotes": 229,
+        "expectedRests": 4,
+        "recognizedRests": 7,
+        "missingEvents": 3,
+        "extraEvents": 1,
+        "pitchCorrectAligned": 224,
+        "onsetCorrectAligned": 219,
+        "durationCorrectAligned": 228,
+        "spellingCorrectAligned": 224,
+        "restCorrectAligned": 4
+      },
+      "exactCaseIds": [
+        "17-page-treble-quarters-clean",
+        "17-page-treble-quarters-scan",
+        "18-page-bass-quarters-clean",
+        "18-page-bass-quarters-scan",
+        "19-page-treble-rhythm-clean",
+        "19-page-treble-rhythm-scan",
+        "20-page-bass-key-eb-clean",
+        "20-page-bass-key-eb-scan"
+      ],
+      "incorrectCaseIds": [
+        "09-treble-accidentals-scan",
+        "12-treble-chords-scan",
+        "14-repeat-bars-scan"
+      ],
+      "engineErrorCaseIds": [
+        "01-treble-quarters-clean",
+        "01-treble-quarters-scan",
+        "02-treble-rhythm-clean",
+        "02-treble-rhythm-scan",
+        "03-bass-quarters-clean",
+        "03-bass-quarters-scan",
+        "04-bass-rhythm-clean",
+        "04-bass-rhythm-scan",
+        "05-treble-rests-clean",
+        "05-treble-rests-scan",
+        "06-bass-rests-clean",
+        "06-bass-rests-scan",
+        "07-treble-eighths-clean",
+        "07-treble-eighths-scan",
+        "08-treble-dotted-clean",
+        "08-treble-dotted-scan",
+        "09-treble-accidentals-clean",
+        "10-treble-key-d-clean",
+        "10-treble-key-d-scan",
+        "11-bass-key-eb-clean",
+        "11-bass-key-eb-scan",
+        "12-treble-chords-clean",
+        "13-treble-tie-clean",
+        "13-treble-tie-scan",
+        "14-repeat-bars-clean",
+        "15-two-parts-clean",
+        "15-two-parts-scan",
+        "16-treble-triplet-clean",
+        "16-treble-triplet-scan"
+      ],
+      "exactPageResources": {
+        "exactCases": 8,
+        "secondsMin": 2.8772707730004186,
+        "secondsMedian": 3.882339041000705,
+        "secondsMax": 4.233450838999488,
+        "peakRssKiBMin": 859284,
+        "peakRssKiBMax": 1069508
+      },
+      "sourceCommit": "b549203bb030cb031d8b73ae3918f35638713cc2",
+      "license": "AGPL-3.0 code/weights; upstream FAQ flags PrIMuS noncommercial/unclear training pedigree",
+      "models": [
+        {
+          "name": "segnet_308-3296ccd40960f90ca6ab9c035cca945675d30a0f.onnx",
+          "bytes": 57311361,
+          "sha256": "6ed36640db4ef5d223098b6d5efe4eda97c66b24a2c72faab8a018c749003a8d"
+        },
+        {
+          "name": "decoder_pytorch_model_465-597144cab54c8f6d0f6c9619df5c5312694eadd6.onnx",
+          "bytes": 47309835,
+          "sha256": "18801c1e3657bdea1b031db90b10d66e15accfc1d607780f09a9e059133e886a"
+        },
+        {
+          "name": "encoder_pytorch_model_465-597144cab54c8f6d0f6c9619df5c5312694eadd6.onnx",
+          "bytes": 52861122,
+          "sha256": "92bd18338dc8da3c9b00185008ab14719ff9f912efe785ca42d7b623e06e0c6b"
+        }
+      ],
+      "licenseSource": "https://github.com/liebharc/homr/blob/b549203bb030cb031d8b73ae3918f35638713cc2/LICENSE_FAQ.md",
+      "shippingStatus": "Not bundled or deployed; no commercially unrestricted weight-redistribution claim"
+    }
+  },
+  "cpuPdfSmokeSeparate": [
+    {
+      "engine": "audiveris",
+      "id": "17-page-treble-quarters-clean",
+      "inputFormat": "pdf",
+      "copiedInputSha256": "4ee35529c94362f92b100048818a2ad43670a719141977b90da8ab8909b680bb",
+      "inputMatchesFrozenCorpus": true,
+      "exactWrittenScore": false,
+      "metrics": {
+        "expectedNotes": 32,
+        "recognizedNotes": 32,
+        "expectedRests": 0,
+        "recognizedRests": 1,
+        "missingEvents": 0,
+        "extraEvents": 1,
+        "pitchCorrectAligned": 29,
+        "onsetCorrectAligned": 32,
+        "durationCorrectAligned": 32,
+        "spellingCorrectAligned": 29
+      },
+      "seconds": 47.023896052000055,
+      "peakRssKiB": 815400
+    },
+    {
+      "engine": "homr",
+      "id": "17-page-treble-quarters-clean",
+      "inputFormat": "pdf",
+      "copiedInputSha256": "4ee35529c94362f92b100048818a2ad43670a719141977b90da8ab8909b680bb",
+      "inputMatchesFrozenCorpus": true,
+      "exactWrittenScore": true,
+      "metrics": {
+        "expectedNotes": 32,
+        "recognizedNotes": 32,
+        "expectedRests": 0,
+        "recognizedRests": 0,
+        "missingEvents": 0,
+        "extraEvents": 0,
+        "pitchCorrectAligned": 32,
+        "onsetCorrectAligned": 32,
+        "durationCorrectAligned": 32,
+        "spellingCorrectAligned": 32
+      },
+      "seconds": 4.59333379599957,
+      "peakRssKiB": 1069964
+    }
+  ],
+  "cases": [
+    {
+      "id": "01-treble-quarters-clean",
+      "compositionId": "01-treble-quarters",
+      "variant": "clean",
+      "scope": "supported-monophonic",
+      "unsupportedSourceFeatures": [],
+      "image": "../corpus/images/01-treble-quarters-clean.png",
+      "imageSha256": "c43724e7d9f0360aa002c4ed45f8d431a47425f4decabb56b63de078b352146b",
+      "pdfSha256": "1f304766b7038a16f864773aea6dac8a567271f0e5ed2892daed7ff9886ba7e6",
+      "truth": "../corpus/truth/01-treble-quarters.json",
+      "truthSha256": "cfdbf98cc8b6eceffe3765551d34afcaad1284e2c2d0b78e191c8a14fcb6682a",
+      "sourcePairingValid": true,
+      "regionPixelSha256": [
+        "4744722da94e4c098f1669d4efda9bb63bea8fe6d2db24a5280d675d9c3efbf1"
+      ],
+      "regionCount": 1,
+      "expectedNotes": 4,
+      "recognizedNotes": 4,
+      "pitchEdits": {
+        "matches": 4,
+        "substitutions": 0,
+        "deletions": 0,
+        "insertions": 0
+      },
+      "onsetsCorrectAmongPitchMatches": 4,
+      "durationsCorrectAmongPitchMatches": 3,
+      "jointPitchOnsetDurationMatches": 3,
+      "expectedRests": 0,
+      "recognizedRests": 0,
+      "restPitchOnsetDurationMatches": 0,
+      "initialAttributesCorrect": {
+        "clef": 1,
+        "key": 1,
+        "meter": 1
+      },
+      "expectedParts": 1,
+      "recognizedPartCount": 1,
+      "exactSupportedMusicalCase": false,
+      "fullEventEdits": 1,
+      "fullEventDifferences": [
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            65,
+            3,
+            1
+          ],
+          "actual": [
+            65,
+            3,
+            0.5
+          ]
+        }
+      ],
+      "unsupportedReported": [],
+      "warningCodes": [
+        "measure-duration-mismatch",
+        "monophonic-scope",
+        "uncalibrated-model"
+      ],
+      "error": null
+    },
+    {
+      "id": "01-treble-quarters-scan",
+      "compositionId": "01-treble-quarters",
+      "variant": "scan",
+      "scope": "supported-monophonic",
+      "unsupportedSourceFeatures": [],
+      "image": "../corpus/images/01-treble-quarters-scan.png",
+      "imageSha256": "82290cfe0b9c06fe8844d1bc48c45f158e3a266341fc14958878f0ff3c52d9ba",
+      "pdfSha256": "b17a9769963a540958bed57869f1f36366f7d7a12dd84130aa6d48f03d2b65b2",
+      "truth": "../corpus/truth/01-treble-quarters.json",
+      "truthSha256": "cfdbf98cc8b6eceffe3765551d34afcaad1284e2c2d0b78e191c8a14fcb6682a",
+      "sourcePairingValid": true,
+      "regionPixelSha256": [
+        "75bcf47e8d90b7378c172854dd18bb2602c14793d131e5a5dab66a7ca63dc2e9"
+      ],
+      "regionCount": 1,
+      "expectedNotes": 4,
+      "recognizedNotes": 4,
+      "pitchEdits": {
+        "matches": 4,
+        "substitutions": 0,
+        "deletions": 0,
+        "insertions": 0
+      },
+      "onsetsCorrectAmongPitchMatches": 4,
+      "durationsCorrectAmongPitchMatches": 4,
+      "jointPitchOnsetDurationMatches": 4,
+      "expectedRests": 0,
+      "recognizedRests": 0,
+      "restPitchOnsetDurationMatches": 0,
+      "initialAttributesCorrect": {
+        "clef": 1,
+        "key": 1,
+        "meter": 1
+      },
+      "expectedParts": 1,
+      "recognizedPartCount": 1,
+      "exactSupportedMusicalCase": true,
+      "fullEventEdits": 0,
+      "fullEventDifferences": [],
+      "unsupportedReported": [],
+      "warningCodes": [
+        "deskewed-staff",
+        "monophonic-scope",
+        "scan-suspected",
+        "uncalibrated-model"
+      ],
+      "error": null
+    },
+    {
+      "id": "02-treble-rhythm-clean",
+      "compositionId": "02-treble-rhythm",
+      "variant": "clean",
+      "scope": "supported-monophonic",
+      "unsupportedSourceFeatures": [],
+      "image": "../corpus/images/02-treble-rhythm-clean.png",
+      "imageSha256": "9415124c9d47e516a3f0ebf290402d111e39d1e861a799b47e3d1ccd0e4d2d89",
+      "pdfSha256": "db746d1fb08a11e6978f6a145451c378b7659f5c6d25a17a555a678898eac0fc",
+      "truth": "../corpus/truth/02-treble-rhythm.json",
+      "truthSha256": "db5b79ee8a06a4601626c5856f94a4fdf4e6399d0d5a11d0358a542df60995ee",
+      "sourcePairingValid": true,
+      "regionPixelSha256": [
+        "768bd6f7def59e8e4119e7c979b2c5125ede25ab50af83256ae8d27eec9c98d5"
+      ],
+      "regionCount": 1,
+      "expectedNotes": 4,
+      "recognizedNotes": 4,
+      "pitchEdits": {
+        "matches": 4,
+        "substitutions": 0,
+        "deletions": 0,
+        "insertions": 0
+      },
+      "onsetsCorrectAmongPitchMatches": 4,
+      "durationsCorrectAmongPitchMatches": 4,
+      "jointPitchOnsetDurationMatches": 4,
+      "expectedRests": 0,
+      "recognizedRests": 0,
+      "restPitchOnsetDurationMatches": 0,
+      "initialAttributesCorrect": {
+        "clef": 1,
+        "key": 1,
+        "meter": 1
+      },
+      "expectedParts": 1,
+      "recognizedPartCount": 1,
+      "exactSupportedMusicalCase": true,
+      "fullEventEdits": 0,
+      "fullEventDifferences": [],
+      "unsupportedReported": [],
+      "warningCodes": [
+        "monophonic-scope",
+        "uncalibrated-model"
+      ],
+      "error": null
+    },
+    {
+      "id": "02-treble-rhythm-scan",
+      "compositionId": "02-treble-rhythm",
+      "variant": "scan",
+      "scope": "supported-monophonic",
+      "unsupportedSourceFeatures": [],
+      "image": "../corpus/images/02-treble-rhythm-scan.png",
+      "imageSha256": "d310abf939d64f7e82c1e1f9dd7a5266ec081fe8de1cd6da2da0ed362e1ce7a3",
+      "pdfSha256": "ac00a56102e020f540091486fb57d56c1c6f1115bdd1436aec18997f8b7f7d6b",
+      "truth": "../corpus/truth/02-treble-rhythm.json",
+      "truthSha256": "db5b79ee8a06a4601626c5856f94a4fdf4e6399d0d5a11d0358a542df60995ee",
+      "sourcePairingValid": true,
+      "regionPixelSha256": [
+        "dd7237c245854eefcf52ac028143ab45b2eeaead7bcaf51d964b8741cd1dc700"
+      ],
+      "regionCount": 1,
+      "expectedNotes": 4,
+      "recognizedNotes": 4,
+      "pitchEdits": {
+        "matches": 4,
+        "substitutions": 0,
+        "deletions": 0,
+        "insertions": 0
+      },
+      "onsetsCorrectAmongPitchMatches": 4,
+      "durationsCorrectAmongPitchMatches": 4,
+      "jointPitchOnsetDurationMatches": 4,
+      "expectedRests": 0,
+      "recognizedRests": 0,
+      "restPitchOnsetDurationMatches": 0,
+      "initialAttributesCorrect": {
+        "clef": 1,
+        "key": 1,
+        "meter": 1
+      },
+      "expectedParts": 1,
+      "recognizedPartCount": 1,
+      "exactSupportedMusicalCase": true,
+      "fullEventEdits": 0,
+      "fullEventDifferences": [],
+      "unsupportedReported": [],
+      "warningCodes": [
+        "deskewed-staff",
+        "monophonic-scope",
+        "scan-suspected",
+        "uncalibrated-model"
+      ],
+      "error": null
+    },
+    {
+      "id": "03-bass-quarters-clean",
+      "compositionId": "03-bass-quarters",
+      "variant": "clean",
+      "scope": "supported-monophonic",
+      "unsupportedSourceFeatures": [],
+      "image": "../corpus/images/03-bass-quarters-clean.png",
+      "imageSha256": "7550ae06d8a30565029845b6127dc6fa7884b1b8e21683becfddd22b4ff9bbc3",
+      "pdfSha256": "92f9d3496a265a2b19b19a3760e1ceda88a48e8f084ae6650d04f54280c6e7b4",
+      "truth": "../corpus/truth/03-bass-quarters.json",
+      "truthSha256": "429d472ca4a92e6a3ef5f4a006a6cbeb431a0b68fe45a041897e680363950f1c",
+      "sourcePairingValid": true,
+      "regionPixelSha256": [
+        "725183a26d67305678493aab206ccf22b8d913739e76327dacd3f6c5b9937976"
+      ],
+      "regionCount": 1,
+      "expectedNotes": 4,
+      "recognizedNotes": 4,
+      "pitchEdits": {
+        "matches": 4,
+        "substitutions": 0,
+        "deletions": 0,
+        "insertions": 0
+      },
+      "onsetsCorrectAmongPitchMatches": 1,
+      "durationsCorrectAmongPitchMatches": 3,
+      "jointPitchOnsetDurationMatches": 0,
+      "expectedRests": 0,
+      "recognizedRests": 0,
+      "restPitchOnsetDurationMatches": 0,
+      "initialAttributesCorrect": {
+        "clef": 1,
+        "key": 1,
+        "meter": 1
+      },
+      "expectedParts": 1,
+      "recognizedPartCount": 1,
+      "exactSupportedMusicalCase": false,
+      "fullEventEdits": 4,
+      "fullEventDifferences": [
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            48,
+            0,
+            1
+          ],
+          "actual": [
+            48,
+            0,
+            0.5
+          ]
+        },
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            50,
+            1,
+            1
+          ],
+          "actual": [
+            50,
+            0.5,
+            1
+          ]
+        },
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            52,
+            2,
+            1
+          ],
+          "actual": [
+            52,
+            1.5,
+            1
+          ]
+        },
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            53,
+            3,
+            1
+          ],
+          "actual": [
+            53,
+            2.5,
+            1
+          ]
+        }
+      ],
+      "unsupportedReported": [],
+      "warningCodes": [
+        "measure-duration-mismatch",
+        "monophonic-scope",
+        "uncalibrated-model"
+      ],
+      "error": null
+    },
+    {
+      "id": "03-bass-quarters-scan",
+      "compositionId": "03-bass-quarters",
+      "variant": "scan",
+      "scope": "supported-monophonic",
+      "unsupportedSourceFeatures": [],
+      "image": "../corpus/images/03-bass-quarters-scan.png",
+      "imageSha256": "e64845685c41cd7c05b6bb9a15450db09a9ac9af56c7b9c31d2bab125f637b85",
+      "pdfSha256": "8a7e3ccb19f5e87aec5b7997ad0aa998bd7009e247d7ac8f6711bd57e0731ff5",
+      "truth": "../corpus/truth/03-bass-quarters.json",
+      "truthSha256": "429d472ca4a92e6a3ef5f4a006a6cbeb431a0b68fe45a041897e680363950f1c",
+      "sourcePairingValid": true,
+      "regionPixelSha256": [
+        "613b747e252cad5091d281d4b34f5ee21d01ac756f0c537f74b2e475e84aa24f"
+      ],
+      "regionCount": 1,
+      "expectedNotes": 4,
+      "recognizedNotes": 4,
+      "pitchEdits": {
+        "matches": 4,
+        "substitutions": 0,
+        "deletions": 0,
+        "insertions": 0
+      },
+      "onsetsCorrectAmongPitchMatches": 4,
+      "durationsCorrectAmongPitchMatches": 4,
+      "jointPitchOnsetDurationMatches": 4,
+      "expectedRests": 0,
+      "recognizedRests": 0,
+      "restPitchOnsetDurationMatches": 0,
+      "initialAttributesCorrect": {
+        "clef": 1,
+        "key": 1,
+        "meter": 1
+      },
+      "expectedParts": 1,
+      "recognizedPartCount": 1,
+      "exactSupportedMusicalCase": true,
+      "fullEventEdits": 0,
+      "fullEventDifferences": [],
+      "unsupportedReported": [],
+      "warningCodes": [
+        "deskewed-staff",
+        "monophonic-scope",
+        "scan-suspected",
+        "uncalibrated-model"
+      ],
+      "error": null
+    },
+    {
+      "id": "04-bass-rhythm-clean",
+      "compositionId": "04-bass-rhythm",
+      "variant": "clean",
+      "scope": "supported-monophonic",
+      "unsupportedSourceFeatures": [],
+      "image": "../corpus/images/04-bass-rhythm-clean.png",
+      "imageSha256": "8821231d821480355511447694e3b192a2be0ace2ee919c9600f2632aae2544c",
+      "pdfSha256": "802ed3803288e4ff555521c7ffe57e4531438be4adf93c3b9c786f02385ee38a",
+      "truth": "../corpus/truth/04-bass-rhythm.json",
+      "truthSha256": "9ba916f3f1795366af6258455639d05f68a60d3a1dfbbf6208250639bbba504a",
+      "sourcePairingValid": true,
+      "regionPixelSha256": [
+        "a09290af34a82ce0b6f11f2d38fac37ff442a8fff5e8ac2ac4ff67e489fe35fe"
+      ],
+      "regionCount": 1,
+      "expectedNotes": 3,
+      "recognizedNotes": 3,
+      "pitchEdits": {
+        "matches": 3,
+        "substitutions": 0,
+        "deletions": 0,
+        "insertions": 0
+      },
+      "onsetsCorrectAmongPitchMatches": 3,
+      "durationsCorrectAmongPitchMatches": 3,
+      "jointPitchOnsetDurationMatches": 3,
+      "expectedRests": 0,
+      "recognizedRests": 0,
+      "restPitchOnsetDurationMatches": 0,
+      "initialAttributesCorrect": {
+        "clef": 1,
+        "key": 1,
+        "meter": 1
+      },
+      "expectedParts": 1,
+      "recognizedPartCount": 1,
+      "exactSupportedMusicalCase": true,
+      "fullEventEdits": 0,
+      "fullEventDifferences": [],
+      "unsupportedReported": [],
+      "warningCodes": [
+        "monophonic-scope",
+        "uncalibrated-model"
+      ],
+      "error": null
+    },
+    {
+      "id": "04-bass-rhythm-scan",
+      "compositionId": "04-bass-rhythm",
+      "variant": "scan",
+      "scope": "supported-monophonic",
+      "unsupportedSourceFeatures": [],
+      "image": "../corpus/images/04-bass-rhythm-scan.png",
+      "imageSha256": "c1b08e1de534cf93cf338e729b23b0c0b34945389398ab85ab7ed7e84285bb1a",
+      "pdfSha256": "626892f0a1b38ebe20bc3e473c6d6d5bbfddbce18618de21606f227c9f0104ec",
+      "truth": "../corpus/truth/04-bass-rhythm.json",
+      "truthSha256": "9ba916f3f1795366af6258455639d05f68a60d3a1dfbbf6208250639bbba504a",
+      "sourcePairingValid": true,
+      "regionPixelSha256": [
+        "2717c19d72ca35a09832a3ed9f9c2e43cec1e04712863cee2d32eddf513073d0"
+      ],
+      "regionCount": 1,
+      "expectedNotes": 3,
+      "recognizedNotes": 3,
+      "pitchEdits": {
+        "matches": 3,
+        "substitutions": 0,
+        "deletions": 0,
+        "insertions": 0
+      },
+      "onsetsCorrectAmongPitchMatches": 3,
+      "durationsCorrectAmongPitchMatches": 3,
+      "jointPitchOnsetDurationMatches": 3,
+      "expectedRests": 0,
+      "recognizedRests": 0,
+      "restPitchOnsetDurationMatches": 0,
+      "initialAttributesCorrect": {
+        "clef": 1,
+        "key": 1,
+        "meter": 1
+      },
+      "expectedParts": 1,
+      "recognizedPartCount": 1,
+      "exactSupportedMusicalCase": true,
+      "fullEventEdits": 0,
+      "fullEventDifferences": [],
+      "unsupportedReported": [],
+      "warningCodes": [
+        "deskewed-staff",
+        "monophonic-scope",
+        "scan-suspected",
+        "uncalibrated-model"
+      ],
+      "error": null
+    },
+    {
+      "id": "05-treble-rests-clean",
+      "compositionId": "05-treble-rests",
+      "variant": "clean",
+      "scope": "supported-monophonic",
+      "unsupportedSourceFeatures": [],
+      "image": "../corpus/images/05-treble-rests-clean.png",
+      "imageSha256": "8b422ae4a000788de4effd211f85c97dec2fc6b928df98f487c8caee0dcfeb12",
+      "pdfSha256": "40b3ae1c5297d5fde57541ef448c10577e6bc50de7f6649542efdb6207a4acb2",
+      "truth": "../corpus/truth/05-treble-rests.json",
+      "truthSha256": "aad9de76743821a2ed14741cd428cc201a636d5779d00198174fc6027947c545",
+      "sourcePairingValid": true,
+      "regionPixelSha256": [
+        "6223701e9445df091674bdf9a699844a960dccc521717f5d83ee8d769542406e"
+      ],
+      "regionCount": 1,
+      "expectedNotes": 2,
+      "recognizedNotes": 2,
+      "pitchEdits": {
+        "matches": 2,
+        "substitutions": 0,
+        "deletions": 0,
+        "insertions": 0
+      },
+      "onsetsCorrectAmongPitchMatches": 2,
+      "durationsCorrectAmongPitchMatches": 2,
+      "jointPitchOnsetDurationMatches": 2,
+      "expectedRests": 2,
+      "recognizedRests": 2,
+      "restPitchOnsetDurationMatches": 2,
+      "initialAttributesCorrect": {
+        "clef": 1,
+        "key": 1,
+        "meter": 1
+      },
+      "expectedParts": 1,
+      "recognizedPartCount": 1,
+      "exactSupportedMusicalCase": true,
+      "fullEventEdits": 0,
+      "fullEventDifferences": [],
+      "unsupportedReported": [],
+      "warningCodes": [
+        "monophonic-scope",
+        "uncalibrated-model"
+      ],
+      "error": null
+    },
+    {
+      "id": "05-treble-rests-scan",
+      "compositionId": "05-treble-rests",
+      "variant": "scan",
+      "scope": "supported-monophonic",
+      "unsupportedSourceFeatures": [],
+      "image": "../corpus/images/05-treble-rests-scan.png",
+      "imageSha256": "7151dbf3fcae6063d8f910f9f4cd1dffaf33362698a4979038ce79c1a637b2ea",
+      "pdfSha256": "cac04b1301625915f0a8d3f7c644ec26f9db84ecc8c23f53a9b0487d5154a3ec",
+      "truth": "../corpus/truth/05-treble-rests.json",
+      "truthSha256": "aad9de76743821a2ed14741cd428cc201a636d5779d00198174fc6027947c545",
+      "sourcePairingValid": true,
+      "regionPixelSha256": [
+        "30a08fbba59cf2b348890f04c6a0ab34606a4901fec4244df4af5f3e742532c5"
+      ],
+      "regionCount": 1,
+      "expectedNotes": 2,
+      "recognizedNotes": 2,
+      "pitchEdits": {
+        "matches": 2,
+        "substitutions": 0,
+        "deletions": 0,
+        "insertions": 0
+      },
+      "onsetsCorrectAmongPitchMatches": 2,
+      "durationsCorrectAmongPitchMatches": 2,
+      "jointPitchOnsetDurationMatches": 2,
+      "expectedRests": 2,
+      "recognizedRests": 2,
+      "restPitchOnsetDurationMatches": 2,
+      "initialAttributesCorrect": {
+        "clef": 1,
+        "key": 1,
+        "meter": 1
+      },
+      "expectedParts": 1,
+      "recognizedPartCount": 1,
+      "exactSupportedMusicalCase": true,
+      "fullEventEdits": 0,
+      "fullEventDifferences": [],
+      "unsupportedReported": [],
+      "warningCodes": [
+        "deskewed-staff",
+        "monophonic-scope",
+        "scan-suspected",
+        "uncalibrated-model"
+      ],
+      "error": null
+    },
+    {
+      "id": "06-bass-rests-clean",
+      "compositionId": "06-bass-rests",
+      "variant": "clean",
+      "scope": "supported-monophonic",
+      "unsupportedSourceFeatures": [],
+      "image": "../corpus/images/06-bass-rests-clean.png",
+      "imageSha256": "b7501986da394ef1c5e39d21ee6c47e7b23b85db3db7eabbec2c3924f9762125",
+      "pdfSha256": "742a37ba1b9fd70a11050bbfa262805b08f6777167b6506a888912d3248a93d9",
+      "truth": "../corpus/truth/06-bass-rests.json",
+      "truthSha256": "633f910dba622f843f8182a9f567849fc17a1fe705c041bc34203b217e85f805",
+      "sourcePairingValid": true,
+      "regionPixelSha256": [
+        "7b3deae0e97fb920a475aa6be0e4f94b66f92b0167cb2b69a5584aff0388e069"
+      ],
+      "regionCount": 1,
+      "expectedNotes": 4,
+      "recognizedNotes": 4,
+      "pitchEdits": {
+        "matches": 4,
+        "substitutions": 0,
+        "deletions": 0,
+        "insertions": 0
+      },
+      "onsetsCorrectAmongPitchMatches": 4,
+      "durationsCorrectAmongPitchMatches": 4,
+      "jointPitchOnsetDurationMatches": 4,
+      "expectedRests": 2,
+      "recognizedRests": 2,
+      "restPitchOnsetDurationMatches": 2,
+      "initialAttributesCorrect": {
+        "clef": 1,
+        "key": 1,
+        "meter": 1
+      },
+      "expectedParts": 1,
+      "recognizedPartCount": 1,
+      "exactSupportedMusicalCase": true,
+      "fullEventEdits": 0,
+      "fullEventDifferences": [],
+      "unsupportedReported": [],
+      "warningCodes": [
+        "monophonic-scope",
+        "uncalibrated-model"
+      ],
+      "error": null
+    },
+    {
+      "id": "06-bass-rests-scan",
+      "compositionId": "06-bass-rests",
+      "variant": "scan",
+      "scope": "supported-monophonic",
+      "unsupportedSourceFeatures": [],
+      "image": "../corpus/images/06-bass-rests-scan.png",
+      "imageSha256": "5e10b5b4a90b26f81aecc06616b5f3edc5349d132ca6f061a25d769742301b1b",
+      "pdfSha256": "31669070b76d9ec0c5c49cc25f46cff66f411046d7995f841c22ad5298b1bc74",
+      "truth": "../corpus/truth/06-bass-rests.json",
+      "truthSha256": "633f910dba622f843f8182a9f567849fc17a1fe705c041bc34203b217e85f805",
+      "sourcePairingValid": true,
+      "regionPixelSha256": [
+        "060625a2e6dbebc0736518e7e6961e11594d02b40205cfa04f2dc26b55fb24ab"
+      ],
+      "regionCount": 1,
+      "expectedNotes": 4,
+      "recognizedNotes": 4,
+      "pitchEdits": {
+        "matches": 4,
+        "substitutions": 0,
+        "deletions": 0,
+        "insertions": 0
+      },
+      "onsetsCorrectAmongPitchMatches": 4,
+      "durationsCorrectAmongPitchMatches": 4,
+      "jointPitchOnsetDurationMatches": 4,
+      "expectedRests": 2,
+      "recognizedRests": 2,
+      "restPitchOnsetDurationMatches": 2,
+      "initialAttributesCorrect": {
+        "clef": 1,
+        "key": 1,
+        "meter": 1
+      },
+      "expectedParts": 1,
+      "recognizedPartCount": 1,
+      "exactSupportedMusicalCase": true,
+      "fullEventEdits": 0,
+      "fullEventDifferences": [],
+      "unsupportedReported": [],
+      "warningCodes": [
+        "deskewed-staff",
+        "monophonic-scope",
+        "scan-suspected",
+        "uncalibrated-model"
+      ],
+      "error": null
+    },
+    {
+      "id": "07-treble-eighths-clean",
+      "compositionId": "07-treble-eighths",
+      "variant": "clean",
+      "scope": "supported-monophonic",
+      "unsupportedSourceFeatures": [],
+      "image": "../corpus/images/07-treble-eighths-clean.png",
+      "imageSha256": "e438a9c2769ccc1471542126a566d9e1e86dde3f54ddf386461fdd9f0c524917",
+      "pdfSha256": "5ca21737762c4fb7679264235dc3ab122e09a4b2d3918e12b14734bc70d687c5",
+      "truth": "../corpus/truth/07-treble-eighths.json",
+      "truthSha256": "372be138dee1d883deebcd3c46d386e6749ef1d8624dc4fa0ddd39baccfb1f9f",
+      "sourcePairingValid": true,
+      "regionPixelSha256": [
+        "f19dc98bde9658ee4855c6ed5b5d2dfbc0e16c6e862258c2bf288b479020b4be"
+      ],
+      "regionCount": 1,
+      "expectedNotes": 8,
+      "recognizedNotes": 8,
+      "pitchEdits": {
+        "matches": 8,
+        "substitutions": 0,
+        "deletions": 0,
+        "insertions": 0
+      },
+      "onsetsCorrectAmongPitchMatches": 8,
+      "durationsCorrectAmongPitchMatches": 8,
+      "jointPitchOnsetDurationMatches": 8,
+      "expectedRests": 0,
+      "recognizedRests": 0,
+      "restPitchOnsetDurationMatches": 0,
+      "initialAttributesCorrect": {
+        "clef": 1,
+        "key": 1,
+        "meter": 1
+      },
+      "expectedParts": 1,
+      "recognizedPartCount": 1,
+      "exactSupportedMusicalCase": true,
+      "fullEventEdits": 0,
+      "fullEventDifferences": [],
+      "unsupportedReported": [],
+      "warningCodes": [
+        "monophonic-scope",
+        "scan-suspected",
+        "uncalibrated-model"
+      ],
+      "error": null
+    },
+    {
+      "id": "07-treble-eighths-scan",
+      "compositionId": "07-treble-eighths",
+      "variant": "scan",
+      "scope": "supported-monophonic",
+      "unsupportedSourceFeatures": [],
+      "image": "../corpus/images/07-treble-eighths-scan.png",
+      "imageSha256": "0e51e615a546e46ce56363ddf6e9ce908314f94db55eb492f118955756c91c28",
+      "pdfSha256": "25da9e93371ba2d2be0fdc5e3a30901573a6237b937f82a8aa1aa90bff6a5cb0",
+      "truth": "../corpus/truth/07-treble-eighths.json",
+      "truthSha256": "372be138dee1d883deebcd3c46d386e6749ef1d8624dc4fa0ddd39baccfb1f9f",
+      "sourcePairingValid": true,
+      "regionPixelSha256": [
+        "52da1af4d7611518b205b68bf674c223cc86937477df105edcbe4071ca9a26da"
+      ],
+      "regionCount": 1,
+      "expectedNotes": 8,
+      "recognizedNotes": 8,
+      "pitchEdits": {
+        "matches": 8,
+        "substitutions": 0,
+        "deletions": 0,
+        "insertions": 0
+      },
+      "onsetsCorrectAmongPitchMatches": 8,
+      "durationsCorrectAmongPitchMatches": 8,
+      "jointPitchOnsetDurationMatches": 8,
+      "expectedRests": 0,
+      "recognizedRests": 0,
+      "restPitchOnsetDurationMatches": 0,
+      "initialAttributesCorrect": {
+        "clef": 1,
+        "key": 1,
+        "meter": 1
+      },
+      "expectedParts": 1,
+      "recognizedPartCount": 1,
+      "exactSupportedMusicalCase": true,
+      "fullEventEdits": 0,
+      "fullEventDifferences": [],
+      "unsupportedReported": [],
+      "warningCodes": [
+        "deskewed-staff",
+        "monophonic-scope",
+        "scan-suspected",
+        "uncalibrated-model"
+      ],
+      "error": null
+    },
+    {
+      "id": "08-treble-dotted-clean",
+      "compositionId": "08-treble-dotted",
+      "variant": "clean",
+      "scope": "supported-monophonic",
+      "unsupportedSourceFeatures": [],
+      "image": "../corpus/images/08-treble-dotted-clean.png",
+      "imageSha256": "7863af8218e9f415130826cfa10cbbf86ddb79b9f79151fad3cd104d12a48f32",
+      "pdfSha256": "370660e510eef51afe31ee747cd0c8e1727942fcbe4b96422a41b836c1ff8da0",
+      "truth": "../corpus/truth/08-treble-dotted.json",
+      "truthSha256": "d34d0921ba52d2dfca6cc8fbe2e207b207bd03242571556c1ea6a22e22c9073a",
+      "sourcePairingValid": true,
+      "regionPixelSha256": [
+        "6673a6276405c24f6b0ef77e3bbde203f6377200e0e725672a40214f05bfc8c3"
+      ],
+      "regionCount": 1,
+      "expectedNotes": 4,
+      "recognizedNotes": 4,
+      "pitchEdits": {
+        "matches": 4,
+        "substitutions": 0,
+        "deletions": 0,
+        "insertions": 0
+      },
+      "onsetsCorrectAmongPitchMatches": 4,
+      "durationsCorrectAmongPitchMatches": 3,
+      "jointPitchOnsetDurationMatches": 3,
+      "expectedRests": 0,
+      "recognizedRests": 0,
+      "restPitchOnsetDurationMatches": 0,
+      "initialAttributesCorrect": {
+        "clef": 1,
+        "key": 1,
+        "meter": 1
+      },
+      "expectedParts": 1,
+      "recognizedPartCount": 1,
+      "exactSupportedMusicalCase": false,
+      "fullEventEdits": 1,
+      "fullEventDifferences": [
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            67,
+            3,
+            1
+          ],
+          "actual": [
+            67,
+            3,
+            0.5
+          ]
+        }
+      ],
+      "unsupportedReported": [],
+      "warningCodes": [
+        "measure-duration-mismatch",
+        "monophonic-scope",
+        "uncalibrated-model"
+      ],
+      "error": null
+    },
+    {
+      "id": "08-treble-dotted-scan",
+      "compositionId": "08-treble-dotted",
+      "variant": "scan",
+      "scope": "supported-monophonic",
+      "unsupportedSourceFeatures": [],
+      "image": "../corpus/images/08-treble-dotted-scan.png",
+      "imageSha256": "2045937307a2c85beffc8d57b5d75c2574492f8f1a83988da6f35183cee93c0f",
+      "pdfSha256": "bdc9e4bdf0dbdc803aab778d6ccb9f69b8adb457fd4db0d35f3c1c5f7b0ad71f",
+      "truth": "../corpus/truth/08-treble-dotted.json",
+      "truthSha256": "d34d0921ba52d2dfca6cc8fbe2e207b207bd03242571556c1ea6a22e22c9073a",
+      "sourcePairingValid": true,
+      "regionPixelSha256": [
+        "8bc43ca4b9980717498153459a7bbce0725415b1d7d4131d1232c874a82cf1fa"
+      ],
+      "regionCount": 1,
+      "expectedNotes": 4,
+      "recognizedNotes": 4,
+      "pitchEdits": {
+        "matches": 4,
+        "substitutions": 0,
+        "deletions": 0,
+        "insertions": 0
+      },
+      "onsetsCorrectAmongPitchMatches": 4,
+      "durationsCorrectAmongPitchMatches": 3,
+      "jointPitchOnsetDurationMatches": 3,
+      "expectedRests": 0,
+      "recognizedRests": 0,
+      "restPitchOnsetDurationMatches": 0,
+      "initialAttributesCorrect": {
+        "clef": 1,
+        "key": 1,
+        "meter": 1
+      },
+      "expectedParts": 1,
+      "recognizedPartCount": 1,
+      "exactSupportedMusicalCase": false,
+      "fullEventEdits": 1,
+      "fullEventDifferences": [
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            67,
+            3,
+            1
+          ],
+          "actual": [
+            67,
+            3,
+            0.5
+          ]
+        }
+      ],
+      "unsupportedReported": [],
+      "warningCodes": [
+        "deskewed-staff",
+        "measure-duration-mismatch",
+        "monophonic-scope",
+        "scan-suspected",
+        "uncalibrated-model"
+      ],
+      "error": null
+    },
+    {
+      "id": "09-treble-accidentals-clean",
+      "compositionId": "09-treble-accidentals",
+      "variant": "clean",
+      "scope": "supported-monophonic",
+      "unsupportedSourceFeatures": [],
+      "image": "../corpus/images/09-treble-accidentals-clean.png",
+      "imageSha256": "faf5e40cb6357caee93152d1b1b9b29b29a203b71269d8640a3ad835da577de1",
+      "pdfSha256": "5d78ce9804086b4b32f31e637b52c998883d1a52a44f62f2349e34fe94dd40a1",
+      "truth": "../corpus/truth/09-treble-accidentals.json",
+      "truthSha256": "b3c8beeedb35b88f707ca73555bf93a5503b17415b5c1ae07ddf48c378280f64",
+      "sourcePairingValid": true,
+      "regionPixelSha256": [
+        "ddcf5a913c6b2aa73e18679ee812e77828a15caede3331a076d467a42effa1c9"
+      ],
+      "regionCount": 1,
+      "expectedNotes": 4,
+      "recognizedNotes": 4,
+      "pitchEdits": {
+        "matches": 4,
+        "substitutions": 0,
+        "deletions": 0,
+        "insertions": 0
+      },
+      "onsetsCorrectAmongPitchMatches": 2,
+      "durationsCorrectAmongPitchMatches": 3,
+      "jointPitchOnsetDurationMatches": 1,
+      "expectedRests": 0,
+      "recognizedRests": 0,
+      "restPitchOnsetDurationMatches": 0,
+      "initialAttributesCorrect": {
+        "clef": 1,
+        "key": 1,
+        "meter": 1
+      },
+      "expectedParts": 1,
+      "recognizedPartCount": 1,
+      "exactSupportedMusicalCase": false,
+      "fullEventEdits": 3,
+      "fullEventDifferences": [
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            65,
+            1,
+            1
+          ],
+          "actual": [
+            65,
+            1,
+            0.5
+          ]
+        },
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            70,
+            2,
+            1
+          ],
+          "actual": [
+            70,
+            1.5,
+            1
+          ]
+        },
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            71,
+            3,
+            1
+          ],
+          "actual": [
+            71,
+            2.5,
+            1
+          ]
+        }
+      ],
+      "unsupportedReported": [],
+      "warningCodes": [
+        "measure-duration-mismatch",
+        "monophonic-scope",
+        "uncalibrated-model"
+      ],
+      "error": null
+    },
+    {
+      "id": "09-treble-accidentals-scan",
+      "compositionId": "09-treble-accidentals",
+      "variant": "scan",
+      "scope": "supported-monophonic",
+      "unsupportedSourceFeatures": [],
+      "image": "../corpus/images/09-treble-accidentals-scan.png",
+      "imageSha256": "23f93c5020bd7ace2ad439b02a20a2bf351c53047868543869b4221bd90f1c72",
+      "pdfSha256": "5a7513d0d24796dc53c22e7f74754e8240d2a4df7182616df6fabf8a126663f3",
+      "truth": "../corpus/truth/09-treble-accidentals.json",
+      "truthSha256": "b3c8beeedb35b88f707ca73555bf93a5503b17415b5c1ae07ddf48c378280f64",
+      "sourcePairingValid": true,
+      "regionPixelSha256": [
+        "7b75c0e003f06dbf84b0c26e509395393253a5a95807438bdda5b9f8cf5e29be"
+      ],
+      "regionCount": 1,
+      "expectedNotes": 4,
+      "recognizedNotes": 4,
+      "pitchEdits": {
+        "matches": 4,
+        "substitutions": 0,
+        "deletions": 0,
+        "insertions": 0
+      },
+      "onsetsCorrectAmongPitchMatches": 2,
+      "durationsCorrectAmongPitchMatches": 3,
+      "jointPitchOnsetDurationMatches": 1,
+      "expectedRests": 0,
+      "recognizedRests": 0,
+      "restPitchOnsetDurationMatches": 0,
+      "initialAttributesCorrect": {
+        "clef": 1,
+        "key": 1,
+        "meter": 1
+      },
+      "expectedParts": 1,
+      "recognizedPartCount": 1,
+      "exactSupportedMusicalCase": false,
+      "fullEventEdits": 3,
+      "fullEventDifferences": [
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            65,
+            1,
+            1
+          ],
+          "actual": [
+            65,
+            1,
+            0.5
+          ]
+        },
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            70,
+            2,
+            1
+          ],
+          "actual": [
+            70,
+            1.5,
+            1
+          ]
+        },
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            71,
+            3,
+            1
+          ],
+          "actual": [
+            71,
+            2.5,
+            1
+          ]
+        }
+      ],
+      "unsupportedReported": [],
+      "warningCodes": [
+        "deskewed-staff",
+        "measure-duration-mismatch",
+        "monophonic-scope",
+        "scan-suspected",
+        "uncalibrated-model"
+      ],
+      "error": null
+    },
+    {
+      "id": "10-treble-key-d-clean",
+      "compositionId": "10-treble-key-d",
+      "variant": "clean",
+      "scope": "supported-monophonic",
+      "unsupportedSourceFeatures": [],
+      "image": "../corpus/images/10-treble-key-d-clean.png",
+      "imageSha256": "d65142c425c19b9f6092236a1a70b2180b5ef172cd37b754c94171ee5fe82e61",
+      "pdfSha256": "dd12471497a0da98197251882c562356a38a1393092db56636c85e8403fca772",
+      "truth": "../corpus/truth/10-treble-key-d.json",
+      "truthSha256": "e1e6f88d15c20ca7ad3b9b0511255d1305b6d2345af07dcb7f699622134f315c",
+      "sourcePairingValid": true,
+      "regionPixelSha256": [
+        "94b0ad1313e91c7d8cd242c98c8b90a60d88feb1f9cf7f2c2de139ba287483c3"
+      ],
+      "regionCount": 1,
+      "expectedNotes": 4,
+      "recognizedNotes": 4,
+      "pitchEdits": {
+        "matches": 4,
+        "substitutions": 0,
+        "deletions": 0,
+        "insertions": 0
+      },
+      "onsetsCorrectAmongPitchMatches": 4,
+      "durationsCorrectAmongPitchMatches": 4,
+      "jointPitchOnsetDurationMatches": 4,
+      "expectedRests": 0,
+      "recognizedRests": 0,
+      "restPitchOnsetDurationMatches": 0,
+      "initialAttributesCorrect": {
+        "clef": 1,
+        "key": 1,
+        "meter": 1
+      },
+      "expectedParts": 1,
+      "recognizedPartCount": 1,
+      "exactSupportedMusicalCase": true,
+      "fullEventEdits": 0,
+      "fullEventDifferences": [],
+      "unsupportedReported": [],
+      "warningCodes": [
+        "monophonic-scope",
+        "uncalibrated-model"
+      ],
+      "error": null
+    },
+    {
+      "id": "10-treble-key-d-scan",
+      "compositionId": "10-treble-key-d",
+      "variant": "scan",
+      "scope": "supported-monophonic",
+      "unsupportedSourceFeatures": [],
+      "image": "../corpus/images/10-treble-key-d-scan.png",
+      "imageSha256": "7fda1e15737fee26b7d43bcf8e3ceb1e7fbcc8713613bbbca268369a30eefaf1",
+      "pdfSha256": "513652f58cbd5120ed0f21caefc7f7b543b01e889148eaf33bcb3e6400acdc02",
+      "truth": "../corpus/truth/10-treble-key-d.json",
+      "truthSha256": "e1e6f88d15c20ca7ad3b9b0511255d1305b6d2345af07dcb7f699622134f315c",
+      "sourcePairingValid": true,
+      "regionPixelSha256": [
+        "cc14bfd283475c8af1e92485ebe60c9886a88887fb1bc9df490d55178128b7bd"
+      ],
+      "regionCount": 1,
+      "expectedNotes": 4,
+      "recognizedNotes": 4,
+      "pitchEdits": {
+        "matches": 4,
+        "substitutions": 0,
+        "deletions": 0,
+        "insertions": 0
+      },
+      "onsetsCorrectAmongPitchMatches": 4,
+      "durationsCorrectAmongPitchMatches": 4,
+      "jointPitchOnsetDurationMatches": 4,
+      "expectedRests": 0,
+      "recognizedRests": 0,
+      "restPitchOnsetDurationMatches": 0,
+      "initialAttributesCorrect": {
+        "clef": 1,
+        "key": 1,
+        "meter": 1
+      },
+      "expectedParts": 1,
+      "recognizedPartCount": 1,
+      "exactSupportedMusicalCase": true,
+      "fullEventEdits": 0,
+      "fullEventDifferences": [],
+      "unsupportedReported": [],
+      "warningCodes": [
+        "deskewed-staff",
+        "monophonic-scope",
+        "scan-suspected",
+        "uncalibrated-model"
+      ],
+      "error": null
+    },
+    {
+      "id": "11-bass-key-eb-clean",
+      "compositionId": "11-bass-key-eb",
+      "variant": "clean",
+      "scope": "supported-monophonic",
+      "unsupportedSourceFeatures": [],
+      "image": "../corpus/images/11-bass-key-eb-clean.png",
+      "imageSha256": "c9a6afa8a37824691b834758c507cc6ad74dd3961c9ea0a8d2d205c5048e2248",
+      "pdfSha256": "bb6b0b43184b1df2cdeb2da13c679fe04383cfa770a0005f31f577ba6ef002ac",
+      "truth": "../corpus/truth/11-bass-key-eb.json",
+      "truthSha256": "8646487d2c4e5ea3794cb763ce4a74901481541cd52244e88d440a73b6bc9711",
+      "sourcePairingValid": true,
+      "regionPixelSha256": [
+        "826f07abd3c8b9af79eee6730b1e845ddcf99cca37dedb4abb69bd3a1d60f52b"
+      ],
+      "regionCount": 1,
+      "expectedNotes": 4,
+      "recognizedNotes": 4,
+      "pitchEdits": {
+        "matches": 4,
+        "substitutions": 0,
+        "deletions": 0,
+        "insertions": 0
+      },
+      "onsetsCorrectAmongPitchMatches": 4,
+      "durationsCorrectAmongPitchMatches": 3,
+      "jointPitchOnsetDurationMatches": 3,
+      "expectedRests": 0,
+      "recognizedRests": 0,
+      "restPitchOnsetDurationMatches": 0,
+      "initialAttributesCorrect": {
+        "clef": 1,
+        "key": 1,
+        "meter": 1
+      },
+      "expectedParts": 1,
+      "recognizedPartCount": 1,
+      "exactSupportedMusicalCase": false,
+      "fullEventEdits": 1,
+      "fullEventDifferences": [
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            56,
+            3,
+            1
+          ],
+          "actual": [
+            56,
+            3,
+            0.5
+          ]
+        }
+      ],
+      "unsupportedReported": [],
+      "warningCodes": [
+        "measure-duration-mismatch",
+        "monophonic-scope",
+        "uncalibrated-model"
+      ],
+      "error": null
+    },
+    {
+      "id": "11-bass-key-eb-scan",
+      "compositionId": "11-bass-key-eb",
+      "variant": "scan",
+      "scope": "supported-monophonic",
+      "unsupportedSourceFeatures": [],
+      "image": "../corpus/images/11-bass-key-eb-scan.png",
+      "imageSha256": "2518e313107e74acb734b625c5a702298467b73a0ce91b8ee42a5fab004e143d",
+      "pdfSha256": "a1797d11098cdf20bfd61d544c0cd1186512815ec0beb61b1ba4a2990016f5e6",
+      "truth": "../corpus/truth/11-bass-key-eb.json",
+      "truthSha256": "8646487d2c4e5ea3794cb763ce4a74901481541cd52244e88d440a73b6bc9711",
+      "sourcePairingValid": true,
+      "regionPixelSha256": [
+        "e9860e41415987851ae3b8d5c1effdf4c0ca31ce5bc12a5f73342925802925ca"
+      ],
+      "regionCount": 1,
+      "expectedNotes": 4,
+      "recognizedNotes": 4,
+      "pitchEdits": {
+        "matches": 4,
+        "substitutions": 0,
+        "deletions": 0,
+        "insertions": 0
+      },
+      "onsetsCorrectAmongPitchMatches": 4,
+      "durationsCorrectAmongPitchMatches": 4,
+      "jointPitchOnsetDurationMatches": 4,
+      "expectedRests": 0,
+      "recognizedRests": 0,
+      "restPitchOnsetDurationMatches": 0,
+      "initialAttributesCorrect": {
+        "clef": 1,
+        "key": 1,
+        "meter": 1
+      },
+      "expectedParts": 1,
+      "recognizedPartCount": 1,
+      "exactSupportedMusicalCase": true,
+      "fullEventEdits": 0,
+      "fullEventDifferences": [],
+      "unsupportedReported": [],
+      "warningCodes": [
+        "deskewed-staff",
+        "monophonic-scope",
+        "scan-suspected",
+        "uncalibrated-model"
+      ],
+      "error": null
+    },
+    {
+      "id": "12-treble-chords-clean",
+      "compositionId": "12-treble-chords",
+      "variant": "clean",
+      "scope": "unsupported",
+      "unsupportedSourceFeatures": [
+        "single-voice-model-chords"
+      ],
+      "image": "../corpus/images/12-treble-chords-clean.png",
+      "imageSha256": "f4b2409aea7e723b5ac1616828fbbc3603b6b7d13fe248eccc826427b07e3f11",
+      "pdfSha256": "c6bef72046ff27e0483518c6500c23508180bd9f649a92d80730496ef3982da8",
+      "truth": "../corpus/truth/12-treble-chords.json",
+      "truthSha256": "740cc9e5ec9efcccef13b895c734580816731f996181c6cb668dbaa7961f7939",
+      "sourcePairingValid": true,
+      "regionPixelSha256": [
+        "d7c7995c1d80d26caabea2441dbebaae4dfc1ae9a9febd527dc29fc90b0ce585"
+      ],
+      "regionCount": 1,
+      "expectedNotes": 6,
+      "recognizedNotes": 0,
+      "pitchEdits": {
+        "matches": 0,
+        "substitutions": 0,
+        "deletions": 6,
+        "insertions": 0
+      },
+      "onsetsCorrectAmongPitchMatches": 0,
+      "durationsCorrectAmongPitchMatches": 0,
+      "jointPitchOnsetDurationMatches": 0,
+      "expectedRests": 0,
+      "recognizedRests": 0,
+      "restPitchOnsetDurationMatches": 0,
+      "initialAttributesCorrect": {
+        "clef": 0,
+        "key": 0,
+        "meter": 0
+      },
+      "expectedParts": 1,
+      "recognizedPartCount": 0,
+      "exactSupportedMusicalCase": false,
+      "fullEventEdits": 6,
+      "fullEventDifferences": [
+        {
+          "part": "P1",
+          "operation": "delete",
+          "expected": [
+            60,
+            0,
+            2
+          ],
+          "actual": null
+        },
+        {
+          "part": "P1",
+          "operation": "delete",
+          "expected": [
+            64,
+            0,
+            2
+          ],
+          "actual": null
+        },
+        {
+          "part": "P1",
+          "operation": "delete",
+          "expected": [
+            67,
+            0,
+            2
+          ],
+          "actual": null
+        },
+        {
+          "part": "P1",
+          "operation": "delete",
+          "expected": [
+            65,
+            2,
+            2
+          ],
+          "actual": null
+        },
+        {
+          "part": "P1",
+          "operation": "delete",
+          "expected": [
+            69,
+            2,
+            2
+          ],
+          "actual": null
+        },
+        {
+          "part": "P1",
+          "operation": "delete",
+          "expected": [
+            72,
+            2,
+            2
+          ],
+          "actual": null
+        }
+      ],
+      "unsupportedReported": [
+        "unparseable-tokens",
+        "no-pitched-targets"
+      ],
+      "warningCodes": [
+        "monophonic-scope",
+        "review-required",
+        "uncalibrated-model"
+      ],
+      "error": null
+    },
+    {
+      "id": "12-treble-chords-scan",
+      "compositionId": "12-treble-chords",
+      "variant": "scan",
+      "scope": "unsupported",
+      "unsupportedSourceFeatures": [
+        "single-voice-model-chords"
+      ],
+      "image": "../corpus/images/12-treble-chords-scan.png",
+      "imageSha256": "bb811a49a8a7a6f559064bd60dab1cae3c083dc3664b4a49d487d4ca59e99f47",
+      "pdfSha256": "56f1b6ad5072ac37fdd321913ae9918d76b434eb616a1062d9e0203849b20e31",
+      "truth": "../corpus/truth/12-treble-chords.json",
+      "truthSha256": "740cc9e5ec9efcccef13b895c734580816731f996181c6cb668dbaa7961f7939",
+      "sourcePairingValid": true,
+      "regionPixelSha256": [
+        "8685a3d3d472298135eed3ef6197334a9bfd350d372875ffe8dbcc7fb3b6d4f4"
+      ],
+      "regionCount": 1,
+      "expectedNotes": 6,
+      "recognizedNotes": 0,
+      "pitchEdits": {
+        "matches": 0,
+        "substitutions": 0,
+        "deletions": 6,
+        "insertions": 0
+      },
+      "onsetsCorrectAmongPitchMatches": 0,
+      "durationsCorrectAmongPitchMatches": 0,
+      "jointPitchOnsetDurationMatches": 0,
+      "expectedRests": 0,
+      "recognizedRests": 0,
+      "restPitchOnsetDurationMatches": 0,
+      "initialAttributesCorrect": {
+        "clef": 0,
+        "key": 0,
+        "meter": 0
+      },
+      "expectedParts": 1,
+      "recognizedPartCount": 0,
+      "exactSupportedMusicalCase": false,
+      "fullEventEdits": 6,
+      "fullEventDifferences": [
+        {
+          "part": "P1",
+          "operation": "delete",
+          "expected": [
+            60,
+            0,
+            2
+          ],
+          "actual": null
+        },
+        {
+          "part": "P1",
+          "operation": "delete",
+          "expected": [
+            64,
+            0,
+            2
+          ],
+          "actual": null
+        },
+        {
+          "part": "P1",
+          "operation": "delete",
+          "expected": [
+            67,
+            0,
+            2
+          ],
+          "actual": null
+        },
+        {
+          "part": "P1",
+          "operation": "delete",
+          "expected": [
+            65,
+            2,
+            2
+          ],
+          "actual": null
+        },
+        {
+          "part": "P1",
+          "operation": "delete",
+          "expected": [
+            69,
+            2,
+            2
+          ],
+          "actual": null
+        },
+        {
+          "part": "P1",
+          "operation": "delete",
+          "expected": [
+            72,
+            2,
+            2
+          ],
+          "actual": null
+        }
+      ],
+      "unsupportedReported": [
+        "unparseable-tokens",
+        "no-pitched-targets"
+      ],
+      "warningCodes": [
+        "monophonic-scope",
+        "review-required",
+        "scan-suspected",
+        "uncalibrated-model"
+      ],
+      "error": null
+    },
+    {
+      "id": "13-treble-tie-clean",
+      "compositionId": "13-treble-tie",
+      "variant": "clean",
+      "scope": "supported-monophonic",
+      "unsupportedSourceFeatures": [],
+      "image": "../corpus/images/13-treble-tie-clean.png",
+      "imageSha256": "609f13975f3e924f3c91c4f1eda4cfc0233fa5576ba67f7e0636f80cd54bc354",
+      "pdfSha256": "8c032bbc23d2090f27154f4ec3e0b2ae33e11e6e2d763287548566fb16a98adb",
+      "truth": "../corpus/truth/13-treble-tie.json",
+      "truthSha256": "69993d7bb044824e7028fda16719d9ecab91a506c1fdafaae55c2da2c8c5393b",
+      "sourcePairingValid": true,
+      "regionPixelSha256": [
+        "2538b96dac67583d7e29f2bb61ba82daf3b04ad4852e154a2703be610f7500c8"
+      ],
+      "regionCount": 1,
+      "expectedNotes": 2,
+      "recognizedNotes": 2,
+      "pitchEdits": {
+        "matches": 2,
+        "substitutions": 0,
+        "deletions": 0,
+        "insertions": 0
+      },
+      "onsetsCorrectAmongPitchMatches": 2,
+      "durationsCorrectAmongPitchMatches": 1,
+      "jointPitchOnsetDurationMatches": 1,
+      "expectedRests": 0,
+      "recognizedRests": 0,
+      "restPitchOnsetDurationMatches": 0,
+      "initialAttributesCorrect": {
+        "clef": 1,
+        "key": 1,
+        "meter": 1
+      },
+      "expectedParts": 1,
+      "recognizedPartCount": 1,
+      "exactSupportedMusicalCase": false,
+      "fullEventEdits": 1,
+      "fullEventDifferences": [
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            67,
+            3,
+            1
+          ],
+          "actual": [
+            67,
+            3,
+            0.5
+          ]
+        }
+      ],
+      "unsupportedReported": [],
+      "warningCodes": [
+        "measure-duration-mismatch",
+        "monophonic-scope",
+        "uncalibrated-model"
+      ],
+      "error": null
+    },
+    {
+      "id": "13-treble-tie-scan",
+      "compositionId": "13-treble-tie",
+      "variant": "scan",
+      "scope": "supported-monophonic",
+      "unsupportedSourceFeatures": [],
+      "image": "../corpus/images/13-treble-tie-scan.png",
+      "imageSha256": "118ba9b7c9d78cce2babe1e0bb824c56859e06a1187d7a9b78bfc3fe6686a5e9",
+      "pdfSha256": "8d89d1985e44272cf488a998faddba6db9ba24bbb95a2c2c9914ed9740e346c7",
+      "truth": "../corpus/truth/13-treble-tie.json",
+      "truthSha256": "69993d7bb044824e7028fda16719d9ecab91a506c1fdafaae55c2da2c8c5393b",
+      "sourcePairingValid": true,
+      "regionPixelSha256": [
+        "78744c62fd14d4095f869b517e644845617d2b7d893c6079400402fe3b46b7c5"
+      ],
+      "regionCount": 1,
+      "expectedNotes": 2,
+      "recognizedNotes": 2,
+      "pitchEdits": {
+        "matches": 2,
+        "substitutions": 0,
+        "deletions": 0,
+        "insertions": 0
+      },
+      "onsetsCorrectAmongPitchMatches": 2,
+      "durationsCorrectAmongPitchMatches": 1,
+      "jointPitchOnsetDurationMatches": 1,
+      "expectedRests": 0,
+      "recognizedRests": 0,
+      "restPitchOnsetDurationMatches": 0,
+      "initialAttributesCorrect": {
+        "clef": 1,
+        "key": 1,
+        "meter": 1
+      },
+      "expectedParts": 1,
+      "recognizedPartCount": 1,
+      "exactSupportedMusicalCase": false,
+      "fullEventEdits": 1,
+      "fullEventDifferences": [
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            67,
+            3,
+            1
+          ],
+          "actual": [
+            67,
+            3,
+            0.5
+          ]
+        }
+      ],
+      "unsupportedReported": [],
+      "warningCodes": [
+        "deskewed-staff",
+        "measure-duration-mismatch",
+        "monophonic-scope",
+        "scan-suspected",
+        "uncalibrated-model"
+      ],
+      "error": null
+    },
+    {
+      "id": "14-repeat-bars-clean",
+      "compositionId": "14-repeat-bars",
+      "variant": "clean",
+      "scope": "unsupported",
+      "unsupportedSourceFeatures": [
+        "repeat-playback-expansion"
+      ],
+      "image": "../corpus/images/14-repeat-bars-clean.png",
+      "imageSha256": "eee1b767c867bac321a46be0a74b89a21980beefdc9b8df824f6d8ea69532b27",
+      "pdfSha256": "a5b244c4c89a500fed4f78541d767a4187094cf576964b6b31707f4eeb1e8219",
+      "truth": "../corpus/truth/14-repeat-bars.json",
+      "truthSha256": "2909b38ddf1e9854eec6052f13e28b94ab0b2eef64546f0c5ef9ab9e02975cd1",
+      "sourcePairingValid": true,
+      "regionPixelSha256": [
+        "cd6bfac01a41edc97a7f0e6befddc43dbd1e3645ad2523f68b78e436e3819b6f"
+      ],
+      "regionCount": 1,
+      "expectedNotes": 6,
+      "recognizedNotes": 6,
+      "pitchEdits": {
+        "matches": 6,
+        "substitutions": 0,
+        "deletions": 0,
+        "insertions": 0
+      },
+      "onsetsCorrectAmongPitchMatches": 6,
+      "durationsCorrectAmongPitchMatches": 6,
+      "jointPitchOnsetDurationMatches": 6,
+      "expectedRests": 0,
+      "recognizedRests": 0,
+      "restPitchOnsetDurationMatches": 0,
+      "initialAttributesCorrect": {
+        "clef": 1,
+        "key": 1,
+        "meter": 1
+      },
+      "expectedParts": 1,
+      "recognizedPartCount": 1,
+      "exactSupportedMusicalCase": false,
+      "fullEventEdits": 0,
+      "fullEventDifferences": [],
+      "unsupportedReported": [],
+      "warningCodes": [
+        "monophonic-scope",
+        "uncalibrated-model"
+      ],
+      "error": null
+    },
+    {
+      "id": "14-repeat-bars-scan",
+      "compositionId": "14-repeat-bars",
+      "variant": "scan",
+      "scope": "unsupported",
+      "unsupportedSourceFeatures": [
+        "repeat-playback-expansion"
+      ],
+      "image": "../corpus/images/14-repeat-bars-scan.png",
+      "imageSha256": "99aa401e48bc17381bf1e7897d103685f6c49a377db537023335505959ef43cd",
+      "pdfSha256": "e76f354bf4620b84a62c5b87d4e35ca42e18910833e81571672842b06986fc87",
+      "truth": "../corpus/truth/14-repeat-bars.json",
+      "truthSha256": "2909b38ddf1e9854eec6052f13e28b94ab0b2eef64546f0c5ef9ab9e02975cd1",
+      "sourcePairingValid": true,
+      "regionPixelSha256": [
+        "2da3a9b62113414c3987c5f53f21edd10f54366a555ac4569c2344b9b2e72a34"
+      ],
+      "regionCount": 1,
+      "expectedNotes": 6,
+      "recognizedNotes": 6,
+      "pitchEdits": {
+        "matches": 6,
+        "substitutions": 0,
+        "deletions": 0,
+        "insertions": 0
+      },
+      "onsetsCorrectAmongPitchMatches": 6,
+      "durationsCorrectAmongPitchMatches": 6,
+      "jointPitchOnsetDurationMatches": 6,
+      "expectedRests": 0,
+      "recognizedRests": 0,
+      "restPitchOnsetDurationMatches": 0,
+      "initialAttributesCorrect": {
+        "clef": 1,
+        "key": 1,
+        "meter": 1
+      },
+      "expectedParts": 1,
+      "recognizedPartCount": 1,
+      "exactSupportedMusicalCase": false,
+      "fullEventEdits": 0,
+      "fullEventDifferences": [],
+      "unsupportedReported": [],
+      "warningCodes": [
+        "deskewed-staff",
+        "monophonic-scope",
+        "scan-suspected",
+        "uncalibrated-model"
+      ],
+      "error": null
+    },
+    {
+      "id": "15-two-parts-clean",
+      "compositionId": "15-two-parts",
+      "variant": "clean",
+      "scope": "unsupported",
+      "unsupportedSourceFeatures": [
+        "multipart-selection-required"
+      ],
+      "image": "../corpus/images/15-two-parts-clean.png",
+      "imageSha256": "fbb97a0452ddcbe6d15a793a20118b5a0677674a2d25f1e6ad64f6e6abb39c15",
+      "pdfSha256": "bb361d02c28d1bf813e6863c426c62ba1ea016f0f4d0c0d50080d1536fa9a03b",
+      "truth": "../corpus/truth/15-two-parts.json",
+      "truthSha256": "2ff2372acce672a7e44b700c4e56559323dcd868e1bad8639868b75ba6fc7ce9",
+      "sourcePairingValid": true,
+      "regionPixelSha256": [
+        "a7932dd11d67e543d88423212fb55929130c8f8a98228bd6ad556edce749fe6a",
+        "37e2e0ad86faf04883eadc38794582ae731e71c8af8da03c78f2c8bf962c0d2c"
+      ],
+      "regionCount": 2,
+      "expectedNotes": 5,
+      "recognizedNotes": 5,
+      "pitchEdits": {
+        "matches": 5,
+        "substitutions": 0,
+        "deletions": 0,
+        "insertions": 0
+      },
+      "onsetsCorrectAmongPitchMatches": 5,
+      "durationsCorrectAmongPitchMatches": 5,
+      "jointPitchOnsetDurationMatches": 5,
+      "expectedRests": 0,
+      "recognizedRests": 0,
+      "restPitchOnsetDurationMatches": 0,
+      "initialAttributesCorrect": {
+        "clef": 2,
+        "key": 2,
+        "meter": 2
+      },
+      "expectedParts": 2,
+      "recognizedPartCount": 2,
+      "exactSupportedMusicalCase": false,
+      "fullEventEdits": 0,
+      "fullEventDifferences": [],
+      "unsupportedReported": [],
+      "warningCodes": [
+        "monophonic-scope",
+        "uncalibrated-model"
+      ],
+      "error": null
+    },
+    {
+      "id": "15-two-parts-scan",
+      "compositionId": "15-two-parts",
+      "variant": "scan",
+      "scope": "unsupported",
+      "unsupportedSourceFeatures": [
+        "multipart-selection-required"
+      ],
+      "image": "../corpus/images/15-two-parts-scan.png",
+      "imageSha256": "09238dd085848256568d7c5be9404ebfca37f1405db14a8451fc1224d8625722",
+      "pdfSha256": "551bc587569a8b57df066bba54ab6e0379ecf863c04d462375b01b65847fad07",
+      "truth": "../corpus/truth/15-two-parts.json",
+      "truthSha256": "2ff2372acce672a7e44b700c4e56559323dcd868e1bad8639868b75ba6fc7ce9",
+      "sourcePairingValid": true,
+      "regionPixelSha256": [
+        "90083f720c4a247624de469f59cc1b90bec1494788d7f1e930a69955819607d7",
+        "bcd2200f11a7dfe37e83d1bd853bf6c4f2af97f8075c3dcddd53bebfc33c368b"
+      ],
+      "regionCount": 2,
+      "expectedNotes": 5,
+      "recognizedNotes": 5,
+      "pitchEdits": {
+        "matches": 5,
+        "substitutions": 0,
+        "deletions": 0,
+        "insertions": 0
+      },
+      "onsetsCorrectAmongPitchMatches": 5,
+      "durationsCorrectAmongPitchMatches": 5,
+      "jointPitchOnsetDurationMatches": 5,
+      "expectedRests": 0,
+      "recognizedRests": 0,
+      "restPitchOnsetDurationMatches": 0,
+      "initialAttributesCorrect": {
+        "clef": 2,
+        "key": 2,
+        "meter": 2
+      },
+      "expectedParts": 2,
+      "recognizedPartCount": 2,
+      "exactSupportedMusicalCase": false,
+      "fullEventEdits": 0,
+      "fullEventDifferences": [],
+      "unsupportedReported": [],
+      "warningCodes": [
+        "deskewed-staff",
+        "monophonic-scope",
+        "scan-suspected",
+        "uncalibrated-model"
+      ],
+      "error": null
+    },
+    {
+      "id": "16-treble-triplet-clean",
+      "compositionId": "16-treble-triplet",
+      "variant": "clean",
+      "scope": "unsupported",
+      "unsupportedSourceFeatures": [
+        "tuplet-rhythm"
+      ],
+      "image": "../corpus/images/16-treble-triplet-clean.png",
+      "imageSha256": "75862a2f6777c6ef42ffa0abd557880a480821134eae38dff867936e79bc9f8c",
+      "pdfSha256": "cbb9837c90988fc9069e03b7a4f17721776b38a10fb3f7b64e9091b35708e1f7",
+      "truth": "../corpus/truth/16-treble-triplet.json",
+      "truthSha256": "0d4d3c9ab565959c7319c45f3bdf049139883a00f6d70a725843ede5767599cd",
+      "sourcePairingValid": true,
+      "regionPixelSha256": [
+        "8122de44c1892ac343c43c388e402f177af62b8759cdd34af10c2871bb2e564a"
+      ],
+      "regionCount": 1,
+      "expectedNotes": 6,
+      "recognizedNotes": 6,
+      "pitchEdits": {
+        "matches": 6,
+        "substitutions": 0,
+        "deletions": 0,
+        "insertions": 0
+      },
+      "onsetsCorrectAmongPitchMatches": 1,
+      "durationsCorrectAmongPitchMatches": 2,
+      "jointPitchOnsetDurationMatches": 0,
+      "expectedRests": 0,
+      "recognizedRests": 0,
+      "restPitchOnsetDurationMatches": 0,
+      "initialAttributesCorrect": {
+        "clef": 1,
+        "key": 1,
+        "meter": 1
+      },
+      "expectedParts": 1,
+      "recognizedPartCount": 1,
+      "exactSupportedMusicalCase": false,
+      "fullEventEdits": 6,
+      "fullEventDifferences": [
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            60,
+            0,
+            0.3333333333333333
+          ],
+          "actual": [
+            60,
+            0,
+            0.5
+          ]
+        },
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            62,
+            0.3333333333333333,
+            0.3333333333333333
+          ],
+          "actual": [
+            62,
+            0.5,
+            0.25
+          ]
+        },
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            64,
+            0.6666666666666666,
+            0.3333333333333333
+          ],
+          "actual": [
+            64,
+            0.75,
+            0.5
+          ]
+        },
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            65,
+            1,
+            1
+          ],
+          "actual": [
+            65,
+            1.25,
+            1
+          ]
+        },
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            67,
+            2,
+            1
+          ],
+          "actual": [
+            67,
+            2.25,
+            1
+          ]
+        },
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            69,
+            3,
+            1
+          ],
+          "actual": [
+            69,
+            3.25,
+            0.5
+          ]
+        }
+      ],
+      "unsupportedReported": [],
+      "warningCodes": [
+        "measure-duration-mismatch",
+        "monophonic-scope",
+        "uncalibrated-model"
+      ],
+      "error": null
+    },
+    {
+      "id": "16-treble-triplet-scan",
+      "compositionId": "16-treble-triplet",
+      "variant": "scan",
+      "scope": "unsupported",
+      "unsupportedSourceFeatures": [
+        "tuplet-rhythm"
+      ],
+      "image": "../corpus/images/16-treble-triplet-scan.png",
+      "imageSha256": "f09b298f5ed910b13605bd9e9b27af9980706b2a1d04e8ee18df237d11ed50c7",
+      "pdfSha256": "7553596da62e3fbcdb81cca9bd28b9456bea0f3725f5c8d6eadefd0cfdd4f221",
+      "truth": "../corpus/truth/16-treble-triplet.json",
+      "truthSha256": "0d4d3c9ab565959c7319c45f3bdf049139883a00f6d70a725843ede5767599cd",
+      "sourcePairingValid": true,
+      "regionPixelSha256": [
+        "a160014864b94a523b9702b0707c313dab95d8d9bdf8c8b282492587515ae7e1"
+      ],
+      "regionCount": 1,
+      "expectedNotes": 6,
+      "recognizedNotes": 5,
+      "pitchEdits": {
+        "matches": 4,
+        "substitutions": 1,
+        "deletions": 1,
+        "insertions": 0
+      },
+      "onsetsCorrectAmongPitchMatches": 1,
+      "durationsCorrectAmongPitchMatches": 2,
+      "jointPitchOnsetDurationMatches": 0,
+      "expectedRests": 0,
+      "recognizedRests": 0,
+      "restPitchOnsetDurationMatches": 0,
+      "initialAttributesCorrect": {
+        "clef": 1,
+        "key": 1,
+        "meter": 1
+      },
+      "expectedParts": 1,
+      "recognizedPartCount": 1,
+      "exactSupportedMusicalCase": false,
+      "fullEventEdits": 6,
+      "fullEventDifferences": [
+        {
+          "part": "P1",
+          "operation": "delete",
+          "expected": [
+            60,
+            0,
+            0.3333333333333333
+          ],
+          "actual": null
+        },
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            62,
+            0.3333333333333333,
+            0.3333333333333333
+          ],
+          "actual": [
+            60,
+            0,
+            0.5
+          ]
+        },
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            64,
+            0.6666666666666666,
+            0.3333333333333333
+          ],
+          "actual": [
+            65,
+            null,
+            0.5
+          ]
+        },
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            65,
+            1,
+            1
+          ],
+          "actual": [
+            65,
+            null,
+            1
+          ]
+        },
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            67,
+            2,
+            1
+          ],
+          "actual": [
+            67,
+            null,
+            1
+          ]
+        },
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            69,
+            3,
+            1
+          ],
+          "actual": [
+            69,
+            null,
+            0.5
+          ]
+        }
+      ],
+      "unsupportedReported": [
+        "unparseable-tokens"
+      ],
+      "warningCodes": [
+        "deskewed-staff",
+        "monophonic-scope",
+        "review-required",
+        "scan-suspected",
+        "uncalibrated-model"
+      ],
+      "error": null
+    },
+    {
+      "id": "17-page-treble-quarters-clean",
+      "compositionId": "17-page-treble-quarters",
+      "variant": "clean",
+      "scope": "supported-monophonic",
+      "unsupportedSourceFeatures": [],
+      "image": "../corpus/images/17-page-treble-quarters-clean.png",
+      "imageSha256": "961866dcced5926de7e4d8f7d38659aa24f4055c54febd63f7bfe541af797e0d",
+      "pdfSha256": "4ee35529c94362f92b100048818a2ad43670a719141977b90da8ab8909b680bb",
+      "truth": "../corpus/truth/17-page-treble-quarters.json",
+      "truthSha256": "2aefaabe1cacb0a94525666912b49f872351acac765fcfa9da35653a2e83af9e",
+      "sourcePairingValid": true,
+      "regionPixelSha256": [
+        "c0cec4b303a8b936dc0ef8b0936def379ddd5a1ac37873d062d83c49d2bd29bc",
+        "0f8d13ee10a1516bea272b6bf5c0ca2e14fb890e3ef0c20311dc84bd802ddd32"
+      ],
+      "regionCount": 2,
+      "expectedNotes": 32,
+      "recognizedNotes": 32,
+      "pitchEdits": {
+        "matches": 32,
+        "substitutions": 0,
+        "deletions": 0,
+        "insertions": 0
+      },
+      "onsetsCorrectAmongPitchMatches": 32,
+      "durationsCorrectAmongPitchMatches": 32,
+      "jointPitchOnsetDurationMatches": 32,
+      "expectedRests": 0,
+      "recognizedRests": 0,
+      "restPitchOnsetDurationMatches": 0,
+      "initialAttributesCorrect": {
+        "clef": 1,
+        "key": 1,
+        "meter": 1
+      },
+      "expectedParts": 1,
+      "recognizedPartCount": 1,
+      "exactSupportedMusicalCase": true,
+      "fullEventEdits": 0,
+      "fullEventDifferences": [],
+      "unsupportedReported": [],
+      "warningCodes": [
+        "monophonic-scope",
+        "uncalibrated-model"
+      ],
+      "error": null
+    },
+    {
+      "id": "17-page-treble-quarters-scan",
+      "compositionId": "17-page-treble-quarters",
+      "variant": "scan",
+      "scope": "supported-monophonic",
+      "unsupportedSourceFeatures": [],
+      "image": "../corpus/images/17-page-treble-quarters-scan.png",
+      "imageSha256": "0e49415ef34f10bd80317e4ce3bf3765f2f8fad371d5ba3e123e2d5ea0aa062b",
+      "pdfSha256": "b21d11f8752b0c7e8c2aec237547e9157328633c6d4ca27273bc0c2b71ff19a8",
+      "truth": "../corpus/truth/17-page-treble-quarters.json",
+      "truthSha256": "2aefaabe1cacb0a94525666912b49f872351acac765fcfa9da35653a2e83af9e",
+      "sourcePairingValid": true,
+      "regionPixelSha256": [
+        "b9dba2d044a6f2962e3b0565d34fa57990c99f472759d651357706f891e028ad",
+        "544dee2018cea7f5d0aec1def17fb50d3a0b1dd51210f065404a974228026748"
+      ],
+      "regionCount": 2,
+      "expectedNotes": 32,
+      "recognizedNotes": 32,
+      "pitchEdits": {
+        "matches": 32,
+        "substitutions": 0,
+        "deletions": 0,
+        "insertions": 0
+      },
+      "onsetsCorrectAmongPitchMatches": 32,
+      "durationsCorrectAmongPitchMatches": 32,
+      "jointPitchOnsetDurationMatches": 32,
+      "expectedRests": 0,
+      "recognizedRests": 0,
+      "restPitchOnsetDurationMatches": 0,
+      "initialAttributesCorrect": {
+        "clef": 1,
+        "key": 1,
+        "meter": 1
+      },
+      "expectedParts": 1,
+      "recognizedPartCount": 1,
+      "exactSupportedMusicalCase": true,
+      "fullEventEdits": 0,
+      "fullEventDifferences": [],
+      "unsupportedReported": [],
+      "warningCodes": [
+        "deskewed-staff",
+        "monophonic-scope",
+        "scan-suspected",
+        "uncalibrated-model"
+      ],
+      "error": null
+    },
+    {
+      "id": "18-page-bass-quarters-clean",
+      "compositionId": "18-page-bass-quarters",
+      "variant": "clean",
+      "scope": "supported-monophonic",
+      "unsupportedSourceFeatures": [],
+      "image": "../corpus/images/18-page-bass-quarters-clean.png",
+      "imageSha256": "043943060205607f33ba538b10c0e99fbcb3f8958557d7473504cfe26ded4e56",
+      "pdfSha256": "4a6f9f583e1ad9a90e599e8ad30871a8eec88c94068f3c264c2f611229f51d98",
+      "truth": "../corpus/truth/18-page-bass-quarters.json",
+      "truthSha256": "331282d47c37ea12e8de77eb462439c5052fcce903a255ff875c68f2436696f0",
+      "sourcePairingValid": true,
+      "regionPixelSha256": [
+        "c38d4194e3f8397fe9e7d0cb86cd2499857382f6abfc4644c4156389584e3874",
+        "883b0ee5b542ea82de38c42b21c904132482ad7366739b7b911852476eadc6b5"
+      ],
+      "regionCount": 2,
+      "expectedNotes": 32,
+      "recognizedNotes": 32,
+      "pitchEdits": {
+        "matches": 32,
+        "substitutions": 0,
+        "deletions": 0,
+        "insertions": 0
+      },
+      "onsetsCorrectAmongPitchMatches": 6,
+      "durationsCorrectAmongPitchMatches": 31,
+      "jointPitchOnsetDurationMatches": 5,
+      "expectedRests": 0,
+      "recognizedRests": 0,
+      "restPitchOnsetDurationMatches": 0,
+      "initialAttributesCorrect": {
+        "clef": 1,
+        "key": 1,
+        "meter": 1
+      },
+      "expectedParts": 1,
+      "recognizedPartCount": 1,
+      "exactSupportedMusicalCase": false,
+      "fullEventEdits": 27,
+      "fullEventDifferences": [
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            53,
+            5,
+            1
+          ],
+          "actual": [
+            53,
+            5,
+            0.6666666666666666
+          ]
+        },
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            52,
+            6,
+            1
+          ],
+          "actual": [
+            52,
+            5.666666666666667,
+            1
+          ]
+        },
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            50,
+            7,
+            1
+          ],
+          "actual": [
+            50,
+            6.666666666666667,
+            1
+          ]
+        },
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            48,
+            8,
+            1
+          ],
+          "actual": [
+            48,
+            7.666666666666667,
+            1
+          ]
+        },
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            47,
+            9,
+            1
+          ],
+          "actual": [
+            47,
+            8.666666666666668,
+            1
+          ]
+        },
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            45,
+            10,
+            1
+          ],
+          "actual": [
+            45,
+            9.666666666666668,
+            1
+          ]
+        },
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            43,
+            11,
+            1
+          ],
+          "actual": [
+            43,
+            10.666666666666668,
+            1
+          ]
+        },
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            41,
+            12,
+            1
+          ],
+          "actual": [
+            41,
+            11.666666666666668,
+            1
+          ]
+        },
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            45,
+            13,
+            1
+          ],
+          "actual": [
+            45,
+            12.666666666666668,
+            1
+          ]
+        },
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            48,
+            14,
+            1
+          ],
+          "actual": [
+            48,
+            13.666666666666668,
+            1
+          ]
+        },
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            47,
+            15,
+            1
+          ],
+          "actual": [
+            47,
+            14.666666666666668,
+            1
+          ]
+        },
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            45,
+            16,
+            1
+          ],
+          "actual": [
+            45,
+            15.666666666666668,
+            1
+          ]
+        },
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            48,
+            17,
+            1
+          ],
+          "actual": [
+            48,
+            16.666666666666668,
+            1
+          ]
+        },
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            50,
+            18,
+            1
+          ],
+          "actual": [
+            50,
+            17.666666666666668,
+            1
+          ]
+        },
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            52,
+            19,
+            1
+          ],
+          "actual": [
+            52,
+            18.666666666666668,
+            1
+          ]
+        },
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            53,
+            20,
+            1
+          ],
+          "actual": [
+            53,
+            19.666666666666668,
+            1
+          ]
+        },
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            50,
+            21,
+            1
+          ],
+          "actual": [
+            50,
+            20.666666666666668,
+            1
+          ]
+        },
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            48,
+            22,
+            1
+          ],
+          "actual": [
+            48,
+            21.666666666666668,
+            1
+          ]
+        },
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            45,
+            23,
+            1
+          ],
+          "actual": [
+            45,
+            22.666666666666668,
+            1
+          ]
+        },
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            43,
+            24,
+            1
+          ],
+          "actual": [
+            43,
+            23.666666666666668,
+            1
+          ]
+        },
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            47,
+            25,
+            1
+          ],
+          "actual": [
+            47,
+            24.666666666666668,
+            1
+          ]
+        },
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            50,
+            26,
+            1
+          ],
+          "actual": [
+            50,
+            25.666666666666668,
+            1
+          ]
+        },
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            47,
+            27,
+            1
+          ],
+          "actual": [
+            47,
+            26.666666666666668,
+            1
+          ]
+        },
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            48,
+            28,
+            1
+          ],
+          "actual": [
+            48,
+            27.666666666666668,
+            1
+          ]
+        },
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            43,
+            29,
+            1
+          ],
+          "actual": [
+            43,
+            28.666666666666668,
+            1
+          ]
+        },
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            40,
+            30,
+            1
+          ],
+          "actual": [
+            40,
+            29.666666666666668,
+            1
+          ]
+        },
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            48,
+            31,
+            1
+          ],
+          "actual": [
+            48,
+            30.666666666666668,
+            1
+          ]
+        }
+      ],
+      "unsupportedReported": [],
+      "warningCodes": [
+        "measure-duration-mismatch",
+        "monophonic-scope",
+        "uncalibrated-model"
+      ],
+      "error": null
+    },
+    {
+      "id": "18-page-bass-quarters-scan",
+      "compositionId": "18-page-bass-quarters",
+      "variant": "scan",
+      "scope": "supported-monophonic",
+      "unsupportedSourceFeatures": [],
+      "image": "../corpus/images/18-page-bass-quarters-scan.png",
+      "imageSha256": "4006dd6f41e33934dbf0100336d8c750177fda851537a9e3cf8f1ba20d08f8d1",
+      "pdfSha256": "ec1c3b6c5715d9f2fba07cc144ccaa2c967e4dd0285e32a8d91def6e99644fc7",
+      "truth": "../corpus/truth/18-page-bass-quarters.json",
+      "truthSha256": "331282d47c37ea12e8de77eb462439c5052fcce903a255ff875c68f2436696f0",
+      "sourcePairingValid": true,
+      "regionPixelSha256": [
+        "d684d4b030ec5afb6a207ae45c35582038ec2866c9354bf6ffe3da4d2504a119",
+        "94da3022e108fac07dbe90a2c371e41495ff869d301ac82631a18f1b6ec9b36d"
+      ],
+      "regionCount": 2,
+      "expectedNotes": 32,
+      "recognizedNotes": 32,
+      "pitchEdits": {
+        "matches": 32,
+        "substitutions": 0,
+        "deletions": 0,
+        "insertions": 0
+      },
+      "onsetsCorrectAmongPitchMatches": 32,
+      "durationsCorrectAmongPitchMatches": 32,
+      "jointPitchOnsetDurationMatches": 32,
+      "expectedRests": 0,
+      "recognizedRests": 0,
+      "restPitchOnsetDurationMatches": 0,
+      "initialAttributesCorrect": {
+        "clef": 1,
+        "key": 1,
+        "meter": 1
+      },
+      "expectedParts": 1,
+      "recognizedPartCount": 1,
+      "exactSupportedMusicalCase": true,
+      "fullEventEdits": 0,
+      "fullEventDifferences": [],
+      "unsupportedReported": [],
+      "warningCodes": [
+        "deskewed-staff",
+        "monophonic-scope",
+        "scan-suspected",
+        "uncalibrated-model"
+      ],
+      "error": null
+    },
+    {
+      "id": "19-page-treble-rhythm-clean",
+      "compositionId": "19-page-treble-rhythm",
+      "variant": "clean",
+      "scope": "supported-monophonic",
+      "unsupportedSourceFeatures": [],
+      "image": "../corpus/images/19-page-treble-rhythm-clean.png",
+      "imageSha256": "cf3991b616e816f4763d589a178061a8378972290c562235b7165e6807536c27",
+      "pdfSha256": "70c21b62d75539f359f20ab55a2ab31086195fd246fc3e696bbf518020cabda1",
+      "truth": "../corpus/truth/19-page-treble-rhythm.json",
+      "truthSha256": "83c26a102072b6dd5792dc49a0565121843f8b377168140182adf5bb640935d5",
+      "sourcePairingValid": true,
+      "regionPixelSha256": [
+        "2ecacc60e6a81fa5066cce2bcf2adfc15a0fafa74645e950985f0c7145c4536c"
+      ],
+      "regionCount": 1,
+      "expectedNotes": 21,
+      "recognizedNotes": 21,
+      "pitchEdits": {
+        "matches": 21,
+        "substitutions": 0,
+        "deletions": 0,
+        "insertions": 0
+      },
+      "onsetsCorrectAmongPitchMatches": 21,
+      "durationsCorrectAmongPitchMatches": 21,
+      "jointPitchOnsetDurationMatches": 21,
+      "expectedRests": 2,
+      "recognizedRests": 2,
+      "restPitchOnsetDurationMatches": 2,
+      "initialAttributesCorrect": {
+        "clef": 1,
+        "key": 1,
+        "meter": 1
+      },
+      "expectedParts": 1,
+      "recognizedPartCount": 1,
+      "exactSupportedMusicalCase": true,
+      "fullEventEdits": 0,
+      "fullEventDifferences": [],
+      "unsupportedReported": [],
+      "warningCodes": [
+        "monophonic-scope",
+        "uncalibrated-model"
+      ],
+      "error": null
+    },
+    {
+      "id": "19-page-treble-rhythm-scan",
+      "compositionId": "19-page-treble-rhythm",
+      "variant": "scan",
+      "scope": "supported-monophonic",
+      "unsupportedSourceFeatures": [],
+      "image": "../corpus/images/19-page-treble-rhythm-scan.png",
+      "imageSha256": "92bfb3fe228cd97929829ee3f7c32da39ec1bf3ad1a926469b6966f977f59b33",
+      "pdfSha256": "12feb64e770db11940d0badd5c606b71bee2e0c11226b5c6769ae83bbae36e58",
+      "truth": "../corpus/truth/19-page-treble-rhythm.json",
+      "truthSha256": "83c26a102072b6dd5792dc49a0565121843f8b377168140182adf5bb640935d5",
+      "sourcePairingValid": true,
+      "regionPixelSha256": [
+        "f4030956715931725b938ecdf017fdf49cbddfc579e058672861ab80668328bd"
+      ],
+      "regionCount": 1,
+      "expectedNotes": 21,
+      "recognizedNotes": 21,
+      "pitchEdits": {
+        "matches": 21,
+        "substitutions": 0,
+        "deletions": 0,
+        "insertions": 0
+      },
+      "onsetsCorrectAmongPitchMatches": 21,
+      "durationsCorrectAmongPitchMatches": 21,
+      "jointPitchOnsetDurationMatches": 21,
+      "expectedRests": 2,
+      "recognizedRests": 2,
+      "restPitchOnsetDurationMatches": 2,
+      "initialAttributesCorrect": {
+        "clef": 1,
+        "key": 1,
+        "meter": 1
+      },
+      "expectedParts": 1,
+      "recognizedPartCount": 1,
+      "exactSupportedMusicalCase": true,
+      "fullEventEdits": 0,
+      "fullEventDifferences": [],
+      "unsupportedReported": [],
+      "warningCodes": [
+        "deskewed-staff",
+        "monophonic-scope",
+        "scan-suspected",
+        "uncalibrated-model"
+      ],
+      "error": null
+    },
+    {
+      "id": "20-page-bass-key-eb-clean",
+      "compositionId": "20-page-bass-key-eb",
+      "variant": "clean",
+      "scope": "supported-monophonic",
+      "unsupportedSourceFeatures": [],
+      "image": "../corpus/images/20-page-bass-key-eb-clean.png",
+      "imageSha256": "0620652fb8f58bd170f716c4c0d055bbb5eb14f4e76b4714758126fdcd27fb2c",
+      "pdfSha256": "366050bb5ed08d06c1e733c752b8004f348c4170acabad11e4c25eaa511c34d3",
+      "truth": "../corpus/truth/20-page-bass-key-eb.json",
+      "truthSha256": "dc994768e672946a61520d7bf63bd2d61e4981998568e4573ed622e74eee26e1",
+      "sourcePairingValid": true,
+      "regionPixelSha256": [
+        "0cf22452de3d880cc5b304721889e71aa70a14109d233fd4f6d9cf04ce4e788e",
+        "7bafa26b957a7b27c68553634a893757c11177134f1ce8b2457f80fff3dc4b79"
+      ],
+      "regionCount": 2,
+      "expectedNotes": 24,
+      "recognizedNotes": 24,
+      "pitchEdits": {
+        "matches": 24,
+        "substitutions": 0,
+        "deletions": 0,
+        "insertions": 0
+      },
+      "onsetsCorrectAmongPitchMatches": 22,
+      "durationsCorrectAmongPitchMatches": 24,
+      "jointPitchOnsetDurationMatches": 22,
+      "expectedRests": 0,
+      "recognizedRests": 0,
+      "restPitchOnsetDurationMatches": 0,
+      "initialAttributesCorrect": {
+        "clef": 1,
+        "key": 1,
+        "meter": 1
+      },
+      "expectedParts": 1,
+      "recognizedPartCount": 1,
+      "exactSupportedMusicalCase": false,
+      "fullEventEdits": 2,
+      "fullEventDifferences": [
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            46,
+            28,
+            2
+          ],
+          "actual": [
+            46,
+            null,
+            2
+          ]
+        },
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            51,
+            30,
+            2
+          ],
+          "actual": [
+            51,
+            null,
+            2
+          ]
+        }
+      ],
+      "unsupportedReported": [
+        "unparseable-tokens",
+        "unparseable-tokens"
+      ],
+      "warningCodes": [
+        "monophonic-scope",
+        "review-required",
+        "uncalibrated-model"
+      ],
+      "error": null
+    },
+    {
+      "id": "20-page-bass-key-eb-scan",
+      "compositionId": "20-page-bass-key-eb",
+      "variant": "scan",
+      "scope": "supported-monophonic",
+      "unsupportedSourceFeatures": [],
+      "image": "../corpus/images/20-page-bass-key-eb-scan.png",
+      "imageSha256": "645d5f26fca90cb1c0b21d1c81a0fc7389ff7afd4cf6ddc34b6cea0324663a1e",
+      "pdfSha256": "5b5e706230a3bb89ed58df68e6ae0e40eb803815606155bde88b07f530caa130",
+      "truth": "../corpus/truth/20-page-bass-key-eb.json",
+      "truthSha256": "dc994768e672946a61520d7bf63bd2d61e4981998568e4573ed622e74eee26e1",
+      "sourcePairingValid": true,
+      "regionPixelSha256": [
+        "3d73f8029d71fb556d26b20b254f48423c7451ccc68ce3ebd64d20e5d1a4208b",
+        "70195416d14f5266b563a58bfc0b821bfca779f287c827c0e8f7c5d0aec986d6"
+      ],
+      "regionCount": 2,
+      "expectedNotes": 24,
+      "recognizedNotes": 24,
+      "pitchEdits": {
+        "matches": 24,
+        "substitutions": 0,
+        "deletions": 0,
+        "insertions": 0
+      },
+      "onsetsCorrectAmongPitchMatches": 22,
+      "durationsCorrectAmongPitchMatches": 24,
+      "jointPitchOnsetDurationMatches": 22,
+      "expectedRests": 0,
+      "recognizedRests": 0,
+      "restPitchOnsetDurationMatches": 0,
+      "initialAttributesCorrect": {
+        "clef": 1,
+        "key": 1,
+        "meter": 1
+      },
+      "expectedParts": 1,
+      "recognizedPartCount": 1,
+      "exactSupportedMusicalCase": false,
+      "fullEventEdits": 2,
+      "fullEventDifferences": [
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            46,
+            28,
+            2
+          ],
+          "actual": [
+            46,
+            null,
+            2
+          ]
+        },
+        {
+          "part": "P1",
+          "operation": "substitute",
+          "expected": [
+            51,
+            30,
+            2
+          ],
+          "actual": [
+            51,
+            null,
+            2
+          ]
+        }
+      ],
+      "unsupportedReported": [
+        "unparseable-tokens",
+        "unparseable-tokens"
+      ],
+      "warningCodes": [
+        "deskewed-staff",
+        "monophonic-scope",
+        "review-required",
+        "scan-suspected",
+        "uncalibrated-model"
+      ],
+      "error": null
+    }
+  ],
+  "limits": [
+    "Original synthetic engraving with controlled degradation, not real scan/camera/handwriting accuracy.",
+    "Clean/degraded pairs share20 compositions; they are not40 independent songs.",
+    "No training was performed here, so no development/test split is claimed. Corpus changes or tuning require retaining prior failed runs.",
+    "Unsupported chords/repeats/multipart/tuplets are separate; matching their visible notes is not proof of full structure/playback support.",
+    "Initial clef/key/meter graded per source staff; later attribute changes and unsupported repeats are not invented.",
+    "Pitch edit alignment and full note/rest/onset/duration edit alignment are both exposed. Insertions/deletions/errors are retained.",
+    "All drafts remain unverified; raw token scores are not calibrated accuracy.",
+    "Unsupported eligibility cannot always be detected automatically from pixels; explicit monophonic selection and manual review remain required.",
+    "Earlier32case results used a changing corpus and are excluded as final evidence; all failed outputs remain in cloud audit history.",
+    "Companion CPU metrics are separate engine/path evidence and not a browser deployment proof.",
+    "Independent GitHub API tree re-fetch was blocked HTTP403; primary pinned license pages, copied source blob hashes and npm integrity were checked."
+  ]
+}

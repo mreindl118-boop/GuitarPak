@@ -9,9 +9,60 @@
  var booleans=['scale.lock','lights.display','lights.displayEnabled','lights.on','lights.octHand','midi.appSound','midi.bendOn','midi.wanted','audio.monitor','audio.tonein','app.click','app.keepAwake'];
  var arrays=['fb.colors','fb.noteColors','sg.lib','ws.lib','st.tracks','ideas.list','plugins.list','tr.sessions','lesson.pending.v1','library.pending.v1'];
  var objects=['qz.prog','qz.instrumentProg','qz.items','kl.prog','pn.perf','pn.qwMap','pads.map','ws.cal','pp.sessions','lesson.observations.v1'];
+ var pendingKeys=['ws.performance.pending','lesson.pending.v1','practice.material.pending.v1','library.pending.v1'];
+ var instruments=['piano','synth','guitar','bass','drums','voice','other'];
+ function object(value){return !!value&&typeof value==='object'&&!Array.isArray(value);}
+ function boundedText(value,max){return typeof value==='string'&&!!value.trim()&&value.length<=max;}
+ function finite(value){return typeof value==='number'&&Number.isFinite(value);}
+ function session(value){
+  if(!object(value)||!boundedText(value.id,128)||instruments.indexOf(value.instrument)<0||!boundedText(value.mode,40)||['complete','partial','stopped'].indexOf(value.status)<0||value.material!=null&&!material(value.material,false))return false;
+  if(!finite(value.startedAt)||!finite(value.endedAt)||value.startedAt<0||value.endedAt<value.startedAt||!Number.isFinite(new Date(value.endedAt).getTime())||!finite(value.engagedSeconds)||value.engagedSeconds<0||value.engagedSeconds>2678400||value.engagedSeconds>(value.endedAt-value.startedAt)/1000+.001)return false;
+  var keys=['expected','matched','missed','extra','wrong','timingSamples'];
+  if(keys.some(function(k){return value[k]!=null&&(!Number.isInteger(value[k])||value[k]<0||value[k]>1000000000);}))return false;
+  if((value.matched||0)+(value.missed||0)>(value.expected||0)||(value.wrong||0)>(value.extra||0)||(value.timingSamples||0)>(value.matched||0)||value.mode==='wait'&&(value.timingSamples||0)>0)return false;
+  var abs=value.sumAbsTimingMs==null?0:value.sumAbsTimingMs,signed=value.sumTimingMs==null?0:value.sumTimingMs;
+  if(!finite(abs)||abs<0||abs>1000000000000||!finite(signed)||Math.abs(signed)>abs+.000001||!(value.timingSamples||0)&&(abs!==0||signed!==0)||value.tempo!=null&&(!finite(value.tempo)||value.tempo<=0||value.tempo>1000))return false;
+  if(value.segments!=null){
+   if(!Array.isArray(value.segments)||value.segments.length>10000)return false;
+   var end=value.startedAt,sum=0;
+   if(value.segments.some(function(part){if(!object(part)||!finite(part.startedAt)||!finite(part.endedAt)||part.startedAt<end||part.endedAt<part.startedAt||part.endedAt>value.endedAt||!finite(part.engagedSeconds)||part.engagedSeconds<0||part.engagedSeconds>(part.endedAt-part.startedAt)/1000+.001)return true;end=part.endedAt;sum+=part.engagedSeconds;return false;}))return false;
+   // Canonical session-end allocations may legitimately have no timed segments.
+   if(value.segments.length&&Math.abs(sum-value.engagedSeconds)>.001)return false;
+  }
+  return true;
+ }
+ function material(value,libraryOnly){
+  if(!object(value))return false;
+  if(value.kind==='library')return boundedText(value.itemId,300)&&boundedText(value.revisionId,300);
+  return !libraryOnly&&value.kind==='legacy'&&(boundedText(value.id,300)||Number.isSafeInteger(value.id));
+ }
+ function materialEntry(value){return object(value)&&session(value.session)&&material(value.material,false)&&value.id===value.session.id&&value.sessionId===value.session.id;}
+ function pendingSchema(key,value){
+  if(!Array.isArray(value)||value.length>10000)return false;
+  var seen=new Set();
+  return value.every(function(entry){
+   var valid=key==='practice.material.pending.v1'?materialEntry(entry):key==='library.pending.v1'?object(entry)&&material(entry.material,true)&&session(entry.session):session(entry);
+   if(!valid)return false;var id=key==='practice.material.pending.v1'||key==='library.pending.v1'?entry.session.id:entry.id;if(seen.has(id))return false;seen.add(id);return true;
+  });
+ }
+ function lumiPreferences(value){return object(value)&&value.version===1&&['simulated','hardware'].indexOf(value.mode)>=0&&['inputId','outputId','synthOutputId'].every(function(k){return typeof value[k]==='string'&&value[k].length<=1000;})&&Number.isInteger(value.low)&&value.low>=0&&value.low<=104&&Number.isInteger(value.channel)&&value.channel>=0&&value.channel<16&&['note','major','minor'].indexOf(value.kind)>=0&&['guided','manual'].indexOf(value.flow)>=0;}
+ function materialSelection(value){
+  if(!object(value)||value.version!==1||!material(value.material,false)||instruments.indexOf(value.instrument)<0||['wait','tempo'].indexOf(value.mode)<0||!object(value.section)||!finite(value.section.startBeat)||value.section.startBeat<0||!finite(value.section.endBeat)||value.section.endBeat<=value.section.startBeat||value.section.endBeat>1000000)return false;
+  return !(value.tempo!=null&&(!finite(value.tempo)||value.tempo<=0||value.tempo>1000)||value.countIn!=null&&(!finite(value.countIn)||value.countIn<0||value.countIn>16)||value.transpose!=null&&(!finite(value.transpose)||!Number.isInteger(value.transpose))||value.section.loop!=null&&typeof value.section.loop!=='boolean'||value.inputKind!=null&&['midi','audio'].indexOf(value.inputKind)<0);
+ }
  function describe(key){return byKey[key]||{key:key,owner:/^midihub\./.test(key)?'MIDI Hub dynamic import':/^ws\.(best|ladder)\./.test(key)?'Woodshed dynamic scores':/^tr\.best\./.test(key)?'Trainer chord-pair scores':/^xp\./.test(key)?'Legacy / unassigned':'Unknown preserved extension',unknown:true};}
  function validate(key,value){
-  var errors=[];if(value===null)return {ok:true,errors:errors};
+  var errors=[];
+  if(pendingKeys.indexOf(key)>=0){if(!pendingSchema(key,value))errors.push('Unsupported '+key+' recovery schema. Original raw bytes are retained; export recovery before repair.');return {ok:!errors.length,errors:errors};}
+  if(key==='practice.material.sessions.v1'){
+   if(!object(value)||value.version!==1||!Array.isArray(value.sessions)||value.sessions.length>100000||value.sessions.some(function(entry){return !materialEntry(entry);})||new Set(value.sessions.map(function(entry){return entry.sessionId;})).size!==value.sessions.length)errors.push('Unsupported material history schema. Original raw bytes are retained; export recovery before repair.');
+   return {ok:!errors.length,errors:errors};
+  }
+  if(key==='lumi.practice.preferences.v1'||key==='practice.material.selection.v1'){
+   if(!(key==='lumi.practice.preferences.v1'?lumiPreferences(value):materialSelection(value)))errors.push('Unsupported '+key+' setup schema. Original raw bytes are retained; export recovery before repair.');
+   return {ok:!errors.length,errors:errors};
+  }
+  if(value===null)return {ok:true,errors:errors};
   if(enums[key]&&enums[key].indexOf(value)<0)errors.push('Unsupported '+key+' value.');
   if(booleans.indexOf(key)>=0&&typeof value!=='boolean')errors.push(key+' must be true or false.');
   if(arrays.indexOf(key)>=0&&!Array.isArray(value))errors.push(key+' must be an array.');

@@ -31,6 +31,7 @@
       if(window.PerformancePlayer){var p=PerformancePlayer.checkpoint();if(!p.ok)failed=failed.concat(errors(p,'Practice has unsaved results.'));}
       if(window.SLXP){SLXP.retryPending();if(SLXP.pending().length)failed.push('Lesson observations still need saving or export.');}
       if(App.practicePlan&&App.practicePlan.checkpoint){var plan=await App.practicePlan.checkpoint();if(!plan.ok)failed=failed.concat(errors(plan,'Teacher notes or draft changes have not saved.'));}
+      if(window.SLOMRReview&&SLOMRReview.checkpoint){var recognition=SLOMRReview.checkpoint();if(!recognition.ok)failed=failed.concat(errors(recognition,'Recognition evidence still needs saving or explicit discard.'));}
       if(window.SLScoreReview&&SLScoreReview.checkpoint){var score=await SLScoreReview.checkpoint();if(!score.ok)failed=failed.concat(errors(score,'Score edits have not saved.'));}
       if(window.SLMusicLibrary&&SLMusicLibrary.checkpoint){var library=await SLMusicLibrary.checkpoint();if(!library.ok)failed=failed.concat(errors(library,'The song library is still saving.'));}
       if(window.PracticeMaterial){var material=PracticeMaterial.checkpoint();if(!material.ok)failed=failed.concat(errors(material,'Material history has not saved.'));}

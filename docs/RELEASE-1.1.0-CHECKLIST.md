@@ -16,6 +16,10 @@ are preserved. APK channel 0.75.0 and native binaries are unchanged.
   practice history, section/setup resume and reversible removal.
 - Offline PDF.js viewer, editable note/chord/rest targets and explicit review
   before guided practice. The existing strict structured importers are reused.
+- Actual browser-local recognition for selected monophonic staff regions,
+  with staff selection/reading order, cancellation, raw model evidence,
+  source anchors and correction drafts. Parsed predictions are retained;
+  every target and its rhythm remain unverified until explicit review.
 - One material launch seam into the existing Wait/Tempo engine, palette, LUMI
   ownership and canonical instrument ledger. Unknown rhythm is Wait-only.
   An arpeggio adaptation has distinct provenance and is not original-chord
@@ -35,29 +39,36 @@ are preserved. APK channel 0.75.0 and native binaries are unchanged.
 ## Gates
 
 - [ ] All final local applicable suites against the frozen candidate.
-- [ ] Independent reviews complete; all demonstrated blockers fixed and rerun.
-- [ ] Desktop/phone, light/dark, keyboard/touch and offline/upgrade evidence.
-- [ ] Exact changed files, provenance, vendor licenses and secret review.
-- [ ] Actual automatic PDF notation recognition, review/correction and practice
+- [x] Independent reviews complete; all demonstrated blockers fixed and rerun.
+- [x] Desktop/phone, light/dark, keyboard/touch and offline/upgrade evidence.
+- [x] Exact changed files, provenance, vendor licenses and secret review.
+- [x] Actual automatic PDF notation recognition, review/correction and practice
       integration, with a hash-bound original-score corpus and explicit limits.
+- [ ] Confirm the material scope of the measured monophonic recognition path;
+      general piano/polyphonic/multistaff/scanned PDF recognition is not supplied.
 - [ ] Public review/hosted CI and final publication authorization verified.
 - [ ] Exact final remote source, immutable version tag and public asset checks.
 
 ## Explicit limits and release decision
 
 **Automatic optical music recognition is required for this release.** The
-user confirmed this requirement on 2026-10-23. The release remains held while
-the actual local recognition path is integrated and evaluated. PDF.js renders
+user confirmed this requirement on 2026-10-23. The bounded local recognition path
+is integrated and evaluated; the release remains held for final regression and
+the material scope decision. PDF.js renders
 pages; it does not recognize notation. Manual targets and structured imports
 are useful existing paths, but do not satisfy the recognition gate.
 
 An eligible MIT-licensed, public-domain-trained staff-line model has run in a
 local browser worker using ONNX Runtime Web. Only that model is eligible for
 this candidate; the separately supplied noncommercial model is excluded.
-Initial trials found pitch/duration errors and unsupported layouts. These
-trials are development evidence, not final accuracy claims. The frozen corpus
-must be rerun with exact image/model hashes and separate supported and
-unsupported cases. All recognized targets must remain unverified until the
+The final selected-region run used 20 original compositions with clean and
+synthetically degraded variants: 32 supported monophonic cases and eight
+unsupported cases retained separately. All 312 expected pitched notes and
+12 rests matched in the supported cases, but ten note durations and 37 onsets
+were incorrect. Only 20/32 supported cases had an exact musical event sequence.
+See [the hash-bound evaluation and all failures](OMR-VALIDATION.md); this is not
+a general accuracy or independent-song generalization percentage.
+All recognized targets remain unverified until the
 user checks and corrects them. No arbitrary PDF, polyphonic piano score or
 scan reliability claim is permitted without corresponding evidence.
 
@@ -65,6 +76,19 @@ Separate CPU evaluations of homr and Audiveris demonstrate another real
 recognition path, but those Python/Java programs cannot run unchanged on the
 existing static deployment. They are evaluation tools, not a deployed backend.
 No private score upload, paid service, new hosting or credentials are included.
+The shipped MIT model/runtime total approximately 21 MB, cached as same-origin
+app assets during online installation. Actual inference starts deliberately and
+works offline after a complete asset cache. No runtime CDN or external account
+is required. The separate CPU engines are not bundled or deployed.
+
+Recognition currently selects up to four consecutive monophonic staff regions
+from one page at a time, with an explicit reading-order acknowledgement. It does
+not align simultaneous hands/parts or assemble a whole multipage song. Repeats
+can be silently omitted by the model; block chords can be rejected or misread.
+Mandatory source comparison and explicit review prevent those raw predictions
+from automatically becoming scored practice. General whole-score recognition
+would need a substantially broader browser engine or a separately approved
+companion/service with runtime, license, privacy and deployment decisions.
 
 The MusicXML subset rejects unsupported multi-voice/repeat/tuplet notation
 instead of inventing a score; MIDI uses the existing constant-tempo practice

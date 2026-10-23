@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "id": "05-treble-rests",
+  "originalComposition": true,
+  "truthOrigin": "authored-composition-events-before-rendering",
+  "label": "Treble: quarter and half rests, whole note",
+  "tags": [
+    "treble",
+    "rest",
+    "half",
+    "whole"
+  ],
+  "parts": [
+    {
+      "id": "P1",
+      "clef": "treble",
+      "keyFifths": 0,
+      "meter": {
+        "beats": 4,
+        "beatType": 4
+      },
+      "events": [
+        {
+          "type": "rest",
+          "partId": "P1",
+          "measure": 1,
+          "onsetBeats": 0,
+          "durationBeats": 1,
+          "midi": null
+        },
+        {
+          "type": "note",
+          "pitch": "D4",
+          "partId": "P1",
+          "measure": 1,
+          "onsetBeats": 1,
+          "durationBeats": 1,
+          "midi": 62
+        },
+        {
+          "type": "rest",
+          "partId": "P1",
+          "measure": 1,
+          "onsetBeats": 2,
+          "durationBeats": 2,
+          "midi": null
+        },
+        {
+          "type": "note",
+          "pitch": "G4",
+          "partId": "P1",
+          "measure": 2,
+          "onsetBeats": 4,
+          "durationBeats": 4,
+          "midi": 67
+        }
+      ],
+      "playback": [
+        {
+          "midi": 62,
+          "pitch": "D4",
+          "onsetBeats": 1,
+          "durationBeats": 1
+        },
+        {
+          "midi": 67,
+          "pitch": "G4",
+          "onsetBeats": 4,
+          "durationBeats": 4
+        }
+      ],
+      "lengthBeats": 8
+    }
+  ],
+  "repeat": null,
+  "repeatExpanded": false,
+  "tempoVisible": false,
+  "tempoBpm": null,
+  "unsupportedForInitialSingleVoiceModel": [],
+  "acceptance": "candidate-for-human-review"
+}

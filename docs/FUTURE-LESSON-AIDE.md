@@ -1,6 +1,9 @@
-# Deferred lesson aide
+# Lesson aide scope
 
-Discussion only; not a SoundLab 1.0.0 release gate or implemented integration.
+Not a SoundLab 1.0.0 release gate. The bounded pasted-text workflow was later
+authorized and implemented in the separate 1.1 candidate; see
+[teacher drafts](TEACHER-DRAFTS.md). Direct Google Docs integration remains
+deferred. The following records the original design discussion.
 The user suggested a teacher Google Doc or text instructions,
 and accepted deferring complexity. No Google OAuth, credentials or document
 access is introduced in this work.

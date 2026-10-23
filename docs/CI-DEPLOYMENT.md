@@ -134,6 +134,13 @@ The managed cloud browser previously blocked two existing update-suite
 does not skip or rewrite them, change browser policy, or treat them as passed.
 GitHub-hosted Chromium must run those cases through the ordinary full suite.
 
+For local diagnostics, `SL_UPDATE_HTTP_ONLY=1` now runs the six ordinary HTTP
+web/shell feed cases without attempting either denied file navigation. The test
+prints `HTTP SUBSET PASS` and explicitly leaves both bundled-file cases unrun.
+Hosted/default CI does not set this variable and retains both original cases.
+The separate `update-persistence` and `omr-offline` suites use actual local HTTP
+service workers and IndexedDB; they do not substitute for bundled-file behavior.
+
 MIDI/device tests use simulated ports and audio fixtures. They do not verify a
 physical LUMI program, RGB appearance, octave alignment, Local Control, external
 synth sound or real microphone/instrument performance. See

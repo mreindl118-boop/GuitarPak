@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "id": "13-treble-tie",
+  "originalComposition": true,
+  "truthOrigin": "authored-composition-events-before-rendering",
+  "label": "Treble: tied half plus quarter",
+  "tags": [
+    "treble",
+    "tie",
+    "duration"
+  ],
+  "parts": [
+    {
+      "id": "P1",
+      "clef": "treble",
+      "keyFifths": 0,
+      "meter": {
+        "beats": 4,
+        "beatType": 4
+      },
+      "events": [
+        {
+          "type": "note",
+          "pitch": "E4",
+          "tie": "start",
+          "partId": "P1",
+          "measure": 1,
+          "onsetBeats": 0,
+          "durationBeats": 2,
+          "midi": 64
+        },
+        {
+          "type": "note",
+          "pitch": "E4",
+          "tie": "stop",
+          "partId": "P1",
+          "measure": 1,
+          "onsetBeats": 2,
+          "durationBeats": 1,
+          "midi": 64
+        },
+        {
+          "type": "note",
+          "pitch": "G4",
+          "partId": "P1",
+          "measure": 1,
+          "onsetBeats": 3,
+          "durationBeats": 1,
+          "midi": 67
+        }
+      ],
+      "playback": [
+        {
+          "midi": 64,
+          "pitch": "E4",
+          "onsetBeats": 0,
+          "durationBeats": 3
+        },
+        {
+          "midi": 67,
+          "pitch": "G4",
+          "onsetBeats": 3,
+          "durationBeats": 1
+        }
+      ],
+      "lengthBeats": 4
+    }
+  ],
+  "repeat": null,
+  "repeatExpanded": false,
+  "tempoVisible": false,
+  "tempoBpm": null,
+  "unsupportedForInitialSingleVoiceModel": [],
+  "acceptance": "candidate-for-human-review"
+}

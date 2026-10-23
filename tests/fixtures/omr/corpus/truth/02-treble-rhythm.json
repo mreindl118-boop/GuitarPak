@@ -1,0 +1,95 @@
+{
+  "schemaVersion": 1,
+  "id": "02-treble-rhythm",
+  "originalComposition": true,
+  "truthOrigin": "authored-composition-events-before-rendering",
+  "label": "Treble: quarter, two eighths and half",
+  "tags": [
+    "treble",
+    "quarter",
+    "eighth",
+    "half"
+  ],
+  "parts": [
+    {
+      "id": "P1",
+      "clef": "treble",
+      "keyFifths": 0,
+      "meter": {
+        "beats": 4,
+        "beatType": 4
+      },
+      "events": [
+        {
+          "type": "note",
+          "pitch": "C4",
+          "partId": "P1",
+          "measure": 1,
+          "onsetBeats": 0,
+          "durationBeats": 1,
+          "midi": 60
+        },
+        {
+          "type": "note",
+          "pitch": "E4",
+          "partId": "P1",
+          "measure": 1,
+          "onsetBeats": 1,
+          "durationBeats": 0.5,
+          "midi": 64
+        },
+        {
+          "type": "note",
+          "pitch": "G4",
+          "partId": "P1",
+          "measure": 1,
+          "onsetBeats": 1.5,
+          "durationBeats": 0.5,
+          "midi": 67
+        },
+        {
+          "type": "note",
+          "pitch": "A4",
+          "partId": "P1",
+          "measure": 1,
+          "onsetBeats": 2.0,
+          "durationBeats": 2,
+          "midi": 69
+        }
+      ],
+      "playback": [
+        {
+          "midi": 60,
+          "pitch": "C4",
+          "onsetBeats": 0,
+          "durationBeats": 1
+        },
+        {
+          "midi": 64,
+          "pitch": "E4",
+          "onsetBeats": 1,
+          "durationBeats": 0.5
+        },
+        {
+          "midi": 67,
+          "pitch": "G4",
+          "onsetBeats": 1.5,
+          "durationBeats": 0.5
+        },
+        {
+          "midi": 69,
+          "pitch": "A4",
+          "onsetBeats": 2.0,
+          "durationBeats": 2
+        }
+      ],
+      "lengthBeats": 4
+    }
+  ],
+  "repeat": null,
+  "repeatExpanded": false,
+  "tempoVisible": false,
+  "tempoBpm": null,
+  "unsupportedForInitialSingleVoiceModel": [],
+  "acceptance": "candidate-for-human-review"
+}

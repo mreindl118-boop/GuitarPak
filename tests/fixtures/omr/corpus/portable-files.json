@@ -1,0 +1,476 @@
+{
+  "schemaVersion": 1,
+  "frozenManifestSha256": "22a4115cd19e126cd69125b1a9f93ee7e4032cfd2fd087d388e0ccbeb2b5e4f6",
+  "files": [
+    {
+      "path": "17-page-treble-quarters-clean.pdf",
+      "bytes": 67416,
+      "sha256": "4ee35529c94362f92b100048818a2ad43670a719141977b90da8ab8909b680bb"
+    },
+    {
+      "path": "17-page-treble-quarters.truth.json",
+      "bytes": 11095,
+      "sha256": "2aefaabe1cacb0a94525666912b49f872351acac765fcfa9da35653a2e83af9e"
+    },
+    {
+      "path": "PORTABLE-CORPUS.md",
+      "bytes": 5154,
+      "sha256": "223cb142b2eea95426cfebc39d8a6e4adad45e2fd181a0deb51837923d063488"
+    },
+    {
+      "path": "README.md",
+      "bytes": 817,
+      "sha256": "e2f4c10cc0396455a8050b8185454f205e7da71498b09336c069143b91d21707"
+    },
+    {
+      "path": "evaluate.py",
+      "bytes": 17848,
+      "sha256": "9b8c3b93cb009941f1a09005523324de8443fc7b730dc9857b1184142396271a"
+    },
+    {
+      "path": "freeze.json",
+      "bytes": 24945,
+      "sha256": "b6ea5afee974abb2fa7e0c4198782666be6d1459452184c653be33d45665d8de"
+    },
+    {
+      "path": "generate.py",
+      "bytes": 15192,
+      "sha256": "a870881c34c21f4c2daa29f8daa86f95a13565461dc67106fb9d9eebab989a8d"
+    },
+    {
+      "path": "images/01-treble-quarters-clean.png",
+      "bytes": 8860,
+      "sha256": "c43724e7d9f0360aa002c4ed45f8d431a47425f4decabb56b63de078b352146b"
+    },
+    {
+      "path": "images/01-treble-quarters-scan.png",
+      "bytes": 31230,
+      "sha256": "82290cfe0b9c06fe8844d1bc48c45f158e3a266341fc14958878f0ff3c52d9ba"
+    },
+    {
+      "path": "images/02-treble-rhythm-clean.png",
+      "bytes": 11072,
+      "sha256": "9415124c9d47e516a3f0ebf290402d111e39d1e861a799b47e3d1ccd0e4d2d89"
+    },
+    {
+      "path": "images/02-treble-rhythm-scan.png",
+      "bytes": 33855,
+      "sha256": "d310abf939d64f7e82c1e1f9dd7a5266ec081fe8de1cd6da2da0ed362e1ce7a3"
+    },
+    {
+      "path": "images/03-bass-quarters-clean.png",
+      "bytes": 6527,
+      "sha256": "7550ae06d8a30565029845b6127dc6fa7884b1b8e21683becfddd22b4ff9bbc3"
+    },
+    {
+      "path": "images/03-bass-quarters-scan.png",
+      "bytes": 29645,
+      "sha256": "e64845685c41cd7c05b6bb9a15450db09a9ac9af56c7b9c31d2bab125f637b85"
+    },
+    {
+      "path": "images/04-bass-rhythm-clean.png",
+      "bytes": 7011,
+      "sha256": "8821231d821480355511447694e3b192a2be0ace2ee919c9600f2632aae2544c"
+    },
+    {
+      "path": "images/04-bass-rhythm-scan.png",
+      "bytes": 26974,
+      "sha256": "c1b08e1de534cf93cf338e729b23b0c0b34945389398ab85ab7ed7e84285bb1a"
+    },
+    {
+      "path": "images/05-treble-rests-clean.png",
+      "bytes": 10535,
+      "sha256": "8b422ae4a000788de4effd211f85c97dec2fc6b928df98f487c8caee0dcfeb12"
+    },
+    {
+      "path": "images/05-treble-rests-scan.png",
+      "bytes": 35370,
+      "sha256": "7151dbf3fcae6063d8f910f9f4cd1dffaf33362698a4979038ce79c1a637b2ea"
+    },
+    {
+      "path": "images/06-bass-rests-clean.png",
+      "bytes": 9447,
+      "sha256": "b7501986da394ef1c5e39d21ee6c47e7b23b85db3db7eabbec2c3924f9762125"
+    },
+    {
+      "path": "images/06-bass-rests-scan.png",
+      "bytes": 40163,
+      "sha256": "5e10b5b4a90b26f81aecc06616b5f3edc5349d132ca6f061a25d769742301b1b"
+    },
+    {
+      "path": "images/07-treble-eighths-clean.png",
+      "bytes": 12193,
+      "sha256": "e438a9c2769ccc1471542126a566d9e1e86dde3f54ddf386461fdd9f0c524917"
+    },
+    {
+      "path": "images/07-treble-eighths-scan.png",
+      "bytes": 44465,
+      "sha256": "0e51e615a546e46ce56363ddf6e9ce908314f94db55eb492f118955756c91c28"
+    },
+    {
+      "path": "images/08-treble-dotted-clean.png",
+      "bytes": 10104,
+      "sha256": "7863af8218e9f415130826cfa10cbbf86ddb79b9f79151fad3cd104d12a48f32"
+    },
+    {
+      "path": "images/08-treble-dotted-scan.png",
+      "bytes": 32566,
+      "sha256": "2045937307a2c85beffc8d57b5d75c2574492f8f1a83988da6f35183cee93c0f"
+    },
+    {
+      "path": "images/09-treble-accidentals-clean.png",
+      "bytes": 10590,
+      "sha256": "faf5e40cb6357caee93152d1b1b9b29b29a203b71269d8640a3ad835da577de1"
+    },
+    {
+      "path": "images/09-treble-accidentals-scan.png",
+      "bytes": 34587,
+      "sha256": "23f93c5020bd7ace2ad439b02a20a2bf351c53047868543869b4221bd90f1c72"
+    },
+    {
+      "path": "images/10-treble-key-d-clean.png",
+      "bytes": 10173,
+      "sha256": "d65142c425c19b9f6092236a1a70b2180b5ef172cd37b754c94171ee5fe82e61"
+    },
+    {
+      "path": "images/10-treble-key-d-scan.png",
+      "bytes": 35336,
+      "sha256": "7fda1e15737fee26b7d43bcf8e3ceb1e7fbcc8713613bbbca268369a30eefaf1"
+    },
+    {
+      "path": "images/11-bass-key-eb-clean.png",
+      "bytes": 8041,
+      "sha256": "c9a6afa8a37824691b834758c507cc6ad74dd3961c9ea0a8d2d205c5048e2248"
+    },
+    {
+      "path": "images/11-bass-key-eb-scan.png",
+      "bytes": 35457,
+      "sha256": "2518e313107e74acb734b625c5a702298467b73a0ce91b8ee42a5fab004e143d"
+    },
+    {
+      "path": "images/12-treble-chords-clean.png",
+      "bytes": 9601,
+      "sha256": "f4b2409aea7e723b5ac1616828fbbc3603b6b7d13fe248eccc826427b07e3f11"
+    },
+    {
+      "path": "images/12-treble-chords-scan.png",
+      "bytes": 27763,
+      "sha256": "bb811a49a8a7a6f559064bd60dab1cae3c083dc3664b4a49d487d4ca59e99f47"
+    },
+    {
+      "path": "images/13-treble-tie-clean.png",
+      "bytes": 9532,
+      "sha256": "609f13975f3e924f3c91c4f1eda4cfc0233fa5576ba67f7e0636f80cd54bc354"
+    },
+    {
+      "path": "images/13-treble-tie-scan.png",
+      "bytes": 29156,
+      "sha256": "118ba9b7c9d78cce2babe1e0bb824c56859e06a1187d7a9b78bfc3fe6686a5e9"
+    },
+    {
+      "path": "images/14-repeat-bars-clean.png",
+      "bytes": 12427,
+      "sha256": "eee1b767c867bac321a46be0a74b89a21980beefdc9b8df824f6d8ea69532b27"
+    },
+    {
+      "path": "images/14-repeat-bars-scan.png",
+      "bytes": 48335,
+      "sha256": "99aa401e48bc17381bf1e7897d103685f6c49a377db537023335505959ef43cd"
+    },
+    {
+      "path": "images/15-two-parts-clean.png",
+      "bytes": 15843,
+      "sha256": "fbb97a0452ddcbe6d15a793a20118b5a0677674a2d25f1e6ad64f6e6abb39c15"
+    },
+    {
+      "path": "images/15-two-parts-scan.png",
+      "bytes": 52309,
+      "sha256": "09238dd085848256568d7c5be9404ebfca37f1405db14a8451fc1224d8625722"
+    },
+    {
+      "path": "images/16-treble-triplet-clean.png",
+      "bytes": 13229,
+      "sha256": "75862a2f6777c6ef42ffa0abd557880a480821134eae38dff867936e79bc9f8c"
+    },
+    {
+      "path": "images/16-treble-triplet-scan.png",
+      "bytes": 41343,
+      "sha256": "f09b298f5ed910b13605bd9e9b27af9980706b2a1d04e8ee18df237d11ed50c7"
+    },
+    {
+      "path": "images/17-page-treble-quarters-clean.png",
+      "bytes": 34467,
+      "sha256": "961866dcced5926de7e4d8f7d38659aa24f4055c54febd63f7bfe541af797e0d"
+    },
+    {
+      "path": "images/17-page-treble-quarters-scan.png",
+      "bytes": 225191,
+      "sha256": "0e49415ef34f10bd80317e4ce3bf3765f2f8fad371d5ba3e123e2d5ea0aa062b"
+    },
+    {
+      "path": "images/18-page-bass-quarters-clean.png",
+      "bytes": 28973,
+      "sha256": "043943060205607f33ba538b10c0e99fbcb3f8958557d7473504cfe26ded4e56"
+    },
+    {
+      "path": "images/18-page-bass-quarters-scan.png",
+      "bytes": 221842,
+      "sha256": "4006dd6f41e33934dbf0100336d8c750177fda851537a9e3cf8f1ba20d08f8d1"
+    },
+    {
+      "path": "images/19-page-treble-rhythm-clean.png",
+      "bytes": 27660,
+      "sha256": "cf3991b616e816f4763d589a178061a8378972290c562235b7165e6807536c27"
+    },
+    {
+      "path": "images/19-page-treble-rhythm-scan.png",
+      "bytes": 126640,
+      "sha256": "92bfb3fe228cd97929829ee3f7c32da39ec1bf3ad1a926469b6966f977f59b33"
+    },
+    {
+      "path": "images/20-page-bass-key-eb-clean.png",
+      "bytes": 31798,
+      "sha256": "0620652fb8f58bd170f716c4c0d055bbb5eb14f4e76b4714758126fdcd27fb2c"
+    },
+    {
+      "path": "images/20-page-bass-key-eb-scan.png",
+      "bytes": 221087,
+      "sha256": "645d5f26fca90cb1c0b21d1c81a0fc7389ff7afd4cf6ddc34b6cea0324663a1e"
+    },
+    {
+      "path": "images-only.json",
+      "bytes": 11136,
+      "sha256": "8dbe3ade19361068e8fd80b8a5f59bebd72b2b71e358d7ac7a9e24ea5cb3bd00"
+    },
+    {
+      "path": "licenses/Verovio-COPYING",
+      "bytes": 35148,
+      "sha256": "8b1ba204bb69a0ade2bfcf65ef294a920f6bb361b317dba43c7ef29d96332b9b"
+    },
+    {
+      "path": "licenses/Verovio-COPYING.LESSER",
+      "bytes": 7651,
+      "sha256": "a5681bf9b05db14d86776930017c647ad9e6e56ff6bbcfdf21e5848288dfaf1b"
+    },
+    {
+      "path": "licenses/cairosvg-2.8.2.dist-info-LICENSE",
+      "bytes": 7650,
+      "sha256": "ea8af5e789cb2d4e9b10bce3874982ade163b749b6bfbdb32e2df21c4d106de1"
+    },
+    {
+      "path": "licenses/pillow-13.0.0.dist-info-LICENSE",
+      "bytes": 70307,
+      "sha256": "dda12a98c1979cf3d94df1cff45d27a4cb3f04a60c76f76902ac54cac03ec0ce"
+    },
+    {
+      "path": "manifest.json",
+      "bytes": 33659,
+      "sha256": "22a4115cd19e126cd69125b1a9f93ee7e4032cfd2fd087d388e0ccbeb2b5e4f6"
+    },
+    {
+      "path": "portable-inputs.json",
+      "bytes": 9222,
+      "sha256": "f425c0b033a96daa0d93a72e8137c2e1908bd5e6d4f771d43bd95df4072fca4f"
+    },
+    {
+      "path": "sources/01-treble-quarters.musicxml",
+      "bytes": 967,
+      "sha256": "ce4862a0e6dbac06a58fa6ba06a0d8386595a02916efb24b05ccb6897dab3dc6"
+    },
+    {
+      "path": "sources/02-treble-rhythm.musicxml",
+      "bytes": 960,
+      "sha256": "c16d9d0bc38388af4764b0278df3114d023d3952dcd5fd7b1e21b49070203da7"
+    },
+    {
+      "path": "sources/03-bass-quarters.musicxml",
+      "bytes": 967,
+      "sha256": "3177f76f95a5c45c5bfafdddf42220f1e5146460ddfb5c1978c080015872f26e"
+    },
+    {
+      "path": "sources/04-bass-rhythm.musicxml",
+      "bytes": 829,
+      "sha256": "e2427cdb93c9e4604090c4c6c4160d9e8418badf3847a32219fb73612be0bc64"
+    },
+    {
+      "path": "sources/05-treble-rests.musicxml",
+      "bytes": 880,
+      "sha256": "17f2c0ae2233321026868510aff9008da075d25112d014ac5d1b732a8e4cebd1"
+    },
+    {
+      "path": "sources/06-bass-rests.musicxml",
+      "bytes": 1149,
+      "sha256": "053fb2202e6605bc79c87b5898178ee0418a2b7c486d352777bf088c302aa23f"
+    },
+    {
+      "path": "sources/07-treble-eighths.musicxml",
+      "bytes": 1731,
+      "sha256": "17c6ea148598ac56a98913d72ea9f30df99182ca4e1ceec32bdab89e1b40b9d4"
+    },
+    {
+      "path": "sources/08-treble-dotted.musicxml",
+      "bytes": 971,
+      "sha256": "d179d586f60558da746d99335713f119d730a81dbcf4062d305cad693f9b6eff"
+    },
+    {
+      "path": "sources/09-treble-accidentals.musicxml",
+      "bytes": 1091,
+      "sha256": "2a742773ddbb4b344aad068b7f7cb2d33b84a169ae0d0f0eeb20c2642ecff8c9"
+    },
+    {
+      "path": "sources/10-treble-key-d.musicxml",
+      "bytes": 967,
+      "sha256": "59292e963945959a4cbe53298862dec00866ecc6769d3847a60d73d9d0a86eed"
+    },
+    {
+      "path": "sources/11-bass-key-eb.musicxml",
+      "bytes": 970,
+      "sha256": "f97a6d4e8fa773f513a504a3c8833b4efd0a98ca369317f20ce76e452251574a"
+    },
+    {
+      "path": "sources/12-treble-chords.musicxml",
+      "bytes": 1251,
+      "sha256": "ded173fbf4ee7688fff7e959086d68dfb62b2f21f76644df2ebdcc3d9b4d1f8a"
+    },
+    {
+      "path": "sources/13-treble-tie.musicxml",
+      "bytes": 951,
+      "sha256": "ebef29a1c59ec6e646baa4598f4866e7e92f35e032510416a426a575971827b4"
+    },
+    {
+      "path": "sources/14-repeat-bars.musicxml",
+      "bytes": 1401,
+      "sha256": "8ba467727b0c586ecf896178c72be4aa0a87f009ad9c2aad7eb8546fdc20f448"
+    },
+    {
+      "path": "sources/15-two-parts.musicxml",
+      "bytes": 1412,
+      "sha256": "4c7f3524b0924286e8b62a2d5a679316e266f6b531885dfede8b56edc82aa137"
+    },
+    {
+      "path": "sources/16-treble-triplet.musicxml",
+      "bytes": 1766,
+      "sha256": "394e6c160edf42d732a9b59650d920ecb506e7b036f54510d536f3bfe02e6d59"
+    },
+    {
+      "path": "sources/17-page-treble-quarters.musicxml",
+      "bytes": 4957,
+      "sha256": "3fb2021e2a113d37a9eb043e103ea64f6f2d53f786f57bc475b81637876cb67a"
+    },
+    {
+      "path": "sources/18-page-bass-quarters.musicxml",
+      "bytes": 4957,
+      "sha256": "2d837dce9a619d85da29449e2f274eb4e5159c5aebf7fa5c97a8c3e3407c487a"
+    },
+    {
+      "path": "sources/19-page-treble-rhythm.musicxml",
+      "bytes": 3607,
+      "sha256": "9387daa6bc77674cc180f912d6a4b8232d4711fb5e01fccfc120fb2aa2677288"
+    },
+    {
+      "path": "sources/20-page-bass-key-eb.musicxml",
+      "bytes": 3875,
+      "sha256": "85947547b4d94905ddfc704a0a32c24838b28fafe91882bf103a0092b93beb6e"
+    },
+    {
+      "path": "truth/01-treble-quarters.json",
+      "bytes": 1980,
+      "sha256": "cfdbf98cc8b6eceffe3765551d34afcaad1284e2c2d0b78e191c8a14fcb6682a"
+    },
+    {
+      "path": "truth/02-treble-rhythm.json",
+      "bytes": 2006,
+      "sha256": "db5b79ee8a06a4601626c5856f94a4fdf4e6399d0d5a11d0358a542df60995ee"
+    },
+    {
+      "path": "truth/03-bass-quarters.json",
+      "bytes": 1972,
+      "sha256": "429d472ca4a92e6a3ef5f4a006a6cbeb431a0b68fe45a041897e680363950f1c"
+    },
+    {
+      "path": "truth/04-bass-rhythm.json",
+      "bytes": 1636,
+      "sha256": "9ba916f3f1795366af6258455639d05f68a60d3a1dfbbf6208250639bbba504a"
+    },
+    {
+      "path": "truth/05-treble-rests.json",
+      "bytes": 1696,
+      "sha256": "aad9de76743821a2ed14741cd428cc201a636d5779d00198174fc6027947c545"
+    },
+    {
+      "path": "truth/06-bass-rests.json",
+      "bytes": 2315,
+      "sha256": "633f910dba622f843f8182a9f567849fc17a1fe705c041bc34203b217e85f805"
+    },
+    {
+      "path": "truth/07-treble-eighths.json",
+      "bytes": 3548,
+      "sha256": "372be138dee1d883deebcd3c46d386e6749ef1d8624dc4fa0ddd39baccfb1f9f"
+    },
+    {
+      "path": "truth/08-treble-dotted.json",
+      "bytes": 1993,
+      "sha256": "d34d0921ba52d2dfca6cc8fbe2e207b207bd03242571556c1ea6a22e22c9073a"
+    },
+    {
+      "path": "truth/09-treble-accidentals.json",
+      "bytes": 2132,
+      "sha256": "b3c8beeedb35b88f707ca73555bf93a5503b17415b5c1ae07ddf48c378280f64"
+    },
+    {
+      "path": "truth/10-treble-key-d.json",
+      "bytes": 1980,
+      "sha256": "e1e6f88d15c20ca7ad3b9b0511255d1305b6d2345af07dcb7f699622134f315c"
+    },
+    {
+      "path": "truth/11-bass-key-eb.json",
+      "bytes": 1974,
+      "sha256": "8646487d2c4e5ea3794cb763ce4a74901481541cd52244e88d440a73b6bc9711"
+    },
+    {
+      "path": "truth/12-treble-chords.json",
+      "bytes": 2658,
+      "sha256": "740cc9e5ec9efcccef13b895c734580816731f996181c6cb668dbaa7961f7939"
+    },
+    {
+      "path": "truth/13-treble-tie.json",
+      "bytes": 1569,
+      "sha256": "69993d7bb044824e7028fda16719d9ecab91a506c1fdafaae55c2da2c8c5393b"
+    },
+    {
+      "path": "truth/14-repeat-bars.json",
+      "bytes": 2743,
+      "sha256": "2909b38ddf1e9854eec6052f13e28b94ab0b2eef64546f0c5ef9ab9e02975cd1"
+    },
+    {
+      "path": "truth/15-two-parts.json",
+      "bytes": 2595,
+      "sha256": "2ff2372acce672a7e44b700c4e56559323dcd868e1bad8639868b75ba6fc7ce9"
+    },
+    {
+      "path": "truth/16-treble-triplet.json",
+      "bytes": 2945,
+      "sha256": "0d4d3c9ab565959c7319c45f3bdf049139883a00f6d70a725843ede5767599cd"
+    },
+    {
+      "path": "truth/17-page-treble-quarters.json",
+      "bytes": 11095,
+      "sha256": "2aefaabe1cacb0a94525666912b49f872351acac765fcfa9da35653a2e83af9e"
+    },
+    {
+      "path": "truth/18-page-bass-quarters.json",
+      "bytes": 11087,
+      "sha256": "331282d47c37ea12e8de77eb462439c5052fcce903a255ff875c68f2436696f0"
+    },
+    {
+      "path": "truth/19-page-treble-rhythm.json",
+      "bytes": 7961,
+      "sha256": "83c26a102072b6dd5792dc49a0565121843f8b377168140182adf5bb640935d5"
+    },
+    {
+      "path": "truth/20-page-bass-key-eb.json",
+      "bytes": 8549,
+      "sha256": "dc994768e672946a61520d7bf63bd2d61e4981998568e4573ed622e74eee26e1"
+    }
+  ]
+}

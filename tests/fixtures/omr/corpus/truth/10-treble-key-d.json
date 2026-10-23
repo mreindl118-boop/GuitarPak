@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "id": "10-treble-key-d",
+  "originalComposition": true,
+  "truthOrigin": "authored-composition-events-before-rendering",
+  "label": "Treble: two-sharp key signature",
+  "tags": [
+    "treble",
+    "key-signature",
+    "sharp"
+  ],
+  "parts": [
+    {
+      "id": "P1",
+      "clef": "treble",
+      "keyFifths": 2,
+      "meter": {
+        "beats": 4,
+        "beatType": 4
+      },
+      "events": [
+        {
+          "type": "note",
+          "pitch": "F#4",
+          "partId": "P1",
+          "measure": 1,
+          "onsetBeats": 0,
+          "durationBeats": 1,
+          "midi": 66
+        },
+        {
+          "type": "note",
+          "pitch": "G4",
+          "partId": "P1",
+          "measure": 1,
+          "onsetBeats": 1,
+          "durationBeats": 1,
+          "midi": 67
+        },
+        {
+          "type": "note",
+          "pitch": "A4",
+          "partId": "P1",
+          "measure": 1,
+          "onsetBeats": 2,
+          "durationBeats": 1,
+          "midi": 69
+        },
+        {
+          "type": "note",
+          "pitch": "C#5",
+          "partId": "P1",
+          "measure": 1,
+          "onsetBeats": 3,
+          "durationBeats": 1,
+          "midi": 73
+        }
+      ],
+      "playback": [
+        {
+          "midi": 66,
+          "pitch": "F#4",
+          "onsetBeats": 0,
+          "durationBeats": 1
+        },
+        {
+          "midi": 67,
+          "pitch": "G4",
+          "onsetBeats": 1,
+          "durationBeats": 1
+        },
+        {
+          "midi": 69,
+          "pitch": "A4",
+          "onsetBeats": 2,
+          "durationBeats": 1
+        },
+        {
+          "midi": 73,
+          "pitch": "C#5",
+          "onsetBeats": 3,
+          "durationBeats": 1
+        }
+      ],
+      "lengthBeats": 4
+    }
+  ],
+  "repeat": null,
+  "repeatExpanded": false,
+  "tempoVisible": false,
+  "tempoBpm": null,
+  "unsupportedForInitialSingleVoiceModel": [],
+  "acceptance": "candidate-for-human-review"
+}

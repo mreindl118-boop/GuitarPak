@@ -1,4 +1,5 @@
-/* Local source viewing and reviewed practice targets. No recognition or audio/MIDI writer.
+/* Local source viewing and reviewed practice targets. Optional local recognition
+ * produces unverified derivatives; this module is never an audio/MIDI writer.
  * Structured notation uses the selectively recovered SLScore format; source bytes and
  * immutable revisions belong to SLMusicLibrary. PDF.js is pinned in vendor/pdfjs. */
 (function () {
@@ -6,6 +7,7 @@
   var root, config = {}, item = null, original = null, revision = null, editor = null, notation = null, sourceScore = null;
   var dirty = false, busy = false, busyCount = 0, token = 0, pdf = null, renderTask = null, imageURL = null, pdfModule;
   var pageNumber = 1, pageCount = 1, zoom = 1, opened = false, serial = 0, editGeneration = 0;
+  var recognitionTool = null, recognitionRenders = new Set();
   var INSTRUMENTS = ['piano','synth','guitar','bass','drums','voice','other'];
   function clone(x) { return JSON.parse(JSON.stringify(x)); }
   function esc(x) { return String(x == null ? '' : x).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
@@ -14,7 +16,7 @@
   function lib() { var x = config.library || window.SLMusicLibrary; if (!x) throw new Error('The local music library is not available.'); return x; }
   function status(s, error) { if (el('status')) { el('status').textContent = s; el('status').classList.toggle('error',!!error); } }
   function beginBusy(){busyCount++;busy=true;buttons();}
-  function endBusy(){busyCount=Math.max(0,busyCount-1);busy=busyCount>0;buttons();}
+  function endBusy(){busyCount=Math.max(0,busyCount-1);busy=busyCount>0;buttons();if(!busy)recognitionChanged();}
   function instrument() { return window.App && App.practiceInstrument ? App.practiceInstrument.get() : 'piano'; }
   function pitch(text) {
     var raw=/^MIDI:(\d{1,3})$/i.exec(text);if(raw){var midi=number(raw[1],'MIDI pitch',0,127);return {midi:midi,notation:'midi',label:'MIDI:'+midi};}
@@ -49,7 +51,7 @@
       var value=String(r.pitches||'').trim();
       if(value==='R'){rests.push({t:at,d:dur,rest:true,id:r.id,partId:r.partId});return;}
       var names=value.split(/[\s,]+/).filter(Boolean);if(!names.length||names.length>8)throw new Error('A chord needs one to eight pitches.');
-      var seen={};names.forEach(function(name){var p=pitch(name);if(seen[p.midi])throw new Error('A chord cannot duplicate a pitch.');seen[p.midi]=true;var n={id:r.id+'-'+p.midi,m:p.midi,t:at,d:dur,v:number(r.velocity==null?88:r.velocity,'Target velocity',1,127),pitch:p,partId:r.partId,sourceAnchor:{page:Math.round(number(r.page||1,'Source page',1,500)),targetId:r.id}};if(Number.isInteger(r.channel)&&r.channel>=0&&r.channel<16)n.ch=r.channel;notes.push(n);});
+      var seen={};names.forEach(function(name){var p=pitch(name);if(seen[p.midi])throw new Error('A chord cannot duplicate a pitch.');seen[p.midi]=true;var n={id:r.id+'-'+p.midi,m:p.midi,t:at,d:dur,v:number(r.velocity==null?88:r.velocity,'Target velocity',1,127),pitch:p,partId:r.partId,sourceAnchor:Object.assign({},r.sourceAnchor||{},{page:Math.round(number(r.page||1,'Source page',1,500)),targetId:r.id})};if(Number.isInteger(r.channel)&&r.channel>=0&&r.channel<16)n.ch=r.channel;notes.push(n);});
     });
     if(requireReview&&!notes.length)throw new Error('Add at least one pitched target before practice. Rest-only drafts can remain saved source notes.');
     var length=number(e.length,'Exercise length',0.015625,4096);if(length+1e-6<end)throw new Error('Exercise length must include every target and rest.');
@@ -62,7 +64,7 @@
   function changed() { editGeneration++;dirty=true; if(el('review-state'))el('review-state').textContent='Unsaved draft · target edits need review'; buttons(); }
   function buttons() {
     if(!root)return;
-    root.querySelectorAll('input,select').forEach(function(c){c.disabled=busy||!item&&c.id!=='sr-file'&&c.id!=='sr-items';});
+    root.querySelectorAll('input,select').forEach(function(c){if(!c.closest('#sr-recognition'))c.disabled=busy||!item&&c.id!=='sr-file'&&c.id!=='sr-items';});
     ['save','review','add','all-verified','add-part'].forEach(function(k){if(el(k))el(k).disabled=busy||!item;});
     var ready=!!(revision && revision.reviewState==='reviewed'&&!dirty);
     if(el('launch'))el('launch').disabled=busy||!ready;
@@ -94,7 +96,33 @@
   async function refreshRevisions() {
     var list=await lib().listRevisions(item.id);el('revisions').innerHTML='<option value="">Original / new draft</option>'+list.map(function(r){return '<option value="'+esc(r.id)+'">'+esc(r.label||r.id)+' · '+esc(r.reviewState)+'</option>';}).join('');if(revision)el('revisions').value=revision.id;
   }
+  function recognitionChanged(){if(recognitionTool)recognitionTool.onSource();}
+  async function recognitionSource(){if(!opened)throw new Error('Open Score review before recognizing notation.');if(busy)throw new Error('Wait for the current source operation to finish.');return item?{item:clone(item),bytes:new Uint8Array(original),currentPage:pageNumber,pageCount:pageCount,dirty:dirty,busy:busy}:null;}
+  async function pagePixels(page, scale) {
+    if(!item||!original||!opened||busy)throw new Error('Open a source and wait for it to finish loading.');
+    var generation=token, sourceId=item.id, kind=item.original.kind, sourcePDF=pdf, requested=Number(page), bitmap=null, task=null;
+    function current(){if(!opened||generation!==token||!item||item.id!==sourceId||requested!==pageNumber)throw new Error('The source or page changed during recognition rendering.');}
+    if(!Number.isInteger(requested)||requested<1||requested>pageCount)throw new Error('Choose a valid current page.');
+    scale=Math.min(3,Math.max(.5,Number(scale)||1.5));
+    var canvas=document.createElement('canvas'), context=canvas.getContext('2d',{willReadFrequently:true});
+    try {
+      if(kind==='pdf'){
+        if(!sourcePDF)throw new Error('The local PDF preview is not ready.');
+        var pageObject=await sourcePDF.getPage(requested);current();var v=pageObject.getViewport({scale:scale});
+        scale*=Math.min(1,Math.sqrt(12000000/(v.width*v.height)),8192/v.width,8192/v.height);v=pageObject.getViewport({scale:scale});
+        canvas.width=Math.max(1,Math.floor(v.width));canvas.height=Math.max(1,Math.floor(v.height));
+        task=pageObject.render({canvasContext:context,viewport:v,background:'#ffffff'});recognitionRenders.add(task);await task.promise;
+      }else if(kind==='image'){
+        bitmap=await createImageBitmap(new Blob([new Uint8Array(original)],{type:item.original.mime}));current();
+        var ratio=Math.min(1,Math.sqrt(12000000/(bitmap.width*bitmap.height)),8192/bitmap.width,8192/bitmap.height);
+        canvas.width=Math.max(1,Math.floor(bitmap.width*ratio));canvas.height=Math.max(1,Math.floor(bitmap.height*ratio));
+        context.fillStyle='#fff';context.fillRect(0,0,canvas.width,canvas.height);context.drawImage(bitmap,0,0,canvas.width,canvas.height);
+      }else throw new Error('Recognition accepts local PDF pages or score images.');
+      current();return context.getImageData(0,0,canvas.width,canvas.height);
+    } finally {if(task)recognitionRenders.delete(task);if(bitmap)bitmap.close();canvas.width=canvas.height=0;}
+  }
   async function releasePDF() {
+    recognitionRenders.forEach(function(task){try{task.cancel();}catch(ignore){}});recognitionRenders.clear();
     if(renderTask){try{renderTask.cancel();}catch(ignore){}renderTask=null;}
     if(pdf){var old=pdf;pdf=null;try{await old.destroy();}catch(ignore){}}
     if(imageURL){URL.revokeObjectURL(imageURL);imageURL=null;}
@@ -111,7 +139,7 @@
     renderTask=pg.render({canvasContext:canvas.getContext('2d'),viewport:viewport});await renderTask.promise;
     if(t!==token)return;
     el('page-status').textContent='Page '+pageNumber+' of '+pageCount;el('prev').disabled=pageNumber<=1;el('next').disabled=pageNumber>=pageCount;
-    el('source-note').textContent='PDF page displayed locally. No notes were recognized. Enter or import targets, then check them against this source.';
+    el('source-note').textContent='PDF page displayed locally. Recognize selected notation below or import/edit targets, then compare every target with this original.';
   }
   async function renderSource(t) {
     await releasePDF();if(!item||t!==token||!opened)return;
@@ -128,7 +156,7 @@
         if(pageCount>500)throw new Error('PDF display is limited to 500 pages. Original remains stored.');
         pageNumber=Math.min(pageNumber,pageCount);el('pdf-controls').hidden=false;await renderPage(t);
       }else if(kind==='image'){
-        imageURL=URL.createObjectURL(new Blob([original],{type:item.original.mime}));el('image').onerror=function(){if(t===token)el('source-note').textContent='This browser cannot preview this image. The original remains stored and exportable; enter targets manually or use supported MusicXML.';};el('image').src=imageURL;el('image').hidden=false;el('source-note').textContent='Local source image. No musical notes were recognized.';
+        imageURL=URL.createObjectURL(new Blob([original],{type:item.original.mime}));el('image').onerror=function(){if(t===token)el('source-note').textContent='This browser cannot preview this image. The original remains stored and exportable; enter targets manually or use supported MusicXML.';};el('image').src=imageURL;el('image').hidden=false;el('source-note').textContent='Local source image. Recognize selected notation below, then check and correct the unverified targets.';
       }else{
         el('source-text').textContent=kind==='musicxml'?new TextDecoder('utf-8',{fatal:true}).decode(original):'Original '+kind+' file retained byte for byte. Use structured targets or create a reviewed derivative.';
         el('source-text').hidden=false;el('source-note').textContent='Original source retained separately from editable targets.';
@@ -139,7 +167,7 @@
     if(!root){if(window.App&&App.switchTo)App.switchTo('score');if(!root)throw new Error('Open the Score page before loading a source.');}
     if(root.contains(document.activeElement)&&document.activeElement.blur)document.activeElement.blur();
     if(dirty&&item&&editor)await saveDraft();
-    var t=++token;beginBusy();status('Opening local source…');
+    var t=++token;if(recognitionTool)recognitionTool.onSource();beginBusy();status('Opening local source…');
     try{
       await lib().ready();var next=await lib().getItem(itemId);if(!next)throw new Error('This local source is unavailable.');
       var bytes=await lib().getOriginal(itemId),revs=await lib().listRevisions(itemId);
@@ -155,11 +183,11 @@
       dirty=false;el('filename').textContent=item.original.filename;fillEditor();await refreshItems(item.id);await refreshRevisions();
       if(!/needs correction/.test(el('status').textContent))status(revision?'Opened immutable '+revision.reviewState+' revision.':'Source loaded. No reviewed targets yet.');
       await renderSource(t);
-    }catch(e){if(t===token)status(e.message,true);throw e;}finally{endBusy();}
+    }catch(e){if(t===token)status(e.message,true);throw e;}finally{endBusy();recognitionChanged();}
   }
   function midiName(m){var names=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];return names[m%12]+(Math.floor(m/12)-1);}
   function targetName(m){return m<12||m>=120?'MIDI:'+m:midiName(m);}
-  function payload(requireReview) {var score=!requireReview&&!editor.rows.length?null:scoreFromEditor(editor,requireReview);return {label:editor.title,notation:notation?clone(notation):null,sourceScore:sourceScore?clone(sourceScore):null,score:score,editor:clone(editor),parts:clone(editor.parts),rhythmKnown:!!editor.rhythmKnown,sourceAnchors:editor.rows.map(function(r){return {targetId:r.id,page:r.page||1};}),reviewState:'draft'};}
+  function payload(requireReview) {var score=!requireReview&&!editor.rows.length?null:scoreFromEditor(editor,requireReview);return {label:editor.title,notation:notation?clone(notation):null,sourceScore:sourceScore?clone(sourceScore):null,score:score,editor:clone(editor),parts:clone(editor.parts),rhythmKnown:!!editor.rhythmKnown,sourceAnchors:editor.rows.map(function(r){return Object.assign({},r.sourceAnchor||{},{targetId:r.id,page:r.page||1});}),recognition:editor.recognition?clone(editor.recognition):null,reviewState:'draft'};}
   async function saveDraft() {
     if(!item||!editor)throw new Error('Load a local source first.');
     if(root.contains(document.activeElement)&&document.activeElement.blur)document.activeElement.blur();
@@ -181,13 +209,13 @@
   async function perform(fn){beginBusy();try{await fn();}catch(e){status(e.message,true);}finally{endBusy();}}
   function mount(container,options) {
     if(options)configure(options);root=container;opened=true;
-    root.innerHTML='<div class="sr-page"><header><h2>Score review</h2><p>Keep your original locally. Check editable targets against the source before practice.</p></header><div class="card sr-load"><label>Load PDF, image or MusicXML<input id="sr-file" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.xml,.musicxml,.mid,.midi,.mxl"></label><label>Reopen local source<select id="sr-items"><option>Loading…</option></select></label><label>Saved target revision<select id="sr-revisions"><option value="">Original / new draft</option></select></label></div><p id="sr-status" role="status" aria-live="polite"></p><div class="sr-columns"><section class="card sr-source-card" aria-label="Original score source"><div class="sr-head"><h3 id="sr-filename">No source loaded</h3><button id="sr-export-original" class="btn sm" type="button">Export original</button></div><div id="sr-pdf-controls" class="sr-tools" hidden><button id="sr-prev" class="btn sm" type="button">Previous page</button><span id="sr-page-status"></span><button id="sr-next" class="btn sm" type="button">Next page</button><label>Zoom<select id="sr-zoom"><option value="0.75">75%</option><option value="1" selected>Fit width</option><option value="1.5">150%</option><option value="2">200%</option></select></label></div><p id="sr-source-note" class="small muted">PDF viewing displays pages. Automatic music recognition is not available.</p><div id="sr-source" class="sr-source"><canvas id="sr-canvas" aria-label="Local PDF score page" hidden></canvas><img id="sr-image" alt="Original local score image" hidden><pre id="sr-source-text" hidden></pre></div></section><section class="card sr-editor" aria-label="Editable practice targets"><div class="sr-head"><h3>Targets to check</h3><span id="sr-review-state" role="status">No targets yet</span></div><p class="small muted">No automatic PDF recognition. Enter pitches with octaves or MIDI:0 through MIDI:127, chords separated by spaces, or R for a rest. Beat positions begin at 0. Imported written notation remains preserved separately.</p><div class="sr-fields"><label>Exercise title<input type="text" id="sr-title" maxlength="120"></label><label>Practice tempo<input id="sr-tempo" type="number" min="20" max="300" value="100"></label><label>Length including trailing rests (beats)<input id="sr-length" type="number" min="0.015625" max="4096" step="0.0625" value="4"></label></div><label class="sr-check"><input id="sr-rhythm" type="checkbox">I have confirmed the beat positions and durations. Otherwise use Wait-only practice.</label><p id="sr-notation" class="small muted" hidden></p><details><summary>Parts and instrument mappings</summary><p class="small muted">Map selected target parts explicitly. Original part data stays in the source; this does not change your practice-credit category.</p><div id="sr-parts"></div><button id="sr-add-part" type="button" class="btn sm">Add target part</button></details><div class="sr-table-wrap"><table class="sr-table"><thead><tr><th>#</th><th>Pitch / chord / rest</th><th>Beat</th><th>Duration</th><th>Part</th><th>Page</th><th>Review</th><th>Action</th></tr></thead><tbody id="sr-rows"></tbody></table></div><p id="sr-empty" class="muted">No targets. Add a note or import supported structured MusicXML.</p><div class="sr-tools"><button id="sr-add" class="btn" type="button">Add target</button><button id="sr-all-verified" class="btn" type="button">I checked all targets</button><button id="sr-save" class="btn" type="button">Save draft</button><button id="sr-review" class="btn" type="button">Save reviewed revision</button></div><details><summary>Named practice section</summary><div class="sr-fields"><label>Name<input type="text" id="sr-section-name" maxlength="80" value="Selected passage"></label><label>Start beat<input id="sr-section-start" type="number" min="0" step="0.0625" value="0"></label><label>End beat<input id="sr-section-end" type="number" min="0" step="0.0625" value="4"></label></div><button id="sr-save-section" class="btn" type="button">Save section</button></details><div class="sr-fields"><label>Practice mode<select id="sr-mode"><option value="wait">Wait for me</option><option value="tempo">Play at Tempo</option></select></label><label>Practice credit category<select id="sr-practice-instrument">'+INSTRUMENTS.map(function(x){return '<option'+(x===instrument()?' selected':'')+'>'+x+'</option>';}).join('')+'</select></label></div><button id="sr-launch" class="btn primary" type="button" disabled>Practice reviewed targets</button></section></div></div>';
+    root.innerHTML='<div class="sr-page"><header><h2>Score review</h2><p>Keep your original locally. Check editable targets against the source before practice.</p></header><div class="card sr-load"><label>Load PDF, image or MusicXML<input id="sr-file" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.xml,.musicxml,.mid,.midi,.mxl"></label><label>Reopen local source<select id="sr-items"><option>Loading…</option></select></label><label>Saved target revision<select id="sr-revisions"><option value="">Original / new draft</option></select></label></div><p id="sr-status" role="status" aria-live="polite"></p><div class="sr-columns"><section class="card sr-source-card" aria-label="Original score source"><div class="sr-head"><h3 id="sr-filename">No source loaded</h3><button id="sr-export-original" class="btn sm" type="button">Export original</button></div><div id="sr-pdf-controls" class="sr-tools" hidden><button id="sr-prev" class="btn sm" type="button">Previous page</button><span id="sr-page-status"></span><button id="sr-next" class="btn sm" type="button">Next page</button><label>Zoom<select id="sr-zoom"><option value="0.75">75%</option><option value="1" selected>Fit width</option><option value="1.5">150%</option><option value="2">200%</option></select></label></div><p id="sr-source-note" class="small muted">PDF viewing retains the original. Local recognition creates an unverified draft for correction.</p><div id="sr-source" class="sr-source"><canvas id="sr-canvas" aria-label="Local PDF score page" hidden></canvas><img id="sr-image" alt="Original local score image" hidden><pre id="sr-source-text" hidden></pre></div><div id="sr-recognition"></div></section><section class="card sr-editor" aria-label="Editable practice targets"><div class="sr-head"><h3>Targets to check</h3><span id="sr-review-state" role="status">No targets yet</span></div><p class="small muted">Automatic targets require correction and review. You can also enter pitches with octaves or MIDI:0 through MIDI:127, chords separated by spaces, or R for a rest. Beat positions begin at 0. Imported written notation remains preserved separately.</p><div class="sr-fields"><label>Exercise title<input type="text" id="sr-title" maxlength="120"></label><label>Practice tempo<input id="sr-tempo" type="number" min="20" max="300" value="100"></label><label>Length including trailing rests (beats)<input id="sr-length" type="number" min="0.015625" max="4096" step="0.0625" value="4"></label></div><label class="sr-check"><input id="sr-rhythm" type="checkbox">I have confirmed the beat positions and durations. Otherwise use Wait-only practice.</label><p id="sr-notation" class="small muted" hidden></p><details><summary>Parts and instrument mappings</summary><p class="small muted">Map selected target parts explicitly. Original part data stays in the source; this does not change your practice-credit category.</p><div id="sr-parts"></div><button id="sr-add-part" type="button" class="btn sm">Add target part</button></details><div class="sr-table-wrap"><table class="sr-table"><thead><tr><th>#</th><th>Pitch / chord / rest</th><th>Beat</th><th>Duration</th><th>Part</th><th>Page</th><th>Review</th><th>Action</th></tr></thead><tbody id="sr-rows"></tbody></table></div><p id="sr-empty" class="muted">No targets. Add a note or import supported structured MusicXML.</p><div class="sr-tools"><button id="sr-add" class="btn" type="button">Add target</button><button id="sr-all-verified" class="btn" type="button">I checked all targets</button><button id="sr-save" class="btn" type="button">Save draft</button><button id="sr-review" class="btn" type="button">Save reviewed revision</button></div><details><summary>Named practice section</summary><div class="sr-fields"><label>Name<input type="text" id="sr-section-name" maxlength="80" value="Selected passage"></label><label>Start beat<input id="sr-section-start" type="number" min="0" step="0.0625" value="0"></label><label>End beat<input id="sr-section-end" type="number" min="0" step="0.0625" value="4"></label></div><button id="sr-save-section" class="btn" type="button">Save section</button></details><div class="sr-fields"><label>Practice mode<select id="sr-mode"><option value="wait">Wait for me</option><option value="tempo">Play at Tempo</option></select></label><label>Practice credit category<select id="sr-practice-instrument">'+INSTRUMENTS.map(function(x){return '<option'+(x===instrument()?' selected':'')+'>'+x+'</option>';}).join('')+'</select></label></div><button id="sr-launch" class="btn primary" type="button" disabled>Practice reviewed targets</button></section></div></div>';
     el('file').onchange=function(){var f=this.files[0];if(!f)return;perform(async function(){var added=await lib().addOriginal(f,{metadata:{title:f.name.replace(/\.[^.]+$/,'')}});await open(added.id);});this.value='';};
     el('items').onchange=function(){if(this.value)perform(function(){return open(el('items').value);});};
     el('revisions').onchange=function(){if(item)perform(function(){return open(item.id,el('revisions').value||null);});};
     el('export-original').onclick=function(){if(original&&item)download(original,item.original.filename,item.original.mime);};
-    el('prev').onclick=function(){if(pageNumber>1){pageNumber--;perform(function(){return renderPage(token);});}};
-    el('next').onclick=function(){if(pageNumber<pageCount){pageNumber++;perform(function(){return renderPage(token);});}};
+    el('prev').onclick=function(){if(pageNumber>1){pageNumber--;perform(function(){return renderPage(token);}).then(recognitionChanged);}};
+    el('next').onclick=function(){if(pageNumber<pageCount){pageNumber++;perform(function(){return renderPage(token);}).then(recognitionChanged);}};
     el('zoom').onchange=function(){zoom=Number(this.value);perform(function(){return renderPage(token);});};
     ['title','tempo','length','rhythm'].forEach(function(k){el(k).onchange=function(){if(!editor)return;editor[{title:'title',tempo:'tempo',length:'length',rhythm:'rhythmKnown'}[k]]=k==='rhythm'?this.checked:k==='title'?this.value:Number(this.value);if(k!=='title')editor.rows.forEach(function(r){r.verified=false;});changed();fillRows();};});
     el('rows').onchange=function(e){var tr=e.target.closest('[data-row]');if(!tr||!editor)return;var r=editor.rows.find(function(x){return x.id===tr.dataset.row;}),field=e.target.dataset.field;if(!r||!field)return;r[field]=field==='verified'?e.target.checked:['beat','duration','page'].indexOf(field)>=0?Number(e.target.value):e.target.value;if(field!=='verified'){r.verified=false;tr.querySelector('[data-field="verified"]').checked=false;}changed();};
@@ -198,14 +226,15 @@
     el('all-verified').onclick=function(){if(!editor)return;editor.rows.forEach(function(r){r.verified=true;});changed();fillRows();status('Targets marked checked by you. Save a reviewed revision to make them available for practice.');};
     el('save').onclick=function(){perform(saveDraft);};el('review').onclick=function(){perform(review);};el('launch').onclick=function(){perform(launch);};
     el('save-section').onclick=function(){perform(async function(){var mapping={parts:{},selectedPartIds:clone(editor.selectedPartIds||editor.parts.map(function(p){return p.id;})),instrument:el('practice-instrument').value};editor.parts.forEach(function(p){mapping.parts[p.id]=p.instrument;});await lib().saveSelection(item.id,{name:el('section-name').value,revisionId:revision.id,section:section(),mapping:mapping});status('Named section saved for this reviewed revision.');});};
-    buttons();perform(async function(){await lib().ready();await refreshItems(item&&item.id);if(editor)fillEditor();});
+    var adapter=config.recognitionAdapter||window.SLOMRReview;if(adapter&&adapter.mount){if(recognitionTool)recognitionTool.dispose();recognitionTool=adapter.mount(el('recognition'),{getSource:recognitionSource,getPagePixels:pagePixels,openRevision:function(revisionId){if(!item)throw new Error('The original is no longer open.');return open(item.id,revisionId);},library:lib()});}
+    buttons();perform(async function(){await lib().ready();await refreshItems(item&&item.id);if(editor)fillEditor();}).then(recognitionChanged);
   }
   function configure(options){Object.assign(config,options||{});return api;}
   var api={configure:configure,mount:mount,open:open,saveDraft:saveDraft,review:review,launch:launch,scoreFromEditor:scoreFromEditor,
     snapshot:function(){return clone({item:item,revision:revision,editor:editor,notation:notation,sourceScore:sourceScore,dirty:dirty,page:pageNumber,pageCount:pageCount,busy:busy});},
-    checkpoint:async function(){if(busy)return {ok:false,errors:['Score review is still loading or saving. Wait for it to finish, then retry.']};if(!dirty||!item||!editor)return {ok:true};beginBusy();try{await saveDraft();return {ok:true};}catch(e){return {ok:false,errors:[e.message]};}finally{endBusy();}},
-    dispose:function(){opened=false;token++;releasePDF();root=null;},
-    module:{init:function(e){mount(e);},onShow:function(){opened=true;var t=++token;if(root)perform(async function(){await refreshItems(item&&item.id);if(item)await renderSource(t);});},onHide:function(){opened=false;token++;releasePDF();}}
+    checkpoint:async function(){var recognition=recognitionTool&&recognitionTool.checkpoint();if(recognition&&!recognition.ok)return recognition;if(busy)return {ok:false,errors:['Score review is still loading or saving. Wait for it to finish, then retry.']};if(!dirty||!item||!editor)return {ok:true};beginBusy();try{await saveDraft();return {ok:true};}catch(e){return {ok:false,errors:[e.message]};}finally{endBusy();}},
+    dispose:function(){opened=false;token++;if(recognitionTool){recognitionTool.dispose();recognitionTool=null;}releasePDF();root=null;},
+    module:{init:function(e){mount(e);},onShow:function(){opened=true;var t=++token;if(root)perform(async function(){await refreshItems(item&&item.id);if(item)await renderSource(t);}).then(function(){if(opened&&t===token&&recognitionTool)recognitionTool.setVisible(true);});},onHide:function(){opened=false;token++;if(recognitionTool)recognitionTool.setVisible(false);releasePDF();}}
   };
   window.SLScoreReview=api;
   if(window.App){
