@@ -3,7 +3,9 @@
 // tests and eligible PNG/PDF end-to-end fixtures are separate explicit checks.
 const assert=require('assert'),fs=require('fs'),path=require('path');
 const {chromium}=require('playwright'),env=require('./env'),OMR=require('../js/omr/review-recognition');
-let checks=0;function ok(value,message){assert(value,message);checks++;console.log('  PASS '+message);}
+let checks=0;const evidenceDir=path.join(process.env.EVIDENCE_DIR||process.env.SL_LOG_DIR||require('os').tmpdir(),'omr-review-screenshots');
+fs.mkdirSync(evidenceDir,{recursive:true});
+function ok(value,message){assert(value,message);checks++;console.log('  PASS '+message);}
 const source={item:{id:'original',original:{filename:'authored.pdf',sha256:'a'.repeat(64),kind:'pdf'},metadata:{title:'Authored source'}},currentPage:2};
 const region={id:'staff-a',bbox:{x:10,y:20,width:700,height:100},lineYs:[40,50,60,70,80],spacing:10,transform:{type:'vertical-shear',slope:.005,centerX:400}};
 const engine={id:'controlled-test-reply',version:'test-1',sourceCommit:'b'.repeat(40),modelSha256:'c'.repeat(64),runtime:'UI regression fixture'};
@@ -63,7 +65,7 @@ assert.throws(()=>OMR.buildDraft(source,[region],[Object.assign({},simple,{engin
  await page.evaluate(async()=>{await document.querySelector('#sr-recognition [data-omr=run]').onclick();});
  ok(await page.evaluate(()=>__omrCalls===0&&SLOMRReview.pending().length===0),'calling recognition directly with forced multiple selections creates no inference or draft');
  await page.evaluate(()=>{const radios=[...document.querySelectorAll('#sr-recognition .omr-region input[type=radio]')];radios[1].checked=false;radios[1].name=radios[0].name;radios[0].checked=true;radios[0].dispatchEvent(new Event('change',{bubbles:true}));});
- for(const theme of ['light','dark']){await page.evaluate(t=>App.setTheme(t),theme);await page.setViewportSize({width:390,height:1000});await ui.locator('[data-omr=run]').scrollIntoViewIfNeeded();await page.screenshot({path:'/workspace/soundlab-evidence/omr-beta-selection-'+theme+'.png',fullPage:true});ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)&&await ui.locator('.omr-region label').evaluateAll(labels=>labels.every(label=>label.getBoundingClientRect().height>=44)),'single-staff beta controls fit a phone with accessible touch labels in '+theme+' theme');}
+ for(const theme of ['light','dark']){await page.evaluate(t=>App.setTheme(t),theme);await page.setViewportSize({width:390,height:1000});await ui.locator('[data-omr=run]').scrollIntoViewIfNeeded();await page.screenshot({path:path.join(evidenceDir,'omr-beta-selection-'+theme+'.png'),fullPage:true});ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)&&await ui.locator('.omr-region label').evaluateAll(labels=>labels.every(label=>label.getBoundingClientRect().height>=44)),'single-staff beta controls fit a phone with accessible touch labels in '+theme+' theme');}
  await page.setViewportSize({width:1280,height:1000});
  await ui.locator('[data-region="fixture-staff"] input[type=radio]').check();await ui.locator('[data-omr=monophonic]').check();await ui.locator('[data-omr=run]').click();await ui.locator('[data-omr=save]').waitFor({state:'visible'});await page.waitForFunction(()=>!document.querySelector('#sr-recognition [data-omr=save]').disabled);
  ok(await page.evaluate(()=>[...document.querySelectorAll('#sr-recognition [data-omr=regions] input,#sr-recognition [data-omr=monophonic]')].every(input=>input.disabled)),'completed results freeze the staff selection and support confirmation');
@@ -150,7 +152,7 @@ assert.throws(()=>OMR.buildDraft(source,[region],[Object.assign({},simple,{engin
  const pdfSaved=await page.evaluate(async()=>({s:SLScoreReview.snapshot(),original:[...await SLMusicLibrary.getOriginal(SLScoreReview.snapshot().item.id)],sessions:App.practiceProgress.history('guitar').length}));
  ok(pdfSaved.s.item.id===pdfOriginal.id&&pdfOriginal.hash==='4ee35529c94362f92b100048818a2ad43670a719141977b90da8ab8909b680bb'&&Buffer.from(pdfSaved.original).equals(fs.readFileSync(pdfFixture)),'PDF recognition saves a separate draft while keeping the pinned original PDF identity and every byte');
  ok(pdfSaved.s.revision.editor.rows.every(r=>!r.verified)&&!pdfSaved.s.revision.editor.rhythmKnown&&pdfSaved.s.revision.recognition.regions[0].rawTokens.length===pdfAutomatic.results[0].rawTokens.length&&pdfSaved.sessions===2,'actual PDF draft retains all raw model evidence and requires review without adding practice credit');
- for(const theme of ['light','dark']){await page.evaluate(t=>App.setTheme(t),theme);await page.setViewportSize({width:390,height:1000});await page.screenshot({path:'/workspace/soundlab-evidence/omr-ui-'+theme+'.png',fullPage:true});}
+ for(const theme of ['light','dark']){await page.evaluate(t=>App.setTheme(t),theme);await page.setViewportSize({width:390,height:1000});await page.screenshot({path:path.join(evidenceDir,'omr-ui-'+theme+'.png'),fullPage:true});}
  for(const width of [360,390,1440]){await page.setViewportSize({width,height:900});await page.evaluate(()=>App.setTheme('light'));ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'recognition source card fits '+width+'px without page overflow');}
  ok(!errors.length,'recognition lifecycle has no browser exceptions: '+errors.join('; '));
  await context.close();

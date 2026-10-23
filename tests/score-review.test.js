@@ -1,5 +1,7 @@
 // Actual browser, local PDF worker and real IndexedDB. No private files/devices.
 const {chromium}=require('playwright');const fs=require('fs'),path=require('path'),assert=require('assert');const env=require('./env');let checks=0;
+const evidenceDir=path.join(process.env.EVIDENCE_DIR||process.env.SL_LOG_DIR||require('os').tmpdir(),'score-review-screenshots');
+fs.mkdirSync(evidenceDir,{recursive:true});
 function ok(v,m){assert.ok(v,m);checks++;console.log('  PASS '+m);}
 (async()=>{const browser=await chromium.launch({executablePath:env.CHROMIUM});try{
  const context=await browser.newContext({serviceWorkers:'block',viewport:{width:1400,height:1000}});
@@ -35,7 +37,7 @@ function ok(v,m){assert.ok(v,m);checks++;console.log('  PASS '+m);}
  ok(reviewed.payload.rhythmKnown===false&&reviewed.payload.score.capabilities.tempo===false&&reviewed.payload.score.capabilities.holdScoring===false,'unknown-rhythm target derivative explicitly requests Wait-only without hold scoring');
  ok(reviewed.payload.score.notes.filter(n=>!n.rest).map(n=>n.m).join(',')==='60,64,67','reviewed launch contains exactly the edited chord pitches');
  ok(reviewed.revisions.find(r=>r.id===draft.s.revision.id).reviewState==='draft','prior draft revision remains intact after review');
- await page.selectOption('#sr-zoom','1');await page.waitForFunction(()=>!SLScoreReview.snapshot().busy);await page.evaluate(()=>window.scrollTo(0,0));await page.waitForTimeout(180);await page.screenshot({path:'/workspace/soundlab-evidence/1.1-score-review-desktop.png',fullPage:true});
+ await page.selectOption('#sr-zoom','1');await page.waitForFunction(()=>!SLScoreReview.snapshot().busy);await page.evaluate(()=>window.scrollTo(0,0));await page.waitForTimeout(180);await page.screenshot({path:path.join(evidenceDir,'1.1-score-review-desktop.png'),fullPage:true});
  const modeState=await page.evaluate(()=>({disabled:document.querySelector('#sr-mode option[value="tempo"]').disabled,rhythm:SLScoreReview.snapshot().editor.rhythmKnown,mode:document.getElementById('sr-mode').value}));
  ok(modeState.disabled&&!modeState.rhythm&&modeState.mode==='wait','unknown rhythm disables the Tempo choice in the actual review UI: '+JSON.stringify(modeState));
  if(await page.evaluate(()=>!!window.PracticeMaterial)){
@@ -120,6 +122,6 @@ function ok(v,m){assert.ok(v,m);checks++;console.log('  PASS '+m);}
  await page.setViewportSize({width:390,height:844});
  await page.evaluate(async p=>{await SLScoreReview.open(p.id,p.rev);window.scrollTo(0,0);},saved);await page.selectOption('#sr-zoom','1');await page.waitForFunction(()=>!SLScoreReview.snapshot().busy);await page.evaluate(()=>window.scrollTo(0,0));await page.waitForTimeout(180);
  ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+2),'phone layout confines the wide editable table to its scroll container');
- await page.screenshot({path:'/workspace/soundlab-evidence/1.1-score-review-phone.png',fullPage:true});
+ await page.screenshot({path:path.join(evidenceDir,'1.1-score-review-phone.png'),fullPage:true});
  console.log('ALL PASS ('+checks+' actual score review/PDF/IndexedDB checks)');
 }finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1;});

@@ -85,6 +85,26 @@ Independent recovery/material/session/XP suites and the normal-history deploymen
 fixture also passed. These local follow-ups do not claim the two blocked
 `file://` cases; the full default hosted suite remains a release requirement.
 
+## First full hosted follow-up
+
+Hosted [run 40005857032](https://github.com/mreindl118-boop/GuitarPak/actions/runs/40005857032)
+tested exact `83bb83aaa57f5a61f263ea1667ec9ecb923962f9` with all 61 default suites.
+It completed **failure** at 19:00 UTC on 2026-10-23: 59 suites passed; `score-review`
+and `omr-review` aborted on `ENOENT` while saving screenshots to a cloud-only
+`/workspace/soundlab-evidence` path. No additional failure was found in the
+terminal logs. The default `update` suite passed all eight assertions, including
+both bundled `file://` cases that remained unexecuted in the managed local browser.
+Optional native APK/aapt checks and physical devices remain separate.
+
+The test-only correction creates a portable per-suite screenshot directory
+under `EVIDENCE_DIR`, `SL_LOG_DIR` or the OS temporary directory. Both complete
+affected HTTP suites then passed locally (42 and 62 assertions), including
+real model/PDF review and practice. Independent review confirmed no assertions
+or runtime code changed. A fresh full hosted run on the correction commit is
+still required. PR creation was denied by automatic approval review citing the
+earlier publication restriction; no PR, merge, tag or 1.1 release was created.
+No denied action was retried while explicit public-PR authorization was pending.
+
 ## Unmet release conditions
 
 This is not a 1.1 publication or hosted-CI success claim. At the historical
