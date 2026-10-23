@@ -163,10 +163,22 @@ jobs:
           deadline=$(( $(date +%s) + 600 ))
           probe=0
           ready=false
+          asset_list=$(node <<'NODE'
+          const fs = require('fs'), html = fs.readFileSync('index.html', 'utf8');
+          const scripts = [...html.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["']/gi)].map(m => m[1]);
+          const styles = [...html.matchAll(/<link\b[^>]*>/gi)].map(m => m[0])
+            .filter(tag => /\brel=["']stylesheet["']/i.test(tag))
+            .map(tag => (/\bhref=["']([^"']+)["']/i.exec(tag) || [])[1]).filter(Boolean);
+          const local = scripts.concat(styles).filter(url => !/^(?:[a-z]+:|\/\/)/i.test(url));
+          if (local.some(url => !/^[a-z0-9_.\/-]+$/i.test(url) || url.startsWith('/') || url.split('/').includes('..'))) throw Error('Unsupported public asset path');
+          console.log([...new Set(['version.json','index.html','sw.js','manifest.webmanifest'].concat(local))].join('\n'));
+          NODE
+          )
+          mapfile -t public_assets <<< "$asset_list"
           while [ "$(date +%s)" -lt "$deadline" ]; do
             probe=$((probe + 1))
             ready=true
-            for asset in version.json index.html js/app.js js/performance-player.js js/performance-engine.js js/practice-input.js js/pitch-detector.js js/practice-progress.js; do
+            for asset in "${public_assets[@]}"; do
               remaining=$((deadline - $(date +%s)))
               if [ "$remaining" -le 0 ]; then ready=false; break; fi
               limit=$((remaining < 5 ? remaining : 5))

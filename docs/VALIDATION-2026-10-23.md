@@ -52,6 +52,9 @@ and `final-integrated.log` with separate per-suite directories. The original
 update test’s six unchanged HTTP cases also passed against web1.0.0 using a
 temporary HTTP-only selection; its two denied file cases were not attempted.
 That is1,695 passed local assertions, with the two file cases still blocked.
+The final release workflow adds36 local mocked publication/readiness checks,
+bringing local verification to1,731 assertions; the default runner now has41
+suites, of which40 are permitted here.
 
 Independent targeted reviews also executed:
 
@@ -101,6 +104,14 @@ The existing cloud `gh auth status` reports its GH_TOKEN invalid. No credential
 was changed. The connected GitHub app's harmless repository lookup succeeds
 and confirms existing push access; normal authorized publication uses that
 existing connection/git route and existing Actions token where available.
+The ordinary review-branch push of implementation commit `c783524` succeeded;
+main remained at the verified baseline. Opening a non-draft public PR was
+subsequently **rejected by automatic approval review**, which cited the earlier
+no-publication instruction. No PR was created. Explicit clarification was
+requested; main/tag/release and publisher handoff remain held, without an
+indirect workaround. Hosted CI was started by the successful review-branch
+push and is observed read-only.
+
 Any failed/denied remote write must be reported exactly, without assuming it
 executed or changing access. Existing workflow GITHUB_TOKEN pushes cannot
 trigger a Pages build; the connected GitHub app publishing handoff and public
