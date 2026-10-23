@@ -61,18 +61,18 @@ const near = (a, b) => Math.abs(a-b)<0.00001;
   console.log('# storage failure retains the original observation and ID');
   const failed=await page.evaluate(()=>{
    SLXP.beginSession({id:'save-failed',instrument:'voice',source:'quiz'});__step(1000);__answer('save-failed','a',1000,'voice');
-   window.__set=App.store.set;App.store.set=function(){throw new Error('Simulated all storage full');};
+   window.__set=Storage.prototype.setItem;Storage.prototype.setItem=function(){throw new DOMException('Simulated all storage full','QuotaExceededError');};
    const result=SLXP.finishLevel({sessionId:'save-failed',instrument:'voice'});
    return {result,pending:SLXP.pending(),payload:JSON.parse(SLXP.exportPending()),visible:!!document.getElementById('lesson-progress-unsaved'),history:App.practiceProgress.history('voice')};
   });
   ok(failed.result.error&&failed.pending.length===1&&failed.visible,'a full-storage save failure remains visible and recoverable in memory');
   ok(failed.history.length===0&&failed.payload.unrecordedLessonSessions[0].id==='save-failed','failed saves retain the exact session payload for export without claiming XP');
-  const recovered=await page.evaluate(()=>{App.store.set=__set;SLXP.retryPending();SLXP.retryPending();SLXP.finishLevel({sessionId:'save-failed',instrument:'voice'});return {history:App.practiceProgress.history('voice'),pending:SLXP.pending(),visible:!!document.getElementById('lesson-progress-unsaved')};});
+  const recovered=await page.evaluate(()=>{Storage.prototype.setItem=__set;SLXP.retryPending();SLXP.retryPending();SLXP.finishLevel({sessionId:'save-failed',instrument:'voice'});return {history:App.practiceProgress.history('voice'),pending:SLXP.pending(),visible:!!document.getElementById('lesson-progress-unsaved')};});
   ok(recovered.history.length===1&&recovered.history[0].id==='save-failed'&&near(recovered.history[0].earnedXP,.2),'retry saves the retained stable ID and awards exactly once');
   ok(!recovered.pending.length&&!recovered.visible,'successful retry clears the unsaved warning and queue');
-  const observationFailure=await page.evaluate(()=>{SLXP.beginSession({id:'observation-failed',instrument:'bass',source:'quiz'});__step(1000);window.__set=App.store.set;App.store.set=function(key,value){if(key==='lesson.observations.v1')return;return __set(key,value);};SLXP.answer({sessionId:'observation-failed',instrument:'bass',answerId:'a',ok:true,ms:1000,unit:'retained-question'});const payload=JSON.parse(SLXP.exportPending());return {payload,stats:SLXP.forInstrument('bass').unitStats(),visible:!!document.getElementById('lesson-progress-unsaved')};});
+  const observationFailure=await page.evaluate(()=>{SLXP.beginSession({id:'observation-failed',instrument:'bass',source:'quiz'});__step(1000);window.__set=Storage.prototype.setItem;Storage.prototype.setItem=function(key,value){if(key==='guitarlab.lesson.observations.v1')return;return __set.call(this,key,value);};SLXP.answer({sessionId:'observation-failed',instrument:'bass',answerId:'a',ok:true,ms:1000,unit:'retained-question'});const payload=JSON.parse(SLXP.exportPending());return {payload,stats:SLXP.forInstrument('bass').unitStats(),visible:!!document.getElementById('lesson-progress-unsaved')};});
   ok(observationFailure.visible&&observationFailure.stats['retained-question'].asked===1&&observationFailure.payload.unrecordedLessonObservations.bass,'silently dropped question-stat writes stay visible, readable in memory and exportable alongside XP observations');
-  const observationRecovery=await page.evaluate(()=>{App.store.set=__set;SLXP.retryPending();SLXP.finishLevel({sessionId:'observation-failed',instrument:'bass'});return {saved:App.store.get('lesson.observations.v1').bass.days,visible:!!document.getElementById('lesson-progress-unsaved')};});
+  const observationRecovery=await page.evaluate(()=>{Storage.prototype.setItem=__set;SLXP.retryPending();SLXP.finishLevel({sessionId:'observation-failed',instrument:'bass'});return {saved:App.store.get('lesson.observations.v1').bass.days,visible:!!document.getElementById('lesson-progress-unsaved')};});
   ok(Object.values(observationRecovery.saved).some(d=>d.u['retained-question'])&&!observationRecovery.visible,'retry persists retained question observations and clears their warning');
   console.log('# observed segments allocate across midnight without spreading idle time');
   const midnight=await page.evaluate(()=>{

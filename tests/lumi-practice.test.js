@@ -27,7 +27,9 @@ async function fixture(browser, native = false) {
       { id: 'mixed-output', name: 'LUMI Helix' }, { id: 'virtual-output', name: 'ROLI LUMI loopback' }];
     const events = {};
     const forbidden = () => { throw new Error('Global MIDI selection, lights or output must never be called'); };
+    const preferences = new Map();
     window.App = {
+      store: { get: (key, fallback) => preferences.has(key) ? preferences.get(key) : fallback, set: (key, value) => { preferences.set(key, value); return {ok:true}; } },
       modules: {}, register: (id, mod) => { App.modules[id] = mod; },
       on: (event, fn) => { (events[event] || (events[event] = [])).push(fn); },
       emit: (event, data) => { (events[event] || []).forEach(fn => fn(data)); },
@@ -677,7 +679,7 @@ async function ingressFixture(browser) {
       return result;
     });
     ok(!unplugged.s.running && !unplugged.s.armed && unplugged.s.activeOutputs === 0 && unplugged.attempted.length === 0 && /could not confirm/.test(unplugged.text), 'output disconnect clears pending original notes and reports undeliverable note-offs; no unrelated-port send');
-    ok(!unplugged.reconnected.running && !unplugged.reconnected.armed && !unplugged.reconnected.tested && !unplugged.reconnected.outputId, 'reconnection does not reselect an output, restart, or re-arm');
+    ok(!unplugged.reconnected.running && !unplugged.reconnected.armed && !unplugged.reconnected.tested && !unplugged.reconnected.leased && unplugged.reconnected.outputId === 'lumi-display', 'reconnection retains the desired device preference while requiring a fresh session, test and arm');
     await hardware(page); await arm(page);
     const sameId = await page.evaluate(() => { App.emit('midi:state', {}); return SLLumiPractice.snapshot(); });
     ok(!sameId.running && !sameId.armed && !sameId.tested && !sameId.leased, 'same-ID inventory/route changes require a fresh session, test and arm');

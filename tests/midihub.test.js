@@ -39,6 +39,7 @@ const J = JSON.stringify;
     App.switchTo('midihub');
     return {
       active: App.active, pills: [...document.querySelectorAll('#subnav .subtab')].map(b => b.textContent).join('|'),
+      tools: [...document.querySelectorAll('#workflow-tools option')].map(o => o.value),
       group: (document.querySelector('#tabbar .tabbar-btn.active') || {}).textContent,
       views: [...document.querySelectorAll('#mh-views button')].map(b => b.dataset.view).join(','),
       status: document.getElementById('mh-status').textContent, ports: !document.getElementById('mh-ports').hidden,
@@ -47,7 +48,7 @@ const J = JSON.stringify;
       tour: !!(window.Help && Help.TOURS.midihub && Help.TOURS.midihub.length)
     };
   });
-  ok(nav.active === 'midihub' && nav.group === 'Keys' && nav.pills === 'Piano|Synth|Pads|MIDI|LUMI', 'MIDI Hub remains the fourth Keys pill alongside LUMI practice: ' + nav.pills);
+  ok(nav.active === 'midihub' && nav.group === 'Free Play' && nav.pills === 'Piano|Synth|Pads|MIDI' && nav.tools.includes('lumipractice'), 'Free Play keeps MIDI visible and LUMI practice reachable through All tools: ' + nav.pills);
   ok(nav.views === 'control,play,controls,rules,sysex,monitor,learn', 'seven views, Control first: ' + nav.views);
   // the shared service hears All keyboards by default (v0.79 multi-input)
   ok(nav.ports && nav.inSel === 'all' && nav.outSel === 'out1' && /In: All keyboards · Synth out: Synth Port 1/.test(nav.status), 'ports picked: All keyboards in, the synth port out: ' + nav.status);

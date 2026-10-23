@@ -44,8 +44,8 @@ const near = (a, b) => Math.abs(a - b) < 0.00001;
       core.recordSession({ id: 'existing-record', instrument: 'piano', startedAt: __wall() - 61000, endedAt: __wall() - 1000,
         engagedSeconds: 60, mode: 'wait', status: 'complete', expected: 1, matched: 1, missed: 0, extra: 0, wrong: 0,
         tempo: null, timingSamples: 0, sumAbsTimingMs: 0, sumTimingMs: 0 });
-      window.__save = core.store.set.bind(core.store);
-      core.store.set = function (key, value) { if (key === PracticeProgress.storageKey) throw new Error('Simulated quota failure'); return __save(key, value); };
+      window.__save = Storage.prototype.setItem;
+      Storage.prototype.setItem = function (key, value) { if (key === 'guitarlab.' + PracticeProgress.storageKey) throw new DOMException('Simulated quota failure', 'QuotaExceededError'); return __save.call(this, key, value); };
       __open('piano'); __start(); __hit(49); __step(1); __stop();
       return { state: __result('piano'), text: document.getElementById('pf-xp').textContent,
         recoverable: !document.getElementById('pf-progress-unsaved').hidden };
@@ -58,7 +58,7 @@ const near = (a, b) => Math.abs(a - b) < 0.00001;
     ok(payload.unrecordedPracticeSessions.length === 1 && near(payload.unrecordedPracticeSessions[0].engagedSeconds, 1) && payload.unrecordedPracticeSessions[0].extra === 1,
       'unsaved export contains the original measured session, raw counts and stable ID');
     const recovery = await page.evaluate(() => {
-      App.practiceProgress.store.set = __save; document.getElementById('pf-progress-retry').click();
+      Storage.prototype.setItem = __save; document.getElementById('pf-progress-retry').click();
       const once = __result('piano');
       document.getElementById('pf-progress-retry').click(); __stop(); __stop(); PerformancePlayer.tick();
       return { once, twice: __result('piano'), hidden: document.getElementById('pf-progress-unsaved').hidden,

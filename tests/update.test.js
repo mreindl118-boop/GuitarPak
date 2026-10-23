@@ -21,7 +21,10 @@ async function run(b, url, feed, shell) {
   return { r, errs };
 }
 (async () => {
-  const b = await chromium.launch({ executablePath: env.CHROMIUM, args: ['--allow-file-access-from-files'] });
+  // Managed cloud policy blocks file://. This explicit HTTP subset keeps those
+  // cases out of the attempted actions; ordinary hosted/default runs retain them.
+  const httpOnly = process.env.SL_UPDATE_HTTP_ONLY === '1';
+  const b = await chromium.launch({ executablePath: env.CHROMIUM, args: httpOnly ? [] : ['--allow-file-access-from-files'] });
   const WEB = env.URL, FILE = 'file://' + env.ROOT + '/index.html';
   const apk = 'https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/soundLAB-alpha.apk';
   let x;
@@ -45,10 +48,12 @@ async function run(b, url, feed, shell) {
   x = await run(b, WEB, { version: BIG, web: BIG, apk }, SHELL);
   ok(x.r && /Android app \(v9\.0\.0\)/.test(x.r.text) && x.r.btn === 'Download', 'shell, genuinely newer APK: Download offered ' + JSON.stringify(x.r));
   console.log('# bundled offline copy (file://)');
+  if (!httpOnly) {
   x = await run(b, FILE, { version: OLD, web: NEWER, apk });
   ok(x.r === null, 'bundled copy, stale APK file: no download loop ' + JSON.stringify(x.r));
   x = await run(b, FILE, { version: BIG, web: BIG, apk });
   ok(x.r && x.r.btn === 'Download', 'bundled copy, newer APK exists: Download offered ' + JSON.stringify(x.r));
+  } else console.log('  NOT RUN: two file:// cases blocked by managed cloud policy; HTTP results do not cover them.');
   console.log('# the feed vs the real APK file (what stops download loops)');
   const feed = require(env.ROOT + '/version.json');
   if (env.AAPT) { // needs build-tools aapt: AAPT=/path/to/aapt
@@ -58,6 +63,6 @@ async function run(b, url, feed, shell) {
     ok(/package: name='com\.mreindl\.soundlab'/.test(badging), 'published APK is the new com.mreindl.soundlab app');
   } else console.log('  skip APK checks (set AAPT to run them); feed APK channel = ' + feed.version);
   await b.close();
-  console.log(fails ? '\nFAILED: ' + fails : '\nALL PASS');
+  console.log(fails ? '\nFAILED: ' + fails : httpOnly ? '\nHTTP SUBSET PASS; file:// cases remain unverified here' : '\nALL PASS');
   process.exit(fails ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(2); });

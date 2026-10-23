@@ -85,6 +85,8 @@ async function newPage(browser, seed) {
     o.dispOff = App.midi.display === false && !document.getElementById('kl-disp').classList.contains('active');
     document.getElementById('kl-disp').click();
     o.dispOn = App.midi.display === true;
+    o.context = { active: App.active, sheet: App.sheet, blocked: App.interactionBlocked, dbl: App.store.get('kl.dbltap',true) };
+    o.heard=[]; App.on('midi:note', d=>o.heard.push({midi:d.midi,on:d.on,silent:d.silent,mute:d.mute}));
     // double-tap the control key: starts
     __tap(o.ck); await wait(60); __tap(o.ck); await wait(80);
     o.started = App.keysLessons.view === 'run' && !!App.keysLessons.run;
@@ -118,7 +120,7 @@ async function newPage(browser, seed) {
   });
   ok(c1.disp && c1.dbl && /Double-tap C3/.test(c1.hint), 'the card has LUMI Display + Double-tap chips and names the control key: ' + c1.hint);
   ok(c1.dispOff && c1.dispOn, 'the LUMI Display chip mirrors Lights & help');
-  ok(c1.started && /Double-tap C3 to stop/.test(c1.runHint), 'double-tapping the control key starts the lesson: ' + c1.runHint);
+  ok(c1.started && /Double-tap C3 to stop/.test(c1.runHint), 'double-tapping the control key starts the lesson: ' + c1.runHint + (c1.started ? '' : JSON.stringify({context:c1.context,heard:c1.heard})));
   ok(c1.stopped, 'double-tapping it again stops the run');
   ok(c1.slow && c1.broken, 'slow taps, or another key in between, do nothing');
   ok(c1.cardStart && c1.cardStop, 'two quick taps on the card start and stop it too');
