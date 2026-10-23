@@ -277,28 +277,20 @@ js/quiz.js        EXERCISES ('quiz', the practice HOME since v0.69.0): Musicca-
                   window.SLQuiz = test hook (levels, gen, start, pick, q,
                   view, cur, nodes, node(i), current, sprint, endless,
                   clock, finishSprint, tab, theory).
-js/xp.js          XP / streak service under the course (App.xp = window.SLXP,
-                  no DOM except html.goal-due = the Learn-tab dot): 2 XP per
-                  right answer, +1 under PAR ms, +1 at a run of 5; level
-                  +5 pass, +5 perfect, +5 sprint record. Player level: 40 XP
-                  to Lv 2, +20 per level. Streak day = a level finished that
-                  day; a freeze is earned per 7-day multiple (max 2) and is
-                  spent only when the banked freezes cover the whole gap.
-                  Stores xp.total (seeded once from qz.prog), xp.days {day:
-                  {x, s, q, k, l, u:{unit:[ok, ms, asked]}}} kept 180 days,
-                  xp.goal, xp.freeze/frozen/fzAt/best, xp.sprint, xp.jump.
-                  PRACTICE LEDGER (v0.72.0): playing anywhere counts — a 5 s
-                  tick logs time while a practice App.wake tag is held
-                  (PLAY_TAGS: fb-run, pn-run, ch-play, sg-run, jam-run,
-                  ws-run, tr-*, met) or notes came in (midi:note /
-                  note:input, 20 s), gated by a touch or note in the last
-                  10 min; never on quiz/settings (answers log their own
-                  time). day.p/a/pm: 2 XP per minute, a day with >= 300 s
-                  playing counts for the streak; emits 'xp:practice' (quiz.js
-                  shows the #xp-toast). Woodshed still keeps its own ws.xp.
-                  Tests pin the clock with SLXP._now(fn) + SLXP._reload();
-                  SLXP._tick() runs one ledger tick. Loaded right before
-                  quiz.js.
+js/learn-instruments.js Shared explicit Learn category (piano/synth/guitar/bass/
+                  drums/voice/other), instrument-appropriate course modes and
+                  actual lesson/practice entry points. Selection is not credit.
+                  Historical qz.prog stays Legacy/unassigned; new completion is
+                  scoped by instrument. Loaded immediately after app.js.
+js/xp.js          Compatible SLXP/App.xp question-stat facade over the ONE
+                  canonical App.practiceProgress instrument XP ledger. Explicit
+                  beginSession/answer/finish hooks snapshot instrument and ID;
+                  bounded observed engagement is recorded once. Knowledge
+                  questions never fabricate musical note/timing counters.
+                  xp.* history is read-only Legacy/unassigned. No passive wake
+                  ledger, per-answer bonus balance, history seeding or new
+                  ws.xp balance. Pending failures support retry/export.
+                  Consult docs/LEARN-INSTRUMENTS.md and PRACTICE-PROGRESS.md.
 js/practiceplan.js PRACTICE PLAN ('practiceplan', Learn group pill "Plan",
                   v0.81.0, prefix pp-; built by null, see docs/PRACTICE-PLAN.md):
                   teacher notes (paste / .txt / .md / Google Docs JSON export;
@@ -307,8 +299,9 @@ js/practiceplan.js PRACTICE PLAN ('practiceplan', Learn group pill "Plan",
                   (Keys lessons via App.keysLessons.open, Fretboard via
                   fb:practice, Chords/Jam/Woodshed/Exercises/Tuner via
                   switchTo + shared key/tempo). Completion is MEASURED: a new
-                  kl.prog run, a new passing qz.prog score, a ws.xp gain, or
-                  active minutes from App.xp. Unmatched lines -> pp.gaps
+                  instrument-scoped lesson/course records or explicit canonical
+                  practice sessions. Global legacy XP/history cannot complete
+                  another instrument's block. Unmatched lines -> pp.gaps
                   (module-gap metric, exportable). Stores pp.students /
                   pp.active / pp.sessions (90 days) / pp.history / pp.running
                   / pp.gaps. App.practicePlan test hook. Suite

@@ -185,9 +185,6 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
 /* auto-hide while scrolling down (app.js wireAutoHideBar) */
 .topbar.bar-hidden { transform: translateY(calc(-100% - 4px)); }
 
-/* pages that don't use the shared key/tempo (app.js NO_CTX) */
-.noctx #ctxbar, .noctx #ctx-btn { display: none; }
-
 .brand {
   display: inline-flex;
   align-items: center;
@@ -408,11 +405,26 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
   border: 1px solid var(--line);
   border-radius: 14px;
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+  max-height: 70vh;
+  max-height: min(70vh, calc(100dvh - 128px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
-html:not(.ctx-open) .ctxbar { display: none; }
+html:not(.ctx-open) .ctxbar, .ctxbar[hidden] { display: none; }
 .ctx-open .ctxbar { animation: ctx-in 140ms ease-out; }
 @keyframes ctx-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
 #ctx-btn { position: relative; }
+.tb-tools #ctx-btn {
+  width: 44px; height: 44px; min-width: 44px; min-height: 44px;
+  border-color: var(--ctl-border); background: var(--card2); color: var(--text);
+}
+.tb-tools #ctx-btn > .ic { width: 28px; height: 28px; stroke-width: 1.7; }
+.ctx-caret { position: absolute; right: 4px; bottom: 7px; width: 7px; height: 5px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+#ctx-btn[aria-expanded="true"] .ctx-caret { transform: rotate(180deg); }
+#ctx-btn:disabled { opacity: 0.5; }
+#ctxbar select, #ctxbar input[type="number"], #ctxbar button { min-height: 44px; }
+#ctxbar button { min-width: 44px; }
+@media (max-width: 600px) { #ctxbar select, #ctxbar input[type="number"] { font-size: 16px; } }
 .cx-toggles { flex-basis: 100%; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-top: 12px; border-top: 1px solid var(--line-soft); }
 .cx-toggles .chip { gap: 6px; }
 .cx-tnote { flex-basis: 100%; font-size: 12.5px; color: var(--muted); }

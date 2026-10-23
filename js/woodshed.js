@@ -412,24 +412,7 @@
 
   // ---------------- progression ----------------
 
-  function addXp(pts) {
-    var xp = parseInt(App.store.get('ws.xp', 0), 10) + pts;
-    App.store.set('ws.xp', xp);
-    return xp;
-  }
-
   function level(xp) { return Math.floor(Math.sqrt(xp / 100)) + 1; }
-
-  function bumpStreak() {
-    var s = App.store.get('ws.streak', { last: '', days: 0 });
-    var today = new Date().toDateString();
-    if (s.last === today) return s.days;
-    var y = new Date(Date.now() - 864e5).toDateString();
-    s.days = (s.last === y) ? s.days + 1 : 1;
-    s.last = today;
-    App.store.set('ws.streak', s);
-    return s.days;
-  }
 
   var ACHIEVEMENTS = {
     first: 'First run in the Shed', ninety: '90%+ accuracy', combo25: '25-note combo',
@@ -453,6 +436,11 @@
   // ---------------- the session ----------------
 
   var S = null; // active session state
+  function selectedInstrument(){return App.practiceInstrument?App.practiceInstrument.get():App.store.get('ws.performance.instrument','piano');}
+  function measureRun(){if(!S||!S.running||!S.xpSession)return;var at=Date.now(),d=(at-S.xpLast)/1000;S.xpLast=at;if(App.getAudio().currentTime>=S.startT&&d>0&&d<=1&&S.xpActivity!=null&&at-S.xpActivity<=5000)S.xpSeconds+=d;}
+  function recordRun(status){if(!S||!S.xpSession||S.xpRecorded||!App.xp)return;measureRun();S.xpRecorded=true;var hits=S.counts.perfect+S.counts.great+S.counts.good,miss=S.counts.miss;S.xpResult=App.xp.finishLevel({sessionId:S.xpSession,instrument:S.creditInstrument,status:status,mode:'woodshed',metrics:{engagedSeconds:S.xpSeconds,expected:S.targets.filter(function(t){return t.judged!=='grace';}).length,matched:hits,missed:miss,extra:S.strays,wrong:S.strays}});}
+  App.on('learn:practice',function(e){if(!e)return;if(S)endRun(false);if(window.PerformancePlayer)PerformancePlayer.close();App.store.set('ws.performance.instrument',e.instrument);view='lib';if(els&&els.root)renderLib();});
+  App.on('learn:instrument',function(){if(S)endRun(false);if(view==='lib'&&els&&els.root)renderLib();});
 
   function calFor(src) {
     var c = App.store.get('ws.cal', {});
@@ -528,6 +516,8 @@
 
   function startRun() {
     var ctx = App.getAudio();
+    recordRun('stopped');
+    S.creditInstrument=selectedInstrument();S.xpSession=uid('woodshed');S.xpLast=Date.now();S.xpSeconds=0;S.xpActivity=null;S.xpRecorded=false;if(App.xp)App.xp.beginSession({id:S.xpSession,instrument:S.creditInstrument,source:'woodshed'});
     buildTargets();
     S.judged = [];
     S.counts = { perfect: 0, great: 0, good: 0, miss: 0 };
@@ -548,6 +538,7 @@
   }
 
   function endRun(finished) {
+    recordRun(finished?'complete':'stopped');
     if (S.timer) { clearInterval(S.timer); S.timer = null; }
     S.running = false;
     App.wake.release('ws-run');
@@ -556,6 +547,7 @@
   }
 
   function tickRun() {
+    measureRun();
     var ctx = App.getAudio();
     var now = ctx.currentTime;
     if (S.mode === 'wait') return; // wait mode has no clock
@@ -591,6 +583,7 @@
 
   function inputNote(midi, vel, src) {
     if (!S || !S.running) return;
+    measureRun();if(App.getAudio().currentTime>=S.startT)S.xpActivity=Date.now();
     var ctx = App.getAudio();
     var now = ctx.currentTime - calFor(src) / 1000;
     S.played.push({ m: midi, at: now - S.startT, v: vel });
@@ -696,8 +689,9 @@
     var bk = bestKey(S.sc, S.mode);
     var prev = parseInt(App.store.get(bk, 0), 10);
     if (score > prev) App.store.set(bk, score);
-    var xp = addXp(Math.round(score / 10) + 5);
-    var days = bumpStreak();
+    var progress=App.practiceProgress.summary(S.creditInstrument);
+    var xp = progress.currentXP;
+    var days = progress.currentStreak;
     grantAch('first');
     if (acc >= 90) grantAch('ninety');
     if (S.counts.miss === 0 && S.targets.length > 4 && acc >= 80) grantAch('clean');
@@ -1151,7 +1145,7 @@
     var xp = parseInt(App.store.get('ws.xp', 0), 10);
     var s = App.store.get('ws.streak', { days: 0 });
     var ach = App.store.get('ws.ach', []);
-    return 'Level ' + level(xp) + ' · ' + xp + ' XP · ' + (s.days || 0) + '-day streak · ' + ach.length + '/' + Object.keys(ACHIEVEMENTS).length + ' achievements';
+    return 'Legacy / unassigned: Level ' + level(xp) + ' · ' + xp + ' XP · ' + (s.days || 0) + '-day legacy streak · Shared achievements ' + ach.length + '/' + Object.keys(ACHIEVEMENTS).length + ' achievements';
   }
 
   function renderLib() {
@@ -1159,7 +1153,7 @@
     var weak = weakQueue();
     var h =
       '<div class="card">' +
-        '<div class="row spread"><h2 style="margin:0">Woodshed</h2>' +
+        '<div class="row spread"><h2 style="margin:0">Woodshed · ' + esc(selectedInstrument()) + '</h2>' +
           '<span class="muted small">' + statsLine() + '</span></div>' +
         '<div class="muted small" style="margin-top:6px">Pick something to practice — every run is scored (Perfect ±' + WIN.perfect +
           'ms) and lands as a take in your Studio Ideas. Calibrate once per input for honest timing.</div>' +
@@ -1195,7 +1189,7 @@
             (best ? ' <span class="muted">' + Math.round(best * 100) + '%</span>' : '') + '</button>';
         }).join('') + '</div>';
       }).join('') + '<div class="muted small" style="margin-top:12px">All 40 PAS rudiments with sticking + accent targets — the ladder raises tempo as you pass.</div></div>' +
-      '<div class="card"><h2>Library</h2><div id="ws-lib">' + (lib().length ? lib().slice().reverse().map(function (sc) {
+      '<div class="card"><h2>Shared source library</h2><p class="muted small">Practice credit: ' + esc(selectedInstrument()) + '. Source instrument describes the score, not your XP category.</p><div id="ws-lib">' + (lib().length ? lib().slice().reverse().map(function (sc) {
         var best = parseInt(App.store.get(bestKey(sc, 'run'), 0), 10);
         return '<div class="row spread ws-row" data-wsid="' + sc.id + '">' +
           '<span><b>' + esc(sc.title) + '</b> <span class="muted small">' + sc.instrument + ' · ' + sc.bpm + ' BPM · ' +
@@ -1212,7 +1206,7 @@
       }).join('') : '<div class="muted">Nothing yet — generate an exercise above, import a MIDI file, or paste a tab.</div>') + '</div></div>';
     els.root.innerHTML = h;
     wireLib();
-    if(window.PracticeProgressUI)progressUI=PracticeProgressUI.mount(document.getElementById('ws-progress'),{instrument:App.store.get('ws.performance.instrument','piano')});
+    if(window.PracticeProgressUI)progressUI=PracticeProgressUI.mount(document.getElementById('ws-progress'),{instrument:selectedInstrument()});
   }
 
   function renderSession() {
@@ -1473,7 +1467,7 @@
     if (S) endRun(false);
     micStop(); lightsOff();
     view = 'performance';
-    PerformancePlayer.open(els.root, sc, Object.assign({}, opts || {}, {mode:mode === 'tempo' ? 'tempo' : 'wait',onBack:function(){view='lib';renderLib();}}));
+    PerformancePlayer.open(els.root, sc, Object.assign({instrument:selectedInstrument()}, opts || {}, {mode:mode === 'tempo' ? 'tempo' : 'wait',onBack:function(){view='lib';renderLib();}}));
   }
 
   function init(rootEl) {

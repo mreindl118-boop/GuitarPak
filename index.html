@@ -39,11 +39,11 @@
     <button type="button" class="btn sm" id="space-btn" aria-label="Switch workspace"></button>
     <button type="button" class="btn sm icon-btn" id="help-btn" aria-label="Help for this page" title="What is this page?"></button>
     <button type="button" class="btn sm icon-btn" id="settings-btn" aria-label="Settings" title="Settings"></button>
-    <button type="button" class="btn sm icon-btn" id="ctx-btn" aria-label="Key, scale and tempo" title="Key, scale &amp; tempo" aria-haspopup="true" aria-expanded="false" aria-controls="ctxbar"></button>
+    <button type="button" class="btn sm icon-btn" id="ctx-btn" aria-label="Key, scale and tempo" title="Key, scale &amp; tempo" aria-expanded="false" aria-controls="ctxbar"></button>
     <button type="button" class="btn sm icon-btn" id="lights-btn" aria-label="Lights and help" title="Lights &amp; help" aria-haspopup="dialog" aria-expanded="false" aria-controls="sheet-lights"></button>
     <button type="button" class="btn sm icon-btn" id="met-btn" aria-label="Metronome" title="Metronome" aria-haspopup="dialog" aria-expanded="false" aria-controls="sheet-metronome"></button>
   </div>
-  <div class="ctxbar" id="ctxbar">
+  <div class="ctxbar" id="ctxbar" role="region" aria-label="Global key, scale, tempo and sound settings" hidden>
     <label class="cx-field">Key<select id="cx-root"></select></label>
     <label class="cx-field cx-scale">Scale<select id="cx-scale"></select></label>
     <label class="cx-field" id="cx-mode-wrap">Mode<select id="cx-mode"></select></label>
@@ -116,6 +116,7 @@
 <script src="js/theory.js"></script>
 <script src="js/note-palette.js"></script>
 <script src="js/app.js"></script>
+<script src="js/learn-instruments.js"></script>
 <script src="js/midi.js"></script>
 <script src="js/practice-router.js"></script>
 <script src="js/pitch-detector.js"></script>

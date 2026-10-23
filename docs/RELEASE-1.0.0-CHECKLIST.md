@@ -25,7 +25,11 @@ credential changes, paid services, hardware settings or unrelated repositories.
 - [x] Shared monophonic audio input adapter, calibration, onset/silence gating,
   incompatible-chord handling, synthetic signal tests and full practice flows.
 - [x] Independent feature review, including adversarial XP and pending audio capture lifecycle.
-- [ ] Exact release-commit regression and offline/mobile/color-mode evidence.
+- [x] Instrument-organized Learn content with visible category and appropriate filtering.
+- [x] Session instrument snapshots, no cross-instrument duplicate credit, preserved legacy totals.
+- [x] Readable global clef control on every tab, accessible desktop/mobile and light/dark checks.
+- [x] Frozen runtime local regression and offline/mobile/color-mode evidence.
+- [ ] Exact final source hosted regression, authorized review/main publication and remote release verification.
 
 ## Intended release surface and process
 

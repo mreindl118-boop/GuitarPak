@@ -16,6 +16,11 @@ verified GuitarPak baseline while preserving source branches and provenance.
   Intervals / Note Names colors share the existing root/scale. Built-in pitched
   audio and musical MIDI admission obey the same lock, with paired cleanup.
   Raw wrong answers remain visible to scoring before sound filtering.
+- **Instrument-organized Learn:** explicit Piano, Synth, Guitar, Bass, Drums,
+  Voice and Other categories filter appropriate exercises and link actual
+  instrument lessons. Shared theory remains available with one instrument
+  credit per run. The larger vector clef and its shared controls are accessible
+  across every workspace, including Exercises and Settings.
 - **Instructional displays:** lessons, generated sheet/Tab exercises,
   pitch-bearing quiz questions, scale practice, Songs and the guided player
   publish actual targets through shared display ownership. Screen and emitted
@@ -32,6 +37,9 @@ verified GuitarPak baseline while preserving source branches and provenance.
   lifetime earned XP and configurable consistency XP/decay. Calendar, grace,
   vacation, rate/cap/floor settings, charts, export and failed-save recovery
   preserve history without a destructive migration.
+  Lessons and performance use one instrument XP balance. Earlier global
+  XP/course history stays Legacy / unassigned; changing categories never
+  copies awards or completions to another instrument.
 - **Release safety:** CI tests the exact deployed source. Pages snapshots
   append to deployment history with ordinary pushes and stale-source checks.
 
@@ -48,6 +56,8 @@ Audio practice is monophonic and may reject distortion, noise, unstable bends
 or ambiguous octaves. It does not perform polyphonic transcription, pitch
 shifting or direct guitar muting. Manual timing calibration is required for
 real devices. Google Docs/teacher-plan integration remains deferred.
+PDF recognition and durable source-file libraries are queued for a later
+version; see [the next-phase roadmap](ROADMAP-AFTER-1.0.md).
 
 See [validation](VALIDATION-2026-10-23.md), [capability coverage](FEATURE-COVERAGE-2026-10-23.md)
 and [release gates/rollback](RELEASE-1.0.0-CHECKLIST.md). The native APK channel

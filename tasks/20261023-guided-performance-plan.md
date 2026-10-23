@@ -1,5 +1,16 @@
 # Guided performance milestone plan — 2026-10-23
 
+## Release addendum — 16:11 UTC
+
+Hold publication for instrument-organized Learn/Lessons, fixed session instrument
+attribution and a readable global treble-clef control. Separate implementation
+owners cover Learn filtering, XP lifecycle and shell/icon accessibility; a fourth
+worker adds independent session tests and a fifth reviews attribution. Integration
+will rerun affected suites, mobile/offline checks and the full release gate on the
+new exact commit. Historical global XP stays explicitly legacy/unassigned.
+Conditional release authorization exists, but automatic review rejected public
+PR creation; explicit clarification is pending and no release was published.
+
 Authorized scope: cloud coding only, no hardware dependency, remote writes or publication. Preserve the branch audit, independent treble-clef Scale Lock/LUMI Display controls, comprehensive built-in pitched-note guard and exact output cleanup.
 
 1. **Verify reusable sources and engines.** Inspect Woodshed, Songs, Keys lessons, notation, MIDI/ASCII import and available exercise data. Define one structured sequence contract with real note/chord/rest/duration semantics; document unsupported PDF/image/plain prose and unsupported import semantics honestly.

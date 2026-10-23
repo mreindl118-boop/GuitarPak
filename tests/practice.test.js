@@ -1,6 +1,6 @@
-// v0.72 batch: the practice ledger (playing on any page counts), Android/
-// browser Back, Drill these, wrong-answer contrast, lesson cards, "apply it"
-// links, and the left-handed fretboard tap targets.
+// Explicit instrument-owned practice: canonical XP, clock/idle safeguards,
+// progress UI, browser Back, mistake drills, apply-it links and lefty hit targets.
+// The player uses injected clocks and simulated note attacks; no hardware or mic.
 const { chromium } = require('playwright');
 const env = require('./env');
 let fails = 0;
@@ -34,40 +34,72 @@ const PLAY = async (right) => {
 
 (async () => {
   const browser = await chromium.launch({ executablePath: env.CHROMIUM, args: ['--autoplay-policy=no-user-gesture-required'] });
-  let { ctx, page, errs } = await newPage(browser);
+  let { ctx, page, errs } = await newPage(browser, {'xp.total':80,'xp.days':{'1999-01-01':{x:80,s:0,p:0,q:0,k:0,l:1,u:{}}}});
 
-  console.log('# practice ledger');
-  const led = await page.evaluate(() => {
-    const out = {};
-    App.wake.acquire('fb-run');
-    out.quizTick = (SLXP._tick(), SLXP.today().p || 0);               // Exercises page: not counted here
-    App.switchTo('fretboard');
-    const x0 = SLXP.total();
-    for (let i = 0; i < 59; i++) SLXP._tick();
-    out.before = { p: SLXP.today().p, streak: SLXP.streak().today };
-    SLXP._tick();                                                      // 300 s
-    out.after = { p: SLXP.today().p, streak: SLXP.streak(), xp: SLXP.total() - x0 };
-    out.toast = (document.getElementById('xp-toast') || {}).textContent || '';
-    out.areas = SLXP.areas(7);
-    App.wake.release('fb-run');
-    const p1 = SLXP.today().p;
-    for (let i = 0; i < 5; i++) SLXP._tick();                          // nothing running, no notes: no time
-    out.idle = SLXP.today().p - p1;
-    App.emit('midi:note', { on: true, midi: 60, vel: 90 });            // free playing on the keys counts
-    App.switchTo('piano');
-    for (let i = 0; i < 3; i++) SLXP._tick();
-    out.keys = (SLXP.today().a || {}).Keys || 0;
+  console.log('# background activity cannot award XP or duplicate instrument credit');
+  const passive = await page.evaluate(() => {
+    const out = {legacyTotal:App.store.get('xp.total'),legacyDays:JSON.stringify(App.store.get('xp.days'))};
+    App.practiceInstrument.set('guitar');App.wake.acquire('fb-run');
+    for(let i=0;i<60;i++)SLXP._tick();
+    App.switchTo('fretboard');for(let i=0;i<60;i++)SLXP._tick();App.wake.release('fb-run');
+    App.switchTo('piano');App.emit('midi:note',{on:true,midi:60,vel:90});App.emit('midi:note',{on:false,midi:60});
+    for(let i=0;i<60;i++)SLXP._tick();SLXP.practice(600,'Keys');
+    out.guitar=App.practiceProgress.summary('guitar');out.piano=App.practiceProgress.summary('piano');
+    out.toast=(document.getElementById('xp-toast')||{}).textContent||'';
+    out.legacyUnchanged=App.store.get('xp.total')===out.legacyTotal&&JSON.stringify(App.store.get('xp.days'))===out.legacyDays;
     return out;
   });
-  ok(led.quizTick === 0, 'time on the Exercises page is not double-counted');
-  ok(led.before.p === 295 && !led.before.streak && led.after.p === 300 && led.after.streak.today && led.after.streak.n === 1, '5 minutes of a running drill make today a streak day: ' + JSON.stringify(led.after.streak));
-  ok(led.after.xp === 10, '2 XP per minute played: +' + led.after.xp);
-  ok(/Today counts/.test(led.toast), 'a toast says today counts: ' + led.toast);
-  ok(led.areas[0] && led.areas[0].area === 'Guitar' && led.areas[0].s === 300, 'time logged per area: ' + JSON.stringify(led.areas));
-  ok(led.idle === 0 && led.keys === 15, 'idle time is not counted; notes coming in on Keys are: ' + led.idle + ' / ' + led.keys);
-  const prog = await page.evaluate(() => { App.switchTo('quiz'); SLQuiz.tab('progress');
-    return { tile: [...document.querySelectorAll('.qz-tile')].find(t => /Practice time/.test(t.textContent)).textContent, rows: document.querySelectorAll('.qz-arow').length, note: document.querySelector('.qz-strip').textContent }; });
-  ok(/playing/.test(prog.tile) && prog.rows >= 2, 'Progress shows playing time and the per-area rows: ' + prog.tile.replace(/\s+/g, ' '));
+  ok(passive.guitar.sessionCount===0&&passive.piano.sessionCount===0,'quiz ticks, a running fretboard wake tag and unowned MIDI notes create no practice sessions');
+  ok(passive.guitar.currentXP===0&&passive.piano.currentXP===0&&passive.legacyUnchanged,'background and anonymous practice preserve both instrument balances and legacy history');
+  ok(!/Today counts|Daily goal reached/.test(passive.toast),'background activity does not claim an earned streak day or daily goal');
+
+  console.log('# deliberately started player owns measured time and raw note observations');
+  const owned = await page.evaluate(() => {
+    window.__practiceClock=0;window.__practiceEpoch=Date.now();
+    window.__practiceWall=()=>__practiceEpoch+__practiceClock*1000;
+    App.practiceProgress=new PracticeProgress({store:App.store,now:__practiceWall,timezone:()=> 'UTC'});
+    App.practiceProgress.updateSettings({dailyMinutes:5,xpPerMinute:2,xpPerCorrectNote:0,decayEnabled:false});
+    window.__practiceOpen=instrument=>{
+      App.practiceInstrument.set(instrument);App.switchTo('shed');
+      Woodshed.performanceStart({title:'Original explicit-session test fixture',bpm:120,len:1024,notes:[{m:60,t:0,d:1},{m:62,t:512,d:1}]},'wait',{instrument,countIn:0,clock:()=>__practiceClock,now:__practiceWall});
+      document.getElementById('pf-sound').checked=false;document.getElementById('pf-start').click();
+    };
+    window.__practiceAttack=()=>{PerformancePlayer.note({midi:61,on:true,velocity:100,source:'test'});PerformancePlayer.note({midi:61,on:false,velocity:0,source:'test'});};
+    window.__practiceStep=seconds=>{__practiceClock+=seconds;PerformancePlayer.tick();};
+    __practiceOpen('guitar');
+    const identity=PerformancePlayer.snapshot().practice;
+    for(let i=0;i<300;i++){if(i%4===0)__practiceAttack();__practiceStep(1);}
+    document.getElementById('pf-stop').click();
+    const summary=App.practiceProgress.summary('guitar'),session=App.practiceProgress.history('guitar')[0];
+    document.getElementById('pf-stop').click();SLXP._tick();
+    return {identity,summary,session,repeated:App.practiceProgress.summary('guitar'),facade:SLXP.forInstrument('guitar').total(),other:App.practiceProgress.summary('piano')};
+  });
+  ok(owned.session.id===owned.identity.id&&owned.session.instrument==='guitar'&&owned.session.status==='stopped','an explicitly started player records its stable owned session ID and captured instrument');
+  ok(owned.session.engagedSeconds===300&&owned.summary.today.qualifies&&owned.summary.currentStreak===1,'five measured engaged minutes meet the configured five-minute instrument goal');
+  ok(owned.summary.currentXP===10&&owned.summary.lifetimeEarnedXP===10&&owned.facade===10,'the selected course facade reads the same configured canonical award of ten XP');
+  ok(owned.session.matched===0&&owned.session.expected===2&&owned.session.extra===75&&owned.session.wrong===75&&owned.session.timingSamples===0,'simulated wrong attacks retain raw counts without inventing matched notes or Wait-mode timing');
+  ok(owned.repeated.sessionCount===1&&owned.repeated.currentXP===10&&owned.other.sessionCount===0,'repeated Stop and background ticks cannot credit the session twice or to Piano');
+
+  console.log('# idle, large clock gaps and pause cannot farm practice time');
+  const idle=await page.evaluate(()=>{
+    __practiceOpen('piano');__practiceAttack();__practiceStep(1);__practiceStep(60);__practiceStep(1);
+    PerformancePlayer.pause();__practiceStep(120);document.getElementById('pf-pause').click();__practiceStep(1);
+    __practiceAttack();__practiceStep(1);document.getElementById('pf-stop').click();
+    return {piano:App.practiceProgress.summary('piano'),session:App.practiceProgress.history('piano')[0],guitar:App.practiceProgress.summary('guitar')};
+  });
+  ok(idle.session.engagedSeconds===2,'a long clock jump, stale-note idle time, paused time and resume without a new attack contribute no engaged time');
+  ok(idle.session.extra===2&&idle.session.matched===0&&idle.session.timingSamples===0,'resumed input records only fresh observed attacks and no fabricated musical success');
+  ok(idle.piano.sessionCount===1&&!idle.piano.today.qualifies&&idle.piano.currentStreak===0&&idle.guitar.currentXP===10,'Piano owns its partial session while the completed Guitar goal remains independent');
+
+  console.log('# course progress presents the canonical selected-instrument metrics');
+  const prog=await page.evaluate(()=>{
+    const read=instrument=>{App.practiceInstrument.set(instrument);App.switchTo('quiz');SLQuiz.tab('progress');return {tiles:[...document.querySelectorAll('.qz-tile')].map(e=>e.textContent),areas:[...document.querySelectorAll('.qz-arow')].map(e=>e.textContent),time:document.getElementById('qz-ch-time').textContent,history:document.querySelector('.qz-prog2').textContent};};
+    const piano=read('piano'),guitar=read('guitar');return {piano,guitar};
+  });
+  ok(prog.guitar.tiles.some(t=>/Lifetime earned XP/.test(t)&&/10/.test(t))&&prog.guitar.tiles.some(t=>/Engaged practice/.test(t)&&/5 min/.test(t)),'Guitar progress displays its canonical lifetime award and five measured minutes');
+  ok(prog.piano.tiles.some(t=>/Engaged practice/.test(t)&&/0 min/.test(t))&&prog.piano.areas.length===1&&/Explicit piano practice/.test(prog.piano.areas[0]),'Piano progress rounds its own two seconds to zero minutes and shows only its explicit instrument area');
+  ok(/canonical instrument history, counted once/.test(prog.guitar.history)&&/Engaged minutes/.test(prog.guitar.time),'the time chart includes an accessible canonical-minutes table without adding question time again');
+  ok(/Legacy \/ unassigned/.test(prog.guitar.history),'legacy history remains explicitly unassigned in course progress');
 
   console.log('# Back');
   const back = async () => { await page.evaluate(() => history.back()); await page.waitForTimeout(200); };
@@ -107,7 +139,7 @@ const PLAY = async (right) => {
     document.getElementById('qz-act').click();
     await play(7);                                       // 7 more right: 7/10 + misses
     out.misses = SLQuiz.cur.drillPool.slice();
-    out.bestBefore = JSON.parse(localStorage.getItem('guitarlab.qz.prog'))['notes/nat/treble/1'].b;
+    out.bestBefore = App.store.get('qz.instrumentProg',{}).guitar['notes/nat/treble/1'].b;
     out.drillBtn = !!document.getElementById('qz-drill');
     document.getElementById('qz-drill').click();
     out.drill = { tag: document.querySelector('.qz-lvltag').textContent, n: SLQuiz.cur.n, items: [] };
@@ -116,7 +148,7 @@ const PLAY = async (right) => {
       await new Promise(r => setTimeout(r, 10)); SLQuiz.pick(SLQuiz.q.correct); document.getElementById('qz-act').click();
     }
     out.drillDone = { big: document.querySelector('.qz-big').textContent, verdict: document.querySelector('.qz-verdict').textContent };
-    out.bestAfter = JSON.parse(localStorage.getItem('guitarlab.qz.prog'))['notes/nat/treble/1'].b;
+    out.bestAfter = App.store.get('qz.instrumentProg',{}).guitar['notes/nat/treble/1'].b;
     out.doneApply = !!document.querySelector('.qz-donelinks [data-qzapply="nat"]');
     SLQuiz.start('scales/smm/staff/1');
     await play(10);

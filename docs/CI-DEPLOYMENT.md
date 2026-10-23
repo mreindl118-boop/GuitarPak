@@ -20,6 +20,9 @@ It uses Ubuntu, Node 24, and the locally verified **Playwright 1.62.1**. Depende
 install under the runner's temporary directory; Playwright installs its matching
 Chromium and required system packages. `NODE_PATH` and `CHROMIUM` point to that
 installation. It then runs **`bash tests/run.sh` with no suite exclusions**.
+The job allows thirty minutes: the first cold hosted run spent nine minutes
+installing system/browser dependencies and another nine running all suites.
+Increasing that deadline does not skip or relax any assertion.
 The [official Playwright CI guide](https://playwright.dev/docs/ci-intro) documents
 the browser/dependency installation used here; the
 [setup-node v4 documentation](https://github.com/actions/setup-node/blob/v4/README.md)

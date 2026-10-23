@@ -280,7 +280,7 @@
       '<canvas id="pf-roll" class="pf-roll" role="img" aria-label="Piano roll"></canvas><p class="small muted" style="margin-bottom:0">Coming up</p><ol id="pf-upcoming" class="pf-upcoming"></ol><progress id="pf-progress" max="1" value="0" aria-label="Performance progress"></progress><p id="pf-stats" class="small"></p>'+
       '<div class="pf-controls"><label>Target key preview <select id="pf-octave">'+[24,36,48,60,72,84,96].map(function(n){return '<option value="'+n+'">'+esc(name(n))+' – '+esc(name(n+24))+'</option>';}).join('')+'</select></label><span class="small muted">● Target · ✓ Correct · × Wrong. Hold multiple keys for chords. A/W/S/E… play the first octave.</span></div><div id="pf-keyboard" class="pf-keys" role="group" aria-label="Playable keyboard and target preview"></div>'+
       '<p id="pf-xp" class="small muted"></p><div id="pf-progress-unsaved" hidden><button type="button" class="btn sm" id="pf-progress-retry">Retry saving progress</button><button type="button" class="btn sm" id="pf-progress-export">Export unsaved sessions</button></div><p id="pf-display-state" class="small muted"></p><p id="pf-lock-state" class="small muted"></p><details class="pf-unsupported"><summary>Source details and scoring limits</summary><ul id="pf-source-warnings"></ul><ul>'+warnings.map(function(w){return '<li>'+esc(w)+'</li>';}).join('')+'</ul></details></div><div id="pf-report" class="card" tabindex="-1" hidden></div></div>';
-    el('progress-retry').onclick=retryProgress;el('progress-export').onclick=exportPending;el('instrument').value=options.instrument;el('instrument').onchange=function(){options.instrument=this.value;App.store.set('ws.performance.instrument',this.value);paintProgress();};el('mode').value=options.mode; el('tempo').value=options.tempo; el('countin').value=options.countIn;
+    el('progress-retry').onclick=retryProgress;el('progress-export').onclick=exportPending;el('instrument').value=options.instrument;el('instrument').onchange=function(){changeInstrument(this.value,true);};el('mode').value=options.mode; el('tempo').value=options.tempo; el('countin').value=options.countIn;
     el('section-end').value=score.len+1; el('octave').value=base;
     el('back').onclick=function(){var back=options.onBack;close();if(back)back();};
     el('start').onclick=function(){start(false);}; el('restart').onclick=function(){start(true);}; el('stop').onclick=stop;
@@ -345,6 +345,7 @@
     });paint(engine.snapshot());
   }
   function installListeners(){if(listenersReady)return;listenersReady=true;
+    App.on('learn:instrument',function(e){if(e)changeInstrument(e.instrument,false);});
     App.on('midi:raw',raw);
     App.on('midi:state',function(){if(!engine||!root)return;refreshInputs();if(options.inputId!=='all'&&!App.midi.inputs.some(function(p){return String(p.id)===String(options.inputId);}))pause('Performance input disconnected. Reconnect, release keys, then resume.');paint(engine.snapshot());});
     App.on('scale:boundary',function(){if(live())pause('Scale or lock changed. Sound cleared; release keys and resume when ready.');});
@@ -356,11 +357,12 @@
     document.addEventListener('keydown',function(e){if(!live()||options.inputKind==='audio'||e.repeat||e.ctrlKey||e.metaKey||e.altKey||/INPUT|SELECT|TEXTAREA/.test(e.target.tagName))return;var i=KEY_CODES.indexOf(e.code);if(i<0)return;e.preventDefault();typing[e.code]=base+i;note({midi:base+i,on:true,source:'qwerty',velocity:100});});
     document.addEventListener('keyup',function(e){if(typing[e.code]==null)return;var m=typing[e.code];delete typing[e.code];note({midi:m,on:false,source:'qwerty'});});
   }
-  function open(container,sc,opts){close();root=container;score=sc;options=Object.assign({mode:'wait',tempo:sc.bpm,countIn:App.store.get('ws.performance.countIn',4),inputId:App.store.get('ws.performance.input','all'),instrument:App.store.get('ws.performance.instrument',INSTRUMENTS.indexOf(sc.instrument)!==-1?sc.instrument:'piano'),inputKind:App.store.get('ws.performance.inputKind','midi'),clock:function(){return App.getAudio().currentTime;}},opts||{});
+  function changeInstrument(id, publish){if(INSTRUMENTS.indexOf(id)<0)return;if(engine&&options&&options.instrument!==id){stop(true);options.instrument=id;App.store.set('ws.performance.instrument',id);if(el('instrument'))el('instrument').value=id;paint(engine.snapshot());paintProgress();}if(publish&&App.practiceInstrument)App.practiceInstrument.set(id);}
+  function open(container,sc,opts){close();root=container;score=sc;options=Object.assign({mode:'wait',tempo:sc.bpm,countIn:App.store.get('ws.performance.countIn',4),inputId:App.store.get('ws.performance.input','all'),instrument:App.practiceInstrument?App.practiceInstrument.get():App.store.get('ws.performance.instrument','piano'),inputKind:App.store.get('ws.performance.inputKind','midi'),clock:function(){return App.getAudio().currentTime;}},opts||{});
     base=Math.max(24,Math.min(96,Math.floor(Math.min.apply(null,score.notes.map(function(n){return n.m;}))/12)*12));lastMessage='';lastCurrent='';installListeners();build();
     if(App.midi&&(options.inputId==='all'||App.midi.inputs.some(function(p){return String(p.id)===String(options.inputId);})))App.midi.setInput(options.inputId);
     if(INSTRUMENTS.indexOf(options.instrument)===-1)options.instrument='piano';el('instrument').value=options.instrument;
     configure();paintProgress();
   }
-  window.PerformancePlayer={open:open,close:close,stop:stop,pause:pause,hide:function(){pause('Practice paused when leaving this page.');if(engine)engine.releaseInput();},note:note,tick:function(){if(engine){engagement();engine.tick();}},snapshot:function(){return engine&&engine.snapshot();},listenAudio:listenAudio,get audioInput(){return audioInput;},get engine(){return engine;}};
+  window.PerformancePlayer={open:open,close:close,stop:stop,pause:pause,hide:function(){pause('Practice paused when leaving this page.');if(engine)engine.releaseInput();},note:note,tick:function(){if(engine){engagement();engine.tick();}},snapshot:function(){if(!engine)return null;return Object.assign({},engine.snapshot(),{practice:metrics?{id:metrics.id,instrument:metrics.instrument,recorded:metrics.recorded}:null});},listenAudio:listenAudio,get audioInput(){return audioInput;},get engine(){return engine;}};
 })();

@@ -106,7 +106,7 @@ const tabs = sel => [...document.querySelectorAll(sel + ' .tabbar-btn')].map(b =
   await page.evaluate(() => App.switchTo('songs')); await page.waitForTimeout(150);
   ok(cx1.open && cx1.exp === 'true' && cx1.afterPick && /Dorian/.test(cx1.label), 'the clef opens it; picking a scale keeps it open and the button names it: ' + JSON.stringify(cx1));
   ok(!cx1.outside && !cx1.toggle && !cx1.esc && !cx1.nav, 'tucked away by a tap outside, the clef again, Esc, or changing page: ' + JSON.stringify(cx1));
-  ok(cx1.quizBtn === 'none', 'no clef on Exercises (it does not use the key bar)');
+  ok(cx1.quizBtn !== 'none', 'the shared clef remains available on Exercises');
   await page.evaluate(() => { const s = document.getElementById('cx-scale'); s.value = 'minorPent'; s.dispatchEvent(new Event('change')); });
 
   console.log('# scale menu');

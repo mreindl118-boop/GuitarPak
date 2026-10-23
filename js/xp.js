@@ -1,315 +1,95 @@
-/* soundLAB XP — the lesson game layer over Exercises (Duolingo-style):
- * XP and player levels, a daily XP goal, a day streak with streak freezes,
- * practice time, per-unit answer speed, and 60-second sprint records.
- * No DOM except one class on <html> (goal-due: today's goal not met yet).
- *
- * PRACTICE LEDGER: playing on any page counts too. While a practice tool
- * runs (its App.wake tag: fretboard/keys runner, chords player, songs, jam,
- * woodshed, trainer, metronome) or notes come in from MIDI / tone-in / the
- * on-screen instruments, the time is logged per area, earns 2 XP a minute,
- * and 5 minutes make the day count for the streak. A forgotten loop stops
- * counting after 10 minutes without a touch or a played note.
- *
- * Stores (App.store → localStorage 'guitarlab.*'):
- *   xp.total   lifetime XP
- *   xp.days    { 'YYYY-MM-DD': { x: XP, s: seconds answering in Exercises,
- *                q: answered, k: correct, l: levels finished,
- *                u: { unitId: [ok, ms, asked] }, p: seconds playing elsewhere,
- *                a: { area: seconds }, pm: playing minutes already paid XP } }
- *              (u = correct answers, their summed answer time, and all
- *              answers per unit; kept ~180 days)
- *   xp.goal    daily XP goal: 20 | 50 | 100 | 150
- *   xp.freeze  streak freezes banked (0..2) · xp.frozen [day keys they covered]
- *   xp.fzAt    day a freeze was last earned · xp.best best streak
- *   xp.sprint  { key: best correct answers in 60 s; 'end:'+key = best endless streak }
- *   xp.jump    furthest path node opened by a jump test (-1 = none)
- *
- * Bus: emits 'xp' {total, today, goal, gained} after every change.
+/* One instrument XP balance: App.practiceProgress owns all new awards.
+ * xp.* and historical course records remain read-only Legacy / unassigned.
+ * lesson.observations.v1 stores instrument-specific knowledge statistics;
+ * lesson.pending.v1 retains exact unsaved canonical sessions for retry/export.
+ * Background wake timers and anonymous practice never award XP.
  */
 (function () {
   'use strict';
-
-  var GOALS = [20, 50, 100, 150];
-  var GOAL_NAMES = { 20: 'Casual', 50: 'Regular', 100: 'Serious', 150: 'Intense' };
-  var PAR = { choice: 4000, ear: 6500, play: 9000 }; // fast-answer bonus thresholds (ms)
-  var KEEP_DAYS = 180;
-  var PLAY_DAY = 300;       // seconds of playing that make a streak day
-  var PLAY_TAGS = { 'fb-run': 'Guitar', 'pn-run': 'Keys', 'ch-play': 'Chords', 'sg-run': 'Songs', 'jam-run': 'Jam',
-    'ws-run': 'Woodshed', 'tr-sess': 'Trainer', 'tr-cc': 'Trainer', 'kl-run': 'Keys', met: 'Metronome' };
-  var PAGE_AREA = { fretboard: 'Guitar', tab: 'Guitar', notation: 'Guitar', piano: 'Keys', synth: 'Keys', pads: 'Keys',
-    chords: 'Chords', songs: 'Songs', jam: 'Jam', shed: 'Woodshed', trainer: 'Trainer', theory: 'Theory', tuner: 'Tuner' };
-
-  var now = function () { return new Date(); }; // tests override via SLXP._now
-
-  function pad(n) { return n < 10 ? '0' + n : '' + n; }
-  function dayKey(d) { d = d || now(); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
-  function fromKey(k) { var p = k.split('-'); return new Date(+p[0], +p[1] - 1, +p[2], 12); }
-  function addDays(k, n) { var d = fromKey(k); d.setDate(d.getDate() + n); return dayKey(d); }
-
-  function get(key, def) { var v = App.store.get(key, def); return v == null ? def : v; }
-  function set(key, v) { App.store.set(key, v); }
-
-  var days = null;
-  function D() {
-    if (!days) { days = get('xp.days', {}); if (!days || typeof days !== 'object') days = {}; }
-    return days;
+  var GOALS=[20,50,100,150], GOAL_NAMES={20:'Casual',50:'Regular',100:'Serious',150:'Intense'};
+  var PAR={choice:4000,ear:6500,play:9000},PLAY_DAY=300;
+  var now=function(){return new Date();},days=null;
+  function pad(n){return n<10?'0'+n:''+n;}
+  function dayKey(d){d=d||now();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
+  function fromKey(k){var p=k.split('-');return new Date(+p[0],+p[1]-1,+p[2],12);}
+  function addDays(k,n){var d=fromKey(k);d.setDate(d.getDate()+n);return dayKey(d);}
+  function get(k,fallback){var v=App.store.get(k,fallback);return v==null?fallback:v;}
+  function set(k,v){App.store.set(k,v);}
+  function D(){if(!days){days=get('xp.days',{});if(!days||typeof days!=='object')days={};}return days;}
+  function total(){return Math.max(0,Math.round(+get('xp.total',0)||0));}
+  function goal(){return +get('xp.goal',50)||50;}
+  function levelOf(xp){var lv=1,need=40,rest=xp;while(rest>=need){rest-=need;lv++;need=40+20*(lv-1);}return {lv:lv,into:rest,need:need,title:'Legacy player'};}
+  // Historical xp.* is intentionally read-only. New lesson observations and
+  // all new awards use the same instrument ledger as guided performance.
+  var IDS = ['piano','synth','guitar','bass','drums','voice','other'];
+  var OBS = 'lesson.observations.v1', PENDING = 'lesson.pending.v1';
+  var sessions = Object.create(null), facades = {}, pendingMemory=null, observationMemory=null, observationsDirty=false;
+  function selected() { return App.practiceInstrument ? App.practiceInstrument.get() : 'piano'; }
+  function valid(id) { return IDS.indexOf(id) >= 0; }
+  function timestamp() { return now().getTime(); }
+  function refreshDot(){if(!App.practiceProgress||!document.documentElement)return;var p=summary(selected());document.documentElement.classList.toggle('goal-due',p.currentXP>0&&!p.today.qualifies);}
+  function scopedDay(){return App.practiceProgress?App.practiceProgress.dayKey(timestamp()):dayKey();}
+  function clone(v) { return JSON.parse(JSON.stringify(v)); }
+  function observationData(){if(observationMemory===null)observationMemory=get(OBS,{});return observationMemory;}
+  function observations(id) { var all=observationData(); return all[id] || {days:{},sprints:{},jump:-1}; }
+  function persistObservations(){var snapshot=JSON.stringify(observationData());set(OBS,observationData());if(JSON.stringify(get(OBS,null))!==snapshot)throw new Error('Lesson observations could not be persisted.');}
+  function saveObservation(id, fn) { var all=observationData(),o=all[id]||(all[id]={days:{},sprints:{},jump:-1});fn(o);try{persistObservations();observationsDirty=false;}catch(e){observationsDirty=true;showPending();App.emit('xp:observation-error',{instrument:id,message:e.message});} }
+  function summary(id) { return App.practiceProgress ? App.practiceProgress.summary(id) : {currentXP:0,lifetimeEarnedXP:0,level:1,currentStreak:0,bestStreak:0,today:{earnedXP:0,engagedSeconds:0},daily:[]}; }
+  function beginSession(o) {
+    o=o||{}; var id=o.id||o.sessionId, instrument=o.instrument;
+    if(typeof id!=='string'||!id.trim()||id.length>128||!Number.isFinite(timestamp()))return null;
+    if(!id||!valid(instrument))return null;
+    if(sessions[id])return sessions[id].instrument===instrument?id:null;
+    var previous=null;if(App.practiceProgress)IDS.some(function(i){previous=App.practiceProgress.history(i).filter(function(s){return s.id===id;})[0];return !!previous;});
+    var unsaved=pending().filter(function(s){return s.id===id;})[0];if(previous||unsaved){var old=previous||unsaved;if(old.instrument!==instrument)return null;sessions[id]={id:id,instrument:instrument,finished:true,result:{bonus:0,duplicate:!!previous,error:!!unsaved,pending:!!unsaved}};return id;}
+    sessions[id]={id:id,instrument:instrument,source:o.source||'lesson',startedAt:timestamp(),lastAt:timestamp(),seconds:0,segments:[],answers:Object.create(null),finished:false};
+    return id;
   }
-  function day(k) {
-    var all = D();
-    k = k || dayKey();
-    if (!all[k]) all[k] = { x: 0, s: 0, q: 0, k: 0, l: 0, u: {} };
-    return all[k];
+  function answerScoped(o) {
+    o=o||{};var id=o.sessionId,r=sessions[id];
+    if(!r||r.finished||r.instrument!==o.instrument)return {xp:0,fast:false,ignored:true};
+    var key=String(o.answerId==null?'answer-'+Object.keys(r.answers).length:o.answerId);
+    if(r.answers[key])return {xp:0,fast:false,duplicate:true};
+    var at=timestamp();if(!Number.isFinite(at)||at<r.lastAt)return {xp:0,ignored:true};r.answers[key]=true;var rawMs=Math.max(0,Math.min(Number(o.ms)||0,Math.max(0,at-r.lastAt))),ms=Math.min(rawMs,5000);
+    r.lastAt=at;r.seconds+=ms/1000;if(ms)r.segments.push({startedAt:at-ms,endedAt:at,engagedSeconds:ms/1000});
+    saveObservation(r.instrument,function(all){var d=all.days[scopedDay()]||(all.days[scopedDay()]={x:0,s:0,p:0,q:0,k:0,l:0,u:{}});d.q++;d.s+=ms/1000;if(o.ok)d.k++;if(o.unit){var u=d.u[o.unit]||(d.u[o.unit]=[0,0,0]);u[2]++;if(o.ok){u[0]++;u[1]+=rawMs;}}});
+    return {xp:0,fast:!!(o.ok&&rawMs>0&&rawMs<(PAR[o.kind]||PAR.choice))};
   }
-  function peek(k) { return D()[k] || null; }
-  function prune() {
-    var all = D(), cut = addDays(dayKey(), -KEEP_DAYS);
-    Object.keys(all).forEach(function (k) { if (k < cut) delete all[k]; });
+  function pending() {if(pendingMemory===null){var p=get(PENDING,[]);pendingMemory=Array.isArray(p)?p:[];}return clone(pendingMemory); }
+  function retainPending(list){pendingMemory=clone(list);try{set(PENDING,list);}catch(e){/* The in-memory export remains available even when all storage is full. */}}
+  function saveSession(input) {
+    var result=App.practiceProgress&&App.practiceProgress.recordSession(input),list=pending().filter(function(s){return s.id!==input.id;});
+    if(!result||!result.ok){list.push(input);retainPending(list);showPending();App.emit('xp:save-error',{sessionId:input.id,instrument:input.instrument,errors:result&&result.errors||['Practice progress is unavailable.']});return {bonus:0,error:true,pending:true,sessionId:input.id};}
+    retainPending(list);showPending();App.emit('practiceprogress:changed',{instrument:input.instrument});App.emit('xp',{instrument:input.instrument,total:result.summary.currentXP,gained:result.accepted?result.session.earnedXP:0});
+    var saved={bonus:result.accepted?result.session.earnedXP:0,duplicate:!!result.duplicate,goalHit:false,streak:result.summary.currentStreak,extended:false,freezeEarned:false};if(sessions[input.id])sessions[input.id].result=saved;return saved;
   }
-  function saveDays() { prune(); set('xp.days', D()); }
-
-  function total() { return Math.max(0, Math.round(+get('xp.total', 0) || 0)); }
-  function goal() { var g = +get('xp.goal', 50); return GOALS.indexOf(g) >= 0 ? g : 50; }
-
-  // first run: existing course progress turns into a starting XP balance
-  function seed() {
-    if (App.store.get('xp.total', null) != null) return;
-    var p = App.store.get('qz.prog', {}), t = 0;
-    if (p && typeof p === 'object') Object.keys(p).forEach(function (id) { if (p[id] && p[id].s) t += 10 + (p[id].s === 3 ? 5 : 0); });
-    set('xp.total', t);
+  function finishScoped(o) {
+    o=o||{};var r=sessions[o.sessionId];
+    if(!r||r.instrument!==o.instrument)return {bonus:0,ignored:true};
+    if(r.finished)return {bonus:0,duplicate:true,error:!!(r.result&&r.result.error),pending:!!(r.result&&r.result.pending)};
+    var end=timestamp();if(!Number.isFinite(end)||end<r.lastAt)end=r.lastAt;r.finished=true;var m=o.metrics||{},musical=!!o.metrics;
+    var engaged=Math.min(Math.max(0,(end-r.startedAt)/1000),musical?Math.max(0,Number(m.engagedSeconds)||0):r.seconds);
+    var input={id:r.id,instrument:r.instrument,startedAt:r.startedAt,endedAt:Math.max(r.startedAt,end),engagedSeconds:engaged,mode:musical?(o.mode||'lesson-play'):'knowledge',status:o.status==='stopped'?'stopped':'complete',expected:musical?(m.expected||0):0,matched:musical?(m.matched||0):0,missed:musical?(m.missed||0):0,extra:musical?(m.extra||0):0,wrong:musical?(m.wrong||0):0,timingSamples:0,sumAbsTimingMs:0,sumTimingMs:0,tempo:null};
+    saveObservation(r.instrument,function(all){var d=all.days[scopedDay()]||(all.days[scopedDay()]={x:0,s:0,p:0,q:0,k:0,l:0,u:{}});if(o.status!=='stopped')d.l++;});
+    if(!musical)input.segments=r.segments.slice();
+    r.result=saveSession(input);return r.result;
   }
+  function retryPending() {if(observationsDirty){try{persistObservations();observationsDirty=false;}catch(e){/* Keep the observations in the export until storage recovers. */}}var results=pending().map(saveSession);showPending();return results;}
+  function showPending(){var box=document.getElementById('lesson-progress-unsaved');if(!pending().length&&!observationsDirty){if(box)box.remove();return;}if(!box){box=document.createElement('aside');box.id='lesson-progress-unsaved';box.className='card';box.setAttribute('role','status');box.style.cssText='position:fixed;bottom:12px;left:12px;right:12px;z-index:9999;max-width:640px;margin:auto';document.body.appendChild(box);}box.innerHTML='<p>Lesson progress was not saved. Retry or export the original observations before closing this page.</p><button type="button" class="btn" data-lesson-retry>Retry save</button> <button type="button" class="btn" data-lesson-export>Export unsaved</button>';box.querySelector('[data-lesson-retry]').onclick=retryPending;box.querySelector('[data-lesson-export]').onclick=function(){var url=URL.createObjectURL(new Blob([api.exportPending()],{type:'application/json'})),link=document.createElement('a');link.href=url;link.download='soundlab-unsaved-lessons.json';link.click();setTimeout(function(){URL.revokeObjectURL(url);},1000);};}
 
-  // ---- player level: 40 XP to reach Lv 2, then +20 more per level ----
-  var TITLES = [[1, 'Beginner'], [3, 'Learner'], [6, 'Player'], [10, 'Musician'], [15, 'Pro'], [20, 'Maestro']];
-  function levelOf(xp) {
-    var lv = 1, need = 40, rest = xp;
-    while (rest >= need) { rest -= need; lv++; need = 40 + 20 * (lv - 1); }
-    var title = TITLES[0][1];
-    TITLES.forEach(function (t) { if (lv >= t[0]) title = t[1]; });
-    return { lv: lv, into: rest, need: need, title: title };
+  function facade(id) {
+    if(!valid(id))throw new RangeError('Choose an explicit supported instrument.');
+    if(facades[id])return facades[id];
+    function h(n){n=Math.max(1,Math.min(3660,Math.floor(n||30)));var o=observations(id),p=App.practiceProgress?App.practiceProgress.summary(id,{rangeDays:n}):summary(id),by={};(p.daily||[]).forEach(function(d){by[d.date]=d;});var out=[],k=addDays(scopedDay(),1-n);for(var i=0;i<n;i++,k=addDays(k,1)){var d=Object.assign({x:0,s:0,p:0,q:0,k:0,l:0,u:{}},o.days[k]||{}),a=by[k]||{};out.push(Object.assign(d,{key:k,x:a.earnedXP||0,p:a.engagedSeconds||0,a:{},active:!!a.qualifies,frozen:false}));}return out;}
+    function sp(unit,from,to){var o=observations(id),n=0,ms=0,only=unit?(Array.isArray(unit)?unit:[unit]):null;Object.keys(o.days).forEach(function(k){if(from&&k<from||to&&k>=to)return;var u=o.days[k].u||{};Object.keys(u).forEach(function(key){if(!only||only.indexOf(key)>=0){n+=u[key][0];ms+=u[key][1];}});});return {n:n,avg:n?ms/n:0};}
+    function st(){var p=summary(id);return {n:p.currentStreak||0,best:p.bestStreak||0,today:!!p.today.qualifies,freezes:0};}
+    var api={GOALS:GOALS,GOAL_NAMES:GOAL_NAMES,instrument:id,total:function(){return summary(id).currentXP;},goal:function(){return App.practiceProgress?App.practiceProgress.getSettings().dailyMinutes:10;},setGoal:function(g){if(App.practiceProgress)App.practiceProgress.updateSettings({dailyMinutes:+g});},level:function(){var p=summary(id),settings=App.practiceProgress&&App.practiceProgress.getSettings(),need=settings?settings.xpPerLevel:100;return {lv:p.level||1,into:p.currentXP%need,need:need,title:'Consistency'};},levelOf:levelOf,today:function(){return h(1)[0];},streak:st,history:h,speed:sp,speedWeeks:function(w,unit){var out=[],end=addDays(scopedDay(),1);for(var i=w-1;i>=0;i--){var to=addDays(end,-7*i),from=addDays(to,-7),v=sp(unit,from,to);out.push({from:from,to:addDays(to,-1),n:v.n,avg:v.avg});}return out;},totals:function(){var t={q:0,k:0,s:0,p:summary(id).totalEngagedSeconds||0,l:0,days:0};Object.keys(observations(id).days).forEach(function(k){var d=observations(id).days[k];['q','k','s','l'].forEach(function(a){t[a]+=d[a]||0;});if(d.l)t.days++;});return t;},unitStats:function(){var out={};Object.keys(observations(id).days).forEach(function(k){var u=observations(id).days[k].u||{};Object.keys(u).forEach(function(a){var v=out[a]||(out[a]={ok:0,asked:0,ms:0});v.ok+=u[a][0];v.ms+=u[a][1];v.asked+=u[a][2];});});return out;},areas:function(){return [{area:'Explicit '+id+' practice',s:summary(id).totalEngagedSeconds||0}];},answer:function(o){return answerScoped(Object.assign({},o,{instrument:id}));},finishLevel:function(o){return finishScoped(Object.assign({},o,{instrument:id}));},practice:function(){return {xp:0,ignored:true};},sprintBest:function(k){return observations(id).sprints[k]||0;},sprintRecord:function(k,score){var old=observations(id).sprints[k]||0;saveObservation(id,function(o){o.sprints[k]=Math.max(old,score);});return {best:Math.max(old,score),old:old,isBest:score>old};},sprints:function(){return clone(observations(id).sprints);},jump:function(){return observations(id).jump;},setJump:function(i){saveObservation(id,function(o){o.jump=Math.max(o.jump,i);});},dayKey:function(d){return App.practiceProgress?App.practiceProgress.dayKey(d?d.getTime():timestamp()):dayKey(d);},addDays:addDays,refresh:function(){refreshDot();App.emit('xp',{instrument:id,total:summary(id).currentXP,gained:0});}};
+    facades[id]=api;return api;
   }
-
-  // ---- streak: a day counts once a level is finished or 5 minutes played ----
-  function dayActive(d) { return !!(d && (d.l > 0 || (d.p || 0) >= PLAY_DAY)); }
-  function active(k) { return dayActive(peek(k)); }
-  function frozenList() { var f = get('xp.frozen', []); return Array.isArray(f) ? f : []; }
-  function covered(k) { return active(k) || frozenList().indexOf(k) >= 0; }
-
-  // Missed days after a living streak are covered by banked freezes — one
-  // per day, and only when there are enough to bridge the whole gap.
-  function settle() {
-    var t = dayKey(), k = addDays(t, -1), missed = [];
-    for (var i = 0; i < 60 && !covered(k); i++) { missed.push(k); k = addDays(k, -1); }
-    if (!missed.length || !covered(k)) return;
-    var fz = +get('xp.freeze', 0) || 0;
-    if (missed.length > fz) return;
-    set('xp.frozen', frozenList().concat(missed).slice(-30));
-    set('xp.freeze', fz - missed.length);
-  }
-
-  function streak() {
-    settle();
-    var t = dayKey(), today = active(t), n = 0, k = today ? t : addDays(t, -1);
-    for (var i = 0; i < 400 && covered(k); i++) { if (active(k)) n++; k = addDays(k, -1); }
-    var best = Math.max(+get('xp.best', 0) || 0, n);
-    return { n: n, today: today, best: best, freezes: +get('xp.freeze', 0) || 0 };
-  }
-
-  function changed(gained) {
-    var t = day(), g = goal();
-    if (document.documentElement) document.documentElement.classList.toggle('goal-due', total() > 0 && t.x < g);
-    App.emit('xp', { total: total(), today: t.x, goal: g, gained: gained || 0 });
-  }
-
-  function addXP(n) {
-    if (!n) return;
-    set('xp.total', total() + n);
-    day().x += n;
-  }
-
-  // one answered question. kind: 'choice' | 'ear' | 'play'
-  function answer(o) {
-    var t = day(), ms = Math.max(0, Math.min(o.ms || 0, 45000));
-    t.q++;
-    t.s += ms / 1000;
-    var gained = 0, fast = false, u = null;
-    if (o.unit) { u = t.u[o.unit] || (t.u[o.unit] = [0, 0, 0]); u[2] = (u[2] || 0) + 1; }
-    if (o.ok) {
-      t.k++;
-      fast = ms > 0 && ms < (PAR[o.kind] || PAR.choice);
-      gained = 2 + (fast ? 1 : 0) + ((o.combo || 0) >= 5 ? 1 : 0);
-      if (u) { u[0]++; u[1] += Math.min(ms, 30000); }
-    }
-    addXP(gained);
-    saveDays();
-    changed(gained);
-    return { xp: gained, fast: fast };
-  }
-
-  // a finished level (or sprint): bonuses, the streak day, freezes
-  function finishLevel(o) {
-    var t = day(), before = t.x, wasActive = dayActive(t);
-    t.l++;
-    var bonus = (o.passed ? 5 : 0) + (o.perfect ? 5 : 0) + (o.record ? 5 : 0);
-    addXP(bonus);
-    saveDays();
-    var st = afterActive(wasActive);
-    var g = goal();
-    changed(bonus);
-    return { bonus: bonus, goalHit: before < g && t.x >= g, streak: st.n, extended: !wasActive, freezeEarned: st.earned };
-  }
-
-  // after today may have become a streak day: best streak + the 7-day freeze
-  function afterActive(wasActive) {
-    var st = streak();
-    st.earned = false;
-    if (st.n > (+get('xp.best', 0) || 0)) set('xp.best', st.n);
-    if (!wasActive && st.today && st.n > 0 && st.n % 7 === 0 && get('xp.fzAt', '') !== dayKey() && (+get('xp.freeze', 0) || 0) < 2) {
-      set('xp.freeze', (+get('xp.freeze', 0) || 0) + 1);
-      set('xp.fzAt', dayKey());
-      st.earned = true;
-      st.freezes++;
-    }
-    return st;
-  }
-
-  // ---- the practice ledger: seconds of playing on any page ----
-  function practice(sec, area) {
-    var t = day(), wasActive = dayActive(t), before = t.x, g = goal();
-    t.p = (t.p || 0) + sec;
-    t.a = t.a || {};
-    t.a[area] = (t.a[area] || 0) + sec;
-    var mins = Math.floor(t.p / 60), paid = t.pm || 0, gained = 0;
-    if (mins > paid) { gained = 2 * (mins - paid); t.pm = mins; addXP(gained); }
-    var nowActive = dayActive(t);
-    if (gained || nowActive !== wasActive) saveDays(); // else saved on hide / next minute
-    var r = { xp: gained, dayDone: nowActive && !wasActive, goalHit: before < g && t.x >= g };
-    if (r.dayDone) { var st = afterActive(false); r.streak = st.n; r.freezeEarned = st.earned; }
-    if (gained || r.dayDone) changed(gained);
-    if (r.dayDone || r.goalHit) App.emit('xp:practice', r);
-    return r;
-  }
-
-  var lastTouch = Date.now(), lastNote = 0, TICK = 5;
-  function tick() {
-    if (document.hidden || !App.wake || !App.wake.held) return;
-    var page = App.active, t = Date.now(), area = null;
-    if (page === 'quiz' || page === 'settings') return; // Exercises logs its own answer time
-    App.wake.held().forEach(function (g) { if (!area && PLAY_TAGS[g]) area = PLAY_TAGS[g]; });
-    if (!area && t - lastNote < 20000) area = PAGE_AREA[page] || 'Playing';
-    if (!area || t - Math.max(lastTouch, lastNote) > 600000) return;
-    practice(TICK, area);
-  }
-  function wireLedger() {
-    ['pointerdown', 'keydown'].forEach(function (e) { document.addEventListener(e, function () { lastTouch = Date.now(); }, true); });
-    App.on('midi:note', function (d) { if (d && d.on) lastNote = Date.now(); });
-    App.on('note:input', function (d) { if (d && d.on) lastNote = Date.now(); });
-    document.addEventListener('visibilitychange', function () { if (document.hidden) saveDays(); });
-    setInterval(tick, TICK * 1000);
-  }
-
-  function setGoal(g) { if (GOALS.indexOf(+g) >= 0) { set('xp.goal', +g); changed(0); } }
-
-  function history(n) {
-    var out = [], k = addDays(dayKey(), -(n - 1));
-    for (var i = 0; i < n; i++) {
-      var d = peek(k) || { x: 0, s: 0, q: 0, k: 0, l: 0, u: {} };
-      out.push({ key: k, x: d.x, s: d.s, p: d.p || 0, a: d.a || {}, q: d.q, k: d.k, l: d.l, active: dayActive(d), frozen: frozenList().indexOf(k) >= 0 });
-      k = addDays(k, 1);
-    }
-    return out;
-  }
-
-  // average ms per correct answer over [from, to) day keys — for one unit id,
-  // an array of unit ids (a topic), or everything (unit falsy)
-  function speed(unit, fromK, toK) {
-    var n = 0, ms = 0, all = D(), only = unit ? (Array.isArray(unit) ? unit : [unit]) : null;
-    Object.keys(all).forEach(function (k) {
-      if ((fromK && k < fromK) || (toK && k >= toK)) return;
-      var u = all[k].u || {};
-      Object.keys(u).forEach(function (id) {
-        if (only && only.indexOf(id) < 0) return;
-        n += u[id][0];
-        ms += u[id][1];
-      });
-    });
-    return { n: n, avg: n ? ms / n : 0 };
-  }
-
-  // weekly speed for the trend chart (oldest first)
-  function speedWeeks(w, unit) {
-    var out = [], end = addDays(dayKey(), 1);
-    for (var i = w - 1; i >= 0; i--) {
-      var to = addDays(end, -7 * i), from = addDays(to, -7);
-      var s = speed(unit, from, to);
-      out.push({ from: from, to: addDays(to, -1), n: s.n, avg: s.avg });
-    }
-    return out;
-  }
-
-  function totals() {
-    var all = D(), t = { q: 0, k: 0, s: 0, p: 0, l: 0, days: 0 };
-    Object.keys(all).forEach(function (k) {
-      var d = all[k];
-      t.q += d.q; t.k += d.k; t.s += d.s; t.p += d.p || 0; t.l += d.l;
-      if (dayActive(d)) t.days++;
-    });
-    return t;
-  }
-
-  // seconds per area over the last n days (Exercises included), biggest first
-  function areas(n) {
-    var out = {};
-    history(n).forEach(function (d) {
-      if (d.s) out.Exercises = (out.Exercises || 0) + d.s;
-      Object.keys(d.a).forEach(function (a) { out[a] = (out[a] || 0) + d.a[a]; });
-    });
-    return Object.keys(out).map(function (a) { return { area: a, s: out[a] }; }).sort(function (x, y) { return y.s - x.s; });
-  }
-
-  // answers / correct per unit over all kept days
-  function unitStats() {
-    var out = {}, all = D();
-    Object.keys(all).forEach(function (k) {
-      var u = all[k].u || {};
-      Object.keys(u).forEach(function (id) {
-        var o = out[id] || (out[id] = { ok: 0, asked: 0, ms: 0 });
-        o.ok += u[id][0]; o.ms += u[id][1]; o.asked += u[id][2] || u[id][0];
-      });
-    });
-    return out;
-  }
-
-  function sprintBest(key) { var s = get('xp.sprint', {}); return (s && s[key]) || 0; }
-  function sprintRecord(key, score) {
-    var s = get('xp.sprint', {});
-    if (!s || typeof s !== 'object') s = {};
-    var old = s[key] || 0, isBest = score > old;
-    if (isBest) { s[key] = score; set('xp.sprint', s); }
-    return { best: Math.max(old, score), old: old, isBest: isBest };
-  }
-
-  function jumpIdx() { var j = +get('xp.jump', -1); return isNaN(j) ? -1 : j; }
-  function setJump(i) { if (i > jumpIdx()) set('xp.jump', i); }
-
-  seed();
-  wireLedger();
-
-  window.SLXP = App.xp = {
-    GOALS: GOALS, GOAL_NAMES: GOAL_NAMES,
-    total: total, goal: goal, setGoal: setGoal, level: function () { return levelOf(total()); }, levelOf: levelOf,
-    today: function () { var d = peek(dayKey()); return d || { x: 0, s: 0, p: 0, q: 0, k: 0, l: 0, u: {} }; },
-    streak: streak, answer: answer, finishLevel: finishLevel, history: history,
-    speed: speed, speedWeeks: speedWeeks, totals: totals, unitStats: unitStats, practice: practice, areas: areas, PLAY_DAY: PLAY_DAY,
-    sprintBest: sprintBest, sprintRecord: sprintRecord, jump: jumpIdx, setJump: setJump,
-    sprints: function () { var o = get('xp.sprint', {}); return o && typeof o === 'object' ? o : {}; },
-    dayKey: dayKey, addDays: addDays,
-    refresh: function () { changed(0); },
-    // tests: pin the clock, drop the cache
-    _now: function (fn) { now = fn || function () { return new Date(); }; },
-    _reload: function () { days = null; },
-    _tick: tick
-  };
-
-  // paint the Learn-tab dot once the shell exists
-  setTimeout(function () { try { changed(0); } catch (e) { /* shell not ready */ } }, 0);
+  var api={GOALS:GOALS,GOAL_NAMES:GOAL_NAMES,PLAY_DAY:PLAY_DAY,dayKey:dayKey,addDays:addDays,levelOf:levelOf,beginSession:beginSession,answer:answerScoped,finishLevel:finishScoped,forInstrument:facade,pending:pending,retryPending:retryPending,exportPending:function(){return JSON.stringify({unrecordedLessonSessions:pending(),unrecordedLessonObservations:observationsDirty?clone(observationData()):null},null,2);},legacy:function(){return {label:'Legacy / unassigned',total:total(),days:clone(D()),sprints:clone(get('xp.sprint',{})),goal:goal()};},_now:function(fn){now=fn||function(){return new Date();};},_reload:function(){days=null;sessions=Object.create(null);facades={};if(!observationsDirty)observationMemory=null;},_tick:function(){}};
+  ['total','goal','setGoal','level','today','streak','history','speed','speedWeeks','totals','unitStats','practice','areas','sprintBest','sprintRecord','sprints','jump','setJump','refresh'].forEach(function(k){api[k]=function(){var f=facade(selected());return f[k].apply(f,arguments);};});
+  window.SLXP=App.xp=api;
+  ['learn:instrument','practice:progress','practiceprogress:changed'].forEach(function(event){App.on(event,refreshDot);});
+  setTimeout(refreshDot,0);
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',showPending);else showPending();
 })();

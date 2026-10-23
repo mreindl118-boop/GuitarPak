@@ -156,7 +156,7 @@ capture, calibration and capability details.
 
 Current audio lane executions: **62 synthetic/shared-graph checks** in
 `tests/practice-input.test.js`, **23 actual-browser audio checks** in
-`tests/practice-audio.test.js`, and **92 existing audio-input checks** pass.
+`tests/practice-audio.test.js`, and the existing audio-input regression checks pass.
 All PCM, ports and capture streams are synthetic. The browser suite verifies
 explicit Resume reacquires capture before clock progress, source changes
 pause without opening the new device, pending cancellation, denied permission,
@@ -167,6 +167,21 @@ mute acoustic/direct audio; uncertain notes and chords are not guessed.
 Audio mode disables virtual-key answers and ignores MIDI/QWERTY grading;
 the keyboard remains a visual target preview. MIDI/virtual mode remains
 available for those instruments without audio capture.
+
+## Instrument organization and credit
+
+Learn uses explicit Piano, Synth, Guitar, Bass, Drums, Voice and Other categories.
+Keyboard/fretboard modes are filtered; Bass uses actual four-string EADG notes.
+Shared content is labeled and each new completion remains in its captured
+instrument. Learn, Keys lessons and both Woodshed players award the same
+canonical instrument XP ledger. Legacy global XP and completion stay unassigned.
+There is no passive page/wake XP timer. Plan blocks use exact, fresh instrument
+session evidence; unsupported casual-tool timers are labeled rather than inferred.
+
+The readable vector clef remains accessible in every built-in page/workspace,
+including Exercises and Settings. One shared root/scale and the same independent
+Scale Lock/LUMI/color controls serve every consumer. Modal sheets temporarily
+block the disclosure. See [instrument behavior and tests](LEARN-INSTRUMENTS.md).
 
 ## Intentional exclusions and remaining validation
 
@@ -186,11 +201,13 @@ available for those instruments without audio capture.
   independent three-port practice routes remain Web MIDI only. No native
   build/signing, physical driver, board firmware or LED response was tested.
 - The managed environment denies the update suite's two `file://` navigation
-  cases; HTTP/PWA checks are separate evidence, not a substitute for that
-  protocol branch. Sampler-DAW's separate integration test needs missing
+  cases; the original full suite passed in hosted CI at `c783524`. The final
+  addendum commit still requires its own full hosted gate. HTTP/PWA checks do
+  not substitute for that protocol branch. Sampler-DAW's separate integration test needs missing
   `esbuild`; its other 22 MIDI tests passed without modifying that repository.
 
 Final palette appearance, end-to-end latency, instrument local sound and
-disconnect persistence require an authorized later hardware session. No push,
-publish, deployment, source-branch deletion or remote-main merge is part of
-this work.
+disconnect persistence remain unverified. The review branch has been published
+for CI; main/tag/release/deployment remain held for final gates and the explicit
+approval clarification described in [validation](VALIDATION-2026-10-23.md).
+Source branches are preserved.

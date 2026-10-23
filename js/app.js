@@ -183,9 +183,9 @@ window.App = (function () {
   // Drawn from Lucide (https://lucide.dev, ISC license, icons/LUCIDE-LICENSE.txt)
   // so every icon shares one 24px grid and 2px stroke; transport glyphs are
   // filled. pickdown/pickup are the guitar pick-stroke marks (not in Lucide);
-  // clef is Tabler's (MIT, icons/TABLER-LICENSE.txt — same grid and stroke).
+  // clef is an original G-clef stroke on the same grid.
   var ICONS = {
-    clef: '<path d="M16 12a4.16 4.16 0 0 1-5.62 3.89 3.78 3.78 0 0 1-2.38-3.39 3.42 3.42 0 0 1 2.34-3.38l3.79-1.42a2.89 2.89 0 0 0 1.87-2.7 2 2 0 1 0-4 0v14a2 2 0 1 1-4 0"/>',
+    clef: '<path d="M13.2 2.5c2.5 2.4 1.5 4.7-.7 6.9l-3.3 3.1c-3.2 3-2.5 7.3 1.2 8.2 4.7 1.1 7.7-3.3 5.7-6.7-1.8-3.1-6.7-2.2-6.7.7 0 1.5 1.2 2.3 2.5 2.3"/><path d="M12 3.8c-.9 2.7-.7 4.7.1 7.3l2.2 8.1c.8 2.9-.8 4.3-2.6 3.8-1.3-.4-1.7-1.6-1.3-2.5"/>',
     play: '<path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z" fill="currentColor"/>',
     pause: '<rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor"/><rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor"/>',
     stop: '<rect x="5" y="5" width="14" height="14" rx="2" fill="currentColor"/>',
@@ -785,25 +785,43 @@ window.App = (function () {
     paintChrome();
   }
 
-  // pages that never use the shared key / tempo drop the context bar, so
-  // the top of the screen is just navigation
-  var NO_CTX = { quiz: true, settings: true };
+  // Musical context belongs to the whole app, including Learn and Settings.
+  // Modal utilities temporarily block its disclosure rather than cloning it.
   function paintChrome() {
-    document.documentElement.classList.toggle('noctx', !!NO_CTX[active]);
+    document.documentElement.classList.remove('noctx'); // old shell compatibility
     paintLock();
     closeCtx();
     showBar();
+    syncContextAvailability();
+    if (window.App && App.learnInstruments && typeof App.learnInstruments.refresh === 'function') App.learnInstruments.refresh();
   }
 
   // the clef button's dropdown (key / scale / mode / tempo / time + the
   // transport): open on tap, tucked away by a tap outside, Esc, Back, a page
   // switch or the top bar sliding away
   function ctxIsOpen() { return document.documentElement.classList.contains('ctx-open'); }
+  function contextBlocked() {
+    if (sheet || window.Help && Help.isOpen && Help.isOpen()) return true;
+    return Array.prototype.some.call(document.querySelectorAll('dialog[open], [aria-modal="true"]'), function (el) {
+      return !el.hidden && el.getClientRects().length > 0;
+    });
+  }
+  function syncContextAvailability() {
+    var blocked = contextBlocked(), b = document.getElementById('ctx-btn');
+    if (b) { b.disabled = blocked; b.setAttribute('aria-disabled', String(blocked)); }
+    if (blocked) closeCtx();
+  }
   function setCtx(on) {
-    on = !!on && !NO_CTX[active];
+    on = !!on && !contextBlocked();
     document.documentElement.classList.toggle('ctx-open', on);
-    var b = document.getElementById('ctx-btn');
+    var b = document.getElementById('ctx-btn'), bar = document.getElementById('ctxbar');
     if (b) { b.setAttribute('aria-expanded', String(on)); b.classList.toggle('active', on); }
+    if (bar) bar.hidden = !on;
+    if (on) {
+      showBar();
+      var first = bar && bar.querySelector('select, input, button');
+      if (first) { try { first.focus({ preventScroll: true }); } catch (e) { first.focus(); } }
+    }
   }
   function closeCtx() { if (ctxIsOpen()) setCtx(false); }
 
@@ -905,12 +923,16 @@ window.App = (function () {
     if (sheet) closeSheet();
     var el = document.getElementById('sheet-' + name);
     if (!el) return;
-    sheet = name;
     sheetReturn = document.activeElement;
+    var context = document.getElementById('ctxbar');
+    if (context && context.contains(sheetReturn)) sheetReturn = document.getElementById('ctx-btn');
+    closeCtx();
+    sheet = name;
     el.hidden = false;
     void el.offsetWidth; // commit before the entrance animation
     el.classList.add('open');
     document.documentElement.classList.add('sheet-open');
+    syncContextAvailability();
     var b = document.getElementById(SHEETS[name]);
     if (b) { b.classList.add('active'); b.setAttribute('aria-expanded', 'true'); }
     if (modules[name] && modules[name].onShow) {
@@ -927,6 +949,7 @@ window.App = (function () {
     sheet = null;
     if (el) { el.classList.remove('open'); el.hidden = true; }
     document.documentElement.classList.remove('sheet-open');
+    syncContextAvailability();
     var b = document.getElementById(SHEETS[name]);
     if (b) { b.classList.remove('active'); b.setAttribute('aria-expanded', 'false'); }
     if (modules[name] && modules[name].onHide) {
@@ -1283,8 +1306,16 @@ window.App = (function () {
       cbtn.setAttribute('aria-label', t);
     }
     if (cbtn && cbar) {
-      cbtn.innerHTML = icon('clef', 20);
+      cbtn.innerHTML = icon('clef', 28) + '<svg class="ctx-caret" viewBox="0 0 8 5" aria-hidden="true" focusable="false"><path d="m1 1 3 3 3-3"/></svg>';
+      // A disclosure contains form controls, so it is not an ARIA menu.
+      cbtn.removeAttribute('aria-haspopup');
+      cbar.setAttribute('role', 'region');
+      cbar.setAttribute('aria-label', 'Global key, scale, tempo and sound settings');
+      cbar.hidden = !ctxIsOpen();
       cbtn.addEventListener('click', function () { setCtx(!ctxIsOpen()); });
+      cbtn.addEventListener('keydown', function (e) {
+        if (e.key === 'ArrowDown') { e.preventDefault(); setCtx(true); }
+      });
       document.addEventListener('pointerdown', function (e) {
         if (ctxIsOpen() && !cbar.contains(e.target) && !cbtn.contains(e.target)) setCtx(false);
       }, true);
@@ -1295,6 +1326,15 @@ window.App = (function () {
         e.stopPropagation();
         e.preventDefault();
       }, true);
+      document.addEventListener('focusin', function (e) {
+        if (ctxIsOpen() && !cbar.contains(e.target) && e.target !== cbtn) setCtx(false);
+      });
+      cbar.addEventListener('keydown', function (e) {
+        if (e.key === 'Tab' && e.shiftKey && e.target === cbar.querySelector('select, input, button')) {
+          e.preventDefault(); setCtx(false); cbtn.focus();
+        }
+      });
+      ['sheet', 'tour'].forEach(function (event) { on(event, syncContextAvailability); });
       ['fb:set', 'tempo'].forEach(function (ev) { on(ev, paintCtxBtn); });
     }
 
