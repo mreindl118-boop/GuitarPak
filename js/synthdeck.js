@@ -106,12 +106,13 @@
     if (isObj(p.prog) && typeof p.prog.pc === 'number') o.prog = { msb: clamp(num(p.prog.msb, 0), 0, 127), lsb: clamp(num(p.prog.lsb, 0), 0, 127), pc: clamp(p.prog.pc, 1, 128), ch: (typeof p.prog.ch === 'number' && p.prog.ch >= 0 && p.prog.ch < 16) ? p.prog.ch : null };
     if (isObj(p.parts)) for (var k in p.parts) {
       if (!/^(\d{1,2})$/.test(k) || +k > 15) continue;
+      var pk = String(+k); // '01' and '1' are the same Part: recallPlan looks up String(part)
       var src = p.parts[k], part = { cc: {}, ctl: {} }, any = false;
       if (isObj(src)) {
         if (isObj(src.cc)) for (var c in src.cc) if (/^\d{1,3}$/.test(c) && +c < 128 && typeof src.cc[c] === 'number') { part.cc[c] = clamp(src.cc[c], 0, 127); any = true; }
         if (isObj(src.ctl)) for (var i in src.ctl) if (typeof src.ctl[i] === 'number') { part.ctl[i] = clamp(src.ctl[i], 0, 127); any = true; }
       }
-      if (any) o.parts[k] = part;
+      if (any) o.parts[pk] = part;
     }
     return o;
   }

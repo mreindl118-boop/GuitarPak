@@ -294,6 +294,10 @@
   }
   function hubOutId() {
     var m = midi(); if (!m || !m.ready) return null;
+    // native bridges (Android / iOS) have ONE route: the service's selected
+    // output. Resolving a port id here would only mislabel where bytes go
+    // (the deck's LUMI guard and the Scope read this name), so say so.
+    if (m.platform && m.platform !== 'web') return null;
     var id = g('outId', null);
     if (id === 'shared') return null;
     if (id != null && m.outputs.some(function (p) { return String(p.id) === String(id); })) return id;
