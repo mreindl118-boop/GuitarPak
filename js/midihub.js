@@ -705,6 +705,7 @@
             '<label class="field">Loudest note<span class="row tight"><input type="range" id="mh-plvel" min="20" max="127" value="' + plCap() + '" style="width:110px"><span class="mh-mono" id="mh-plvelv">' + plCap() + '</span></span></label>' +
             '<div class="seg mh-plroute" role="group" aria-label="Channels"><button type="button" data-plroute="file">Channels as in file</button><button type="button" data-plroute="part" id="mh-plpartlab">All on one Part</button></div>' +
             '<label class="mh-chk"><input type="checkbox" id="mh-plloop"' + (plLoop() ? ' checked' : '') + '> Loop</label>' +
+            '<button type="button" class="btn sm" id="mh-pltab" disabled title="Show this as guitar tab on the Songs page, in the chosen key">Open as tab</button>' +
           '</div>' +
           '<div class="row tight mh-plkey">' +
             '<label class="field">Transpose<select id="mh-pltrans">' + (function () { var h = ''; for (var t = -12; t <= 12; t++) h += '<option value="' + t + '"' + (t === plTrans() ? ' selected' : '') + '>' + (t > 0 ? '+' + t : t) + (t === 0 ? ' (as written)' : ' semitone' + (Math.abs(t) === 1 ? '' : 's')) + '</option>'; return h; })() + '</select></label>' +
@@ -866,7 +867,7 @@
       'monin', 'monout', 'monclock', 'monas', 'monhex', 'monpause', 'monclear', 'monexport', 'moncount', 'mon', 'devnotes', 'naming', 'export', 'import', 'importfile', 'reset', 'toast', 'enable',
       'cvout', 'parts', 'hero', 'knobs', 'extra', 'cvprev', 'cvnext', 'cvpnum', 'cvbank', 'cvsend', 'cvreset',
       'plout', 'plfile', 'plinfo', 'plplay', 'plstop', 'pltime', 'plseek', 'pltempo', 'plvel', 'plvelv', 'plloop', 'plwarn', 'plpartlab',
-      'pltrans', 'plshift', 'plkeys', 'plfr', 'plfs', 'pltr', 'plts', 'plkeyinfo'];
+      'pltrans', 'plshift', 'plkeys', 'plfr', 'plfs', 'pltr', 'plts', 'plkeyinfo', 'pltab'];
     ids.forEach(function (id) { els[id] = root.querySelector('#mh-' + id); });
     // friendlier aliases used above
     els.inSel = els['in']; els.outSel = els.out; els.ledIn = els.ledin; els.ledOut = els.ledout; els.lastIn = els.lastin; els.lastOut = els.lastout;
@@ -1208,9 +1209,12 @@
       if (e.k === 'tempo') { if (e.us > 0) us = e.us; return; }
       e.t = sec; notes.push(e);
     });
+    var bpm0 = 120, firstT = raw.filter(function (e) { return e.k === 'tempo' && e.us > 0; })[0]; if (firstT) bpm0 = 60000000 / firstT.us;
     if (dropped) warnings.push(dropped + ' program, controller or SysEx message' + (dropped === 1 ? '' : 's') + ' left out (only notes and the sustain pedal are played).');
     if (notes.some(function (e) { return e.ch === 9; })) warnings.push('Channel 10 (drums in General MIDI) is included; on "All on one Part" those notes play pitched.');
-    return finishSong(title || fname.replace(/\.(mid|midi)$/i, ''), notes, warnings, 'MIDI');
+    var songM = finishSong(title || fname.replace(/\.(mid|midi)$/i, ''), notes, warnings, 'MIDI');
+    songM.bpm = bpm0;
+    return songM;
   }
 
   function readMusicXml(text, fname) {
@@ -1288,7 +1292,9 @@
       raw.push({ t: a, k: 'on', ch: x.ch, n: x.n, v: 80, o: x.o * 2 });
       raw.push({ t: Math.max(a + 0.02, z - 0.01), k: 'off', ch: x.ch, n: x.n, v: 0, o: x.o * 2 + 1 });
     });
-    return finishSong(title, raw, warnings, 'MusicXML');
+    var songX = finishSong(title, raw, warnings, 'MusicXML');
+    songX.bpm = tempos[0].bpm;
+    return songX;
   }
 
   // .mxl = a zip: META-INF/container.xml names the score; stored or deflated
@@ -1330,6 +1336,32 @@
     if (sig === 'PK\u0003\u0004' || /\.mxl$/.test(lower)) return readMxl(buf, name);
     return readMusicXml(new TextDecoder('utf-8').decode(buf), name);
   }
+  // the open song as a format-0 MIDI file at its own tempo, notes shifted as
+  // set (the Songs page turns it into guitar tab in the chosen key)
+  function songToMidi(song) {
+    var TPQ = 480, bpm = song.bpm > 0 ? song.bpm : 120, body = [], last = 0;
+    var vlq = function (n) { var o = [n & 0x7f]; n >>= 7; while (n) { o.unshift((n & 0x7f) | 0x80); n >>= 7; } return o; };
+    var title = Array.from(new TextEncoder().encode(String(song.title || 'Song').slice(0, 100))), us = Math.round(60000000 / bpm);
+    body.push.apply(body, [0, 0xff, 0x03].concat(vlq(title.length), title, [0, 0xff, 0x51, 3, (us >> 16) & 255, (us >> 8) & 255, us & 255]));
+    song.events.forEach(function (e) {
+      var tick = Math.round(e.t * bpm / 60 * TPQ), st = e.k === 'on' ? 0x90 : e.k === 'off' ? 0x80 : 0xb0;
+      body.push.apply(body, vlq(tick - last).concat([st | e.ch, e.k === 'sus' ? 64 : shiftNote(e.n), e.k === 'off' ? 0 : e.v]));
+      last = tick;
+    });
+    body.push(0, 0xff, 0x2f, 0);
+    var n = body.length, out = [0x4d, 0x54, 0x68, 0x64, 0, 0, 0, 6, 0, 0, 0, 1, (TPQ >> 8) & 255, TPQ & 255, 0x4d, 0x54, 0x72, 0x6b, (n >>> 24) & 255, (n >> 16) & 255, (n >> 8) & 255, n & 255];
+    return new Uint8Array(out.concat(body));
+  }
+  function plOpenAsTab() {
+    if (!PL.song) { toast('Open a file first'); return false; }
+    if (!App.songs) { toast('The Songs page is not available'); return false; }
+    var song = App.songs.fromMidi(songToMidi(PL.song), PL.song.title);
+    if (!song) { toast('Nothing in this file fits a guitar'); return false; }
+    song.from = 'from the MIDI Hub Player' + (plShift().on || plTrans() ? ', in the chosen key' : '');
+    App.songs.load(song); App.switchTo('songs');
+    return true;
+  }
+
   function plSet(song) {
     plStop();
     PL.song = song; PL.pos = 0; PL.idx = 0;
@@ -1363,7 +1395,9 @@
       raw.push({ t: Math.max(a + 0.02, z - 0.01), k: 'off', ch: c, n: n.m, v: 0, o: i * 2 + 1 });
     });
     if (score.rhythmKnown === false) warnings.push('Rhythm was not confirmed in review: timing follows the draft’s beat positions.');
-    return finishSong(score.title || 'Reviewed score', raw, warnings, 'Reviewed score');
+    var songS = finishSong(score.title || 'Reviewed score', raw, warnings, 'Reviewed score');
+    songS.bpm = score.bpm;
+    return songS;
   }
   // the same score as a standard MIDI file: format 1, a tempo track, one
   // track per part on its own channel, 480 ticks per beat
@@ -1533,6 +1567,7 @@
     els.plplay.textContent = PL.playing ? 'Pause' : 'Play';
     els.plplay.classList.toggle('active', PL.playing);
     els.plplay.disabled = els.plstop.disabled = els.plseek.disabled = !s;
+    els.pltab.disabled = !s || !App.songs;
     var n = hubOutName();
     els.plout.textContent = n ? '→ ' + n + (plRoute() === 'part' ? ' · ' + partLabel() + ' ' + (ch() + 1) : '') : 'No synth output yet — connect MIDI above';
     els.plpartlab.textContent = 'All on ' + partLabel() + ' ' + (ch() + 1);
@@ -1564,6 +1599,7 @@
     });
     els.plvel.addEventListener('input', function () { set('plVel', parseInt(this.value, 10)); els.plvelv.textContent = this.value; });
     els.plloop.addEventListener('change', function () { set('plLoop', this.checked); });
+    els.pltab.addEventListener('click', plOpenAsTab);
     var roots = ''; for (var r = 0; r < 12; r++) roots += '<option value="' + r + '">' + Theory.pcName(r, Theory.FLAT_KEYS.has(r)) + '</option>';
     var scales = SHIFT_SCALES.map(function (x) { return '<option value="' + x + '">' + esc(Theory.SCALES[x].name.replace(/\s*\(.*\)$/, '')) + '</option>'; }).join('');
     els.plfr.innerHTML = els.pltr.innerHTML = roots; els.plfs.innerHTML = els.plts.innerHTML = scales;
@@ -1670,7 +1706,7 @@
       // a reviewed practice score {title, bpm, len, notes:[{t, d, m, rest, partId, v}]}
       loadScore: function (score) { return plSet(scoreToSong(score)); },
       // key shifter: shiftNote(midi) under the current settings; the guessed key of the open song
-      shiftNote: function (n) { return shiftNote(n); }, get key() { return PL.song && PL.song.key ? { root: PL.song.key.root, scale: PL.song.key.scale } : null; },
+      shiftNote: function (n) { return shiftNote(n); }, openAsTab: plOpenAsTab, toMidiBytes: function () { return PL.song ? songToMidi(PL.song) : null; }, get key() { return PL.song && PL.song.key ? { root: PL.song.key.root, scale: PL.song.key.scale } : null; },
       // open the Player view showing it (Score review's "Play on synth")
       show: function () { App.switchTo('midihub'); view('player'); },
       get state() { return { playing: PL.playing, pos: PL.pos, title: PL.song && PL.song.title, held: Object.keys(PL.held).length, duration: PL.song ? PL.song.duration : 0 }; } },

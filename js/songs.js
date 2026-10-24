@@ -375,12 +375,14 @@
       // nothing to play or loop yet (style.display: the label's .row flex beats [hidden])
       els.play.disabled = true;
       els.loopA.parentNode.style.display = 'none';
+      var ex0 = document.getElementById('sg-exporttab'); if (ex0) ex0.disabled = true;
       return;
     }
     els.songTitle.innerHTML = escapeHtml(cur.name) + '<span class="sg-meta">' + cur.bars + ' bar' + (cur.bars === 1 ? '' : 's') +
       (cur.srcType === 'midi' ? ' · from MIDI' : ' · from tab') + '</span>';
     els.play.disabled = false;
     els.loopA.parentNode.style.display = '';
+    var ex = document.getElementById('sg-exporttab'); if (ex) ex.disabled = false;
 
     // chunk into systems of ~24 steps, bar-aligned where possible
     var PER = 24;
@@ -427,6 +429,26 @@
     pl.loopB = cur.bars - 1;
     els.loopA.value = '0';
     els.loopB.value = String(cur.bars - 1);
+  }
+
+  // the song as six-line ASCII tab: exactly what the page shows, as text
+  function toAscii(song) {
+    var PER = 24, out = '';
+    for (var start = 0; start < song.steps.length; start += PER) {
+      var chunk = song.steps.slice(start, start + PER), rows = LINE_LABELS.map(function (l) { return l + '|'; });
+      chunk.forEach(function (st, k) {
+        var idx = start + k, width = 1, byString = {};
+        st.notes.forEach(function (n) { width = Math.max(width, String(n.f).length); byString[n.s] = n.f; });
+        var barMark = idx > 0 && song.steps[idx - 1].bar !== st.bar;
+        for (var li = 0; li < 6; li++) {
+          var cell = byString[5 - li] === undefined ? '' : String(byString[5 - li]);
+          while (cell.length < width) cell += '-';
+          rows[li] += (barMark ? '|' : '') + cell + '-';
+        }
+      });
+      out += rows.map(function (r) { return r + '|'; }).join('\n') + '\n\n';
+    }
+    return out.trim() + '\n';
   }
 
   function loadSong(song) {
@@ -476,6 +498,7 @@
           '<input type="file" id="sg-file" accept=".mid,.midi,audio/midi">' +
           '<input type="text" id="sg-name" placeholder="Song name" style="width:180px">' +
           '<button type="button" class="btn sm" id="sg-save" disabled>Save to library</button>' +
+          '<button type="button" class="btn sm" id="sg-exporttab" disabled title="Download this tab as a text file">Export tab</button>' +
           '<span class="muted small" id="sg-addmsg"></span>' +
         '</div>' +
         '<div class="row tight" id="sg-lib" style="margin-top:12px"></div>' +
@@ -579,6 +602,14 @@
 
     els.play.addEventListener('click', function () { if (pl.running) plPause(); else plStart(); });
     document.getElementById('sg-reset').addEventListener('click', plStop);
+    document.getElementById('sg-exporttab').addEventListener('click', function () {
+      if (!cur) return;
+      var name = String(cur.name || 'tab').replace(/[^\w\- ]+/g, '').trim().slice(0, 60) || 'tab';
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([toAscii(cur)], { type: 'text/plain' }));
+      a.download = name + '.txt'; a.click();
+      setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+    });
 
     document.getElementById('sg-parse').addEventListener('click', function () {
       var parsed = parseAsciiTab(els.paste.value);
@@ -691,6 +722,22 @@
   function onHide() {
     plPause();
   }
+
+  // other pages (Score review, the MIDI Hub Player) hand music over as a
+  // MIDI file: fromMidi -> a song {name, steps, bars} with playable guitar
+  // positions (standard tuning), load() shows it here, toAscii() = the tab
+  App.songs = {
+    fromMidi: function (bytes, name) { var s = parseMidiFile(bytes); if (!s) return null; s.name = String(name || 'From MIDI').slice(0, 120); return s; },
+    load: function (song) {
+      if (!song || !Array.isArray(song.steps) || !song.steps.length) return false;
+      loadSong(song);
+      if (els.save) els.save.disabled = false;
+      if (els.addmsg) els.addmsg.textContent = song.steps.length + ' steps, ' + song.bars + ' bar' + (song.bars === 1 ? '' : 's') + (song.from ? ' \u00b7 ' + song.from : '');
+      return true;
+    },
+    toAscii: toAscii,
+    get current() { return cur; }
+  };
 
   App.register('songs', {
     init: init,
