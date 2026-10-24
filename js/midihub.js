@@ -115,7 +115,9 @@
   };
 
   // ---- state (persisted under midihub.*) ----
-  function g(k, d) { return App.store.get('midihub.' + k, d); }
+  // a stored null (Reset Hub writes null) counts as absent: the fallback wins,
+  // so the view / bank / program never come back as null after a reset
+  function g(k, d) { var v = App.store.get('midihub.' + k, d); return v === null ? d : v; }
   function set(k, v) {
     if (['rules', 'rulesApp', 'ch', 'outId', 'profile'].indexOf(k) >= 0 || (k === 'thru' && !v)) flushHub('MIDI Hub routing/rules changed');
     if (k === 'kv') { kvCache = v && typeof v === 'object' ? v : null; if (kvTimer) { clearTimeout(kvTimer); kvTimer = 0; } }
