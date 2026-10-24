@@ -17,7 +17,7 @@ The page is adapted to the artifact viewer's contract:
 import os, re, shutil, sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-ASSET_DIRS = ['js', 'css', 'fonts', 'icons', 'samples']
+ASSET_DIRS = ['js', 'css', 'fonts', 'icons', 'samples', 'data']
 ASSET_EXT = {'.js', '.css', '.woff2', '.ttf', '.svg', '.png', '.mp3'}
 
 

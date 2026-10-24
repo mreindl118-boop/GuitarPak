@@ -30,7 +30,7 @@ mkdir -p "$out/obj" "$out/dex" "$out/assets" "$web/releases"
 
 # the bundled copy is only the OFFLINE FALLBACK — the app loads the live site
 cp "$web/index.html" "$web/manifest.webmanifest" "$out/assets/"
-cp -r "$web/css" "$web/js" "$web/icons" "$web/fonts" "$web/samples" "$out/assets/"
+cp -r "$web/css" "$web/js" "$web/icons" "$web/fonts" "$web/samples" "$web/data" "$out/assets/"
 
 echo "==> javac"
 javac -source 8 -target 8 -nowarn -classpath "$ANDROID_JAR" -d "$out/obj" \

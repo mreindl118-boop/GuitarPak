@@ -80,7 +80,7 @@
       knobs: { hero: { cc: 95, name: 'Super Knob', def: 0 }, extraTitle: 'Assign knobs',
         extra: [17, 18, 19, 20, 21, 22, 23, 24].map(function (n, i) { return { cc: n, name: 'Assign ' + (i + 1), def: 64 }; }) },
       bankMsb: 63,
-      bankHint: 'Performances: Bank MSB 63, LSB = the bank page from the Data List (Preset / User / Library), Program 1–128.',
+      bankHint: 'MSB 63 loads ONE Performance\u2019s Part 1 into the Part on this channel (a sound per Part); MSB 64 loads the whole Performance (all Parts; send on channel 1). LSB 0\u201317 = Preset pages of 128, 32\u201336 = User, 40+ = Library; Program 1\u2013128. MSB 62 = Live Set slots.',
       sysex: {
         model: [0x07], devMax: 15, addrLen: 3,
         paramChange: function (o) { return yamahaHdr(1, o).concat(o.addr, o.data, [0xF7]); },
@@ -118,6 +118,7 @@
   function g(k, d) { return App.store.get('midihub.' + k, d); }
   function set(k, v) {
     if (['rules', 'rulesApp', 'ch', 'outId', 'profile'].indexOf(k) >= 0 || (k === 'thru' && !v)) flushHub('MIDI Hub routing/rules changed');
+    if (k === 'kv') { kvCache = v && typeof v === 'object' ? v : null; if (kvTimer) { clearTimeout(kvTimer); kvTimer = 0; } }
     App.store.set('midihub.' + k, v);
   }
   function profile() { return PROFILES[g('profile', 'generic')] || PROFILES.generic; }
@@ -320,13 +321,27 @@
   ];
   function knobSet() {
     var k = profile().knobs || {};
-    return { hero: k.hero || null, main: BASE_KNOBS, extra: k.extra || [] };
+    // the Synth Deck (js/synthdeck.js) may redefine these from its editable
+    // map; null = no map for this profile = exactly the built-in set
+    var ov = App.synthDeck && App.synthDeck.hubKnobs ? App.synthDeck.hubKnobs(profileKey()) : null;
+    if (ov) return { hero: ov.hero || null, main: ov.main && ov.main.length ? ov.main : BASE_KNOBS, extra: ov.extra || [], extraTitle: ov.extraTitle || k.extraTitle };
+    return { hero: k.hero || null, main: BASE_KNOBS, extra: k.extra || [], extraTitle: k.extraTitle };
   }
+  function profileKey() { var k = g('profile', 'generic'); return PROFILES[k] ? k : 'generic'; }
   function allKnobs() { var s = knobSet(); return (s.hero ? [s.hero] : []).concat(s.main, s.extra); }
   function knobDef(cc) { var k = allKnobs().filter(function (x) { return x.cc === cc; })[0]; return k ? k.def : 64; }
-  function kvAll() { var o = g('kv', null); return o && typeof o === 'object' ? o : {}; }
-  function kv(cc, c) { var a = kvAll()[c == null ? ch() : c]; var v = a && a[cc]; return typeof v === 'number' ? v : knobDef(cc); }
-  function setKv(cc, v, c) { var a = kvAll(), k = String(c == null ? ch() : c); a[k] = a[k] || {}; a[k][cc] = v; set('kv', a); }
+  // kv is cached and written at most once per 200 ms burst: a Super Knob
+  // sweep or a Motion Sequencer echo arrives at 100+ messages a second and
+  // used to re-serialise the whole object on every one. Flushed on hide.
+  var kvCache = null, kvTimer = 0;
+  function kvAll() { if (!kvCache) { var o = g('kv', null); kvCache = o && typeof o === 'object' ? o : {}; } return kvCache; }
+  function kvGet(cc, c) { var a = kvAll()[String(c == null ? ch() : c)]; var v = a && a[cc]; return typeof v === 'number' ? v : null; }
+  function kv(cc, c) { var v = kvGet(cc, c); return v == null ? knobDef(cc) : v; }
+  function kvFlush() { if (kvTimer) { clearTimeout(kvTimer); kvTimer = 0; } if (kvCache) App.store.set('midihub.kv', kvCache); }
+  function setKv(cc, v, c) {
+    var a = kvAll(), k = String(c == null ? ch() : c); a[k] = a[k] || {}; a[k][cc] = v;
+    if (!kvTimer) kvTimer = setTimeout(function () { kvTimer = 0; App.store.set('midihub.kv', kvCache); }, 200);
+  }
   var ARC0 = -135, ARC1 = 135;
   function arcPath(v) {
     var a = (ARC0 + (ARC1 - ARC0) * v / 127) * Math.PI / 180, a0 = ARC0 * Math.PI / 180, r = 25;
@@ -341,15 +356,19 @@
       '<line class="mh-kptr" x1="32" y1="32" x2="' + (32 + 17 * Math.sin(a)).toFixed(2) + '" y2="' + (32 - 17 * Math.cos(a)).toFixed(2) + '"/></svg>' +
       '<b class="mh-kv">' + v + '</b><span class="mh-kn">' + esc(k.name) + '</span><small class="muted">CC ' + k.cc + '</small></div>';
   }
-  function paintKnob(cc) {
-    if (!els.knobs) return;
-    var el = els.knobs.parentNode.querySelector('.mh-knob[data-cc="' + cc + '"]');
-    if (!el) return;
-    var v = kv(cc), a = (ARC0 + (ARC1 - ARC0) * v / 127) * Math.PI / 180;
+  function paintKnobEl(el, v) {
+    var a = (ARC0 + (ARC1 - ARC0) * v / 127) * Math.PI / 180;
     el.setAttribute('aria-valuenow', v);
     el.querySelector('.mh-karc').setAttribute('d', arcPath(v));
     var p = el.querySelector('.mh-kptr'); p.setAttribute('x2', (32 + 17 * Math.sin(a)).toFixed(2)); p.setAttribute('y2', (32 - 17 * Math.cos(a)).toFixed(2));
     el.querySelector('.mh-kv').textContent = v;
+  }
+  function paintKnob(cc) {
+    if (!root) return;
+    var v = kv(cc);
+    // every knob showing this CC on the selected Part: the Hub card and the
+    // Deck's pages share kv; a Deck knob of another kind (SysEx) is its own
+    root.querySelectorAll('.mh-knob[data-cc="' + cc + '"]').forEach(function (el) { if (!el.dataset.kind || el.dataset.kind === 'cc') paintKnobEl(el, v); });
   }
   function turn(n, v, quiet) {
     v = clamp(Math.round(v), 0, 127);
@@ -368,9 +387,10 @@
     els.hero.innerHTML = s.hero ? knobHTML(s.hero, true) : '';
     els.hero.hidden = !s.hero;
     els.knobs.innerHTML = s.main.map(function (k) { return knobHTML(k); }).join('');
-    els.extra.innerHTML = s.extra.length ? '<h3>' + esc(profile().knobs.extraTitle || 'More') + '</h3><div class="mh-knobs">' + s.extra.map(function (k) { return knobHTML(k); }).join('') + '</div>' : '';
+    els.extra.innerHTML = s.extra.length ? '<h3>' + esc(s.extraTitle || 'More') + '</h3><div class="mh-knobs">' + s.extra.map(function (k) { return knobHTML(k); }).join('') + '</div>' : '';
     paintProg();
     paintCvOut();
+    if (App.synthDeck && App.synthDeck.onPart) App.synthDeck.onPart();
   }
   function paintCvOut() {
     if (!els.cvout) return;
@@ -383,28 +403,36 @@
     els.cvpnum.textContent = progNum();
     els.cvbank.textContent = 'Bank ' + g('msb', profile().bankMsb) + '/' + g('lsb', 0);
   }
-  function sendProgram(pg) {
+  function sendProgram(pg, msbIn, lsbIn) {
+    if (msbIn != null) set('msb', clamp(parseInt(msbIn, 10) || 0, 0, 127));
+    if (lsbIn != null) set('lsb', clamp(parseInt(lsbIn, 10) || 0, 0, 127));
     var msb = clamp(parseInt(g('msb', profile().bankMsb), 10) || 0, 0, 127), lsb = clamp(parseInt(g('lsb', 0), 10) || 0, 0, 127);
     pg = clamp(pg, 1, 128);
     set('msb', msb); set('lsb', lsb); set('prog', pg);
     cc(0, msb); cc(32, lsb); sendCh(12, pg - 1);
     if (els.prog) els.prog.value = pg;
+    if (els.msb) els.msb.value = msb; if (els.lsb) els.lsb.value = lsb;
     paintProg();
     toast('Bank ' + msb + '/' + lsb + ' \u00b7 program ' + pg);
   }
-  function wireKnobs(box) {
+  // h = optional {turn(c, v, el), def(c, el), val(c, el)} so another owner
+  // (the Synth Deck's knob pages) can reuse the same gestures on its knobs
+  function wireKnobs(box, h) {
     var drag = null;
+    var T = function (c, v, el) { return h && h.turn ? h.turn(c, v, el) : turn(c, v); };
+    var D = function (c, el) { return h && h.def ? h.def(c, el) : knobDef(c); };
+    var V = function (c, el) { return h && h.val ? h.val(c, el) : kv(c); };
     box.addEventListener('pointerdown', function (e) {
       var k = e.target.closest && e.target.closest('.mh-knob'); if (!k) return;
       e.preventDefault();
       var c = +k.dataset.cc;
-      drag = { cc: c, y: e.clientY, v: kv(c), el: k };
+      drag = { cc: c, y: e.clientY, v: V(c, k), el: k };
       try { k.setPointerCapture(e.pointerId); } catch (x) { /* synthetic */ }
       k.focus();
     });
     box.addEventListener('pointermove', function (e) {
       if (!drag) return;
-      turn(drag.cc, drag.v + (drag.y - e.clientY) / (e.shiftKey ? 6 : 1.5));
+      T(drag.cc, drag.v + (drag.y - e.clientY) / (e.shiftKey ? 6 : 1.5), drag.el);
     });
     var end = function () { drag = null; };
     box.addEventListener('pointerup', end); box.addEventListener('pointercancel', end);
@@ -413,21 +441,21 @@
     box.addEventListener('wheel', function (e) {
       var k = e.target.closest && e.target.closest('.mh-knob'); if (!k || document.activeElement !== k) return;
       e.preventDefault();
-      var c = +k.dataset.cc; turn(c, kv(c) + (e.deltaY < 0 ? 1 : -1) * (e.shiftKey ? 1 : 4));
+      var c = +k.dataset.cc; T(c, V(c, k) + (e.deltaY < 0 ? 1 : -1) * (e.shiftKey ? 1 : 4), k);
     }, { passive: false });
     box.addEventListener('keydown', function (e) {
       var k = e.target.closest && e.target.closest('.mh-knob'); if (!k) return;
-      var c = +k.dataset.cc, v = kv(c), n = null;
+      var c = +k.dataset.cc, v = V(c, k), n = null;
       if (e.key === 'ArrowUp' || e.key === 'ArrowRight') n = v + 1;
       else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') n = v - 1;
       else if (e.key === 'PageUp') n = v + 10; else if (e.key === 'PageDown') n = v - 10;
       else if (e.key === 'Home') n = 0; else if (e.key === 'End') n = 127;
       if (n == null) return;
-      e.preventDefault(); e.stopPropagation(); turn(c, n);
+      e.preventDefault(); e.stopPropagation(); T(c, n, k);
     });
     box.addEventListener('dblclick', function (e) {
       var k = e.target.closest && e.target.closest('.mh-knob'); if (!k) return;
-      var c = +k.dataset.cc; turn(c, knobDef(c));
+      var c = +k.dataset.cc; T(c, D(c, k), k);
     });
   }
   function pickPart(c) {
@@ -505,6 +533,7 @@
     // two-way: the synth's own knobs / program changes on this Part move the screen
     if ((b[0] & 0xF0) === 0xB0 && (b[0] & 15) === ch() && b.length > 2 && allKnobs().some(function (k) { return k.cc === b[1]; })) { setKv(b[1], b[2]); paintKnob(b[1]); }
     if ((b[0] & 0xF0) === 0xC0 && (b[0] & 15) === ch() && b.length > 1) { set('prog', b[1] + 1); if (els.prog) els.prog.value = b[1] + 1; paintProg(); }
+    if ((b[0] & 0xF0) === 0xB0 && (b[0] & 15) === ch() && b.length > 2 && (b[1] === 0 || b[1] === 32)) { var bk = b[1] === 0 ? 'msb' : 'lsb'; set(bk, b[2]); if (els[bk]) els[bk].value = b[2]; paintProg(); }
     if (b[0] === 0xF0 && els.rx) {
       els.rx.value = hex(b); els.rxInfo.textContent = b.length + ' bytes';
       if (b[1] === 0x7E && b[3] === 0x06 && b[4] === 0x02 && els.idReply) els.idReply.textContent = identity(b);
@@ -675,6 +704,7 @@
 
       // CONTROL (v0.80.0)
       '<div class="mh-view" data-view="control" hidden>' +
+        '<div id="mh-deck"></div>' + // Synth Deck: Now bar + sub-tabs (js/synthdeck.js)
         '<div class="card mh-cv">' +
           '<div class="mh-cv-head"><h2>Synth control</h2><span class="muted small" id="mh-cvout"></span></div>' +
           '<div class="mh-parts" id="mh-parts" role="group" aria-label="Part"></div>' +
@@ -686,8 +716,9 @@
             '<button type="button" class="btn" id="mh-cvnext" aria-label="Next program">Next ' + App.icon('right', 16) + '</button></div>' +
           '<div class="row tight mh-cv-acts"><button type="button" class="btn sm" id="mh-cvsend" title="Send every knob on this Part to the synth">Send all</button>' +
             '<button type="button" class="btn sm" id="mh-cvreset" title="Every knob back to its start value, sent">Reset knobs</button></div>' +
-          '<p class="muted small">Drag a knob up or down (Shift = fine), scroll on it, or use the arrow keys; double-tap puts it back. Turn a knob on the synth and the one here follows. Bank and program numbers live in Play.</p>' +
+          '<p class="muted small">Drag a knob up or down (Shift = fine), scroll on it, or use the arrow keys; double-tap puts it back. Turn a knob on the synth and the one here follows. Sounds, banks and programs live in Sounds above.</p>' +
         '</div>' +
+        '<div id="mh-deck2"></div>' + // Synth Deck: the sub-tab panels
       '</div>' +
 
       // PLAY
@@ -834,7 +865,7 @@
       'newcc', 'newccname', 'addcc', 'resetcc', 'ccgrid', 'switches', 'start', 'cont', 'stop', 'clock',
       'rulesin', 'rulesapp', 'addrule', 'rules', 'idreq', 'idreply', 'sxcard', 'raw', 'rawsend', 'rawerr', 'rx', 'rxcopy', 'rxraw', 'rxinfo',
       'monin', 'monout', 'monclock', 'monas', 'monhex', 'monpause', 'monclear', 'monexport', 'moncount', 'mon', 'devnotes', 'naming', 'export', 'import', 'importfile', 'reset', 'toast', 'enable',
-      'cvout', 'parts', 'hero', 'knobs', 'extra', 'cvprev', 'cvnext', 'cvpnum', 'cvbank', 'cvsend', 'cvreset'];
+      'cvout', 'parts', 'hero', 'knobs', 'extra', 'cvprev', 'cvnext', 'cvpnum', 'cvbank', 'cvsend', 'cvreset', 'deck', 'deck2'];
     ids.forEach(function (id) { els[id] = root.querySelector('#mh-' + id); });
     // friendlier aliases used above
     els.inSel = els['in']; els.outSel = els.out; els.ledIn = els.ledin; els.ledOut = els.ledout; els.lastIn = els.lastin; els.lastOut = els.lastout;
@@ -843,6 +874,9 @@
 
     wire();
     buildKeyboard(); renderCcs(); renderSwitches(); renderRules(); renderSysex(); renderNotes(); renderControl(); paintClock(); paintPorts();
+    // the Synth Deck mounts into the Control view; render() re-runs on
+    // Import / Reset Hub, so this remount is what keeps it alive
+    if (App.synthDeck) { try { App.synthDeck.init(els.deck, els.deck2, HUB_API); } catch (e) { console.error('synth deck', e); } }
     view(g('view', 'control'));
   }
 
@@ -958,7 +992,8 @@
     // learn / housekeeping
     els.naming.addEventListener('change', function () { set('naming', parseInt(this.value, 10)); buildKeyboard(); });
     els.export.addEventListener('click', function () {
-      var o = {}; ['ch', 'oct', 'vel', 'thru', 'rulesIn', 'rulesApp', 'profile', 'dev', 'model', 'ccs', 'rules', 'hex', 'naming', 'msb', 'lsb', 'prog'].forEach(function (k) { o[k] = g(k, null); });
+      kvFlush();
+      var o = {}; ['ch', 'oct', 'vel', 'thru', 'rulesIn', 'rulesApp', 'profile', 'dev', 'model', 'ccs', 'rules', 'hex', 'naming', 'msb', 'lsb', 'prog', 'outId', 'kv', 'deck', 'decklib', 'deckvals', 'names'].forEach(function (k) { o[k] = g(k, null); });
       var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(o, null, 1)], { type: 'application/json' })); a.download = 'soundlab-midi-hub.json'; a.click();
     });
     els['import'].addEventListener('click', function () { els.importfile.click(); });
@@ -968,7 +1003,9 @@
         .catch(function () { toast('Not a Hub setup file'); });
     });
     els.reset.addEventListener('click', function () {
-      ['ch', 'oct', 'vel', 'thru', 'rulesIn', 'rulesApp', 'profile', 'dev', 'model', 'ccs', 'rules', 'hex', 'naming', 'msb', 'lsb', 'prog', 'view'].forEach(function (k) { set(k, null); });
+      // the sound library (decklib) and your program names survive a Hub
+      // reset: the Deck's own two-step 'Delete all sounds' removes them
+      ['ch', 'oct', 'vel', 'thru', 'rulesIn', 'rulesApp', 'profile', 'dev', 'model', 'ccs', 'rules', 'hex', 'naming', 'msb', 'lsb', 'prog', 'view', 'deck', 'deckvals'].forEach(function (k) { set(k, null); });
       setClock(false); render(); installFilter(); toast('Hub reset');
     });
 
@@ -1156,14 +1193,26 @@
       else if (e.code === 'Space') setSustain(false);
     });
     window.addEventListener('blur', function () { releaseAll(); flushHub('Window lost focus'); });
-    document.addEventListener('visibilitychange', function () { if (document.hidden) { releaseAll(); flushHub('App hidden'); } });
-    window.addEventListener('pagehide', function () { releaseAll(); flushHub('Page closed'); });
+    document.addEventListener('visibilitychange', function () { if (document.hidden) { releaseAll(); flushHub('App hidden'); kvFlush(); } });
+    window.addEventListener('pagehide', function () { releaseAll(); flushHub('Page closed'); kvFlush(); });
   }
+
+  // ---- the API the Synth Deck (js/synthdeck.js) drives; also SLMidiHub.api ----
+  var HUB_API = {
+    g: g, set: set, ch: ch, pickPart: pickPart, profile: profile, profileKey: profileKey, PROFILES: PROFILES, partLabel: partLabel,
+    kv: kv, kvGet: kvGet, setKv: setKv, kvFlush: kvFlush, allKnobs: allKnobs, knobDef: knobDef, turn: turn, paintKnob: paintKnob, paintKnobEl: paintKnobEl,
+    knobHTML: knobHTML, arcPath: arcPath, wireKnobs: wireKnobs, renderControl: renderControl,
+    cc: cc, sendCh: sendCh, send: send, sendProgram: sendProgram, progNum: progNum, paintProg: paintProg,
+    hubOutId: hubOutId, hubOutName: hubOutName, hasOut: hasOut, midi: midi, get sysexOk() { var m = midi(); return !!(m && m.sysexOk); },
+    toast: toast, esc: esc, clamp: clamp, hex: hex, parseHex: parseHex, decode: decode, noteName: noteName, ccName: ccName, view: view,
+    cv: function () { return root && root.querySelector('.mh-cv'); }, root: function () { return root; }, els: function () { return els; }
+  };
 
   App.register('midihub', {
     init: init,
     onShow: function () { applyMute(); paintPorts(); paintClock(); if (midi() && midi().supported && !midi().ready && App.store.get('midi.wanted', false)) midi().enable().then(paintPorts).catch(function () { }); },
-    onHide: function () { releaseAll(); if (sustain) setSustain(false); flushHub('MIDI Hub left'); if (midi() && midi().mute) midi().mute('midihub', false); },
+    onHide: function () { if (App.synthDeck && App.synthDeck.stop) App.synthDeck.stop(); releaseAll(); if (sustain) setSustain(false); flushHub('MIDI Hub left'); kvFlush(); if (midi() && midi().mute) midi().mute('midihub', false); },
+    onBack: function () { return !!(App.synthDeck && App.synthDeck.onBack && App.synthDeck.onBack()); },
     onKey: function (e) {
       if (e.repeat) return;
       if (e.code in KB_KEYS) { press(base() + KB_KEYS[e.code]); e.preventDefault(); }
@@ -1174,5 +1223,5 @@
   });
 
   // test / plugin hook
-  window.SLMidiHub = { decode: decode, applyRules: applyRules, PROFILES: PROFILES, parseHex: parseHex, hex: hex, get rules() { return rules(); }, get outId() { return hubOutId(); }, knob: function (cc) { return kv(cc); }, turn: turn };
+  window.SLMidiHub = { decode: decode, applyRules: applyRules, PROFILES: PROFILES, parseHex: parseHex, hex: hex, get rules() { return rules(); }, get outId() { return hubOutId(); }, knob: function (cc) { return kv(cc); }, turn: turn, api: HUB_API };
 })();

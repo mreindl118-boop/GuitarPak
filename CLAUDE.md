@@ -391,6 +391,47 @@ js/midihub.js     MIDI HUB page ('midihub', Keys group, pill "MIDI", v0.78.0;
                   midihub.msb/lsb), Send all, Reset knobs. TWO-WAY: onRaw
                   moves a knob / the program number when the synth sends
                   that CC / Program Change on the selected Part.
+js/synthdeck.js   SYNTH DECK (v1.1.0): the MIDI Hub's Control view as a real
+                  control surface for the synth on the cable (built around the
+                  owner's MODX8+, device-agnostic by design). Mounted by
+                  midihub.js render() into #mh-deck (Now bar + sub-tabs) and
+                  #mh-deck2 (panels) with HUB_API (= SLMidiHub.api); App.
+                  synthDeck / window.SLSynthDeck; init is idempotent (render()
+                  re-runs on Import / Reset Hub). Sub-tabs: Knobs (the Hub card
+                  + knob PAGES via api.wireKnobs handlers), Buttons (toggle /
+                  momentary / radio / trigger from the MAP; held momentaries
+                  drained on blur / hide / Part change / midi:beforeoutput),
+                  Sounds (library midihub.decklib cap 200: save/edit/star/
+                  search/duplicate/two-step delete/export/import; LOAD =
+                  Bank MSB, LSB, PC back to back, settle (deck.settleMs 250),
+                  then paced values; recallPlan(id) feeds the byte preview and
+                  the tests; bank browser with MSB 63 'Into this Part' /
+                  64 'Whole performance' and the MODX factory names from
+                  data/modx-performances.json; Read name from synth = Yamaha
+                  bulk request 0E 25 00, name block 30 40 00), Scope
+                  (js/synthdeck-scope.js, window.SLSynthScope: canvas note
+                  roll per channel + CC lanes + clock from incoming F8 / the
+                  Hub clock / met.bpm; feed()/frame()/state() test hooks, rAF
+                  only while the tab is visible), Map (every control's kind /
+                  channel scope / number or SysEx address / on-off / conf
+                  badge; MIDI Learn + Learn 2 moves; Reset map). Maps are
+                  DATA in js/synthdeck-maps.js (generic / yamaha / roland;
+                  conf verified | documented | unverified | learned per entry;
+                  num null never sends) from docs/MODX-MIDI-REFERENCE.md.
+                  ONE tx funnel: api.send (Rules-on-app-controls, ledger,
+                  echo suppression) after refusing a LUMI-named resolved
+                  output; nothing sends on load/show/tab/Part/profile/Import/
+                  Reset/Learn/save; UI state moves only for bytes actually
+                  sent. Stores midihub.deck (settings + per-profile map
+                  overrides) / decklib / deckvals / names; Hub Export covers
+                  them, Reset Hub keeps decklib + names. hubKnobs(profile)
+                  lets the map redefine the Hub card's own knobs (null =
+                  built-ins). Docs docs/SYNTH-DECK.md; suites synthdeck +
+                  synthdeck-scope.
+data/             app data files: modx-performances.json (2,143 MODX factory
+                  Performance names by LSB/PC, parsed from a public Cakewalk
+                  .ins list; MSB 63 and 64 share the layout). In sw ASSETS,
+                  the artifact build and the APK asset copy.
 js/pads.js        drum-pad controller page ('pads', PRACTICE Instrument group
                   since v0.64.0; still records to st.tracks + studio-armed
                   MIDI works): 8 velocity pads on the pad drum track's live
