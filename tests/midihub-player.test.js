@@ -151,6 +151,62 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
   ok(x.stored.notes === 6 && x.deflated.notes === 6 && x.stored.title === 'Two voices', '.mxl opens, stored and compressed');
   ok(/MusicXML/.test(x.bad) && /grace/.test(x.warn), 'a non-score is refused with a clear message; grace notes are reported: ' + x.bad);
 
+  console.log('# a reviewed score (Score review / practice format)');
+  const r = await page.evaluate(async () => {
+    const score = { title: 'Reviewed demo', bpm: 120, len: 4, rhythmKnown: true, notes: [
+      { t: 0, d: 1, m: 60, partId: 'P1' }, { t: 0, d: 1, m: 64, partId: 'P1' }, { t: 1, d: 1, rest: true, partId: 'P1' },
+      { t: 2, d: 2, m: 67, partId: 'P1', v: 100 }, { t: 0, d: 4, m: 36, partId: 'P2' }] };
+    const sum = SLMidiHub.player.loadScore(score);
+    App.store.set('midihub.plRoute', 'file'); App.store.set('midihub.plTempo', 200);
+    __by.modx1.length = 0; SLMidiHub.player.play();
+    const deadline = performance.now() + 4000;
+    while (SLMidiHub.player.state.playing && performance.now() < deadline) await new Promise(r => setTimeout(r, 30));
+    const ons = __by.modx1.filter(b => (b[0] & 0xf0) === 0x90).map(b => ((b[0] & 15) + 1) + ':' + b[1]);
+    const mid = SLMidiHub.scoreToMidi(score);
+    const back = await SLMidiHub.player.loadFile('reviewed.mid', mid.buffer);
+    const unconfirmed = SLMidiHub.player.loadScore(Object.assign({}, score, { rhythmKnown: false }));
+    let bad = '';
+    try { SLMidiHub.player.loadScore({ bpm: 120, len: 4, notes: [{ t: 0, d: 1, rest: true }] }); } catch (e) { bad = e.message; }
+    SLMidiHub.player.show();
+    const shown = [...document.querySelectorAll('.mh-view')].filter(x => !x.hidden).map(x => x.dataset.view).join();
+    return { sum, ons, head: String.fromCharCode(...mid.slice(0, 4)), back, unconfirmed, bad, shown };
+  });
+  ok(r.sum.title === 'Reviewed demo' && r.sum.notes === 4 && r.sum.channels.join() === '1,2' && Math.abs(r.sum.duration - 2) < 0.05, 'loadScore: 4 notes (rest skipped), parts on channels 1-2, 4 beats at 120 = 2 s: ' + JSON.stringify(r.sum));
+  ok(r.ons.slice(0, 3).sort().join() === '1:60,1:64,2:36' && r.ons.includes('1:67'), 'it plays the chord, the bass part on channel 2 and the last note: ' + r.ons.join(' '));
+  ok(r.head === 'MThd' && r.back.notes === 4 && r.back.channels.join() === '1,2' && Math.abs(r.back.duration - r.sum.duration) < 0.02 && r.back.title === 'Reviewed demo', 'scoreToMidi round-trips through the Player: same notes, channels, length and title: ' + JSON.stringify(r.back));
+  ok(r.unconfirmed.warnings.some(w => /not confirmed/.test(w)) && /no pitched notes/.test(r.bad), 'an unconfirmed rhythm is flagged; a score with no notes is refused: ' + r.bad);
+  ok(r.shown === 'player', 'player.show() opens the Player view');
+
+  console.log('# key shifter');
+  const k = await page.evaluate(async () => {
+    // a C major line: C D E F G A B C', then an F# (chromatic)
+    const notes = [60, 62, 64, 65, 67, 69, 71, 72].map((m, i) => ({ t: i, d: 1, m, partId: 'P1' })).concat([{ t: 8, d: 1, m: 66, partId: 'P1' }]);
+    SLMidiHub.player.loadScore({ title: 'C line', bpm: 240, len: 9, notes });
+    const key = SLMidiHub.player.key, info0 = document.getElementById('mh-plkeyinfo').textContent;
+    const map = () => [60, 62, 64, 65, 67, 69, 71, 72, 66].map(n => SLMidiHub.player.shiftNote(n));
+    const sel = (id, v) => { const e = document.getElementById(id); e.value = String(v); e.dispatchEvent(new Event('change')); };
+    const box = document.getElementById('mh-plshift');
+    sel('mh-pltrans', 2); const up2 = map();
+    sel('mh-pltrans', 0); box.checked = true; box.dispatchEvent(new Event('change'));
+    sel('mh-pltr', 0); sel('mh-plts', 'aeolian'); const toMinor = map(); const info1 = document.getElementById('mh-plkeyinfo').textContent;
+    sel('mh-pltr', 7); sel('mh-plts', 'major'); const toG = map();
+    sel('mh-pltr', 0); sel('mh-plts', 'aeolian');
+    App.store.set('midihub.plRoute', 'file'); App.store.set('midihub.plTempo', 200);
+    __by.modx1.length = 0; SLMidiHub.player.play();
+    const deadline = performance.now() + 4000;
+    while (SLMidiHub.player.state.playing && performance.now() < deadline) await new Promise(r => setTimeout(r, 30));
+    const played = __by.modx1.filter(b => (b[0] & 0xf0) === 0x90).map(b => b[1]);
+    const offs = __by.modx1.filter(b => (b[0] & 0xf0) === 0x80).map(b => b[1]);
+    box.checked = false; box.dispatchEvent(new Event('change'));
+    return { key, info0, up2, toMinor, info1, toG, played, offs, hidden: document.getElementById('mh-plkeys').hidden, plain: map() };
+  });
+  ok(k.key.root === 0 && k.key.scale === 'major' && /C major/.test(k.info0), 'it guesses the key: ' + k.info0);
+  ok(k.up2.join() === '62,64,66,67,69,71,73,74,68', 'transpose +2 moves every note two semitones: ' + k.up2.join(','));
+  ok(k.toMinor.join() === '60,62,63,65,67,68,70,72,66' && /C major as C minor/.test(k.info1), 'C major as C minor: E A B become Eb Ab Bb, F# stays chromatic: ' + k.toMinor.join(',') + ' / ' + k.info1);
+  ok(k.toG.join() === '55,57,59,60,62,64,66,67,61', 'C major as G major moves each degree to G major (down a 4th): ' + k.toG.join(','));
+  ok(k.played.join() === k.toMinor.join() && k.offs.slice().sort().join() === k.played.slice().sort().join(), 'playback sends the shifted notes, and each Note Off matches its Note On: ' + k.played.join(','));
+  ok(k.hidden && k.plain.join() === '60,62,64,65,67,69,71,72,66', 'Change key off: notes as written again');
+
   ok(errs.length === 0, 'no page errors' + (errs.length ? ': ' + errs.join(' | ') : ''));
   await ctx.close(); await browser.close();
   console.log(fails ? 'FAILED ' + fails : 'ALL PASS');

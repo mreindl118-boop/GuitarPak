@@ -706,6 +706,15 @@
             '<div class="seg mh-plroute" role="group" aria-label="Channels"><button type="button" data-plroute="file">Channels as in file</button><button type="button" data-plroute="part" id="mh-plpartlab">All on one Part</button></div>' +
             '<label class="mh-chk"><input type="checkbox" id="mh-plloop"' + (plLoop() ? ' checked' : '') + '> Loop</label>' +
           '</div>' +
+          '<div class="row tight mh-plkey">' +
+            '<label class="field">Transpose<select id="mh-pltrans">' + (function () { var h = ''; for (var t = -12; t <= 12; t++) h += '<option value="' + t + '"' + (t === plTrans() ? ' selected' : '') + '>' + (t > 0 ? '+' + t : t) + (t === 0 ? ' (as written)' : ' semitone' + (Math.abs(t) === 1 ? '' : 's')) + '</option>'; return h; })() + '</select></label>' +
+            '<label class="mh-chk"><input type="checkbox" id="mh-plshift"' + (plShift().on ? ' checked' : '') + '> Change key</label>' +
+            '<span class="mh-plkeys row tight" id="mh-plkeys"' + (plShift().on ? '' : ' hidden') + '>' +
+              '<label class="field">From<span class="row tight"><select id="mh-plfr"></select><select id="mh-plfs"></select></span></label>' +
+              '<label class="field">To<span class="row tight"><select id="mh-pltr"></select><select id="mh-plts"></select></span></label>' +
+            '</span>' +
+          '</div>' +
+          '<p class="muted small" id="mh-plkeyinfo"></p>' +
           '<p class="mh-warn small" id="mh-plwarn" hidden></p>' +
           '<details class="tips"><summary>Sheet music as a PDF?</summary><p class="muted small">A notation app turns a score into a file this player opens: if it came from MuseScore, open the original score there and choose <b>Export \u203a MIDI</b> or <b>MusicXML</b>. For a printed or PDF score, a free recognizer such as Audiveris reads it into MusicXML; check its result against the page before you rely on it. \u201cChannels as in file\u201d plays each part or track on its own channel (Part 1 = channel 1 on a MODX in Multi mode); \u201cAll on one Part\u201d sends everything to the Part picked in Control.</p></details>' +
         '</div>' +
@@ -856,7 +865,8 @@
       'rulesin', 'rulesapp', 'addrule', 'rules', 'idreq', 'idreply', 'sxcard', 'raw', 'rawsend', 'rawerr', 'rx', 'rxcopy', 'rxraw', 'rxinfo',
       'monin', 'monout', 'monclock', 'monas', 'monhex', 'monpause', 'monclear', 'monexport', 'moncount', 'mon', 'devnotes', 'naming', 'export', 'import', 'importfile', 'reset', 'toast', 'enable',
       'cvout', 'parts', 'hero', 'knobs', 'extra', 'cvprev', 'cvnext', 'cvpnum', 'cvbank', 'cvsend', 'cvreset',
-      'plout', 'plfile', 'plinfo', 'plplay', 'plstop', 'pltime', 'plseek', 'pltempo', 'plvel', 'plvelv', 'plloop', 'plwarn', 'plpartlab'];
+      'plout', 'plfile', 'plinfo', 'plplay', 'plstop', 'pltime', 'plseek', 'pltempo', 'plvel', 'plvelv', 'plloop', 'plwarn', 'plpartlab',
+      'pltrans', 'plshift', 'plkeys', 'plfr', 'plfs', 'pltr', 'plts', 'plkeyinfo'];
     ids.forEach(function (id) { els[id] = root.querySelector('#mh-' + id); });
     // friendlier aliases used above
     els.inSel = els['in']; els.outSel = els.out; els.ledIn = els.ledin; els.ledOut = els.ledout; els.lastIn = els.lastin; els.lastOut = els.lastout;
@@ -1323,22 +1333,136 @@
   function plSet(song) {
     plStop();
     PL.song = song; PL.pos = 0; PL.idx = 0;
+    var k = detectSongKey(song), sh = plShift();
+    song.key = { root: k.root, scale: k.scale };
+    set('plShift', { on: sh.on, fr: k.root, fs: k.scale, tr: sh.tr, ts: sh.ts }); shiftCache.key = '';
     paintPlayer();
     return { title: song.title, notes: song.notes, duration: song.duration, channels: song.channels.slice(), warnings: song.warnings.slice() };
   }
 
+  // REVIEWED SCORES (the 1.1 Score review / practice-material format):
+  // {title?, bpm, len (beats), rhythmKnown?, notes: [{t, d (beats), m, rest?, partId?, v?}]}.
+  // Each partId gets its own channel in order of first appearance (channel
+  // 10 skipped), chords stay chords, rests are silent.
+  function checkScore(score) {
+    if (!score || !Array.isArray(score.notes) || !score.notes.length || score.notes.length > 50000) throw new Error('Choose a nonempty reviewed score (at most 50,000 notes).');
+    if (!isFinite(score.bpm) || score.bpm <= 0 || score.bpm > 1000) throw new Error('The score needs a reviewed tempo.');
+    if (score.notes.some(function (n) { return !n || !isFinite(n.t) || n.t < 0 || !isFinite(n.d) || n.d < 0 || (!n.rest && (!Number.isInteger(n.m) || n.m < 0 || n.m > 127)); })) throw new Error('This score has an invalid note.');
+    if (!score.notes.some(function (n) { return !n.rest; })) throw new Error('This score contains no pitched notes.');
+    var parts = [], chOf = {};
+    score.notes.forEach(function (n) { var p = n.partId == null ? '' : String(n.partId); if (!(p in chOf)) { var i = parts.length; parts.push(p); chOf[p] = i < 9 ? i : Math.min(15, i + 1); } });
+    return chOf;
+  }
+  function scoreToSong(score) {
+    var chOf = checkScore(score), spb = 60 / score.bpm, raw = [], warnings = [];
+    score.notes.forEach(function (n, i) {
+      if (n.rest || n.d <= 0) return;
+      var a = n.t * spb, z = (n.t + n.d) * spb, c = chOf[n.partId == null ? '' : String(n.partId)];
+      var v = Number.isInteger(n.v) && n.v > 0 && n.v <= 127 ? n.v : 80;
+      raw.push({ t: a, k: 'on', ch: c, n: n.m, v: v, o: i * 2 });
+      raw.push({ t: Math.max(a + 0.02, z - 0.01), k: 'off', ch: c, n: n.m, v: 0, o: i * 2 + 1 });
+    });
+    if (score.rhythmKnown === false) warnings.push('Rhythm was not confirmed in review: timing follows the draft’s beat positions.');
+    return finishSong(score.title || 'Reviewed score', raw, warnings, 'Reviewed score');
+  }
+  // the same score as a standard MIDI file: format 1, a tempo track, one
+  // track per part on its own channel, 480 ticks per beat
+  function scoreToMidi(score) {
+    var chOf = checkScore(score), TPQ = 480, tracks = [];
+    var vlq = function (n) { var o = [n & 0x7f]; n >>= 7; while (n) { o.unshift((n & 0x7f) | 0x80); n >>= 7; } return o; };
+    var finish = function (evs) { var body = [], last = 0; evs.sort(function (a, b) { return a.tick - b.tick || a.ord - b.ord; }); evs.forEach(function (e) { body.push.apply(body, vlq(e.tick - last).concat(e.b)); last = e.tick; }); body.push(0, 0xff, 0x2f, 0); return body; };
+    var title = Array.from(new TextEncoder().encode(String(score.title || 'Reviewed score').slice(0, 100)));
+    var us = Math.round(60000000 / score.bpm);
+    tracks.push(finish([{ tick: 0, ord: 0, b: [0xff, 0x03].concat(vlq(title.length), title) }, { tick: 0, ord: 1, b: [0xff, 0x51, 3, (us >> 16) & 255, (us >> 8) & 255, us & 255] }]));
+    Object.keys(chOf).forEach(function (p) {
+      var c = chOf[p], evs = [];
+      score.notes.forEach(function (n, i) {
+        if (n.rest || n.d <= 0 || (n.partId == null ? '' : String(n.partId)) !== p) return;
+        var a = Math.round(n.t * TPQ), z = Math.max(a + 1, Math.round((n.t + n.d) * TPQ));
+        var v = Number.isInteger(n.v) && n.v > 0 && n.v <= 127 ? n.v : 80;
+        evs.push({ tick: a, ord: i * 2 + 1, b: [0x90 | c, n.m, v] }, { tick: z, ord: i * 2, b: [0x80 | c, n.m, 0] }); // offs first at equal ticks
+      });
+      tracks.push(finish(evs));
+    });
+    var out = [0x4d, 0x54, 0x68, 0x64, 0, 0, 0, 6, 0, 1, (tracks.length >> 8) & 255, tracks.length & 255, (TPQ >> 8) & 255, TPQ & 255];
+    tracks.forEach(function (body) { var n = body.length; out.push(0x4d, 0x54, 0x72, 0x6b, (n >>> 24) & 255, (n >> 16) & 255, (n >> 8) & 255, n & 255); for (var k = 0; k < n; k++) out.push(body[k]); });
+    return new Uint8Array(out);
+  }
+
+  // KEY SHIFTER: transpose by semitones, and/or move the piece into another
+  // key and scale by scale degree (C major -> A minor turns every 3rd, 6th
+  // and 7th into the minor ones; notes outside the source scale move with
+  // the key). Store midihub.plTrans (-12..12) and midihub.plShift
+  // {on, fr, fs, tr, ts} (roots 0-11, seven-note Theory scale ids). The
+  // source key is guessed when a song loads. Changing either while playing
+  // re-starts the sounding notes, so every Note Off matches its Note On.
+  var SHIFT_SCALES = ['major', 'aeolian', 'dorian', 'mixolydian', 'phrygian', 'lydian', 'locrian', 'harmonicMinor', 'melodicMinor', 'phrygDom'];
+  function plTrans() { var t = parseInt(g('plTrans', 0), 10); return t >= -12 && t <= 12 ? t : 0; }
+  function plShift() {
+    var o = g('plShift', null) || {}, sc = function (x, d) { return SHIFT_SCALES.indexOf(x) !== -1 ? x : d; }, rt = function (x, d) { x = parseInt(x, 10); return x >= 0 && x <= 11 ? x : d; };
+    return { on: o.on === true, fr: rt(o.fr, 0), fs: sc(o.fs, 'major'), tr: rt(o.tr, 9), ts: sc(o.ts, 'aeolian') };
+  }
+  function keyName(root, scale) { return Theory.pcName(root, Theory.FLAT_KEYS.has(root)) + ' ' + (scale === 'aeolian' ? 'minor' : Theory.SCALES[scale].name.replace(/\s*\(.*\)$/, '').toLowerCase()); }
+  // duration-weighted pitch classes against each major / natural minor key;
+  // ties go to the key whose tonic sounds most
+  function detectSongKey(song) {
+    var w = new Array(12).fill(0), open = {};
+    song.events.forEach(function (e) {
+      var k = e.ch + '/' + e.n;
+      if (e.k === 'on') open[k] = e.t;
+      else if (e.k === 'off' && open[k] != null) { w[e.n % 12] += Math.max(0.05, e.t - open[k]); delete open[k]; }
+    });
+    var best = { score: -1, root: 0, scale: 'major' };
+    ['major', 'aeolian'].forEach(function (scale) {
+      for (var r = 0; r < 12; r++) {
+        var info = Theory.scaleInfo(r, scale), sc = 0;
+        for (var pc = 0; pc < 12; pc++) if (info.pcSet.has(pc)) sc += w[pc];
+        sc += w[r] * 0.5 + w[(r + 7) % 12] * 0.2;
+        if (sc > best.score + 1e-9) best = { score: sc, root: r, scale: scale };
+      }
+    });
+    return best;
+  }
+  var shiftCache = { key: '', map: null };
+  function shiftMap() {
+    var sh = plShift(), t = plTrans(), key = JSON.stringify([sh, t]);
+    if (shiftCache.key === key) return shiftCache.map;
+    var map = new Array(128);
+    var from = Theory.scaleInfo(sh.fr, sh.fs), to = Theory.scaleInfo(sh.tr, sh.ts);
+    var rootMove = ((sh.tr - sh.fr + 18) % 12) - 6; // nearest way to the new key: -6..+5
+    for (var n = 0; n < 128; n++) {
+      var m = n;
+      if (sh.on) {
+        var pc = n % 12, step = from.pcToStep.get(pc);
+        if (step === undefined) m = n + rootMove;
+        else {
+          var rel = (pc - sh.fr + 12) % 12, trel = (to.pcs[step] - sh.tr + 12) % 12;
+          m = n - rel + rootMove + trel;
+        }
+      }
+      m += t;
+      while (m > 127) m -= 12;
+      while (m < 0) m += 12;
+      map[n] = m;
+    }
+    shiftCache = { key: key, map: map };
+    return map;
+  }
+  function shiftNote(n) { return shiftMap()[n]; }
+  function plReshift(apply) { var was = PL.playing; if (was) plPause(); apply(); shiftCache.key = ''; if (was) plPlay(); else paintPlayer(); }
+
   function plNow() { return PL.startPos + (performance.now() - PL.startWall) / 1000 * plTempo() / 100; }
   function plSend(bytes) { if (PL.sender) PL.sender(bytes); }
   function plEmit(e) {
-    var c = plRoute() === 'part' ? ch() : e.ch, key = c + '/' + e.n;
+    var c = plRoute() === 'part' ? ch() : e.ch, n = e.k === 'sus' ? 64 : shiftNote(e.n), key = c + '/' + n;
     if (e.k === 'on') {
-      if (PL.held[key]) plSend([0x80 | c, e.n, 0]);
-      PL.held[key] = [c, e.n];
-      plSend([0x90 | c, e.n, Math.max(1, Math.min(127, Math.round(e.v * plCap() / PL.song.peak)))]);
+      if (PL.held[key]) plSend([0x80 | c, n, 0]);
+      PL.held[key] = [c, n];
+      plSend([0x90 | c, n, Math.max(1, Math.min(127, Math.round(e.v * plCap() / PL.song.peak)))]);
     } else if (e.k === 'off') {
       if (!PL.held[key]) return;
       delete PL.held[key];
-      plSend([0x80 | c, e.n, 0]);
+      plSend([0x80 | c, n, 0]);
     } else {
       PL.sus[c] = e.v >= 64;
       plSend([0xB0 | c, 64, e.v]);
@@ -1412,6 +1536,14 @@
     var n = hubOutName();
     els.plout.textContent = n ? '→ ' + n + (plRoute() === 'part' ? ' · ' + partLabel() + ' ' + (ch() + 1) : '') : 'No synth output yet — connect MIDI above';
     els.plpartlab.textContent = 'All on ' + partLabel() + ' ' + (ch() + 1);
+    var sh = plShift(), t = plTrans();
+    els.plshift.checked = sh.on; els.plkeys.hidden = !sh.on; els.pltrans.value = String(t);
+    els.plfr.value = String(sh.fr); els.plfs.value = sh.fs; els.pltr.value = String(sh.tr); els.plts.value = sh.ts;
+    var parts = [];
+    if (s && s.key) parts.push('Sounds like ' + keyName(s.key.root, s.key.scale) + '.');
+    if (sh.on) parts.push('Playing ' + keyName(sh.fr, sh.fs) + ' as ' + keyName(sh.tr, sh.ts) + '.');
+    if (t) parts.push('Transposed ' + (t > 0 ? 'up ' : 'down ') + Math.abs(t) + ' semitone' + (Math.abs(t) === 1 ? '' : 's') + '.');
+    els.plkeyinfo.textContent = parts.join(' ');
     root.querySelectorAll('[data-plroute]').forEach(function (b) { var on = b.getAttribute('data-plroute') === plRoute(); b.classList.toggle('active', on); b.setAttribute('aria-pressed', on); });
     paintPlayerTime();
   }
@@ -1432,6 +1564,14 @@
     });
     els.plvel.addEventListener('input', function () { set('plVel', parseInt(this.value, 10)); els.plvelv.textContent = this.value; });
     els.plloop.addEventListener('change', function () { set('plLoop', this.checked); });
+    var roots = ''; for (var r = 0; r < 12; r++) roots += '<option value="' + r + '">' + Theory.pcName(r, Theory.FLAT_KEYS.has(r)) + '</option>';
+    var scales = SHIFT_SCALES.map(function (x) { return '<option value="' + x + '">' + esc(Theory.SCALES[x].name.replace(/\s*\(.*\)$/, '')) + '</option>'; }).join('');
+    els.plfr.innerHTML = els.pltr.innerHTML = roots; els.plfs.innerHTML = els.plts.innerHTML = scales;
+    els.pltrans.addEventListener('change', function () { var v = parseInt(this.value, 10); plReshift(function () { set('plTrans', v); }); });
+    els.plshift.addEventListener('change', function () { var on = this.checked; plReshift(function () { var sh = plShift(); sh.on = on; set('plShift', sh); }); });
+    [['plfr', 'fr', true], ['plfs', 'fs', false], ['pltr', 'tr', true], ['plts', 'ts', false]].forEach(function (x) {
+      els[x[0]].addEventListener('change', function () { var v = x[2] ? parseInt(this.value, 10) : this.value; plReshift(function () { var sh = plShift(); sh[x[1]] = v; set('plShift', sh); }); });
+    });
     root.querySelector('.mh-plroute').addEventListener('click', function (e) {
       var b = e.target.closest('[data-plroute]'); if (!b) return;
       var was = PL.playing; if (was) plPause();
@@ -1486,7 +1626,7 @@
       '.mh-cv-pnum{display:grid;justify-items:center;gap:2px;min-width:110px}.mh-cv-pnum b{font:400 44px/1 var(--font-display)}' +
       '.mh-cv-acts{justify-content:center;margin-top:12px}' +
       '.mh-pl .row{margin-top:10px}.mh-pltrans{display:flex;gap:10px;align-items:center;margin-top:12px}.mh-pltrans .btn{min-height:48px;min-width:96px;font-size:16px}' +
-      '#mh-plseek{width:100%;margin-top:8px}.mh-plopts{align-items:flex-end}.mh-plroute{flex-wrap:wrap}.mh-pl details{margin-top:10px}' +
+      '.mh-plkey{align-items:flex-end}.mh-plkeys{gap:10px}#mh-plseek{width:100%;margin-top:8px}.mh-plopts{align-items:flex-end}.mh-plroute{flex-wrap:wrap}.mh-pl details{margin-top:10px}' +
       '@media (max-width:700px){.mh-r{grid-template-columns:56px 30px 30px 1fr}.mh-hex{display:none}.mh-knobs{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.mh-knob svg{width:60px;height:60px}.mh-knob.hero svg{width:110px;height:110px}.mh-parts button{min-width:34px;height:36px}}'
     );
     t0 = performance.now();
@@ -1527,5 +1667,13 @@
   window.SLMidiHub = { decode: decode, applyRules: applyRules, PROFILES: PROFILES, parseHex: parseHex, hex: hex, get rules() { return rules(); }, get outId() { return hubOutId(); }, knob: function (cc) { return kv(cc); }, turn: turn,
     // the Player: load a file (name, ArrayBuffer) -> summary; play/pause/stop/seek(seconds)
     player: { loadFile: function (name, buf) { return plLoadFile(name, buf).then(plSet); }, play: plPlay, pause: plPause, stop: plStop, seek: plSeek,
-      get state() { return { playing: PL.playing, pos: PL.pos, title: PL.song && PL.song.title, held: Object.keys(PL.held).length, duration: PL.song ? PL.song.duration : 0 }; } } };
+      // a reviewed practice score {title, bpm, len, notes:[{t, d, m, rest, partId, v}]}
+      loadScore: function (score) { return plSet(scoreToSong(score)); },
+      // key shifter: shiftNote(midi) under the current settings; the guessed key of the open song
+      shiftNote: function (n) { return shiftNote(n); }, get key() { return PL.song && PL.song.key ? { root: PL.song.key.root, scale: PL.song.key.scale } : null; },
+      // open the Player view showing it (Score review's "Play on synth")
+      show: function () { App.switchTo('midihub'); view('player'); },
+      get state() { return { playing: PL.playing, pos: PL.pos, title: PL.song && PL.song.title, held: Object.keys(PL.held).length, duration: PL.song ? PL.song.duration : 0 }; } },
+    // the same reviewed score as a standard MIDI file (Uint8Array)
+    scoreToMidi: scoreToMidi };
 })();
