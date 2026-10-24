@@ -3,9 +3,10 @@
 The **Helix** page (*Guitar › Helix*, `js/helix.js`) reads, writes and
 controls a Line 6 **Helix Stadium / Stadium XL**. It is built in since 0.82.0;
 it began as a plugin (`plugins/helix-stadium.js`, now a stub) and outgrew the
-100 KB plugin cap. Nothing connects when soundLAB starts: opening the page asks
-for MIDI access, and the bridge connects only after you press *Connect bridge*
-once. It uses two routes at once:
+100 KB plugin cap. Nothing connects when soundLAB starts: the page asks for
+MIDI access when you open it only once you have said yes to MIDI somewhere in
+soundLAB (otherwise *Connect MIDI* does), and the bridge connects only after you
+press *Connect bridge* once. It uses two routes at once:
 
 | Route | Needs | Gives |
 |---|---|---|

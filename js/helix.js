@@ -1089,7 +1089,10 @@
       visible = true;
       // the page's own Web MIDI access on the first visit (the boot-time midi:state can
       // already have settled on the app's shared output, which gives no input to listen to)
-      if (!midi.access) midiConnect(true);
+      // ask for Web MIDI on show only once the user has said yes to MIDI
+      // anywhere in the app (midi.wanted, the Hub's rule): a first visit never
+      // raises a permission prompt by itself - Connect MIDI does
+      if (!midi.access && A.store.get('midi.wanted', false)) midiConnect(true);
       if (g('bridgeAuto', false)) brConnect();
       if (devOnline()) devRefresh();
       showView(view);

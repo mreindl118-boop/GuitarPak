@@ -320,7 +320,8 @@ js/helix.js       HELIX STADIUM page ('helix', Guitar group pill "Helix",
                   plugin, plugins/helix-stadium.js is now a stub and
                   js/plugins.js skips an old stored copy whose code sets
                   window.SLHelix). NOTHING CONNECTS AT BOOT: init builds the
-                  DOM only; Web MIDI on the first onShow; the bridge only
+                  DOM only; Web MIDI on show only once midi.wanted is set
+                  (the Hub's rule: no permission prompt by itself); the bridge only
                   after Connect bridge was pressed once (hx.bridgeAuto,
                   default off) and retries only while visible. Read / write /
                   control a Line 6 Helix
