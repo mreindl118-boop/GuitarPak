@@ -17,12 +17,17 @@
 - Repository: mreindl118-boop/GuitarPak
 - Branch: `feat/hub-player`; worktree `C:\Users\mrein\AppData\Local\Temp\sl-player`
 - Base commit: `2077f3b` (main, 1.0.0)
-- Claimed files: `js/midihub.js`, new `tests/midihub-player.test.js`, this
+- Claimed files: `js/midihub.js`, `js/songs.js` (App.songs + Export tab), new `tests/midihub-player.test.js`, this
   record. Deliberately NOT touching `tests/midihub.test.js`, `index.html`,
   `js/app.js`, `js/help.js`, `sw.js`, `tests/run.sh` (edited on the 1.1 and
   Helix branches); release bookkeeping waits for integration.
 - Created: 2026-10-24
-- Status: ready-for-review: `feat/hub-player` at `6c99335`, not live.
+- Status: ready-for-review: `feat/hub-player` at `a4a741a`, not live.
+  Since `6c99335`: `player.loadScore` (the 1.1 reviewed practice score),
+  `SLMidiHub.scoreToMidi`, transpose + key shifter (by scale degree, source
+  key guessed), the song's own tempo kept, `Open as tab` -> Songs page
+  (`js/songs.js` gains `App.songs` {fromMidi, load, toAscii} + Export tab;
+  added to this claim). midihub-player 31 checks.
 - Evidence: `tests/midihub-player.test.js` 20 checks; 45 of 46 suites pass
   locally (pages-deploy and release-workflow fail identically on untouched
   1.0.0 here: CRLF workflow files on this Windows checkout).
