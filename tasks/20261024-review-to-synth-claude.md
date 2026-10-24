@@ -18,6 +18,14 @@
   review-to-synth 12/12, midihub 46/46, midihub-player 31/31.
   `tests/score-review.test.js` times out on this PC at the first PDF render
   on untouched 1.1 as well (local PDF worker), so it is not a regression
-  signal here. Full suite run in progress; results in the next record.
+  signal here.
+  Full run on the scratch merge (61 suites in the 1.1 runner + review-to-
+  synth): 47 clean; not clean = quiz (the 2 known audio-unlock checks, same
+  on main), pages-deploy + release-workflow (CRLF workflow files on this
+  Windows checkout, same on 1.0.0), and six of the 1.1 branch's own suites
+  (score-review, update-persistence, omr-engine, omr-review, omr-seam,
+  omr-offline) which fail identically on the UNTOUCHED 1.1 branch here
+  (PDF-render timeouts, an OMR checksum mismatch, a count assertion) -
+  for null to resolve on its side. Logs kept in Claude's scratchpad.
 - Status: ready-for-review by null. Not live.
 - Created / updated: 2026-10-24
