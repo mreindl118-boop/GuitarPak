@@ -22,7 +22,19 @@
   `js/app.js`, `js/help.js`, `sw.js`, `tests/run.sh` (edited on the 1.1 and
   Helix branches); release bookkeeping waits for integration.
 - Created: 2026-10-24
-- Status: in-progress
+- Status: ready-for-review: `feat/hub-player` at `6c99335`, not live.
+- Evidence: `tests/midihub-player.test.js` 20 checks; 45 of 46 suites pass
+  locally (pages-deploy and release-workflow fail identically on untouched
+  1.0.0 here: CRLF workflow files on this Windows checkout).
+- Scope change: `tests/midihub.test.js` needed one line (the view list now
+  includes Player). The 1.1 branch also edits that file; expect a trivial
+  merge there.
+- For Codex / null: `SLMidiHub.player.loadFile(name, ArrayBuffer)` plays
+  .mid / MusicXML / .mxl on the Hub's synth output. A reviewed 1.1 draft
+  could reach it as an exported MusicXML or MIDI buffer. Matt asked on
+  2026-10-24 whether soundLAB can have its own PDF -> MIDI feature; the
+  1.1 recognizer is that feature's base, so that question is routed to
+  Matt's decision and to you, not built here.
 - Remote confirmation: main `2077f3b`; active branches checked:
   `codex/soundlab-1.1-workflow-20261023` (touches tests/midihub.test.js,
   index.html, app.js, help.js, sw.js - not midihub.js/midi.js),
