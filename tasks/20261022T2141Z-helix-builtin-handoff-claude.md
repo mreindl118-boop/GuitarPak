@@ -83,6 +83,40 @@ regression.
   `C:\Users\mrein\Creative-Workspace\GuitarPak` (Matt's Desktop soundLAB).
   No force-push. Recheck `origin` before any push.
 
+## UPDATE 2026-10-24: `main` moved; read this before step 10
+
+The release numbers in the step-10 table below are **stale**. Since this
+branch was cut from `e9426ce` (0.81.1), `main` went to **1.0.0** (`2077f3b`,
+2026-10-23), and a 1.1.0 release is being prepared on
+`codex/soundlab-1.1-workflow-20261023` (`APP_VERSION` 1.1.0).
+
+- **Take every number from `main` at merge time.** As of `2077f3b`:
+  `APP_VERSION` 1.0.0, `version.json` `web` 1.0.0 (`version` still 0.75.0,
+  never touch it), `versionCode` 110 / `versionName` 0.82.0,
+  `CACHE` `guitarlab-v124`. Bump each by one from whatever `main` holds then.
+- **Replace the "0.82.0" label** with the version Helix actually ships in, in
+  7 files: `js/helix.js` (header), `js/plugins.js` (comment),
+  `plugins/helix-stadium.js` (comment and the error message),
+  `docs/HELIX-STADIUM.md`, `PLUGINS.md`, the Helix entry in `CLAUDE.md`, and
+  `tests/helix.test.js` (header comment).
+- **Trial merge** (`git merge-tree --write-tree origin/main
+  feat/helix-stadium`, 2026-10-24): two conflicts, both additive, everything
+  else auto-merges (`CLAUDE.md`, `index.html`, `js/help.js`, `sw.js`,
+  `tests/nav.test.js`):
+  - `js/app.js`, 4 hunks (`SPACES.practice`, `SPACE_LABELS`, the Guitar and
+    Keys lines in `GROUPS`, `SUB_LABELS`): `main` added `lumipractice`, this
+    branch added `helix`. Keep `main`'s lines and add the `helix` entries:
+    `'helix'` after `'notation'` in `SPACES.practice`,
+    `helix: 'Helix Stadium'`, Guitar `pages` `['fretboard', 'tab',
+    'notation', 'helix']`, `helix: 'Helix'`.
+  - `tests/run.sh`: keep `main`'s list (now about 40 suites) and append
+    `helix`.
+- **After the merge, run `main`'s full suite list**, not the 20 suites this
+  branch was verified against. Check `tests/nav.test.js` still expects the
+  Guitar pills `Neck|Tab|Notation|Helix`.
+- Name the release branch for the real version (`release/<version>`), not
+  `release/0.82.0`.
+
 ## How null finishes (steps 10 and 12; Matt approves each)
 
 **Step 10, release bookkeeping** (exact values as of `8593ca5`; recheck
@@ -132,3 +166,4 @@ firmware 1.1.0.
 - 21:45Z: tests converted (`tests/helix.test.js` 54 checks, `tests/nav.test.js` Guitar pills) and one bug fixed: the first visit now always requests the page's own Web MIDI access (the boot-time `midi:state` could leave it on the shared output with no input). Next: run every suite.
 - 21:46Z: docs updated (`8593ca5`), step 11 done.
 - 21:55Z: **Claude stopped here.** Steps 1-9 and 11 are done and verified; every suite passes (fingering, lights, keys, practice, game, quiz, nav, smoke, taps, update, audio-level, midihub, midihub-wheel, audioin, btmidi, colors, multiin, lumidisplay, practiceplan, helix). The page was also checked by eye in a browser under Guitar › Helix: disarmed, bridge off, no connection. **null: steps 10 and 12 are yours once Matt says yes**, from the section "How null finishes". Nothing here is pushed yet unless Matt asked Claude to push it.
+- 2026-10-24: both branches pushed on Matt's say-so (`feat/helix-stadium` at `46bd301`, coord at `857b05a`). `main` had moved to 1.0.0, so the dated UPDATE section above the finishing steps was added; follow it over the old numbers.
