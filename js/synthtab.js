@@ -175,10 +175,21 @@
     els.nowname.textContent = now.name;
     els.nowsub.textContent = now.sub + (now.out ? ' → ' + now.out : '');
     els.nowsub.classList.toggle('bad', !!now.bad);
-    // pinned + recent sounds as one-tap slots (Live sets come in step 5)
-    var pins = p.presets().filter(function (it) { return it.star; }).sort(function (a, b) { return (b.used || 0) - (a.used || 0); }).slice(0, 8);
-    els.pins.innerHTML = pins.map(function (it) { return slotHTML(it, now.match && now.match.id === it.id); }).join('');
-    els.pins.hidden = !pins.length;
+    // the active Live set's page as one-tap slots; without a set, the pinned sounds
+    var lv = window.SLSynthLive, lset = lv ? lv.active() : null;
+    if (lset) {
+      var page = lv.page(), cur = lv.slot();
+      els.pins.innerHTML = '<div class="st-pinhead muted small"><span>' + esc(lset.name) + ' · page ' + (lv.pageIndex() + 1) + '</span><button type="button" class="btn sm" data-golive="1">Go live</button></div>' +
+        '<div class="st-pingrid">' + page.map(function (sl, i) {
+          var col = sl ? COLOURS[(function () { var it = sl.preset ? p.find(sl.preset) : null; return it && it.snap ? it.snap.colour : ''; })()] || '' : '';
+          return '<button type="button" class="st-slot' + (sl ? '' : ' empty') + (i === cur ? ' active' : '') + '" data-lvslot="' + i + '"' + (col ? ' style="border-left:4px solid ' + col + '"' : '') + ' aria-label="Slot ' + (i + 1) + '"><span class="st-slotname">' + (i + 1) + ' ' + esc(lv.slotName(sl)) + '</span><span class="st-slotsub">' + esc(lv.slotBadges(sl)) + '</span></button>';
+        }).join('') + '</div>';
+      els.pins.hidden = false;
+    } else {
+      var pins = p.presets().filter(function (it) { return it.star; }).sort(function (a, b) { return (b.used || 0) - (a.used || 0); }).slice(0, 8);
+      els.pins.innerHTML = '<div class="st-pingrid">' + pins.map(function (it) { return slotHTML(it, now.match && now.match.id === it.id); }).join('') + '</div>';
+      els.pins.hidden = !pins.length;
+    }
     paintStrips();
     paintChips();
   }
@@ -345,6 +356,8 @@
     if ((b = t.closest('[data-split]'))) { setSplitFromBox(b.dataset.split === 'two'); return; }
     if (t.closest('#st-splitlearn')) { splitLearning = !splitLearning; paintSplitBox(); return; }
     if (t.closest('#st-pickfav')) { pickFavs(); return; }
+    if ((b = t.closest('[data-lvslot]'))) { if (window.SLSynthLive) { var pg = SLSynthLive.page(); if (pg && pg[+b.dataset.lvslot]) SLSynthLive.go(+b.dataset.lvslot); else App.switchTo('liveset'); } return; }
+    if (t.closest('[data-golive]')) { App.switchTo('liveset'); if (window.SLSynthLive) SLSynthLive.setLive(true); return; }
     if ((b = t.closest('[data-preset]'))) { var it = p.find(b.dataset.preset); p.load(b.dataset.preset).then(function () { if (it && it.snap && Array.isArray(it.snap.fav) && it.snap.fav.length === 4) { set('fav', it.snap.fav); render(); } else paint(); }); return; }
     if ((b = t.closest('[data-chip]'))) {
       var id = b.dataset.chip;
@@ -378,7 +391,7 @@
         '.st-nowname{font:600 32px/1.1 var(--font-condensed);letter-spacing:.3px;overflow-wrap:anywhere}.st-nowacts{display:flex;gap:8px;margin-top:4px}' +
         '.st-big{flex:1;min-height:48px;font-size:15px;font-weight:600}.st-big.primary{flex:1.4}' +
         '.st-cap{margin:6px 0 0;padding:8px 10px;border-radius:10px;background:var(--accent-soft);color:var(--accent-ink);font-size:13px;line-height:1.4}' +
-        '.st-pins{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:6px}' +
+        '.st-pins{margin-top:6px;display:grid;gap:6px}.st-pingrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.st-pinhead{display:flex;justify-content:space-between;align-items:center}.st-pinhead .btn{min-height:40px}.st-slot.empty{border-style:dashed;color:var(--muted)}' +
         '.st-slot{min-height:58px;padding:8px;border-radius:12px;border:1px solid var(--line);background:var(--card-2,rgba(255,255,255,.04));color:var(--text);text-align:left;display:grid;gap:2px;align-content:start;font:inherit}' +
         '.st-slot.active{border-color:var(--accent-line);background:var(--accent-soft)}.st-slotname{font-weight:600;font-size:13px;overflow-wrap:anywhere}.st-slotsub{font-size:11px;color:var(--muted)}' +
         '.st-strips{display:grid;gap:10px;padding:14px 16px}.st-striphead{display:flex;justify-content:space-between;align-items:baseline;gap:8px}.st-lab{font-size:13px;font-weight:600;color:var(--muted)}' +
@@ -401,7 +414,7 @@
         '.st-inc.active{border-color:var(--accent-line);background:var(--accent-soft);color:var(--accent-ink)}.st-incname{font-weight:600;font-size:14px}.st-incsub{font-size:11px;color:var(--muted);overflow-wrap:anywhere}' +
         '.st-splitbox{padding:10px 12px;border-radius:10px;border:1px dashed var(--line);display:grid;gap:8px}.st-splithead{display:flex;justify-content:space-between;gap:8px;align-items:baseline}' +
         '.st-splitrow{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end}.st-splitrow .seg button,.st-splitrow .btn{min-height:44px}.st-splitrow select{min-height:44px}.st-formacts{display:flex;gap:8px}' +
-        '@media (min-width:900px){.st-four{grid-template-columns:repeat(4,minmax(0,1fr))}.st-pins{grid-template-columns:repeat(8,minmax(0,1fr))}}');
+        '@media (min-width:900px){.st-four{grid-template-columns:repeat(4,minmax(0,1fr))}.st-pingrid{grid-template-columns:repeat(8,minmax(0,1fr))}}');
       face = document.createElement('div'); face.className = 'st-face'; el.appendChild(face);
       face.addEventListener('click', onClick);
       face.addEventListener('pointerdown', onStripDown);
@@ -415,6 +428,7 @@
       App.on('midi:state', function () { if (App.active === 'deck') schedulePaint(); });
       App.on('deck:assignnames', function () { if (App.active === 'deck') render(); }); // the strips take the Performance's knob names
       App.on('midihub:split', function () { if (App.active === 'deck') { paintChips(); if (els.sheet && !els.sheet.hidden) paintSplitBox(); } });
+      App.on('synthlive:slot', function () { if (App.active === 'deck') schedulePaint(); });
       App.on('midi:note', function (d) { if (!splitLearning || !d || !d.on || !els.splitat) return; splitLearning = false; els.splitat.value = String(Math.max(36, Math.min(84, d.midi))); paintSplitBox(); });
     },
     onShow: function () {
@@ -441,20 +455,7 @@
   var paintT = 0;
   function schedulePaint() { if (paintT) return; paintT = setTimeout(function () { paintT = 0; paint(); }, 60); }
 
-  App.register('liveset', {
-    init: function (el) {
-      liveRoot = el;
-      el.innerHTML =
-        '<div class="card st-soon">' +
-          '<h2>Live sets</h2>' +
-          '<p class="muted">Your presets in pages of 16, like the synth’s own Live Sets: pick a set, step through its slots with a foot switch, every slot brings back the sound, the knobs, the scene and the split.</p>' +
-          '<ul class="muted small"><li>Save a preset from the Deck (Save preset).</li><li>Name a set, drop presets on its slots.</li><li>Go live: only the grid, the sound and your strips.</li></ul>' +
-          '<p class="muted small">Being built (docs/SYNTH-TAB-PLAN.md, step 5).</p>' +
-        '</div>';
-    },
-    onShow: function () { applyMute(true); },
-    onHide: function () { applyMute(false); }
-  });
+  // the Live page lives in js/synthlive.js (SLSynthLive); the Deck's grid shows its active page
 
   window.SLSynthTab = { // test hook
     borrowed: function () { return !!borrowed; }, mode: mode, row: function () { return g('row', 'fav'); }, favs: favs, rows: ROWS,

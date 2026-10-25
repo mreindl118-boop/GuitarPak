@@ -184,6 +184,61 @@ async function newPage(browser, seed, viewport) {
   ok(sp.saved && sp.saved.at === 60 && sp.savedOff && sp.savedOff.off === true && sp.afterLoad === 60 && sp.afterLoadOff === null, 'presets carry the split: one restores it on load, one saved without a split switches it off: ' + JSON.stringify([sp.saved, sp.savedOff]));
   ok(sp.lumiThru === 0, 'with the LUMI as Synth out, Thru forwards nothing to it');
 
+  console.log('# Live sets: pages of 16, stepping, Go live, lock, panic');
+  const lv = await page.evaluate(async () => {
+    const o = {};
+    window.prompt = () => 'Sunday service'; window.confirm = () => true;
+    App.switchTo('liveset'); await __wait(300);
+    o.emptyCard = !!__q('#st-lvnew');
+    __q('#st-lvnew').click(); await __wait(50);
+    o.set = SLSynthLive.active() && SLSynthLive.active().name; o.slots = __qa('#panel-liveset .st-lvslot').length;
+    // edit: slot 1 = the preset "Dorian pad", slot 2 = MODX Live Set page 1 slot 2
+    __q('#st-lvedit').click(); await __wait(30);
+    __q('#panel-liveset [data-slot="0"]').click(); await __wait(30);
+    const dp = App.synthDeck.presets().filter(x => x.name === 'Dorian pad')[0];
+    __q('#st-lvpick [data-pick="preset"][data-id="' + dp.id + '"]').click(); await __wait(30);
+    __q('#panel-liveset [data-slot="1"]').click(); await __wait(30);
+    __q('#st-lvmpage').value = '1'; __q('#st-lvmslot').value = '2'; __q('#st-lvpick [data-pick="modx"]').click(); await __wait(30);
+    __q('#st-lvpadd').click(); await __wait(30); // a second page with one slot
+    __q('#panel-liveset [data-slot="0"]').click(); await __wait(30);
+    __q('#st-lvpick [data-pick="preset"][data-id="' + dp.id + '"]').click(); await __wait(30);
+    __q('#st-lvedit').click(); await __wait(30);
+    o.pages = SLSynthLive.active().pages.length; o.names = [SLSynthLive.active().pages[0][0], SLSynthLive.active().pages[0][1], SLSynthLive.active().pages[1][0]].map(s => SLSynthLive.slotName(s));
+    __q('#st-lvpprev').click(); await __wait(30);
+    // tap slot 2: the MODX Live Set slot = MSB 62 / LSB 0 / PC 2
+    __clear(); __q('#panel-liveset [data-slot="1"]').click(); await __wait(60);
+    o.modxBytes = __nonClean(__bytes()); o.slotAfter = SLSynthLive.slot();
+    // Next wraps across pages: slot 2 -> page 2 slot 1 -> page 1 slot 1
+    SLSynthLive.step(1); await __wait(900); o.s1 = [SLSynthLive.pageIndex(), SLSynthLive.slot()];
+    SLSynthLive.step(1); await __wait(900); o.s2 = [SLSynthLive.pageIndex(), SLSynthLive.slot()];
+    SLSynthLive.step(-1); await __wait(900); o.s3 = [SLSynthLive.pageIndex(), SLSynthLive.slot()];
+    // the foot switch: learn CC 86 from the MODX, then a press steps
+    __q('#st-lvfs').click(); await __wait(20); __fromModx([0xB0, 86, 127]); await __wait(40);
+    o.fs = App.store.get('synthtab.fsCC'); const before = [SLSynthLive.pageIndex(), SLSynthLive.slot()];
+    __fromModx([0xB0, 86, 127]); await __wait(900); o.fsStep = [before, [SLSynthLive.pageIndex(), SLSynthLive.slot()]];
+    __fromModx([0xB0, 86, 0]); await __wait(60); o.fsRelease = [SLSynthLive.pageIndex(), SLSynthLive.slot()];
+    // Go live: the bars fold away, keep-awake is held, Lock makes slots press-and-hold, Panic clears every channel
+    __q('#st-lvgo').click(); await __wait(60);
+    o.live = { html: document.documentElement.classList.contains('st-live'), topbar: getComputedStyle(__q('.topbar')).display, tabs: getComputedStyle(__q('#tabbar-m')).display, now: (__q('#st-lvnowname') || {}).textContent, wake: App.wake && App.wake.held ? App.wake.held('synthlive') : 'n/a' };
+    __q('#st-lvlock').click(); await __wait(20);
+    __clear(); const sl = __q('#panel-liveset [data-slot="1"]'); sl.click(); await __wait(60); o.lockedTap = __nonClean(__bytes()).length;
+    __pt(sl, 'pointerdown', 5); await __wait(500); __pt(sl, 'pointerup', 5); await __wait(60); o.lockedHold = __nonClean(__bytes()).length;
+    __clear(); __q('#st-lvpanic').click(); await __wait(40); const pb = __bytes(); o.panic = { n: pb.length, allOff: pb.filter(b => /^(17[6-9]|18\d|19[01]) 123 0$/.test(b)).length, sus: pb.filter(b => /^(17[6-9]|18\d|19[01]) 64 0$/.test(b)).length };
+    __q('#st-lvexit').click(); await __wait(40); o.exit = { html: document.documentElement.classList.contains('st-live'), topbar: getComputedStyle(__q('.topbar')).display };
+    // the Deck shows the set's page
+    App.switchTo('deck'); await __wait(300); o.deck = { slots: __qa('#st-pins [data-lvslot]').length, head: (__q('#st-pins .st-pinhead') || {}).textContent, lumi: __by.lumi.length };
+    return o;
+  });
+  ok(lv.emptyCard && lv.set === 'Sunday service' && lv.slots === 16, 'a new set is 16 empty slots: ' + lv.set);
+  ok(lv.pages === 2 && lv.names.join('|') === 'Dorian pad|Live Set 1-2|Dorian pad', 'Edit slots assigns a preset and a MODX Live Set slot, and adds a page: ' + lv.names.join('|'));
+  ok(lv.modxBytes.join('|') === '176 0 62|176 32 0|192 1' && lv.slotAfter === 1, 'a MODX Live Set slot sends MSB 62 / LSB page / PC slot: ' + lv.modxBytes.join('|'));
+  ok(lv.s1.join() === '1,0' && lv.s2.join() === '0,0' && lv.s3.join() === '1,0', 'Next / Prev step through filled slots across pages and wrap: ' + [lv.s1, lv.s2, lv.s3].join(' / '));
+  ok(lv.fs === 86 && lv.fsStep[1].join() !== lv.fsStep[0].join() && lv.fsRelease.join() === lv.fsStep[1].join(), 'Learn takes the foot switch CC and a press steps once (release does nothing): ' + JSON.stringify(lv.fsStep));
+  ok(lv.live.html && lv.live.topbar === 'none' && lv.live.tabs === 'none' && lv.live.now && lv.live.now !== '—', 'Go live hides the top bar and the tabs and shows the slot you are on: ' + lv.live.now);
+  ok(lv.lockedTap === 0 && lv.lockedHold === 3, 'locked: a tap does nothing, a 400 ms hold loads the slot');
+  ok(lv.panic.n >= 48 && lv.panic.allOff === 16 && lv.panic.sus === 16, 'Panic = all notes off + sustain off on all 16 channels: ' + JSON.stringify(lv.panic));
+  ok(!lv.exit.html && lv.exit.topbar !== 'none' && lv.deck.slots === 16 && /Sunday service/.test(lv.deck.head) && lv.deck.lumi === 0, 'Exit brings the bars back; the Deck shows the set’s page; the LUMI never got a byte');
+
   console.log('# chips, Scenes, Prev / Next, Explain, Edit, Back');
   const ch = await page.evaluate(async () => {
     const o = {};

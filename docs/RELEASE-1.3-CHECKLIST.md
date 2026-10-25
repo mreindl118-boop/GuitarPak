@@ -20,7 +20,7 @@ Tick items here as they land (commit in brackets).
       program -> settle -> values -> split -> app state
 - [x] 1.5 (step 4) Hub: Rules gain a port match + Split presets (below split -> Part 2; three zones); Thru
       never reaches a LUMI output; views renamed "Play" -> Keys, "Controls" -> CCs
-- [ ] 1.6 Live: named sets, pages of 16 (4 x 4), slot editor (preset / MODX Live Set slot / empty),
+- [x] 1.6 (step 5) Live: named sets, pages of 16 (4 x 4), slot editor (preset / MODX Live Set slot / empty),
       prev/next page, step by foot-switch CC or (option) LUMI octave buttons, Go live page; MODX Live
       Set slot recall (MSB 62)
 - [ ] 1.7 Profiles: named bundles of settings + presets + sets, switcher on Live, export/import

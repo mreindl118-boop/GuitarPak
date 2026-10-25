@@ -1718,6 +1718,10 @@
     ccName: function (cc) { return api && api.ccName ? api.ccName(cc) : null; },
     tap: tapCtl, ctl: ctlInfo,
     save: save, find: findPreset, appState: appState,
+    // Live: all notes off + sustain off on every channel, through the deck's funnel
+    panic: function () { if (!txCheck([0xB0])) return false; var n = 0; for (var c = 0; c < 16; c++) { if (tx([0xB0 | c, 123, 0], 'raw')) n++; tx([0xB0 | c, 120, 0], 'raw'); tx([0xB0 | c, 64, 0], 'raw'); } return n > 0; },
+    // a bank/program (e.g. a MODX Live Set slot: MSB 62, LSB page, PC slot) on the current Part
+    program: function (msb, lsb, pc) { if (!txCheck([0xC0])) return false; api.sendProgram(pc, msb, lsb); paintNow(); return true; },
     persist: function () { persist('decklib'); if (mounted) { renderTiles(); paintNow(); } },
     // the Performance's own names for Assign knobs 1-8 (Read name from synth fills them), or null
     assignNames: function () { var p = hubProg(), an = App.store.get('midihub.assignnames', null); var a = an && an[p.msb + '/' + p.lsb + '/' + p.pc]; return Array.isArray(a) ? a : null; },
