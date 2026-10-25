@@ -55,6 +55,17 @@ Matt's words and ours:
 **Hub** — the MIDI Hub as it is (Player, Play, Controls, Rules, SysEx, Monitor, Learn). The deck's
 Control view stays mounted there for the tests and the knob card, but the Synth pills are the way in.
 
+## Preset tiles and zones (Matt, 2026-10-25)
+
+- A slot/preset tile carries its data, not just a name: name, colour, the sound (bank/program,
+  Part), Scene, split summary ("below C4 -> Part 2"), the four favourite values as mini bars, tags,
+  and a "changed since saved" dot when the synth drifted from the snapshot. Compact on the phone
+  grid (name + two badges), full on the iPad and in the Sounds library.
+- A **zone picker**: a strip of the keyboard (the LUMI's 24 keys highlighted inside the 88) with two
+  drag handles, or "Play the lowest key / play the highest key" buttons that capture from MIDI, to
+  say which part of the keyboard a preset or a split zone covers. A preset may be a whole-keyboard
+  sound or a zone (range -> Part -> sound); layered zones make a split.
+
 ## Preset builder
 
 One sheet, opened by Save preset: name, tags, colour; checkboxes for what to include (sound,
