@@ -120,7 +120,10 @@
       if (typeof p.snap.colour === 'string' && /^[a-z]{1,12}$/.test(p.snap.colour)) sn.colour = p.snap.colour;
       if (isObj(p.snap.app) && typeof p.snap.app.root === 'number') sn.app = { root: clamp(Math.round(p.snap.app.root), 0, 11), scale: typeof p.snap.app.scale === 'string' ? p.snap.app.scale.slice(0, 24) : 'major', mode: typeof p.snap.app.mode === 'number' ? clamp(Math.round(p.snap.app.mode), 0, 11) : 0 };
       if (isArr(p.snap.fav) && p.snap.fav.length === 4 && p.snap.fav.every(function (n) { return typeof n === 'number' && n >= 0 && n < 128; })) sn.fav = p.snap.fav.slice();
-      if (isObj(p.snap.split) && typeof p.snap.split.at === 'number') sn.split = { at: clamp(Math.round(p.snap.split.at), 0, 127), zones: isArr(p.snap.split.zones) ? p.snap.split.zones.slice(0, 3) : [] };
+      if (isObj(p.snap.split)) { // the Hub's key split (SLMidiHub.split): {off:true} = this preset switches the split off
+        if (p.snap.split.off) sn.split = { off: true };
+        else if (typeof p.snap.split.at === 'number') sn.split = { at: clamp(Math.round(p.snap.split.at), 1, 127), at2: typeof p.snap.split.at2 === 'number' ? clamp(Math.round(p.snap.split.at2), 1, 127) : null, parts: isArr(p.snap.split.parts) ? p.snap.split.parts.slice(0, 2).map(function (n) { return clamp(num(n, 2), 1, 16); }) : [2], port: typeof p.snap.split.port === 'string' ? p.snap.split.port.slice(0, 40) : '', sus: p.snap.split.sus !== false, on: p.snap.split.on !== false };
+      }
       if (Object.keys(sn).length) o.snap = sn;
     }
     return o;
@@ -1372,7 +1375,8 @@
     if (typeof o.colour === 'string') snap.colour = o.colour.slice(0, 12);
     if (o.incApp === true) snap.app = appState(); else if (o.incApp === false) delete snap.app;
     if (isArr(o.fav) && o.fav.length === 4) snap.fav = o.fav.slice();
-    if (isObj(o.split)) snap.split = o.split; else if (o.split === null) delete snap.split;
+    if (o.incSplit === true) { var hs = window.SLMidiHub && SLMidiHub.split ? SLMidiHub.split.get() : null; snap.split = hs ? { at: hs.at, at2: hs.at2 || null, parts: hs.parts.slice(), port: hs.port || '', sus: hs.sus !== false, on: hs.on !== false } : { off: true }; }
+    else if (o.incSplit === false) delete snap.split;
     if (!Object.keys(snap).length) snap = null;
     if (it) { it.name = name; it.tags = tags; it.prog = prog; it.parts = parts; it.updated = now; it.dev = profileKey(); if (snap) it.snap = snap; else delete it.snap; }
     else { it = { id: uid('p_'), name: name, star: false, tags: tags, dev: profileKey(), prog: prog, parts: parts, created: now, updated: now, used: 0 }; if (snap) it.snap = snap; lib.items.push(it); }
@@ -1514,7 +1518,7 @@
     if (els.lstop) els.lstop.hidden = true;
     var it = findPreset(job.id);
     if (stopped) ldStatus('Load stopped at ' + job.i + '/' + job.plan.length);
-    else { if (it) { it.used = Date.now(); persist('decklib'); if (it.snap && it.snap.app) applyApp(it.snap.app); } lastLoaded = job.id; ldStatus('Loaded ' + job.name + ' → ' + (api.hubOutName() || 'output')); }
+    else { if (it) { it.used = Date.now(); persist('decklib'); if (it.snap && it.snap.app) applyApp(it.snap.app); if (it.snap && it.snap.split && window.SLMidiHub && SLMidiHub.split) SLMidiHub.split.set(it.snap.split.off ? null : it.snap.split); } lastLoaded = job.id; ldStatus('Loaded ' + job.name + ' → ' + (api.hubOutName() || 'output')); }
     paintButtons(); paintPageKnobs(); paintNow(); if (mounted) renderTiles();
     job.resolve({ sent: job.sent, planned: job.plan.length, stopped: !!stopped });
   }

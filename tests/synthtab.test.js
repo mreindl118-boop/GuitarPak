@@ -24,7 +24,9 @@ async function newPage(browser, seed, viewport) {
     const mk = (id, name) => ({ id, name, state: 'connected', send: b => { const a = Array.from(b); if (id !== 'lumi' || a[0] < 0xF0) window.__by[id].push(a); } });
     const outs = new Map([['lumi', mk('lumi', 'LUMI Keys BLOCK')], ['modx1', mk('modx1', 'MODX-1')]]);
     const modxIn = { id: 'mi', name: 'MODX-1', state: 'connected', onmidimessage: null };
-    const access = { inputs: new Map([['mi', modxIn]]), outputs: outs, sysexEnabled: true, onstatechange: null };
+    const lumiIn = { id: 'li', name: 'LUMI Keys BLOCK', state: 'connected', onmidimessage: null };
+    const access = { inputs: new Map([['mi', modxIn], ['li', lumiIn]]), outputs: outs, sysexEnabled: true, onstatechange: null };
+    window.__fromLumi = (bytes) => lumiIn.onmidimessage({ data: new Uint8Array(bytes) });
     navigator.requestMIDIAccess = () => Promise.resolve(access);
     window.__fromModx = (bytes) => modxIn.onmidimessage({ data: new Uint8Array(bytes) });
     window.__bytes = (id) => window.__by[id || 'modx1'].map(b => b.join(' '));
@@ -135,10 +137,52 @@ async function newPage(browser, seed, viewport) {
     o.lumi = __by.lumi.length;
     return o;
   });
-  ok(pb.open && /Sweep Pad|CFX \+ FM EP/.test(pb.defaultName) && pb.incs.length === 4 && /Scene 3/.test(pb.incs[2]) && /D dorian/.test(pb.incs[3]), 'Save preset opens the builder with the sound name and what it will remember: ' + pb.incs.join(' / '));
+  ok(pb.open && /Sweep Pad|CFX \+ FM EP/.test(pb.defaultName) && pb.incs.length === 5 && /Scene 3/.test(pb.incs[2]) && /D dorian/.test(pb.incs[3]), 'Save preset opens the builder with the sound name and what it will remember: ' + pb.incs.join(' / '));
   ok(pb.sentOnSave === 0 && pb.closed && pb.item && pb.item.star && pb.item.colour === 'teal' && pb.item.app && pb.item.app.root === 2 && pb.item.app.scale === 'dorian' && pb.item.scene === 32 && pb.item.fav && pb.item.fav.length === 4, 'Save sends nothing, pins the preset and keeps colour, key/scale, Scene and the favourite strips: ' + JSON.stringify(pb.item));
   ok(pb.slot && /Dorian pad/.test(pb.slot.text) && /Scene 3/.test(pb.slot.text) && /D dorian/.test(pb.slot.text) && /47, 184, 160|2fb8a0/i.test(pb.slot.border), 'the slot shows its data (sound, Scene, key) and its colour: ' + pb.slot.text);
   ok(pb.loadBytes.length >= 4 && /^176 0 /.test(pb.loadBytes[0]) && pb.loadBytes.some(b => /^192 /.test(b)) && pb.loadBytes.some(b => b === '176 92 32') && pb.rootAfter === 2 && pb.scaleAfter === 'dorian' && pb.lumi === 0, 'tapping the slot sends bank/program, waits, re-sends Scene 3, then restores D dorian in the app; nothing to the LUMI (' + pb.loadBytes.length + ' bytes)');
+
+  console.log('# the key split: LUMI keys below the point play another Part');
+  const sp = await page.evaluate(async () => {
+    const o = {};
+    App.store.set('midihub.thru', true); SLMidiHub.split.set(null); await __wait(30);
+    __q('#st-save').click(); await __wait(50);
+    o.boxOff = __q('#st-splitbox [data-split="off"]').classList.contains('active');
+    __q('#st-splitat').value = '60'; __q('#st-splitpart').value = '2';
+    __q('#st-splitbox [data-split="two"]').click(); await __wait(50);
+    o.spec = SLMidiHub.split.get(); o.text = SLMidiHub.split.text(); o.rules = SLMidiHub.split.rules().map(r => r.name + ' [' + r.m.port + ']');
+    __q('#st-sheetclose').click(); await __wait(30);
+    o.chip = (__q('#panel-deck [data-chip="split"]') || {}).textContent; o.chipOn = __q('#panel-deck [data-chip="split"]').classList.contains('active');
+    __clear();
+    __fromLumi([0x90, 48, 100]); __fromLumi([0x80, 48, 0]); __fromLumi([0x90, 72, 100]); __fromLumi([0x80, 72, 0]); __fromLumi([0xB0, 64, 127]); __fromLumi([0xB0, 64, 0]);
+    __fromModx([0x90, 48, 100]); __fromModx([0x80, 48, 0]);
+    await __wait(60);
+    o.out = __nonClean(__bytes()); o.lumi = __by.lumi.length;
+    // the chip toggles the split off: everything stays as played
+    __q('#panel-deck [data-chip="split"]').click(); await __wait(40);
+    o.offSpec = SLMidiHub.split.get(); o.chipOff = !__q('#panel-deck [data-chip="split"]').classList.contains('active');
+    __clear(); __fromLumi([0x90, 48, 100]); __fromLumi([0x80, 48, 0]); await __wait(40); o.outOff = __nonClean(__bytes());
+    __q('#panel-deck [data-chip="split"]').click(); await __wait(40); o.backOn = SLMidiHub.split.get() && SLMidiHub.split.get().on !== false;
+    // a preset keeps the split; one saved with no split switches it off on load
+    __q('#st-save').click(); await __wait(40); __q('#st-pname').value = 'Split bass'; __q('#st-psave').click(); await __wait(60);
+    const it = App.synthDeck.presets().filter(x => x.name === 'Split bass')[0]; o.saved = it && it.snap && it.snap.split;
+    SLMidiHub.split.set(null); await __wait(20);
+    __q('#st-save').click(); await __wait(40); __q('#st-pname').value = 'Whole keys'; __q('#st-psave').click(); await __wait(60);
+    const it2 = App.synthDeck.presets().filter(x => x.name === 'Whole keys')[0]; o.savedOff = it2 && it2.snap && it2.snap.split;
+    __q('#st-pins [data-preset="' + it.id + '"]').click(); await __wait(900); o.afterLoad = SLMidiHub.split.get() && SLMidiHub.split.get().at;
+    __q('#st-pins [data-preset="' + it2.id + '"]').click(); await __wait(900); o.afterLoadOff = SLMidiHub.split.get();
+    // Thru never reaches a LUMI-named output
+    App.store.set('midihub.outId', 'lumi'); __clear(); __fromLumi([0x90, 48, 100]); __fromLumi([0x80, 48, 0]); await __wait(40);
+    o.lumiThru = __by.lumi.length; App.store.set('midihub.outId', null);
+    App.store.set('midihub.thru', false);
+    return o;
+  });
+  ok(sp.boxOff && sp.spec && sp.spec.at === 60 && sp.spec.parts[0] === 2 && sp.spec.port === 'LUMI' && sp.rules.length === 1 && /Split: C-1–B3 → Part 2 \[LUMI\]/.test(sp.rules[0]), 'the builder’s Two zones makes one split rule for the LUMI port: ' + sp.rules[0] + ' / ' + sp.text);
+  ok(/Split C4/.test(sp.chip) && sp.chipOn, 'the Deck chip reads the split point and is on: ' + sp.chip);
+  ok(sp.out.join('|') === '145 48 100|129 48 0|144 72 100|128 72 0|176 64 127|177 64 127|144 48 100|128 48 0' && sp.lumi === 0, 'LUMI C3 goes to channel 2 (note-off follows), C5 stays on 1, the hold pedal is copied to Part 2 (its release is pedal cleanup, filtered here), the MODX’s own C3 is untouched: ' + sp.out.join('|'));
+  ok(sp.offSpec && sp.offSpec.on === false && sp.chipOff && sp.outOff.join('|') === '144 48 100|128 48 0' && sp.backOn, 'the chip switches the split off (keys play as played) and on again');
+  ok(sp.saved && sp.saved.at === 60 && sp.savedOff && sp.savedOff.off === true && sp.afterLoad === 60 && sp.afterLoadOff === null, 'presets carry the split: one restores it on load, one saved without a split switches it off: ' + JSON.stringify([sp.saved, sp.savedOff]));
+  ok(sp.lumiThru === 0, 'with the LUMI as Synth out, Thru forwards nothing to it');
 
   console.log('# chips, Scenes, Prev / Next, Explain, Edit, Back');
   const ch = await page.evaluate(async () => {

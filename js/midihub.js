@@ -489,10 +489,12 @@
     if (o) { if (o.name) r.name = o.name; if (o.m) for (var k in o.m) r.m[k] = o.m[k]; if (o.a) for (var j in o.a) r.a[j] = o.a[j]; }
     return r;
   }
+  var rulePort = ''; // the port a Thru message came from, while it is in the rules
   function matches(r, d) {
     var m = r.m;
     if (m.type !== 'any' && m.type !== d.kind && !(m.type === 'at' && d.kind === 'pat')) return false;
     if (m.ch && m.ch !== d.ch + 1) return false;
+    if (m.port && String(d.port || '').toLowerCase().indexOf(String(m.port).toLowerCase()) < 0) return false; // 1.3: a rule for one keyboard only
     if (d.kind === 'note' || d.kind === 'cc' || d.kind === 'pc' || d.kind === 'pat') { if (d.num < m.lo || d.num > m.hi) return false; }
     return true;
   }
@@ -504,7 +506,7 @@
     var kind = d.kind, c = d.ch, num = d.num, val = d.val, on = d.on, touched = false;
     for (var i = 0; i < list.length; i++) {
       var r = list[i];
-      if (!r.on || !matches(r, { kind: kind, ch: c, num: num, val: val })) continue;
+      if (!r.on || !matches(r, { kind: kind, ch: c, num: num, val: val, port: rulePort })) continue;
       var a = r.a;
       touched = true;
       if (a.block) return [];
@@ -562,8 +564,49 @@
     var echoIndex = hubEchoes.findIndex(function (x) { return x.key === b.join(','); });
     var reflected = !ownsRelease && t !== 0x90 && echoIndex >= 0;
     if (reflected) hubEchoes.splice(echoIndex, 1);
-    if (!hubSending && !reflected && !(App.practiceRouter && App.practiceRouter.active) && g('thru', false) && b[0] !== 0xFE && hasOut()) send(b, 'thru', d.portId);
+    if (splitLearn && t === 0x90 && b[2] > 0) { splitLearn = false; if (els.splitat) els.splitat.value = String(b[1]); toast('Split key: ' + noteName(b[1]) + ' — tap Two zones'); }
+    if (!hubSending && !reflected && !(App.practiceRouter && App.practiceRouter.active) && g('thru', false) && b[0] !== 0xFE && hasOut() && !/lumi/i.test(hubOutName() || '')) {
+      rulePort = d.port || '';
+      try {
+        send(b, 'thru', d.portId);
+        // a key split: the hold pedal reaches every zone's Part (CC 64 has no key to split on)
+        var sp = splitSpec();
+        if (sp && sp.on !== false && sp.sus !== false && t === 0xB0 && b[1] === 64 && (!sp.port || String(d.port || '').toLowerCase().indexOf(sp.port.toLowerCase()) >= 0)) {
+          sp.parts.forEach(function (part) { if (part - 1 !== (b[0] & 15)) send([0xB0 | (part - 1), 64, b[2]], 'thru', d.portId); });
+        }
+      } finally { rulePort = ''; }
+    }
   }
+
+  // ---- KEY SPLIT (1.3, docs/SYNTH-TAB-PLAN.md): zones of one keyboard -> Parts, as Rules tagged split ----
+  // spec {at, at2|null, parts:[lowPart, midPart], port, sus, on}: notes below `at` go to parts[0]
+  // (a second point `at2` makes a middle zone -> parts[1]); notes at/above the top point stay as
+  // played. Only note on/off is re-channeled; CC 64 is copied to the zone Parts (above).
+  var splitLearn = false;
+  function splitSpec() { var s = g('split', null); return s && typeof s.at === 'number' && Array.isArray(s.parts) ? s : null; }
+  function splitRules() { return rules().filter(function (r) { return r.split; }); }
+  function defaultSplitPort() { var m = midi(), ins = m && m.inputsHeard ? m.inputsHeard : []; return ins.some(function (p) { return /lumi/i.test(p.name || ''); }) ? 'LUMI' : ''; }
+  function setSplit(spec) {
+    var keep = rules().filter(function (r) { return !r.split; });
+    if (spec && typeof spec.at === 'number') {
+      var at = clamp(Math.round(spec.at), 1, 127), at2 = spec.at2 != null && spec.at2 > at ? clamp(Math.round(spec.at2), at + 1, 127) : null;
+      var parts = [clamp(parseInt(spec.parts && spec.parts[0], 10) || 2, 1, 16), clamp(parseInt(spec.parts && spec.parts[1], 10) || 3, 1, 16)];
+      var port = typeof spec.port === 'string' ? spec.port : defaultSplitPort(), on = spec.on !== false;
+      var zones = at2 ? [{ lo: 0, hi: at - 1, ch: parts[0] }, { lo: at, hi: at2 - 1, ch: parts[1] }] : [{ lo: 0, hi: at - 1, ch: parts[0] }];
+      zones.forEach(function (z) {
+        var r = newRule({ name: 'Split: ' + noteName(z.lo) + '–' + noteName(z.hi) + ' → ' + partLabel() + ' ' + z.ch, m: { type: 'note', ch: 0, lo: z.lo, hi: z.hi, port: port }, a: { ch: z.ch } });
+        r.split = true; r.on = on; keep.push(r);
+      });
+      set('split', { at: at, at2: at2, parts: at2 ? parts : [parts[0]], port: port, sus: spec.sus !== false, on: on });
+    } else set('split', null);
+    set('rules', keep);
+    if (els.rules) { renderRules(); paintSplit(); }
+    App.emit('midihub:split', { split: splitSpec() });
+    return splitSpec();
+  }
+  function enableSplit(on) { var s = splitSpec(); if (!s) return null; s.on = !!on; return setSplit(s); }
+  function splitText(s) { s = s || splitSpec(); if (!s) return 'No split'; return (s.on === false ? 'Split off: ' : 'Split: ') + 'below ' + noteName(s.at) + ' → ' + partLabel() + ' ' + s.parts[0] + (s.at2 ? ', ' + noteName(s.at) + '–' + noteName(s.at2 - 1) + ' → ' + partLabel() + ' ' + s.parts[1] : '') + (s.port ? ' (' + s.port + ' only)' : ''); }
+  function paintSplit() { if (els.splitinfo) els.splitinfo.textContent = splitText(); if (els.splitoff) els.splitoff.hidden = !splitSpec(); }
   function identity(b) {
     var mf = { 0x43: 'Yamaha', 0x41: 'Roland', 0x42: 'Korg', 0x47: 'Akai', 0x00: 'extended id' }[b[5]] || ('mfr ' + hex([b[5]]));
     return mf + ' · family ' + hex(b.slice(6, 8)) + ' · model ' + hex(b.slice(8, 10)) + ' · version ' + hex(b.slice(10, 14)) + '  [' + hex(b) + ']';
@@ -706,7 +749,7 @@
         '<div class="row tight small mh-act"><span><i class="mh-led in" id="mh-ledin"></i>In <span class="mh-mono" id="mh-lastin">—</span></span><span><i class="mh-led out" id="mh-ledout"></i>Out <span class="mh-mono" id="mh-lastout">—</span></span></div>' +
       '</div>' +
       '<div class="seg mh-seg" id="mh-views" role="group" aria-label="Hub views">' +
-        '<button type="button" data-view="control">Control</button><button type="button" data-view="player">Player</button><button type="button" data-view="play">Play</button><button type="button" data-view="controls">Controls</button><button type="button" data-view="rules">Rules</button>' +
+        '<button type="button" data-view="control">Deck</button><button type="button" data-view="player">Player</button><button type="button" data-view="play">Keys</button><button type="button" data-view="controls">CCs</button><button type="button" data-view="rules">Rules</button>' +
         '<button type="button" data-view="sysex">SysEx</button><button type="button" data-view="monitor">Monitor</button><button type="button" data-view="learn">Learn</button>' +
       '</div>' +
 
@@ -825,6 +868,14 @@
             '<button type="button" class="btn sm" data-preset="chan">Example: force channel 2</button>' +
             '<button type="button" class="btn sm" data-preset="block">Example: block aftertouch</button>' +
           '</div>' +
+          '<div class="row tight mh-splitrow"><b class="mh-w">Split</b>' +
+            '<label class="field">keys below<select id="mh-splitat">' + (function () { var h = ''; for (var n = 36; n <= 84; n++) h += '<option value="' + n + '"' + (n === 60 ? ' selected' : '') + '>' + noteName(n) + '</option>'; return h; })() + '</select></label>' +
+            '<label class="field">play Part<select id="mh-splitpart">' + (function () { var h = ''; for (var k = 1; k <= 16; k++) h += '<option value="' + k + '"' + (k === 2 ? ' selected' : '') + '>' + k + '</option>'; return h; })() + '</select></label>' +
+            '<button type="button" class="btn sm primary" id="mh-splitset">Two zones</button>' +
+            '<button type="button" class="btn sm" id="mh-splitlearn" title="The next key you play becomes the split point">Learn: play the split key</button>' +
+            '<button type="button" class="btn sm" id="mh-splitoff" hidden>Split off</button>' +
+            '<span class="muted small" id="mh-splitinfo"></span></div>' +
+          '<p class="muted small" style="margin:6px 0 0">A split sends the keys below the point to another Part (its channel in Multi mode); the top zone stays as played. Only notes move; the hold pedal is copied to every zone. With a LUMI connected the split applies to the LUMI only.</p>' +
         '</div>' +
         '<div id="mh-rules"></div>' +
       '</div>' +
@@ -990,6 +1041,11 @@
     els.rulesin.addEventListener('change', function () { set('rulesIn', this.checked); installFilter(); });
     els.rulesapp.addEventListener('change', function () { set('rulesApp', this.checked); });
     els.addrule.addEventListener('click', function () { var l = rulesList(); l.push(newRule()); set('rules', l); renderRules(); });
+    ['splitat', 'splitpart', 'splitset', 'splitlearn', 'splitoff', 'splitinfo'].forEach(function (id) { els[id] = root.querySelector('#mh-' + id); });
+    els.splitset.addEventListener('click', function () { var s = splitSpec() || {}; setSplit({ at: parseInt(els.splitat.value, 10), at2: null, parts: [parseInt(els.splitpart.value, 10)], port: s.port, sus: true, on: true }); toast(splitText()); });
+    els.splitlearn.addEventListener('click', function () { splitLearn = !splitLearn; els.splitlearn.classList.toggle('active', splitLearn); if (splitLearn) toast('Play the key where the split starts'); });
+    els.splitoff.addEventListener('click', function () { setSplit(null); toast('Split off'); });
+    paintSplit();
     root.querySelectorAll('[data-preset]').forEach(function (b) {
       b.addEventListener('click', function () {
         var P = {
@@ -1090,7 +1146,7 @@
           '<input type="text" data-k="name" placeholder="rule name" value="' + esc(r.name || '') + '" style="width:150px">' +
           '<button type="button" class="btn sm' + (learning === r || (learning && learning.id === r.id) ? ' active' : '') + '" data-act="learn">' + ((learning && learning.id === r.id) ? 'Listening… play something' : 'Learn') + '</button>' +
           '<span style="flex:1"></span><button type="button" class="btn sm" data-act="up"' + (i === 0 ? ' disabled' : '') + '>' + App.icon('up', 12) + '</button><button type="button" class="btn sm" data-act="down"' + (i === list.length - 1 ? ' disabled' : '') + '>' + App.icon('down', 12) + '</button><button type="button" class="btn sm" data-act="del">' + App.icon('close', 12) + '</button></div>' +
-        '<div class="row tight"><b class="mh-w">When</b><label class="field">type<select data-k="m.type">' + tOpts + '</select></label><label class="field">channel<select data-k="m.ch">' + chOpts(r.m.ch, 'any') + '</select></label>' +
+        '<div class="row tight"><b class="mh-w">When</b><label class="field">port<input type="text" data-k="m.port" placeholder="any" value="' + esc(r.m.port || '') + '" style="width:84px" title="Only messages from a port whose name contains this"></label><label class="field">type<select data-k="m.type">' + tOpts + '</select></label><label class="field">channel<select data-k="m.ch">' + chOpts(r.m.ch, 'any') + '</select></label>' +
           '<label class="field">number<input type="number" data-k="m.lo" min="0" max="127" value="' + r.m.lo + '"></label><label class="field">to<input type="number" data-k="m.hi" min="0" max="127" value="' + r.m.hi + '"></label></div>' +
         '<div class="row tight"><b class="mh-w">Do</b><label class="mh-chk"><input type="checkbox" data-k="a.block"' + (r.a.block ? ' checked' : '') + '> Block</label>' +
           '<label class="field">convert<select data-k="a.to">' + toOpts + '</select></label><label class="field">channel<select data-k="a.ch">' + chOpts(r.a.ch, 'keep') + '</select></label>' +
@@ -1755,7 +1811,8 @@
   });
 
   // test / plugin hook
-  window.SLMidiHub = { decode: decode, applyRules: applyRules, PROFILES: PROFILES, parseHex: parseHex, hex: hex, get rules() { return rules(); }, get outId() { return hubOutId(); }, knob: function (cc) { return kv(cc); }, turn: turn,
+  window.SLMidiHub = { decode: decode, applyRules: applyRules, PROFILES: PROFILES, parseHex: parseHex, hex: hex, get rules() { return rules(); },
+    split: { get: splitSpec, set: setSplit, enable: enableSplit, text: splitText, rules: splitRules, defaultPort: defaultSplitPort }, get outId() { return hubOutId(); }, knob: function (cc) { return kv(cc); }, turn: turn,
     // the Player: load a file (name, ArrayBuffer) -> summary; play/pause/stop/seek(seconds)
     player: { loadFile: function (name, buf) { return plLoadFile(name, buf).then(plSet); }, play: plPlay, pause: plPause, stop: plStop, seek: plSeek,
       // a reviewed practice score {title, bpm, len, notes:[{t, d, m, rest, partId, v}]}

@@ -153,12 +153,17 @@
             '<div class="field">Colour<div class="st-colours" id="st-colours" role="group" aria-label="Colour"></div></div></div>' +
           '<div class="ctl-label">This preset remembers</div>' +
           '<div class="st-incs" id="st-incs"></div>' +
-          '<div class="st-splitbox muted small" id="st-splitbox">Key split: set up in step 4 (which keys play which Part).</div>' +
+          '<div class="st-splitbox" id="st-splitbox"><div class="st-splithead"><b>Key split</b><span class="muted small" id="st-splittext"></span></div>' +
+            '<div class="st-splitrow"><div class="seg" role="group" aria-label="Split"><button type="button" data-split="off">Off</button><button type="button" data-split="two">Two zones</button></div>' +
+            '<label class="field">keys below<select id="st-splitat"></select></label><label class="field">play Part<select id="st-splitpart"></select></label>' +
+            '<button type="button" class="btn sm" id="st-splitlearn">Play the split key</button></div></div>' +
           '<div class="st-formacts"><button type="button" class="btn st-big" id="st-capture">Capture now</button><button type="submit" class="btn st-big primary" id="st-psave">Save</button></div>' +
           '<p class="muted small" id="st-pnote"></p>' +
         '</form>' +
       '</div></div>';
-    ['perform', 'edit', 'nowname', 'nowsub', 'prev', 'next', 'save', 'pins', 'superval', 'chips', 'scenes', 'sheet', 'sheetclose', 'form', 'pid', 'pname', 'ptags', 'colours', 'incs', 'capture', 'psave', 'pnote'].forEach(function (id) { els[id] = q('#st-' + id); });
+    ['perform', 'edit', 'nowname', 'nowsub', 'prev', 'next', 'save', 'pins', 'superval', 'chips', 'scenes', 'sheet', 'sheetclose', 'form', 'pid', 'pname', 'ptags', 'colours', 'incs', 'capture', 'psave', 'pnote', 'splitbox', 'splittext', 'splitat', 'splitpart', 'splitlearn'].forEach(function (id) { els[id] = q('#st-' + id); });
+    var h = ''; for (var n = 36; n <= 84; n++) h += '<option value="' + n + '"' + (n === 60 ? ' selected' : '') + '>' + noteName(n) + '</option>'; els.splitat.innerHTML = h;
+    h = ''; for (var k = 1; k <= 16; k++) h += '<option value="' + k + '"' + (k === 2 ? ' selected' : '') + '>' + k + '</option>'; els.splitpart.innerHTML = h;
     els.form.addEventListener('submit', function (e) { e.preventDefault(); submitSheet(); });
     if (borrowed) { els.edit.appendChild(borrowed); borrowed.hidden = mode() !== 'edit'; }
     paint();
@@ -184,7 +189,7 @@
     if (it.prog) badges.push(it.prog.msb + '/' + it.prog.lsb + '/' + it.prog.pc);
     var scene = sceneOf(it); if (scene) badges.push('Scene ' + scene);
     if (sn.app && typeof sn.app.root === 'number') badges.push(NOTE[sn.app.root % 12] + ' ' + (sn.app.scale || ''));
-    if (sn.split) badges.push('split ' + noteName(sn.split.at));
+    if (sn.split) badges.push(sn.split.off ? 'no split' : 'split ' + noteName(sn.split.at));
     var parts = Object.keys(it.parts || {}).length; if (parts) badges.push(parts === 1 ? 'knobs' : parts + ' Parts');
     var col = COLOURS[sn.colour] || '';
     return '<button type="button" class="st-slot' + (active ? ' active' : '') + '" data-preset="' + esc(it.id) + '" title="' + esc(it.name) + (it.tags && it.tags.length ? ' · ' + esc(it.tags.join(', ')) : '') + '"' + (col ? ' style="border-left:4px solid ' + col + '"' : '') + '>' +
@@ -197,17 +202,20 @@
   }
 
   // ---- the preset builder sheet ----
-  var sheet = { id: null, colour: 'amber', inc: { prog: true, knobs: true, btns: true, app: true } };
+  var sheet = { id: null, colour: 'amber', inc: { prog: true, knobs: true, btns: true, app: true, split: true } };
+  var splitLearning = false;
   var INCS = [['prog', 'Sound', function (p) { var n = p.now(); return n.msb + ' / ' + n.lsb + ' / ' + n.pc + ' · ' + n.name; }],
     ['knobs', 'Knobs', function () { return 'Super Knob, the strips, Assign 1-8 on this Part'; }],
     ['btns', 'Buttons & Scene', function (p) { var s = p.ctl('scene1'); var on = []; ['arpMaster', 'msMaster', 'asw1', 'asw2', 'sus'].forEach(function (id) { var c = p.ctl(id); if (c && c.on) on.push(c.name); }); return (on.length ? on.join(', ') : 'all off') + sceneNow(p); }],
-    ['app', 'Key & scale', function () { var r = App.store.get('fb.root', 9), s = App.store.get('fb.scale', 'minorPent'); return NOTE[((typeof r === 'number' ? r : 9) % 12 + 12) % 12] + ' ' + s + ' · LUMI layout'; }]];
+    ['app', 'Key & scale', function () { var r = App.store.get('fb.root', 9), s = App.store.get('fb.scale', 'minorPent'); return NOTE[((typeof r === 'number' ? r : 9) % 12 + 12) % 12] + ' ' + s + ' · LUMI layout'; }],
+    ['split', 'Split', function () { return hubSplit() ? hubSplit().text() : 'the Hub is not open'; }]];
+  function hubSplit() { return window.SLMidiHub && SLMidiHub.split ? SLMidiHub.split : null; }
   function sceneNow(p) { for (var i = 1; i <= 8; i++) { var c = p.ctl('scene' + i); if (c && c.on) return ' · Scene ' + i; } return ''; }
   function openSheet(id) {
     var p = P(); if (!p || !els.sheet) return;
     var it = id ? p.find(id) : null, m = p.now().match;
     sheet.id = it ? it.id : null; sheet.colour = it && it.snap && it.snap.colour ? it.snap.colour : 'amber';
-    sheet.inc = { prog: it ? !!it.prog : true, knobs: true, btns: true, app: it ? !!(it.snap && it.snap.app) : true };
+    sheet.inc = { prog: it ? !!it.prog : true, knobs: true, btns: true, app: it ? !!(it.snap && it.snap.app) : true, split: it ? !!(it.snap && it.snap.split) : true };
     els.pid.value = sheet.id || '';
     els.pname.value = it ? it.name : (m ? m.name + ' 2' : p.now().name);
     els.ptags.value = it ? it.tags.join(', ') : '';
@@ -225,10 +233,24 @@
       return '<button type="button" class="st-inc' + (on ? ' active' : '') + '" data-inc="' + r[0] + '" aria-pressed="' + on + '"><span class="st-incname">' + (on ? '✓' : '○') + ' ' + r[1] + '</span><span class="st-incsub">' + esc(sub) + '</span></button>';
     }).join('');
     els.pnote.textContent = 'Capture re-reads the synth and the app. Save keeps it in your Sounds' + (sheet.id ? '.' : ' and pins it to the Deck.');
+    paintSplitBox();
+  }
+  // the split box edits the Hub's split directly (it is the live routing); the preset remembers it when Split is included
+  function paintSplitBox() {
+    var hs = hubSplit(), s = hs ? hs.get() : null;
+    if (els.splittext) els.splittext.textContent = hs ? hs.text() : '';
+    qa('[data-split]', els.splitbox).forEach(function (b) { var on = (b.dataset.split === 'off') === !s; b.classList.toggle('active', on); b.setAttribute('aria-pressed', String(on)); });
+    if (s) { els.splitat.value = String(s.at); els.splitpart.value = String(s.parts[0]); }
+    els.splitlearn.classList.toggle('active', splitLearning); els.splitlearn.textContent = splitLearning ? 'Listening… play the split key' : 'Play the split key';
+  }
+  function setSplitFromBox(on) {
+    var hs = hubSplit(); if (!hs) return;
+    if (!on) hs.set(null); else hs.set({ at: parseInt(els.splitat.value, 10), at2: null, parts: [parseInt(els.splitpart.value, 10)], port: hs.defaultPort(), sus: true, on: true });
+    paintSplitBox(); paintChips();
   }
   function submitSheet() {
     var p = P(); if (!p) return;
-    var it = p.save({ id: sheet.id, name: els.pname.value, tags: els.ptags.value, scope: 'part', incProg: sheet.inc.prog, incKnobs: sheet.inc.knobs, incBtns: sheet.inc.btns, incApp: sheet.inc.app, colour: sheet.colour, fav: favs() });
+    var it = p.save({ id: sheet.id, name: els.pname.value, tags: els.ptags.value, scope: 'part', incProg: sheet.inc.prog, incKnobs: sheet.inc.knobs, incBtns: sheet.inc.btns, incApp: sheet.inc.app, incSplit: sheet.inc.split, colour: sheet.colour, fav: favs() });
     if (!it) return;
     if (!sheet.id && !it.star) { it.star = true; p.persist(); } // a new preset shows up on the Deck at once
     closeSheet(); paint();
@@ -250,7 +272,7 @@
   function paintChips() {
     var p = P(); if (!p) return;
     els.chips.innerHTML = CHIPS.map(function (id) {
-      if (id === 'split') return '<button type="button" class="chip st-chip" data-chip="split" title="Set up in the preset builder (step 4)">Split</button>';
+      if (id === 'split') { var hs = hubSplit(), s = hs ? hs.get() : null; return '<button type="button" class="chip st-chip' + (s && s.on !== false ? ' active' : '') + '" data-chip="split" aria-pressed="' + !!(s && s.on !== false) + '" title="' + esc(hs ? hs.text() : 'Key split') + '">' + (s ? 'Split ' + esc(noteName(s.at)) : 'Split') + '</button>'; }
       var st = p.ctl(id); if (!st) return '';
       return '<button type="button" class="chip st-chip' + (st.on ? ' active' : '') + (st.unsure ? ' unsure' : '') + '" data-chip="' + id + '" aria-pressed="' + !!st.on + '">' + esc(st.name) + '</button>';
     }).join('');
@@ -320,11 +342,13 @@
     if ((b = t.closest('[data-colour]'))) { sheet.colour = b.dataset.colour; paintSheet(); return; }
     if ((b = t.closest('[data-inc]'))) { sheet.inc[b.dataset.inc] = !sheet.inc[b.dataset.inc]; paintSheet(); return; }
     if (t.closest('#st-capture')) { paintSheet(); if (App.toast) App.toast('Captured what the synth and the app are on now'); return; }
+    if ((b = t.closest('[data-split]'))) { setSplitFromBox(b.dataset.split === 'two'); return; }
+    if (t.closest('#st-splitlearn')) { splitLearning = !splitLearning; paintSplitBox(); return; }
     if (t.closest('#st-pickfav')) { pickFavs(); return; }
     if ((b = t.closest('[data-preset]'))) { var it = p.find(b.dataset.preset); p.load(b.dataset.preset).then(function () { if (it && it.snap && Array.isArray(it.snap.fav) && it.snap.fav.length === 4) { set('fav', it.snap.fav); render(); } else paint(); }); return; }
     if ((b = t.closest('[data-chip]'))) {
       var id = b.dataset.chip;
-      if (id === 'split') { App.toast ? App.toast('Key splits arrive with the preset builder') : 0; return; }
+      if (id === 'split') { var hs = hubSplit(), s = hs ? hs.get() : null; if (s) { hs.enable(s.on === false); paintChips(); } else { openSheet(null); try { els.splitbox.scrollIntoView({ block: 'center' }); } catch (e) { } } return; }
       p.tap(id); paintChips(); return;
     }
   }
@@ -375,7 +399,8 @@
         '.st-colours{display:flex;gap:6px;align-items:center;min-height:44px}.st-swatch{width:32px;height:32px;border-radius:50%;border:3px solid transparent;padding:0}.st-swatch.active{border-color:var(--text)}' +
         '.st-incs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.st-inc{min-height:52px;padding:8px 10px;border-radius:10px;border:1px solid var(--line);background:transparent;color:var(--text);text-align:left;display:grid;gap:2px;font:inherit}' +
         '.st-inc.active{border-color:var(--accent-line);background:var(--accent-soft);color:var(--accent-ink)}.st-incname{font-weight:600;font-size:14px}.st-incsub{font-size:11px;color:var(--muted);overflow-wrap:anywhere}' +
-        '.st-splitbox{padding:10px 12px;border-radius:10px;border:1px dashed var(--line)}.st-formacts{display:flex;gap:8px}' +
+        '.st-splitbox{padding:10px 12px;border-radius:10px;border:1px dashed var(--line);display:grid;gap:8px}.st-splithead{display:flex;justify-content:space-between;gap:8px;align-items:baseline}' +
+        '.st-splitrow{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end}.st-splitrow .seg button,.st-splitrow .btn{min-height:44px}.st-splitrow select{min-height:44px}.st-formacts{display:flex;gap:8px}' +
         '@media (min-width:900px){.st-four{grid-template-columns:repeat(4,minmax(0,1fr))}.st-pins{grid-template-columns:repeat(8,minmax(0,1fr))}}');
       face = document.createElement('div'); face.className = 'st-face'; el.appendChild(face);
       face.addEventListener('click', onClick);
@@ -389,6 +414,8 @@
       App.on('midi:raw', function () { if (App.active === 'deck' && !drag) schedulePaint(); });
       App.on('midi:state', function () { if (App.active === 'deck') schedulePaint(); });
       App.on('deck:assignnames', function () { if (App.active === 'deck') render(); }); // the strips take the Performance's knob names
+      App.on('midihub:split', function () { if (App.active === 'deck') { paintChips(); if (els.sheet && !els.sheet.hidden) paintSplitBox(); } });
+      App.on('midi:note', function (d) { if (!splitLearning || !d || !d.on || !els.splitat) return; splitLearning = false; els.splitat.value = String(Math.max(36, Math.min(84, d.midi))); paintSplitBox(); });
     },
     onShow: function () {
       render();

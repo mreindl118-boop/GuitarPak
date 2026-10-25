@@ -15,10 +15,10 @@ Tick items here as they land (commit in brackets).
       (captions + Try this + long-press to Learn)
 - [x] 1.3 Touch (step 2): 44 px targets, strips with readout, no page scroll while a strip is held, no
       hover-only controls (tests/synthtab.test.js, 375 px)
-- [x] 1.4 Presets (step 3; the split part lands with step 4): full snapshot (sound, knobs, buttons, Scene, key split, soundLAB key/scale, LUMI
+- [x] 1.4 Presets (steps 3-4): full snapshot (sound, knobs, buttons, Scene, key split, soundLAB key/scale, LUMI
       layout); builder sheet (name, tags, colour, include checkboxes, Capture now); restore order
       program -> settle -> values -> split -> app state
-- [ ] 1.5 Hub: Rules gain a port match + Split presets (below split -> Part 2; three zones); Thru
+- [x] 1.5 (step 4) Hub: Rules gain a port match + Split presets (below split -> Part 2; three zones); Thru
       never reaches a LUMI output; views renamed "Play" -> Keys, "Controls" -> CCs
 - [ ] 1.6 Live: named sets, pages of 16 (4 x 4), slot editor (preset / MODX Live Set slot / empty),
       prev/next page, step by foot-switch CC or (option) LUMI octave buttons, Go live page; MODX Live
