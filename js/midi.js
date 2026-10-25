@@ -505,6 +505,13 @@
     if (!nextOutput && access && !id) access.outputs.forEach(function (port) {
       if (!nextOutput && port.state !== 'disconnected') nextOutput = port;
     });
+    // the chosen output is not here (a stale id from another enumeration, a
+    // synth switched off): a LUMI on the bus gets the lights meanwhile, and
+    // the choice is kept for when it returns
+    var standIn = false;
+    if (!nextOutput && access && id) access.outputs.forEach(function (port) {
+      if (!nextOutput && port.state !== 'disconnected' && knownLumi(port.name)) { nextOutput = port; standIn = true; }
+    });
     if (nextOutput !== output) {
       App.emit('midi:beforeoutput', { outputId: output ? output.id : null });
       flushMusicalOutputs('Selected output changed.');
@@ -512,7 +519,7 @@
       resetOutputLights();
     }
     output = nextOutput;
-    if (output) App.store.set('midi.outputId', output.id);
+    if (output && !standIn) App.store.set('midi.outputId', output.id);
     announce();
   }
 
@@ -763,6 +770,7 @@
   function resetOutputLights() {
     lit = {};
     lumiShown = null;
+    lumiCfg = null;
   }
 
   function light(midi, vel) {
@@ -891,7 +899,10 @@
   var LIGHT_LO = 24, LIGHT_HI = 108;
 
   // The archived LUMI default program colors EACH KEY by note velocity.
-  // Physical firmware/program behavior is not verified here. That program lights an incoming note in colourLookup[velocity] (0 off,
+  // Checked on a stock LUMI Keys Block 2026-10-25: a note-on lights its key
+  // in a velocity hue (pink/red at 1 through orange, yellow, green, cyan and
+  // blue to violet at 127 - 127 is NOT white on that firmware), it holds until
+  // a note-off, and a pressed key blanks its light (see RELIGHT). That program lights an incoming note in colourLookup[velocity] (0 off,
   // 1-126 a hue sweep red > yellow > green > cyan > blue > violet, 127 white),
   // only within its current 24-key octave window. So the app's degree colors
   // go to the keybed one key at a time, matched to the nearest table color.
@@ -1042,7 +1053,7 @@
   // compose + diff: only changed keys are sent
   function paint(force) {
     if (!hasLightOutput() || keybedLeased()) return;
-    if (claimedBy) {
+    if (claimedBy) { // a page owns the keys: only an explicit re-send touches the LUMI
       if (force === true) {
         if (isLumi()) lumiLayout();
         Object.keys(lit).forEach(function (note) { light(Number(note), lit[note]); });
@@ -1050,19 +1061,29 @@
       return;
     }
     if (!lightsOn()) { allDark(); if ((ledMode() === 'off' || !displayEnabled()) && isLumi()) lumiLayout(); return; } // off: a dark LUMI
-    if (isLumi()) lumiLayout();
+    var reset = isLumi() && lumiLayout(); // a config frame went: every key needs its color again
     var want = wanted(), m;
     for (m in lit) if (!want[m]) dark(Number(m));
-    for (m in want) if (force === true || lit[m] !== want[m]) light(Number(m), want[m]);
+    for (m in want) if (force === true || reset || lit[m] !== want[m]) light(Number(m), want[m]);
   }
 
   // the app paints a LUMI key by key, so its own background goes dark (night
   // mode) — then only the app's colors show; brightness rides along
+  // Checked on a LUMI Keys Block (stock ROLI firmware, 2026-10-25): the frames
+  // are accepted, 'night' is a DIM rainbow background rather than black, and
+  // EVERY config frame wipes the keys the app has lit - so they go only when
+  // the mode or brightness actually changed (a MODX plugging in used to fire
+  // a dozen repaints = 48 frames = a dark keyboard), and the caller re-lights
+  // everything when they went (returns true).
+  var lumiCfg = null; // {mode, bright} the LUMI holds now
   function lumiLayout(force) {
-    if (lumiShown === 'night' && !force) return;
-    var sentMode = lumiCmd([0x10, 0x40].concat(lumiVal(0x02, LUMI_MODES.night)));
-    var sentBrightness = lumiCmd([0x10, 0x40].concat(lumiVal(0x04, brightness())));
+    var want = { mode: LUMI_MODES.night, bright: brightness() };
+    if (!force && lumiShown === 'night' && lumiCfg && lumiCfg.mode === want.mode && lumiCfg.bright === want.bright) return false;
+    var sentMode = lumiCmd([0x10, 0x40].concat(lumiVal(0x02, want.mode)));
+    var sentBrightness = lumiCmd([0x10, 0x40].concat(lumiVal(0x04, want.bright)));
     lumiShown = sentMode && sentBrightness ? 'night' : null;
+    lumiCfg = lumiShown ? want : null;
+    return !!(sentMode || sentBrightness);
   }
 
   function setGuide(now, next) {
@@ -1088,9 +1109,22 @@
     if (d.port && lumiInputs() && !/lumi/i.test(d.port)) return;
     learnRange(d.midi);
   });
+  // RELIGHT (checked on the stock firmware 2026-10-25): the LUMI blanks a key
+  // the app lit when that key is pressed, and does not restore it on release.
+  // So its own note-off gets the key's color sent again - unless lights.relight
+  // is off or a page holds it off (a lesson that wants a played key to stay
+  // dark as progress feedback: holdRelight(owner, true)).
+  var relightHold = {};
+  function relightOn() { return App.store.get('lights.relight', true) !== false && !Object.keys(relightHold).length; }
+  App.on('midi:note', function (d) {
+    if (!d || d.on || d.silent || !isLumi() || !relightOn() || keybedLeased()) return;
+    if (d.port && !/lumi/i.test(d.port)) return;
+    var v = lit[d.midi];
+    if (v != null) sendBytes([0x90, d.midi, v], 'led');
+  });
 
   // follow the app's key/scale/colors/help live
-  function repaintAll(force) { lumiShown = null; paint(force === true); }
+  function repaintAll(force) { if (force === true) lumiShown = null; paint(force === true); }
   App.on('fb:set', repaintAll);
   App.on('fb:scale', repaintAll);
   App.on('midi:state', repaintAll);
@@ -1187,6 +1221,10 @@
     release: function (owner) { if (claimedBy === owner) { allDark(); claimedBy = null; repaintAll(); } },
     repaint: function () { repaintAll(true); },
     lumiSync: function () { repaintAll(true); },
+    // relight a played key (lights.relight, default on); holdRelight(owner, on) = a page wants played keys to stay dark
+    get relight() { return relightOn(); },
+    setRelight: function (on) { App.store.set('lights.relight', on !== false); },
+    holdRelight: function (owner, on) { if (on) relightHold[owner] = true; else delete relightHold[owner]; },
     range: range,
     fold: fold,
     get lumi() { return isLumi(); },
@@ -1199,7 +1237,7 @@
       App.store.set('lights.led', 'auto'); // the sheet's On/Off: back to the Help level
       App.store.set('lights.on', !!on);
       if (!on) { allDark(); if (isLumi() && hasLightOutput()) { lumiShown = null; lumiNative(); } }
-      repaintAll();
+      repaintAll(!!on); // On: push the background + every key again (the user asked for lights)
     },
     // LED scale (the clef dropdown): 'scale' | 'off' | 'auto'
     get ledMode() { return ledMode(); },

@@ -41,6 +41,29 @@ semantic frames are owned by the shared MIDI service and obey the single
 LUMI Display master. Sound-note filtering never suppresses a permitted
 instructional wrong-note display frame.
 
+## Checked on a real LUMI Keys Block (stock ROLI firmware, 2026-10-25)
+
+Matt's LUMI over Bluetooth LE (Chrome with `--enable-features=MidiManagerWinrt`), photos of the
+keys, record `tasks/20261025T0100Z-lumi-check-claude.md`, suite `tests/lumi-firmware.test.js`:
+
+- A Note On to the LUMI lights that key in a velocity colour and the light HOLDS until a Note Off
+  (`80 nn 00` clears it). The colour is a hue sweep: pink/red at 1, orange, yellow, green, cyan,
+  blue, violet at 127. **127 is not white** on this firmware. The sweep is rotated about one colour
+  step from the archived `colourLookup` (the table's orange came out pink on the keys); the
+  calibration from the 24-key sweep photo is noted in the record.
+- Every SysEx config frame (colour mode, brightness) is accepted - but it WIPES the keys the app has
+  lit. `js/midi.js` therefore sends mode/brightness only when they changed and re-lights every key
+  afterwards (`lumiLayout` returns true = "the keys need their colours again").
+- "Night" mode (`10 40 62 00`) is a DIM rainbow background, not a black keyboard. "Piano" showed
+  white/black for a moment. The ROLI Dashboard colour scheme on the unit was Rainbow.
+- A key you press loses its virtual light and does not get it back by itself: the app re-sends the
+  key's Note On on the LUMI's own Note Off (`lights.relight`, default on; `App.midi.holdRelight
+  (owner, true)` for a lesson that wants a played key to stay dark).
+- The LUMI sends notes on channel 1 with release velocities; its octave buttons send nothing
+  (the app's 24-key window is inferred from played notes, as designed).
+- Device id: both `37` and `00` frames were sent together; which one the unit answers to was not
+  separated. The benob LittleFoot program was NOT loaded; nothing was written to the device.
+
 ## Evidence and limits
 
 The exact 128-entry lookup is the `colourLookup` array in the archived
@@ -67,9 +90,9 @@ No custom program is uploaded by this change.
 The official Dashboard help URL was also checked; the direct page redirected
 to vendor sign-in during re-verification, so firmware compatibility is not
 inferred from it. The SDK and archived program support the limited claims
-above. Physical RGB calibration, brightness, pressed-key overrides, firmware,
-24-key octave alignment and actual synth sound remain **hardware unverified**.
-All reported tests use cloud browser/VM ports and simulations.
+above. Brightness steps, the exact per-velocity RGB, the device-id question and synth sound remain
+unverified; pressed-key behaviour, config-frame wiping, hold-until-Note-Off, the hue sweep and the
+24-key window were checked on the real unit (section above). The suites use simulated ports.
 
 ## Checks
 

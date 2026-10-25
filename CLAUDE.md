@@ -91,6 +91,18 @@ js/midi.js        MIDI service (App.midi: in/out ports, note/bend/pressure
                   calls guide only when its now/next targets change, so the
                   blink keeps time; Wait mode lights the first note at Go).
                   Nothing calls App.midi.light/dark for practice any more.
+                  CHECKED ON THE REAL LUMI (stock firmware, 2026-10-25; docs/
+                  NOTE-PALETTE.md, tests/lumi-firmware.test.js): a note-on
+                  lights its key in a velocity HUE (127 is not white) and holds
+                  until note-off; EVERY config frame (mode/brightness) wipes the
+                  lit keys, so lumiLayout() sends them only when they changed and
+                  returns true = re-light everything; a pressed key loses its
+                  light, so the LUMI's own note-off re-sends it (lights.relight,
+                  App.midi.setRelight / holdRelight(owner, on) for lessons that
+                  want a played key dark); 'night' = dim rainbow, not black; a
+                  stale midi.outputId no longer blocks the LUMI auto-pick (it
+                  stands in, the stored choice is kept). Chrome needs
+                  --enable-features=MidiManagerWinrt to list the Bluetooth LUMI.
 js/tonein.js      1/4"/audio-in TONE-IN: pitch-detects the selected audio
                   input (audio.inId; toggle audio.tonein in Settings) and
                   emits midi:note {silent:true} — instrument pages show the

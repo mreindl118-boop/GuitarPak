@@ -388,7 +388,7 @@ const keys = o => Object.keys(o).map(Number).sort((a, b) => a - b);
     window.__out = replacement;
     return result;
   });
-  ok(failedSends.initialNotes === 13 && failedSends.retriedNotes.join() === String(failedSends.failedNote), 'a failed note-on is retried by the next ordinary layout update instead of being cached as lit');
+  ok(failedSends.initialNotes === 13 && failedSends.retriedNotes.includes(failedSends.failedNote), 'a failed note-on is retried by the next ordinary layout update instead of being cached as lit (the update also re-sent the dark-background frame the stock firmware wipes keys on, so the other keys may go again): ' + failedSends.retriedNotes.join());
   ok(failedSends.retriedSysex === 4, 'failed LUMI configuration is retried before the next layout update');
   ok(failedSends.retriedOffs.join() === String(failedSends.failedOff), 'a failed note-off remains pending and is retried on the next layout update');
   ok(errs.length === 0, 'no page errors' + (errs.length ? ': ' + errs.join(' | ') : ''));

@@ -14,8 +14,10 @@ lessons, Songs, exercises and scale practice. The advanced page adds explicit
 port roles and safe test/arm controls; it does not add a second illumination
 master. There is no standalone text/matrix display implementation in this slice.
 
-Physical LUMI/synth behavior remains **EXPERIMENTAL / UNVERIFIED**. All reported
-validation uses cloud simulations; no hardware was connected or configured.
+Physical LUMI behaviour was checked on the real unit on 2026-10-25 (see NOTE-PALETTE.md,
+"Checked on a real LUMI Keys Block"): note-on lights hold, a pressed key must be re-lit, config
+frames wipe the lights, 127 is not white. The synth side of this page (Local Control, routing)
+remains **UNVERIFIED**; the suites use simulations.
 
 ## Start with simulation
 
