@@ -15,7 +15,7 @@ Tick items here as they land (commit in brackets).
       (captions + Try this + long-press to Learn)
 - [x] 1.3 Touch (step 2): 44 px targets, strips with readout, no page scroll while a strip is held, no
       hover-only controls (tests/synthtab.test.js, 375 px)
-- [ ] 1.4 Presets: full snapshot (sound, knobs, buttons, Scene, key split, soundLAB key/scale, LUMI
+- [x] 1.4 Presets (step 3; the split part lands with step 4): full snapshot (sound, knobs, buttons, Scene, key split, soundLAB key/scale, LUMI
       layout); builder sheet (name, tags, colour, include checkboxes, Capture now); restore order
       program -> settle -> values -> split -> app state
 - [ ] 1.5 Hub: Rules gain a port match + Split presets (below split -> Part 2; three zones); Thru

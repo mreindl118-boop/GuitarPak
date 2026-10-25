@@ -114,6 +114,15 @@
       }
       if (any) o.parts[pk] = part;
     }
+    // 1.3 full snapshot (docs/SYNTH-TAB-PLAN.md): what the Synth tab brings back besides the synth
+    if (isObj(p.snap)) {
+      var sn = {};
+      if (typeof p.snap.colour === 'string' && /^[a-z]{1,12}$/.test(p.snap.colour)) sn.colour = p.snap.colour;
+      if (isObj(p.snap.app) && typeof p.snap.app.root === 'number') sn.app = { root: clamp(Math.round(p.snap.app.root), 0, 11), scale: typeof p.snap.app.scale === 'string' ? p.snap.app.scale.slice(0, 24) : 'major', mode: typeof p.snap.app.mode === 'number' ? clamp(Math.round(p.snap.app.mode), 0, 11) : 0 };
+      if (isArr(p.snap.fav) && p.snap.fav.length === 4 && p.snap.fav.every(function (n) { return typeof n === 'number' && n >= 0 && n < 128; })) sn.fav = p.snap.fav.slice();
+      if (isObj(p.snap.split) && typeof p.snap.split.at === 'number') sn.split = { at: clamp(Math.round(p.snap.split.at), 0, 127), zones: isArr(p.snap.split.zones) ? p.snap.split.zones.slice(0, 3) : [] };
+      if (Object.keys(sn).length) o.snap = sn;
+    }
     return o;
   }
   // migrate(name, blob) -> a valid blob of the current version (defaults when
@@ -1359,13 +1368,28 @@
     var tags = isArr(o.tags) ? o.tags : String(o.tags || '').split(',');
     tags = tags.map(function (t) { return String(t).trim().slice(0, 20); }).filter(function (t) { return t; }).slice(0, 8);
     var now = Date.now();
-    if (it) { it.name = name; it.tags = tags; it.prog = prog; it.parts = parts; it.updated = now; it.dev = profileKey(); }
-    else { it = { id: uid('p_'), name: name, star: false, tags: tags, dev: profileKey(), prog: prog, parts: parts, created: now, updated: now, used: 0 }; lib.items.push(it); }
+    var snap = it && it.snap ? it.snap : {};
+    if (typeof o.colour === 'string') snap.colour = o.colour.slice(0, 12);
+    if (o.incApp === true) snap.app = appState(); else if (o.incApp === false) delete snap.app;
+    if (isArr(o.fav) && o.fav.length === 4) snap.fav = o.fav.slice();
+    if (isObj(o.split)) snap.split = o.split; else if (o.split === null) delete snap.split;
+    if (!Object.keys(snap).length) snap = null;
+    if (it) { it.name = name; it.tags = tags; it.prog = prog; it.parts = parts; it.updated = now; it.dev = profileKey(); if (snap) it.snap = snap; else delete it.snap; }
+    else { it = { id: uid('p_'), name: name, star: false, tags: tags, dev: profileKey(), prog: prog, parts: parts, created: now, updated: now, used: 0 }; if (snap) it.snap = snap; lib.items.push(it); }
     persist('decklib');
     if (mounted) { renderTiles(); paintNow(); openRow = it.id; paintBytes(it.id); }
     if (!savedOnce && mounted) { savedOnce = true; tab('sounds'); revealTile(it.id); }
     toast((o.id ? 'Updated ' : 'Saved ') + name);
     return it;
+  }
+  // the app's own state a preset carries (the context bar's key / scale / mode; the LUMI layout follows)
+  function appState() {
+    var r = App.store.get('fb.root', 9), s = App.store.get('fb.scale', 'minorPent'), m = App.store.get('fb.mode', 0);
+    return { root: typeof r === 'number' ? ((r % 12) + 12) % 12 : 9, scale: typeof s === 'string' ? s : 'minorPent', mode: typeof m === 'number' ? m : 0 };
+  }
+  function applyApp(app) {
+    if (!app || typeof app.root !== 'number') return;
+    App.emit('fb:set', { source: 'synthdeck', root: app.root, scale: app.scale, mode: app.mode });
   }
   function openSaveForm(id) {
     var f = els['save-form'], it = id ? findPreset(id) : null;
@@ -1490,7 +1514,7 @@
     if (els.lstop) els.lstop.hidden = true;
     var it = findPreset(job.id);
     if (stopped) ldStatus('Load stopped at ' + job.i + '/' + job.plan.length);
-    else { if (it) { it.used = Date.now(); persist('decklib'); } lastLoaded = job.id; ldStatus('Loaded ' + job.name + ' → ' + (api.hubOutName() || 'output')); }
+    else { if (it) { it.used = Date.now(); persist('decklib'); if (it.snap && it.snap.app) applyApp(it.snap.app); } lastLoaded = job.id; ldStatus('Loaded ' + job.name + ' → ' + (api.hubOutName() || 'output')); }
     paintButtons(); paintPageKnobs(); paintNow(); if (mounted) renderTiles();
     job.resolve({ sent: job.sent, planned: job.plan.length, stopped: !!stopped });
   }
@@ -1689,6 +1713,8 @@
     knobs: function () { return api ? api.allKnobs() : []; },
     ccName: function (cc) { return api && api.ccName ? api.ccName(cc) : null; },
     tap: tapCtl, ctl: ctlInfo,
+    save: save, find: findPreset, appState: appState,
+    persist: function () { persist('decklib'); if (mounted) { renderTiles(); paintNow(); } },
     // the Performance's own names for Assign knobs 1-8 (Read name from synth fills them), or null
     assignNames: function () { var p = hubProg(), an = App.store.get('midihub.assignnames', null); var a = an && an[p.msb + '/' + p.lsb + '/' + p.pc]; return Array.isArray(a) ? a : null; },
     readName: readName

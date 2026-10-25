@@ -143,8 +143,23 @@
         '<div class="st-chips" id="st-chips"></div>' + (explainOn() ? '<p class="st-cap">' + esc(EXPLAIN.arpMaster) + ' ' + esc(EXPLAIN.msMaster) + ' ' + esc(EXPLAIN.asw1) + '</p>' : '') +
         '<div class="st-scenes" id="st-scenes" role="group" aria-label="Scenes"></div><div class="muted small st-scenelab">Scenes 1–8</div>' + cap('scenes') +
       '</div>' +
-      '<div class="st-edit" id="st-edit"' + (mode() === 'edit' ? '' : ' hidden') + '></div>';
-    ['perform', 'edit', 'nowname', 'nowsub', 'prev', 'next', 'save', 'pins', 'superval', 'chips', 'scenes'].forEach(function (id) { els[id] = q('#st-' + id); });
+      '<div class="st-edit" id="st-edit"' + (mode() === 'edit' ? '' : ' hidden') + '></div>' +
+      '<div class="st-sheet" id="st-sheet" hidden><div class="st-sheetcard" role="dialog" aria-modal="true" aria-labelledby="st-sheet-t">' +
+        '<div class="st-sheethead"><h2 id="st-sheet-t">Save preset</h2><button type="button" class="btn sm icon-btn" id="st-sheetclose" aria-label="Close">×</button></div>' +
+        '<form id="st-form" autocomplete="off">' +
+          '<input type="hidden" id="st-pid" value="">' +
+          '<label class="field">Name<input type="text" id="st-pname" maxlength="48" required placeholder="Warm EP"></label>' +
+          '<div class="st-formrow"><label class="field st-grow">Tags<input type="text" id="st-ptags" maxlength="80" placeholder="ep, soft"></label>' +
+            '<div class="field">Colour<div class="st-colours" id="st-colours" role="group" aria-label="Colour"></div></div></div>' +
+          '<div class="ctl-label">This preset remembers</div>' +
+          '<div class="st-incs" id="st-incs"></div>' +
+          '<div class="st-splitbox muted small" id="st-splitbox">Key split: set up in step 4 (which keys play which Part).</div>' +
+          '<div class="st-formacts"><button type="button" class="btn st-big" id="st-capture">Capture now</button><button type="submit" class="btn st-big primary" id="st-psave">Save</button></div>' +
+          '<p class="muted small" id="st-pnote"></p>' +
+        '</form>' +
+      '</div></div>';
+    ['perform', 'edit', 'nowname', 'nowsub', 'prev', 'next', 'save', 'pins', 'superval', 'chips', 'scenes', 'sheet', 'sheetclose', 'form', 'pid', 'pname', 'ptags', 'colours', 'incs', 'capture', 'psave', 'pnote'].forEach(function (id) { els[id] = q('#st-' + id); });
+    els.form.addEventListener('submit', function (e) { e.preventDefault(); submitSheet(); });
     if (borrowed) { els.edit.appendChild(borrowed); borrowed.hidden = mode() !== 'edit'; }
     paint();
   }
@@ -157,14 +172,68 @@
     els.nowsub.classList.toggle('bad', !!now.bad);
     // pinned + recent sounds as one-tap slots (Live sets come in step 5)
     var pins = p.presets().filter(function (it) { return it.star; }).sort(function (a, b) { return (b.used || 0) - (a.used || 0); }).slice(0, 8);
-    els.pins.innerHTML = pins.map(function (it) {
-      var pr = it.prog ? (it.prog.msb + '/' + it.prog.lsb + '/' + it.prog.pc) : '';
-      return '<button type="button" class="st-slot' + (now.match && now.match.id === it.id ? ' active' : '') + '" data-preset="' + esc(it.id) + '"><span class="st-slotname">' + esc(it.name) + '</span><span class="st-slotsub">' + esc(pr) + (it.tags && it.tags.length ? ' · ' + esc(it.tags.slice(0, 2).join(', ')) : '') + '</span></button>';
-    }).join('');
+    els.pins.innerHTML = pins.map(function (it) { return slotHTML(it, now.match && now.match.id === it.id); }).join('');
     els.pins.hidden = !pins.length;
     paintStrips();
     paintChips();
   }
+  // one preset as a slot: name, colour, and what it brings back (badges)
+  var COLOURS = { amber: '#ffab47', teal: '#2fb8a0', blue: '#4f8df5', pink: '#e06aa0', green: '#7dc45a', grey: '#8a8580' };
+  function slotHTML(it, active) {
+    var sn = it.snap || {}, badges = [];
+    if (it.prog) badges.push(it.prog.msb + '/' + it.prog.lsb + '/' + it.prog.pc);
+    var scene = sceneOf(it); if (scene) badges.push('Scene ' + scene);
+    if (sn.app && typeof sn.app.root === 'number') badges.push(NOTE[sn.app.root % 12] + ' ' + (sn.app.scale || ''));
+    if (sn.split) badges.push('split ' + noteName(sn.split.at));
+    var parts = Object.keys(it.parts || {}).length; if (parts) badges.push(parts === 1 ? 'knobs' : parts + ' Parts');
+    var col = COLOURS[sn.colour] || '';
+    return '<button type="button" class="st-slot' + (active ? ' active' : '') + '" data-preset="' + esc(it.id) + '" title="' + esc(it.name) + (it.tags && it.tags.length ? ' · ' + esc(it.tags.join(', ')) : '') + '"' + (col ? ' style="border-left:4px solid ' + col + '"' : '') + '>' +
+      '<span class="st-slotname">' + esc(it.name) + '</span><span class="st-slotsub">' + esc(badges.slice(0, 3).join(' · ')) + '</span></button>';
+  }
+  function sceneOf(it) {
+    var parts = it.parts || {};
+    for (var k in parts) { var c = parts[k].ctl || {}; if (typeof c.scene === 'number') return Math.floor(c.scene / 16) + 1; }
+    return 0;
+  }
+
+  // ---- the preset builder sheet ----
+  var sheet = { id: null, colour: 'amber', inc: { prog: true, knobs: true, btns: true, app: true } };
+  var INCS = [['prog', 'Sound', function (p) { var n = p.now(); return n.msb + ' / ' + n.lsb + ' / ' + n.pc + ' · ' + n.name; }],
+    ['knobs', 'Knobs', function () { return 'Super Knob, the strips, Assign 1-8 on this Part'; }],
+    ['btns', 'Buttons & Scene', function (p) { var s = p.ctl('scene1'); var on = []; ['arpMaster', 'msMaster', 'asw1', 'asw2', 'sus'].forEach(function (id) { var c = p.ctl(id); if (c && c.on) on.push(c.name); }); return (on.length ? on.join(', ') : 'all off') + sceneNow(p); }],
+    ['app', 'Key & scale', function () { var r = App.store.get('fb.root', 9), s = App.store.get('fb.scale', 'minorPent'); return NOTE[((typeof r === 'number' ? r : 9) % 12 + 12) % 12] + ' ' + s + ' · LUMI layout'; }]];
+  function sceneNow(p) { for (var i = 1; i <= 8; i++) { var c = p.ctl('scene' + i); if (c && c.on) return ' · Scene ' + i; } return ''; }
+  function openSheet(id) {
+    var p = P(); if (!p || !els.sheet) return;
+    var it = id ? p.find(id) : null, m = p.now().match;
+    sheet.id = it ? it.id : null; sheet.colour = it && it.snap && it.snap.colour ? it.snap.colour : 'amber';
+    sheet.inc = { prog: it ? !!it.prog : true, knobs: true, btns: true, app: it ? !!(it.snap && it.snap.app) : true };
+    els.pid.value = sheet.id || '';
+    els.pname.value = it ? it.name : (m ? m.name + ' 2' : p.now().name);
+    els.ptags.value = it ? it.tags.join(', ') : '';
+    els.psave.textContent = it ? 'Update' : 'Save';
+    paintSheet();
+    els.sheet.hidden = false;
+    try { els.pname.focus(); els.pname.select(); } catch (e) { /* no focus */ }
+  }
+  function closeSheet() { if (els.sheet) els.sheet.hidden = true; sheet.id = null; }
+  function paintSheet() {
+    var p = P(); if (!p) return;
+    els.colours.innerHTML = Object.keys(COLOURS).map(function (k) { return '<button type="button" class="st-swatch' + (k === sheet.colour ? ' active' : '') + '" data-colour="' + k + '" aria-label="' + k + '" aria-pressed="' + (k === sheet.colour) + '" style="background:' + COLOURS[k] + '"></button>'; }).join('');
+    els.incs.innerHTML = INCS.map(function (r) {
+      var on = !!sheet.inc[r[0]], sub = ''; try { sub = r[2](p); } catch (e) { sub = ''; }
+      return '<button type="button" class="st-inc' + (on ? ' active' : '') + '" data-inc="' + r[0] + '" aria-pressed="' + on + '"><span class="st-incname">' + (on ? '✓' : '○') + ' ' + r[1] + '</span><span class="st-incsub">' + esc(sub) + '</span></button>';
+    }).join('');
+    els.pnote.textContent = 'Capture re-reads the synth and the app. Save keeps it in your Sounds' + (sheet.id ? '.' : ' and pins it to the Deck.');
+  }
+  function submitSheet() {
+    var p = P(); if (!p) return;
+    var it = p.save({ id: sheet.id, name: els.pname.value, tags: els.ptags.value, scope: 'part', incProg: sheet.inc.prog, incKnobs: sheet.inc.knobs, incBtns: sheet.inc.btns, incApp: sheet.inc.app, colour: sheet.colour, fav: favs() });
+    if (!it) return;
+    if (!sheet.id && !it.star) { it.star = true; p.persist(); } // a new preset shows up on the Deck at once
+    closeSheet(); paint();
+  }
+
   function paintStrips() {
     var p = P(); if (!p) return;
     qa('.st-strip').forEach(function (s) {
@@ -246,9 +315,13 @@
     if (!p) return;
     if (t.closest('#st-prev')) { p.step(-1); paint(); return; }
     if (t.closest('#st-next')) { p.step(1); paint(); return; }
-    if (t.closest('#st-save')) { set('mode', 'edit'); render(); p.openSave(); return; }
+    if (t.closest('#st-save')) { openSheet(null); return; }
+    if (t.closest('#st-sheetclose') || (t.id === 'st-sheet')) { closeSheet(); return; }
+    if ((b = t.closest('[data-colour]'))) { sheet.colour = b.dataset.colour; paintSheet(); return; }
+    if ((b = t.closest('[data-inc]'))) { sheet.inc[b.dataset.inc] = !sheet.inc[b.dataset.inc]; paintSheet(); return; }
+    if (t.closest('#st-capture')) { paintSheet(); if (App.toast) App.toast('Captured what the synth and the app are on now'); return; }
     if (t.closest('#st-pickfav')) { pickFavs(); return; }
-    if ((b = t.closest('[data-preset]'))) { p.load(b.dataset.preset).then(paint); return; }
+    if ((b = t.closest('[data-preset]'))) { var it = p.find(b.dataset.preset); p.load(b.dataset.preset).then(function () { if (it && it.snap && Array.isArray(it.snap.fav) && it.snap.fav.length === 4) { set('fav', it.snap.fav); render(); } else paint(); }); return; }
     if ((b = t.closest('[data-chip]'))) {
       var id = b.dataset.chip;
       if (id === 'split') { App.toast ? App.toast('Key splits arrive with the preset builder') : 0; return; }
@@ -294,6 +367,15 @@
         '.st-chips{display:flex;gap:8px;flex-wrap:wrap}.st-chip{min-height:44px;padding:0 16px;font-size:14px;font-weight:600}.st-chip.unsure{opacity:.6}' +
         '.st-scenes{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:6px}.st-scene{min-height:44px;border-radius:10px;border:1px solid var(--line);background:var(--card-2,rgba(255,255,255,.04));color:var(--text);font:600 15px/1 var(--font-body)}' +
         '.st-scene.active{background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent-ink)}.st-scenelab{margin:-4px 0 0}' +
+        '.st-sheet{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center}.st-sheet[hidden]{display:none}#st-sheetclose{width:44px;height:44px;min-height:44px;padding:0;font-size:20px}' +
+        '.st-sheetcard{width:100%;max-width:560px;max-height:92vh;overflow:auto;background:var(--card);border:1px solid var(--line);border-radius:20px 20px 0 0;padding:14px 16px 20px;display:grid;gap:12px}' +
+        '@media (min-width:700px){.st-sheet{align-items:center}.st-sheetcard{border-radius:16px}}' +
+        '.st-sheethead{display:flex;align-items:center;justify-content:space-between}.st-sheethead h2{margin:0}' +
+        '#st-form{display:grid;gap:12px}.st-formrow{display:flex;gap:8px;align-items:flex-end}.st-grow{flex:1}#st-form input[type=text]{min-height:44px;font-size:16px;width:100%;box-sizing:border-box}' +
+        '.st-colours{display:flex;gap:6px;align-items:center;min-height:44px}.st-swatch{width:32px;height:32px;border-radius:50%;border:3px solid transparent;padding:0}.st-swatch.active{border-color:var(--text)}' +
+        '.st-incs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.st-inc{min-height:52px;padding:8px 10px;border-radius:10px;border:1px solid var(--line);background:transparent;color:var(--text);text-align:left;display:grid;gap:2px;font:inherit}' +
+        '.st-inc.active{border-color:var(--accent-line);background:var(--accent-soft);color:var(--accent-ink)}.st-incname{font-weight:600;font-size:14px}.st-incsub{font-size:11px;color:var(--muted);overflow-wrap:anywhere}' +
+        '.st-splitbox{padding:10px 12px;border-radius:10px;border:1px dashed var(--line)}.st-formacts{display:flex;gap:8px}' +
         '@media (min-width:900px){.st-four{grid-template-columns:repeat(4,minmax(0,1fr))}.st-pins{grid-template-columns:repeat(8,minmax(0,1fr))}}');
       face = document.createElement('div'); face.className = 'st-face'; el.appendChild(face);
       face.addEventListener('click', onClick);
@@ -324,6 +406,7 @@
       giveBack();
     },
     onBack: function () {
+      if (els.sheet && !els.sheet.hidden) { closeSheet(); return true; }
       if (mode() === 'edit') { set('mode', 'perform'); render(); return true; }
       return !!(App.synthDeck && App.synthDeck.onBack && App.synthDeck.onBack());
     }

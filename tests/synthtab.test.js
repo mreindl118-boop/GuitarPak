@@ -112,6 +112,34 @@ async function newPage(browser, seed, viewport) {
   ok(rows.stored && rows.stored.join(',') === 'Sweep,Grit,Air,,Wobble,,,Shimmer' && rows.labels === 'Assign knob 1 · Sweep|Assign knob 2 · Grit|Assign knob 3 · Air|Assign knob 4', 'the dump’s Assign-name block names the strips ("Assigned" = blank): ' + rows.labels);
   ok(rows.fav === 'Cutoff|Reverb|Attack|Assign knob 1 · Sweep', 'Favourites carries the name too: ' + rows.fav);
 
+  console.log('# the preset builder: a full snapshot, a data-rich slot, and back');
+  const pb = await page.evaluate(async () => {
+    const o = {};
+    App.emit('fb:set', { source: 't', root: 2, scale: 'dorian', mode: 0 }); await __wait(30);
+    __q('#panel-deck [data-chip="scene3"]').click(); await __wait(30);
+    __q('#st-save').click(); await __wait(50);
+    o.open = !__q('#st-sheet').hidden; o.defaultName = __q('#st-pname').value;
+    o.incs = __qa('#st-incs .st-inc').map(b => b.textContent.replace(/\s+/g, ' ').trim());
+    __q('#st-pname').value = 'Dorian pad'; __q('#st-ptags').value = 'pad, soft';
+    __q('#st-colours [data-colour="teal"]').click(); await __wait(20);
+    __clear(); __q('#st-psave').click(); await __wait(80);
+    o.sentOnSave = __nonClean(__bytes()).length; o.closed = __q('#st-sheet').hidden;
+    const it = App.synthDeck.presets().filter(x => x.name === 'Dorian pad')[0];
+    o.item = it && { star: it.star, colour: it.snap && it.snap.colour, app: it.snap && it.snap.app, fav: it.snap && it.snap.fav, scene: it.parts && it.parts['0'] && it.parts['0'].ctl && it.parts['0'].ctl.scene, prog: it.prog && it.prog.msb + '/' + it.prog.lsb + '/' + it.prog.pc };
+    const slot = __q('#st-pins [data-preset="' + (it && it.id) + '"]');
+    o.slot = slot && { text: slot.textContent.replace(/\s+/g, ' ').trim(), border: slot.style.borderLeft };
+    // the app moves on, then the slot brings everything back: synth bytes first, the key after the load
+    App.emit('fb:set', { source: 't', root: 7, scale: 'major', mode: 0 }); await __wait(30);
+    __clear(); slot.click(); await __wait(900);
+    o.loadBytes = __nonClean(__bytes()); o.rootAfter = App.store.get('fb.root'); o.scaleAfter = App.store.get('fb.scale');
+    o.lumi = __by.lumi.length;
+    return o;
+  });
+  ok(pb.open && /Sweep Pad|CFX \+ FM EP/.test(pb.defaultName) && pb.incs.length === 4 && /Scene 3/.test(pb.incs[2]) && /D dorian/.test(pb.incs[3]), 'Save preset opens the builder with the sound name and what it will remember: ' + pb.incs.join(' / '));
+  ok(pb.sentOnSave === 0 && pb.closed && pb.item && pb.item.star && pb.item.colour === 'teal' && pb.item.app && pb.item.app.root === 2 && pb.item.app.scale === 'dorian' && pb.item.scene === 32 && pb.item.fav && pb.item.fav.length === 4, 'Save sends nothing, pins the preset and keeps colour, key/scale, Scene and the favourite strips: ' + JSON.stringify(pb.item));
+  ok(pb.slot && /Dorian pad/.test(pb.slot.text) && /Scene 3/.test(pb.slot.text) && /D dorian/.test(pb.slot.text) && /47, 184, 160|2fb8a0/i.test(pb.slot.border), 'the slot shows its data (sound, Scene, key) and its colour: ' + pb.slot.text);
+  ok(pb.loadBytes.length >= 4 && /^176 0 /.test(pb.loadBytes[0]) && pb.loadBytes.some(b => /^192 /.test(b)) && pb.loadBytes.some(b => b === '176 92 32') && pb.rootAfter === 2 && pb.scaleAfter === 'dorian' && pb.lumi === 0, 'tapping the slot sends bank/program, waits, re-sends Scene 3, then restores D dorian in the app; nothing to the LUMI (' + pb.loadBytes.length + ' bytes)');
+
   console.log('# chips, Scenes, Prev / Next, Explain, Edit, Back');
   const ch = await page.evaluate(async () => {
     const o = {};
