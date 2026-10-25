@@ -9,12 +9,12 @@ Tick items here as they land (commit in brackets).
 ## 1. Synth tab (Deck / Live / Hub) — mine, docs/SYNTH-TAB-PLAN.md
 - [x] 1.1 Navigation: Synth group after Keys, Hub = the MIDI Hub, Keys keeps Piano/Synth/Pads/LUMI,
       six phone tabs slightly narrower (a31394f)
-- [ ] 1.2 Deck, Perform face: Now bar (sound, Part, Prev/Next, Save preset), Super Knob STRIP, four
+- [x] 1.2 Deck, Perform face (step 2): Now bar (sound, Part, Prev/Next, Save preset), Super Knob STRIP, four
       strips with a row picker (Favourites / Tone / Envelope / Effects / Assign 1-4 / 5-8), chips
       Arp / Motion seq / Split / Assign 1 / Assign 2 / Scenes 1-8, Perform <-> Edit, EXPLAIN mode
       (captions + Try this + long-press to Learn)
-- [ ] 1.3 Touch: 44 px targets, knob drag with readout, no page scroll while a knob is held, no
-      hover-only controls
+- [x] 1.3 Touch (step 2): 44 px targets, strips with readout, no page scroll while a strip is held, no
+      hover-only controls (tests/synthtab.test.js, 375 px)
 - [ ] 1.4 Presets: full snapshot (sound, knobs, buttons, Scene, key split, soundLAB key/scale, LUMI
       layout); builder sheet (name, tags, colour, include checkboxes, Capture now); restore order
       program -> settle -> values -> split -> app state

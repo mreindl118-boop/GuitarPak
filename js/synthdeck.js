@@ -58,7 +58,7 @@
   function hex(b) { return api ? api.hex(b) : b.map(function (x) { return ('0' + x.toString(16).toUpperCase()).slice(-2); }).join(' '); }
   function q(sel, root) { return (root || box2 || document).querySelector(sel); }
   function qa(sel, root) { return Array.prototype.slice.call((root || box2 || document).querySelectorAll(sel)); }
-  function active() { return !!(window.App && App.active === 'midihub'); }
+  function active() { return App.active === 'midihub' || App.active === 'deck' || App.active === 'liveset'; } // the Synth tab's pages host the deck too (js/synthtab.js)
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
 
   // ---- store: four blobs, validated / migrated on read, debounced writes ----
@@ -1281,11 +1281,25 @@
     // F0 43 0n 7F 1C bb bb mm aH aM aL dd… F7 (Yamaha bulk dump block)
     if (b[1] !== 0x43 || (b[2] & 0xF0) !== 0x00 || b[3] !== 0x7F || b[4] !== 0x1C) return;
     var sx = api.profile().sysex, ml = sx ? sx.model.length : 1, al = sx ? (sx.addrLen || 3) : 3, a0 = 7 + ml;
-    if (b.length < a0 + al + 1 || hex(b.slice(a0, a0 + al)) !== readJob.addr) return;
+    if (b.length < a0 + al + 1) return;
+    var addr = hex(b.slice(a0, a0 + al));
+    if (addr === hex([0x30, 0x50, 0x00]) && b.length >= a0 + al + 128) { // the eight Assign knob display names (checked on a MODX8+ dump 2026-10-24: "Assigned" when blank)
+      var arr = [];
+      for (var j = 0; j < 8; j++) { var s2 = ''; for (var k2 = 0; k2 < 16; k2++) { var c2 = b[a0 + al + j * 16 + k2]; s2 += (c2 >= 32 && c2 < 127) ? String.fromCharCode(c2) : ' '; } s2 = s2.replace(/\s+$/, '').replace(/^\s+/, ''); arr.push(/^assigned$/i.test(s2) ? '' : s2.slice(0, 16)); }
+      var an = App.store.get('midihub.assignnames', null) || {};
+      an[readJob.msb + '/' + readJob.lsb + '/' + readJob.pc] = arr; App.store.set('midihub.assignnames', an);
+      readJob.assigned = true; App.emit('deck:assignnames', { names: arr });
+      if (readJob.named) readOff();
+      return;
+    }
+    if (addr !== readJob.addr || readJob.named) return;
     var start = typeof readJob.off === 'number' ? readJob.off : a0 + al, s = '';
     for (var i = start; i < Math.min(b.length - 1, start + readJob.len); i++) { var c = b[i]; s += (c >= 32 && c < 127) ? String.fromCharCode(c) : ' '; }
     s = s.replace(/\s+$/, '').replace(/^\s+/, '');
-    var job = readJob; readOff();
+    var job = readJob;
+    // the Assign names block follows the name block in the dump: keep listening a moment for it
+    job.named = true; clearTimeout(job.t); job.t = setTimeout(function () { if (readJob === job) readJob = null; }, 1500);
+    if (job.assigned) readOff();
     if (!s) return toast('The synth answered, but with an empty name');
     var key = job.msb + '/' + job.lsb; names[key] = names[key] || {}; names[key][String(job.pc - 1)] = s.slice(0, 48);
     persist('names'); paintNow(); renderBankGrid(); renderTiles();
@@ -1647,8 +1661,42 @@
   }
 
   // ============================================================ PUBLIC ====
+  // ---- PERFORM: what the Synth tab's play face (js/synthtab.js) needs ----
+  // Everything still goes through sendCtl / the Hub's turn(), so the LUMI
+  // guard, Rules-on-app-controls, the ledger and the switch states hold.
+  function tapCtl(id) {
+    var ctl = ctlById(id); if (!ctl) return false;
+    if (unsure(ctl)) { toast('No number yet — set it in Map or tap Learn'); return false; }
+    if (ctl.ui === 'toggle') { var next = getState(ctl) === 1 ? 0 : 1; if (!sendCtl(ctl, next ? 'on' : 'off')) return false; setState(ctl, next); paintButtons(); return true; }
+    if (ctl.ui === 'radio') { if (!sendCtl(ctl, 'val')) return false; setState(ctl, typeof ctl.val === 'number' ? ctl.val : 0); paintButtons(); return true; }
+    if (ctl.ui === 'trigger') return sendCtl(ctl, 'val');
+    return false;
+  }
+  function ctlInfo(id) {
+    var ctl = ctlById(id); if (!ctl) return null;
+    var st = getState(ctl), on = ctl.ui === 'radio' ? (st != null && st === (typeof ctl.val === 'number' ? ctl.val : 0)) : st === 1;
+    return { id: ctl.id, name: ctl.name, ui: ctl.ui, on: on, unsure: unsure(ctl), conf: ctl.conf, num: ctl.num };
+  }
+  var PERFORM = {
+    ready: function () { return !!(api && deck && lib); }, // the Hub mounts the deck after the Synth tab's pages init
+    now: function () { var t = nowText(), p = hubProg(); return { name: t.name, sub: t.sub, bad: t.bad, msb: p.msb, lsb: p.lsb, pc: p.pc, part: api.ch(), out: api.hubOutName ? (api.hubOutName() || '') : '', match: matchPreset() }; },
+    step: stepProgram,
+    presets: function () { return lib ? lib.items.slice() : []; },
+    load: load,
+    openSave: function () { tab('sounds'); openSaveForm(null); },
+    kv: function (cc) { return api ? api.kv(cc) : 0; },
+    turn: function (cc, v) { if (!api || !txCheck([0xB0])) return false; api.turn(cc, v); return true; },
+    knobs: function () { return api ? api.allKnobs() : []; },
+    ccName: function (cc) { return api && api.ccName ? api.ccName(cc) : null; },
+    tap: tapCtl, ctl: ctlInfo,
+    // the Performance's own names for Assign knobs 1-8 (Read name from synth fills them), or null
+    assignNames: function () { var p = hubProg(), an = App.store.get('midihub.assignnames', null); var a = an && an[p.msb + '/' + p.lsb + '/' + p.pc]; return Array.isArray(a) ? a : null; },
+    readName: readName
+  };
+
   var DECK = {
     version: VERSION,
+    perform: PERFORM,
     init: init, stop: stop, onPart: onPart, onBack: onBack,
     hubKnobs: hubKnobs, map: function (pk) { return deck ? map(pk) : null; }, setControl: setControl, resetMap: resetMap, learn: learn,
     presets: function () { return lib ? lib.items.slice() : []; }, save: save, load: load, recallPlan: recallPlan, cancelLoad: function () { return cancelLoad(); },
