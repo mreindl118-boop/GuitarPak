@@ -25,6 +25,12 @@ Matt's words and ours:
   defaults Cutoff, Reverb, Attack, Assign knob 1) · Tone · Envelope · Effects · Assign 1-4 ·
   Assign 5-8. Naming: "Assign knob n" = the Assignable Knobs (CC 17-24); "Assign 1 / 2" = the two
   Assignable SWITCHES by the Super Knob (CC 86 / 87) and they are chips, not strips.
+- **Assign knobs are named by what they control** (Matt): the Performance bulk dump (block
+  `30 50 00`, 8 x 16 ASCII fields, "Assigned" when blank on the factory sound captured
+  2026-10-24) carries the per-Performance Assign knob display names; the Deck reads them from the
+  dump it already requests (Read name from synth) and labels the strips "Assign knob n · <name>",
+  falling back to "Assign knob n"; a user name typed in the Map wins. Verify the block offset on
+  the MODX before shipping (a knob renamed on the synth must move the label).
 - Chips for what matters live: Arp, Motion seq, Split, Assign 1, Assign 2, Sustain; the Scenes as a
   1-8 strip.
 - **Didactic** (Matt: "it should help me learn what things can be done with the MODX as I use it"):
