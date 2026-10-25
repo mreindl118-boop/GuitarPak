@@ -56,6 +56,52 @@
   }
   function slotColour(sl) { var p = P(), it = sl && sl.preset && p ? p.find(sl.preset) : null; return it && it.snap && it.snap.colour ? it.snap.colour : ''; }
 
+  // ---- PROFILES: a named bundle of sounds (the deck library + names), Live sets and Deck settings ----
+  // synthtab.profiles [{id, name, updated, data}], synthtab.profile = the active id. Switching
+  // saves the active profile first, then replaces the deck's library and the Live/Deck stores.
+  var PROFILE_KEYS = ['live', 'fav', 'fsCC', 'octStep', 'explain', 'row'];
+  function profiles() { var l = g('profiles', null); return Array.isArray(l) ? l.filter(function (x) { return x && typeof x.id === 'string'; }) : []; }
+  function profileId() { return g('profile', null); }
+  function activeProfile() { var id = profileId(); return profiles().filter(function (x) { return x.id === id; })[0] || null; }
+  function snapshotProfile(into) {
+    var p = P(), d = {};
+    PROFILE_KEYS.forEach(function (k) { d[k] = g(k, null); });
+    d.deck = p && p.exportJSON ? p.exportJSON() : null;
+    into.data = d; into.updated = Date.now();
+    return into;
+  }
+  function applyProfile(pr) {
+    var d = pr.data || {}, p = P();
+    PROFILE_KEYS.forEach(function (k) { set(k, d[k] == null ? null : d[k]); });
+    if (p && p.replaceSounds) p.replaceSounds(d.deck || { lib: { items: [] } });
+    set('profile', pr.id);
+    editing = false; closePicker(); render();
+    App.emit('synthtab:profile', { id: pr.id });
+  }
+  function saveActiveProfile() { var list = profiles(), a = activeProfile(); if (!a) return list; snapshotProfile(a); set('profiles', list.map(function (x) { return x.id === a.id ? a : x; })); return profiles(); }
+  function switchProfile(id) { var list = saveActiveProfile(), to = list.filter(function (x) { return x.id === id; })[0]; if (!to) return false; applyProfile(to); return true; }
+  function newProfile(name, duplicate) {
+    var list = saveActiveProfile(), pr = { id: 'pf' + Date.now().toString(36) + Math.floor(Math.random() * 1e4), name: String(name || 'Profile').slice(0, 40), updated: Date.now(), data: {} };
+    if (duplicate) snapshotProfile(pr); else { pr.data = { deck: { lib: { items: [] } }, live: null, fav: null, fsCC: null, octStep: false, explain: g('explain', false), row: 'fav' }; }
+    if (!list.length && !activeProfile()) { var cur = { id: 'pf' + (Date.now() - 1).toString(36), name: 'My setup', updated: Date.now(), data: {} }; snapshotProfile(cur); list.push(cur); } // the setup you had becomes the first profile
+    list.push(pr); set('profiles', list); applyProfile(pr); return pr;
+  }
+  function renameProfile(name) { var a = activeProfile(); if (!a) return; a.name = String(name || a.name).slice(0, 40); set('profiles', profiles().map(function (x) { return x.id === a.id ? a : x; })); render(); }
+  function deleteProfile() { var a = activeProfile(); if (!a) return; var list = profiles().filter(function (x) { return x.id !== a.id; }); set('profiles', list); if (list.length) applyProfile(list[0]); else { set('profile', null); render(); } }
+  function exportProfile() {
+    var a = activeProfile(); if (!a) { toast('No profile yet — make one first'); return null; }
+    snapshotProfile(a); set('profiles', profiles().map(function (x) { return x.id === a.id ? a : x; }));
+    var obj = { soundlab: 'synthtab-profile', v: 1, profile: a }, txt = JSON.stringify(obj, null, 1);
+    if (!window.SL_ARTIFACT) { try { var el = document.createElement('a'); el.href = URL.createObjectURL(new Blob([txt], { type: 'application/json' })); el.download = 'soundlab-profile-' + a.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase() + '.json'; document.body.appendChild(el); el.click(); document.body.removeChild(el); } catch (e) { toast('Downloads are blocked here'); } }
+    return obj;
+  }
+  function importProfile(obj) {
+    if (!obj || obj.soundlab !== 'synthtab-profile' || !obj.profile || typeof obj.profile.id !== 'string') { toast('Not a soundLAB profile file'); return false; }
+    var list = saveActiveProfile(), pr = { id: obj.profile.id, name: String(obj.profile.name || 'Imported').slice(0, 40), updated: Date.now(), data: obj.profile.data || {} };
+    if (list.some(function (x) { return x.id === pr.id; })) pr.id = pr.id + '-' + Date.now().toString(36);
+    list.push(pr); set('profiles', list); applyProfile(pr); toast('Profile ' + pr.name + ' loaded'); return true;
+  }
+
   // ---- loading a slot ----
   var COLOURS = { amber: '#ffab47', teal: '#2fb8a0', blue: '#4f8df5', pink: '#e06aa0', green: '#7dc45a', grey: '#8a8580' };
   function go(d, idx) {
@@ -84,7 +130,8 @@
     var d = data(), s = active(d), page = pageOf(d);
     root.classList.toggle('st-islive', live);
     if (!s) {
-      root.innerHTML = '<div class="card st-lvempty"><h2>Live sets</h2><p class="muted">Pages of 16 presets, like the synth’s own Live Sets. Save presets on the Deck, then put them on slots here; step through them with a foot switch on stage.</p><button type="button" class="btn primary st-big" id="st-lvnew">New set</button></div>';
+      root.innerHTML = '<div class="st-lvprof muted small"><span>Profile</span><select id="st-lvprofile" aria-label="Profile">' + (profiles().length ? profiles().map(function (x) { return '<option value="' + esc(x.id) + '"' + (x.id === profileId() ? ' selected' : '') + '>' + esc(x.name) + '</option>'; }).join('') : '<option value="">(no profile — your current setup)</option>') + '</select><button type="button" class="btn sm" id="st-lvpnew">+ New</button><button type="button" class="btn sm" id="st-lvpdup">Duplicate</button>' + (profiles().length ? '<button type="button" class="btn sm" id="st-lvprename">Rename</button><button type="button" class="btn sm" id="st-lvpdel">Delete</button>' : '') + '<button type="button" class="btn sm" id="st-lvpexport">Export</button><label class="btn sm">Import<input type="file" id="st-lvpimport" accept=".json,application/json" hidden></label></div>' +
+        '<div class="card st-lvempty"><h2>Live sets</h2><p class="muted">Pages of 16 presets, like the synth’s own Live Sets. Save presets on the Deck, then put them on slots here; step through them with a foot switch on stage.</p><button type="button" class="btn primary st-big" id="st-lvnew">New set</button></div>';
       return;
     }
     var fs = g('fsCC', null);
@@ -97,6 +144,9 @@
         '<button type="button" class="btn sm' + (editing ? ' active' : '') + '" id="st-lvedit" aria-pressed="' + editing + '">' + (editing ? 'Done' : 'Edit slots') + '</button>' +
         '<button type="button" class="btn primary" id="st-lvgo">Go live</button>' +
       '</div>' +
+      '<div class="st-lvprof muted small"><span>Profile</span><select id="st-lvprofile" aria-label="Profile">' + (profiles().length ? profiles().map(function (x) { return '<option value="' + esc(x.id) + '"' + (x.id === profileId() ? ' selected' : '') + '>' + esc(x.name) + '</option>'; }).join('') : '<option value="">(no profile — your current setup)</option>') + '</select>' +
+        '<button type="button" class="btn sm" id="st-lvpnew" title="An empty profile">+ New</button><button type="button" class="btn sm" id="st-lvpdup" title="A copy of this setup">Duplicate</button>' + (profiles().length ? '<button type="button" class="btn sm" id="st-lvprename">Rename</button><button type="button" class="btn sm" id="st-lvpdel">Delete</button>' : '') +
+        '<button type="button" class="btn sm" id="st-lvpexport">Export</button><label class="btn sm">Import<input type="file" id="st-lvpimport" accept=".json,application/json" hidden></label></div>' +
       '<div class="st-lvopts muted small">' +
         '<span>Foot switch: ' + (fs == null ? 'none' : 'CC ' + fs) + '</span><button type="button" class="btn sm' + (learnFs ? ' active' : '') + '" id="st-lvfs">' + (learnFs ? 'Listening… press the switch' : 'Learn') + '</button>' + (fs == null ? '' : '<button type="button" class="btn sm" id="st-lvfsclr">Clear</button>') +
         '<label class="mh-chk"><input type="checkbox" id="st-lvoct"' + (g('octStep', false) ? ' checked' : '') + '> LUMI octave buttons step the set</label>' +
@@ -145,6 +195,11 @@
 
   function onClick(e) {
     var t = e.target, b, d = data();
+    if (t.closest('#st-lvpnew')) { var pn = window.prompt('Name the new profile', 'Profile ' + (profiles().length + 1)); if (pn == null) return; newProfile(pn, false); toast('Profile ' + pn + ' — empty, yours to fill'); return; }
+    if (t.closest('#st-lvpdup')) { var pd = window.prompt('Name the copy', (activeProfile() ? activeProfile().name : 'My setup') + ' copy'); if (pd == null) return; newProfile(pd, true); return; }
+    if (t.closest('#st-lvprename')) { var pr = activeProfile(); if (!pr) return; var pnn = window.prompt('Rename the profile', pr.name); if (pnn == null) return; renameProfile(pnn); return; }
+    if (t.closest('#st-lvpdel')) { var pa = activeProfile(); if (!pa) return; if (!window.confirm('Delete the profile "' + pa.name + '" with its sounds and sets?')) return; deleteProfile(); return; }
+    if (t.closest('#st-lvpexport')) { exportProfile(); return; }
     if (t.closest('#st-lvnew')) { var n = window.prompt('Name the set', d.sets.length ? 'Set ' + (d.sets.length + 1) : 'My set'); if (n == null) return; var s0 = { id: uid(), name: n.trim() || 'Set', pages: [emptyPage()] }; d.sets.push(s0); d.active = s0.id; d.page = 0; d.slot = null; save(d); render(); return; }
     var s = active(d); if (!s) return;
     if (t.closest('#st-lvrename')) { var nn = window.prompt('Rename the set', s.name); if (nn == null) return; s.name = nn.trim().slice(0, 40) || s.name; save(d); render(); return; }
@@ -201,6 +256,7 @@
       App.injectCSS('synthlive',
         '.st-lvtop{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:8px}.st-lvsel{flex:1;min-width:140px}.st-lvsel select{min-height:44px;width:100%}.st-lvgap{flex:1}.st-lvtop .btn{min-height:44px}' +
         '.st-lvopts{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}.st-lvopts .btn{min-height:40px}' +
+        '.st-lvprof{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px}.st-lvprof select{min-height:40px;max-width:200px}.st-lvprof .btn{min-height:40px}' +
         '.st-lvpager{display:flex;gap:8px;align-items:center;margin:4px 0 8px}.st-lvpager .btn{min-width:44px;min-height:44px}' +
         '.st-lvgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}' +
         '.st-lvslot{min-height:64px;padding:8px;border-radius:12px;border:1px solid var(--line);background:var(--card-2,rgba(255,255,255,.04));color:var(--text);text-align:left;display:grid;gap:2px;align-content:start;font:inherit;touch-action:manipulation}' +
@@ -222,6 +278,8 @@
       el.addEventListener('pointercancel', onUp);
       el.addEventListener('change', function (e) {
         if (e.target.id === 'st-lvset') { var d = data(); d.active = e.target.value; d.page = 0; d.slot = null; save(d); render(); }
+        else if (e.target.id === 'st-lvprofile') { if (e.target.value) switchProfile(e.target.value); }
+        else if (e.target.id === 'st-lvpimport') { var f = e.target.files && e.target.files[0]; if (!f) return; var rd = new FileReader(); rd.onload = function () { try { importProfile(JSON.parse(rd.result)); } catch (x) { toast('Not a soundLAB profile file'); } }; rd.readAsText(f); e.target.value = ''; }
         else if (e.target.id === 'st-lvoct') set('octStep', !!e.target.checked);
       });
       // a foot switch: learn its CC once, then every press steps the set
@@ -247,6 +305,7 @@
   window.SLSynthLive = { // for the Deck's grid and the tests
     data: data, active: function () { return active(); }, page: function () { var d = data(); return pageOf(d); }, pageIndex: function () { return data().page; }, slot: function () { return data().slot; },
     go: function (i) { return go(data(), i); }, step: step, setLive: setLive, get live() { return live; }, get locked() { return locked; }, lock: function (on) { locked = !!on; render(); },
-    slotName: slotName, slotBadges: slotBadges, render: render
+    slotName: slotName, slotBadges: slotBadges, render: render,
+    profiles: profiles, profile: activeProfile, newProfile: newProfile, switchProfile: switchProfile, exportProfile: exportProfile, importProfile: importProfile
   };
 })();

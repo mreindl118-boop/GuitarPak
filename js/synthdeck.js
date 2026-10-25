@@ -1719,6 +1719,9 @@
     tap: tapCtl, ctl: ctlInfo,
     save: save, find: findPreset, appState: appState,
     // Live: all notes off + sustain off on every channel, through the deck's funnel
+    // profiles (js/synthlive.js): the whole library + names as JSON, and a replace that swaps them
+    exportJSON: exportJSON,
+    replaceSounds: function (obj) { lib.items.length = 0; for (var k in names) if (k !== 'v') delete names[k]; var r = importJSON(obj || {}); persist('decklib'); persist('names'); if (mounted) { renderTiles(); paintNow(); } return r; },
     panic: function () { if (!txCheck([0xB0])) return false; var n = 0; for (var c = 0; c < 16; c++) { if (tx([0xB0 | c, 123, 0], 'raw')) n++; tx([0xB0 | c, 120, 0], 'raw'); tx([0xB0 | c, 64, 0], 'raw'); } return n > 0; },
     // a bank/program (e.g. a MODX Live Set slot: MSB 62, LSB page, PC slot) on the current Part
     program: function (msb, lsb, pc) { if (!txCheck([0xC0])) return false; api.sendProgram(pc, msb, lsb); paintNow(); return true; },

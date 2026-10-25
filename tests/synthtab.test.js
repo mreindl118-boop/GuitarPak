@@ -239,6 +239,29 @@ async function newPage(browser, seed, viewport) {
   ok(lv.panic.n >= 48 && lv.panic.allOff === 16 && lv.panic.sus === 16, 'Panic = all notes off + sustain off on all 16 channels: ' + JSON.stringify(lv.panic));
   ok(!lv.exit.html && lv.exit.topbar !== 'none' && lv.deck.slots === 16 && /Sunday service/.test(lv.deck.head) && lv.deck.lumi === 0, 'Exit brings the bars back; the Deck shows the set’s page; the LUMI never got a byte');
 
+  console.log('# profiles: whole setups, switched without a send');
+  const pf = await page.evaluate(async () => {
+    const o = {};
+    App.switchTo('liveset'); await __wait(200);
+    const n0 = App.synthDeck.presets().length; o.n0 = n0;
+    window.prompt = () => 'Church'; __clear();
+    __q('#st-lvpnew').click(); await __wait(80);
+    o.afterNew = { profiles: SLSynthLive.profiles().map(x => x.name), active: SLSynthLive.profile() && SLSynthLive.profile().name, presets: App.synthDeck.presets().length, sets: SLSynthLive.data().sets.length, sent: __nonClean(__bytes()).length };
+    const first = SLSynthLive.profiles()[0];
+    __q('#st-lvprofile').value = first.id; __q('#st-lvprofile').dispatchEvent(new Event('change', { bubbles: true })); await __wait(80);
+    o.back = { active: SLSynthLive.profile() && SLSynthLive.profile().name, presets: App.synthDeck.presets().length, sets: SLSynthLive.data().sets.length, set: SLSynthLive.active() && SLSynthLive.active().name };
+    const exp = SLSynthLive.exportProfile(); o.exported = exp && exp.soundlab === 'synthtab-profile' && exp.profile.data.deck.lib.items.length === n0;
+    exp.profile.id = 'pf-imported'; exp.profile.name = 'From file';
+    o.imported = SLSynthLive.importProfile(JSON.parse(JSON.stringify(exp)));
+    o.afterImport = { active: SLSynthLive.profile() && SLSynthLive.profile().name, presets: App.synthDeck.presets().length, sets: SLSynthLive.data().sets.length };
+    __q('#st-lvprofile').value = first.id; __q('#st-lvprofile').dispatchEvent(new Event('change', { bubbles: true })); await __wait(80);
+    App.switchTo('deck'); await __wait(200);
+    return o;
+  });
+  ok(pf.afterNew.profiles.join('|') === 'My setup|Church' && pf.afterNew.active === 'Church' && pf.afterNew.presets === 0 && pf.afterNew.sets === 0 && pf.afterNew.sent === 0, 'New makes an empty profile (the setup you had becomes "My setup"); switching sends nothing: ' + JSON.stringify(pf.afterNew));
+  ok(pf.back.active === 'My setup' && pf.back.presets === pf.n0 && pf.back.sets === 1 && pf.back.set === 'Sunday service', 'switching back restores the sounds and the Live set: ' + JSON.stringify(pf.back));
+  ok(pf.exported && pf.imported && pf.afterImport.active === 'From file' && pf.afterImport.presets === pf.n0 && pf.afterImport.sets === 1, 'Export is the whole profile; Import brings it back as a new profile: ' + JSON.stringify(pf.afterImport));
+
   console.log('# chips, Scenes, Prev / Next, Explain, Edit, Back');
   const ch = await page.evaluate(async () => {
     const o = {};
@@ -265,6 +288,22 @@ async function newPage(browser, seed, viewport) {
   ok(ch.perform.mode === 'perform' && ch.perform.controlHidden, 'Perform brings the face back');
   ok(ch.leave.active === 'midihub' && ch.leave.controlBackInHub && !ch.leave.borrowed && ch.leave.lumi === 0, 'leaving gives the Control view back to the Hub; the LUMI never got a byte');
   ok(errs.length === 0, 'no page errors' + (errs.length ? ': ' + errs.join(' | ') : ''));
+  await ctx.close();
+
+  console.log('# iPad: 768 x 1024, touch');
+  ({ ctx, page, errs } = await newPage(browser, {}, { width: 768, height: 1024 }));
+  const ip = await page.evaluate(async () => {
+    App.switchTo('deck'); await __wait(400); window.scrollTo(0, 0);
+    const vis = __qa('#panel-deck button, #panel-deck .st-strip').filter(b => b.offsetParent);
+    const small = vis.filter(b => b.getBoundingClientRect().height < 40).map(b => (b.textContent || b.className).trim().slice(0, 14) + ':' + Math.round(b.getBoundingClientRect().height));
+    const four = getComputedStyle(__q('#panel-deck .st-four')).gridTemplateColumns.split(' ').length;
+    App.store.set('synthtab.live', { sets: [{ id: 'ls-ipad', name: 'iPad set', pages: [[null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null]] }], active: 'ls-ipad', page: 0, slot: null });
+    App.switchTo('liveset'); await __wait(300);
+    const cols = getComputedStyle(__q('#st-lvgrid')).gridTemplateColumns.split(' ').length;
+    return { scrollW: document.documentElement.scrollWidth, w: innerWidth, small, four, cols, tabs: __qa('#tabbar-m .tabbar-btn').length };
+  });
+  ok(ip.scrollW <= ip.w && ip.small.length === 0 && ip.four >= 2 && ip.cols === 4, 'iPad: no horizontal scroll, targets >= 40 px, four slot columns: ' + JSON.stringify(ip));
+  ok(errs.length === 0, 'no page errors on the iPad' + (errs.length ? ': ' + errs.join(' | ') : ''));
   await ctx.close();
 
   console.log('# phone: 375 wide, touch');

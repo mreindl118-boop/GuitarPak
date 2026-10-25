@@ -23,11 +23,10 @@ Tick items here as they land (commit in brackets).
 - [x] 1.6 (step 5) Live: named sets, pages of 16 (4 x 4), slot editor (preset / MODX Live Set slot / empty),
       prev/next page, step by foot-switch CC or (option) LUMI octave buttons, Go live page; MODX Live
       Set slot recall (MSB 62)
-- [ ] 1.7 Profiles: named bundles of settings + presets + sets, switcher on Live, export/import
-- [ ] 1.8 iPad: 768 x 1024 touch layout in Playwright; device test in Web MIDI Browser; native
-      wrapper later (needs a Mac)
-- [ ] 1.9 Help tours (Deck, Live), docs (SYNTH-DECK.md or SYNTH-TAB.md, CLAUDE.md),
-      tests/synthtab.test.js; synthdeck / synthdeck-scope / midihub* / nav / smoke green
+- [x] 1.7 (step 6) Profiles: named bundles of settings + presets + sets, switcher on Live, export/import
+- [x] 1.8 (step 6) iPad: 768 x 1024 touch layout in Playwright; [ ] device test in Web MIDI Browser
+      (Matt); native wrapper later (needs a Mac)
+- [x] 1.9 (step 6) Help tours (Deck, Live), docs/SYNTH-TAB.md, CLAUDE.md, tests/synthtab.test.js (48); synthdeck / synthdeck-scope / midihub* / nav / smoke green
 
 ## 2. UI phase A — navigation and copy — UI session
 - [ ] 2.1 One vocabulary: Practice tab -> Train; "LUMI practice" -> LUMI; Learn home reads Learn;

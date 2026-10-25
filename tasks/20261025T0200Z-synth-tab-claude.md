@@ -19,4 +19,13 @@
   `check/lumi-claude` (5cdc826); null's `codex/soundlab-1.1-workflow-20261023` touches
   score/OMR files only; Helix session's `release/1.2.0` is merged. No other claim on
   `js/synthdeck.js` / `js/midihub.js` known.
-- Status: plan written, no code yet.
+- Status 2026-10-25: steps 1-6 built on `feat/synth-tab` (a31394f step 1, 89e8ff1 step 2, 15aad10
+  step 3, fa9e08f step 4, 67a45d1 step 5, step 6 = this commit): the Synth group, the Deck's
+  perform face (strips, row picker, Assign names from the dump, chips, Scenes, Explain, Perform/Edit),
+  the preset builder + full snapshot, key splits in the Hub (port match, LUMI thru guard, view
+  renames), Live sets (pages of 16, MODX Live Set slots, stepping, foot switch, octave buttons, Go
+  live, Lock, Panic), profiles (export/import), docs/SYNTH-TAB.md, help tours, tests/synthtab.test.js
+  (48). Left for the release: rebase on main (3890488), the UI session's phases A/B + C2 "One Open",
+  the device test on the iPad (Matt), stamps on Matt's go.
+- Design decisions on the way (Matt, 2026-10-25): strips not knobs; the knob-row picker; Assign
+  knobs named by what they control; Explain mode (didactic); data-rich slots; zones later.
