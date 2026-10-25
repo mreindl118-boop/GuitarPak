@@ -48,9 +48,9 @@ keys, record `tasks/20261025T0100Z-lumi-check-claude.md`, suite `tests/lumi-firm
 
 - A Note On to the LUMI lights that key in a velocity colour and the light HOLDS until a Note Off
   (`80 nn 00` clears it). The colour is a hue sweep: pink/red at 1, orange, yellow, green, cyan,
-  blue, violet at 127. **127 is not white** on this firmware. The sweep is rotated about one colour
-  step from the archived `colourLookup` (the table's orange came out pink on the keys); the
-  calibration from the 24-key sweep photo is noted in the record.
+  blue, violet at 127. **127 is not white** on this firmware (it is violet, the end of the sweep). A 12-step ladder
+  photo matched the archived `colourLookup` within about one step; a precise per-velocity
+  calibration (24-key sweep in daylight) is still open - see the task record.
 - Every SysEx config frame (colour mode, brightness) is accepted - but it WIPES the keys the app has
   lit. `js/midi.js` therefore sends mode/brightness only when they changed and re-lights every key
   afterwards (`lumiLayout` returns true = "the keys need their colours again").

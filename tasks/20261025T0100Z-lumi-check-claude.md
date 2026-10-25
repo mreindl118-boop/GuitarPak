@@ -44,8 +44,15 @@
 
 ## Colour table
 
-Pending the straight-on photo of the 24-key sweep (60:1 ... 83:127); until then the app keeps
-the archived table and the docs say the sweep is rotated.
+From the 12-step ladder photo (C5..B5 = velocities 1, 12, 23, 35, 46, 58, 69, 81, 92, 104, 115,
+127): pink, orange-red, orange, yellow-orange, gold, green, teal, cyan, light blue, blue, blue,
+VIOLET. That matches the archived colourLookup within about one step everywhere except the top:
+127 is violet on this firmware, not white. The degree-coloured walk looked one key off in a
+photo taken right after a white walk (hold-over of the previous frame is the likely cause; not
+reproduced in the ladder). Decision (Matt, going to bed: "guesswork for now"): the table stays;
+nothing in the app relies on 127 being white on a LUMI (guides and reveals use palette hues);
+`App.midi.test()`'s 127 shows as violet. A proper per-velocity calibration needs a daylight,
+straight-on photo of the 24-key sweep (60:1 ... 83:127) and is left open.
 
 ## Tests
 
