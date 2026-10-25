@@ -169,7 +169,7 @@ async function newPage(browser, seed) {
     const mute = __q('.sdk-btn[data-ctl="mute"]');
     __clear(); mute.click(); await __wait(10); o.muteOn = __bytes(); o.mutePressed = mute.getAttribute('aria-pressed');
     __clear(); mute.click(); await __wait(10); o.muteOff = __bytes();
-    // unverified
+    // verified on the MODX8+ 2026-10-24 (was the unverified example)
     const arp = __q('.sdk-btn[data-ctl="arpPart"]');
     __clear(); arp.click(); await __wait(10); o.arp = __bytes(); o.arpToast = __toast(); o.arpPressed = arp.getAttribute('aria-pressed');
     // unmapped
@@ -194,7 +194,7 @@ async function newPage(browser, seed) {
   ok(bt.scenes === 8 && bt.sceneUi === 'radio' && bt.scene3.join('|') === '176 92 32' && bt.checked === 'false,false,true,false,false,false,false,false', 'Scene 3 = CC 92 value 32 on the global channel 1, aria-checked follows: ' + bt.scene3.join('|'));
   ok(bt.scene3again.join('|') === '176 92 32', 'tapping the current scene re-sends it');
   ok(bt.muteOn.join('|') === '240 67 16 127 28 7 49 0 24 1 247' && bt.mutePressed === 'true' && bt.muteOff.join('|') === '240 67 16 127 28 7 49 0 24 0 247', 'Mute this Part = Yamaha parameter change 31 0p 18 with p = Part 1: ' + bt.muteOn.join('|'));
-  ok(bt.arp.join('|') === '240 67 16 127 28 7 49 96 0 1 247' && /unverified/i.test(bt.arpToast) && bt.arpPressed === 'true', 'an unverified address still sends (31 6p 00) and says so once: ' + bt.arpToast);
+  ok(bt.arp.join('|') === '240 67 16 127 28 7 49 96 0 1 247' && !/unverified/i.test(bt.arpToast || '') && bt.arpPressed === 'true', 'Arp on this Part (31 6p 00, verified on the MODX8+) sends with no unverified warning: ' + bt.arp.join('|'));
   ok(bt.fsUnsure && bt.fsBadge === '?' && !bt.fsDisabled && bt.fsSent === 0 && (/No number yet/.test(bt.fsToast) || bt.fsTab === 'map'), 'Foot switch has no number: .unsure, a ? badge, enabled, never sends; tap toasts or opens Map: ' + (bt.fsToast || bt.fsTab));
   ok(bt.aoUi === 'trigger' && bt.allOff.join('|') === '176 123 0', 'All notes off trigger: ' + bt.allOff.join('|'));
   ok(bt.lumi === 0, 'nothing reached the LUMI');

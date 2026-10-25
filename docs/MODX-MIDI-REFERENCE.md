@@ -3,8 +3,75 @@
 Collected 2026-10-24 for the Synth Deck (js/synthdeck.js, js/synthdeck-maps.js) from public
 sources — forum posts quoting the Data List, working code and user captures. Yamaha's own PDFs could
 not be fetched by the research tooling, so every value carries a confidence; `unverified` entries are
-not used as defaults that send. Nothing here was verified on the owner's MODX8+ yet: the Map tab's
-MIDI Learn and the Monitor are the way to confirm a number on the real synth.
+not used as defaults that send. The research below (sections 0-7) is unchanged; what was then
+checked on the owner's MODX8+ is in the next section and overrides it where they differ.
+
+# Checked on the MODX8+ (2026-10-24)
+
+Two Claude sessions, one synth (MODX8+ on USB, MIDI IN/OUT = USB, Multi mode, Performance "CFX + FM
+EP 2" = 64/0/PC 1), Chrome 152 with Web MIDI + SysEx, soundLAB 1.2.0 Synth Deck, Synth out MODX-1.
+Methods: (a) transmit capture — every message the synth sent while Matt pressed the panel, tapped off
+`midi:raw`; (b) write → Parameter Request → readback → bulk-dump diff → restore (the "modx-gate"
+session, record `tasks/20261025T0010Z-modx-check-claude.md`). The synth was left exactly as found
+except the arpeggiator master, which Matt's last panel press left ON.
+
+## Differences from the documentation above
+
+| Topic | Documentation said | The MODX8+ does |
+|---|---|---|
+| Bulk footer block | `0F 00 00` | **`0F 25 00`** (header `0E 25 00`, 189 blocks for a 2-Part Performance, ~375 ms) |
+| Device Inquiry model byte | 0x56/57/58 = MODX6/7/8; MODX+ unverified | **0x6A (106) = MODX8+**: `F0 7E 7F 06 02 43 00 41 6A 06 00 00 00 7F F7` |
+| Active Scene over SysEx | unverified; "the panel sends a Parameter Change when Scene CC = Off" | `30 4C 00` byte 0 = the active Scene index 0-7, **readable but not settable** (writing 01 reads back 0). Scene CC 92 is the only way. Scene CC = Off was not tried. |
+| Arp Part switch `31 6p 00` | low-medium (one forum post) | **verified**: Part 1 wrote 00 → read 0, dump `31 60 00` byte 0 1→0, restored 01 |
+| "Nothing is transmitted when a parameter changes on the panel" | medium | **confirmed** for [ARP ON/OFF], [MOTION SEQ ON/OFF] (readback changed, nothing transmitted) and [PERFORMANCE (HOME)]. The synth also never echoes a Parameter Change it receives (sent `30 47 03 01`, listened 600 ms: silence). |
+| Common knobs | "with Common selected they send SysEx" | confirmed and now addressed: with Common selected and ASSIGN lit, knobs 1-4 transmit Parameter Changes **`30 40 53` / `54` / `55` / `56`** (Common Assign Knob 1-4 values); with the TONE row lit, CC 74 on ch 1. CC 17-24 need a Part selected (not reached on the panel this time; receive side verified below). |
+| Motion Seq Hold | CC 88 "momentary button" | **a latch**: press → 127, press again → 0 (the deck's momentary control is still right for remote use) |
+| Checksum | Data List text wrong, rule inferred from one example | **confirmed on all 189 blocks**: two's complement of sum(model id .. last data byte), low 7 bits; the byte count is not included; byte count = bytes from model id through the last data byte |
+| Settle after a Program Change | 250 ms chosen | CC 7 in the same burst as the PC is **lost**; at 25 ms and later it lands. Parameter Requests during the load are queued (reply gap 66 → 162 ms). 250 ms default kept. |
+| Read name from synth | stores the name | works ("CFX + FM EP 2" from block `30 40 00`), but files it under the Hub's assumed program (63/0/1), because a panel Performance change sends no PC and the dump has no bank/program number |
+
+## Confirmed as documented
+
+- Transmit (Matt at the panel): SCENE 1-8 → `B0 5C` 0/16/32/48/64/80/96/112; Super Knob → CC 95 ch 1;
+  A.SW1 / A.SW2 → CC 86 / 87, 127 on press, 0 on release; MSEQ HOLD → CC 88 127/0 (latch); MSEQ
+  TRIGGER → CC 89 127 then 0. The switch CCs go out on **every keyboard-control Part's channel**
+  (ch 1, 2 and 3 on a 3-Part Performance), the Super Knob and Scene CC on ch 1 only.
+- Receive → Performance address (write, readback, dump diff; ch 1 = Part 1, Multi mode):
+  CC 95 → `30 4B 00`; CC 17-24 → `31 0p 6A..71` (Part Assign Knob 1-8); CC 74 → `31 0p 50`;
+  CC 71 → `+51`; CC 73 → `+46`; CC 75 → `+47`; CC 72 → `+49`; CC 91 → `+29`; CC 7 → `+24` (Part
+  volume; ch 2 moved Part 2 = Multi mode); CC 10 → `+25`; CC 5 → `+32`; CC 65 → `+31`.
+  CC 93 changed nothing in the dump (not confirmed either way). CC 1/2/4/11/16/64/86/87 leave no
+  trace in a Performance dump (controller state), so no evidence either way from this method.
+- SysEx toggles (write 01/00, readback, dump diff, restore): `30 47 03` arp master, `30 48 00`
+  Motion Seq master, `31 0p 18` Part mute, `31 0p 17` Part keyboard control, `31 6p 00` Part arp
+  switch — all take and restore. The deck's own Arpeggiator button sent exactly
+  `F0 43 10 7F 1C 07 30 47 03 01 F7` / `… 00 F7` to MODX-1.
+- Reads: `00 00 00` master volume 7F; `00 00 01` note shift 40; `00 00 07` transpose 40; `00 00 30`
+  reads 00 in Multi mode (value map still unknown); `30 4B 00` Super Knob follows CC 95 and scenes.
+  A Parameter Request to a non-parameter address gets **no reply** (`7F 7F 7F`, `30 47 7F`,
+  `31 00 7E` silent) — a reply proves an address exists.
+- Bank Select: MSB 63 / LSB 0 / PC 3 on ch 2 → Part 2 became "CFX Stage", Performance name and Part 1
+  unchanged (dump 189 → 196 blocks); MSB 64 / 0 / PC 1 on ch 1 reloaded the whole Performance (dump
+  diff against the original: empty). As documented.
+- Clock Out is on by default on this unit: F8 median gap 28 ms (~89 BPM), the Scope read
+  `Clock: synth 89.9 BPM`; Active Sensing FE every ~300 ms.
+- Bulk block map of `0E 25 00` (2-Part Performance): header `0E 25 00` (count 4, no data), `00 7F 00`
+  (4 bytes), `30 00..07 / 10..17 / 20..27 / 30..37` (50 each), `30 40 00` (94: name = first 20
+  ASCII, then the Control Number settings — bytes `10 02 0B 60 56 57 58 59 11 12 13 14 15 16 17 18` =
+  ribbon 16, breath 2, FC1 11, FC2 0x60, A.SW1/2 86/87, MS hold/trigger 88/89, Assign knobs 17-24),
+  `30 41..52`, `30 60..67` (50), `30 70/71` (4), `31 0p 00` (121: Part common, name first 20),
+  `31 1p` (64), `31 2p` (68), `31 3p` (68), `31 4p` (39), `31 5p` (17), `31 6p` (92: Part arp),
+  `32..35 xp` (50: motion-seq lanes), `36 xp` (26), `37 0p` (128), `38 0p` (117), `38 1p` (27),
+  `41 e0` (103: elements), `42 ..` (70). Only existing Parts appear. `30 47 00` = 13 bytes (byte 3 =
+  arp master), `30 48 00` = 6 bytes (byte 0 = MS master), `30 4B 00` = 28 bytes (byte 0 = Super
+  Knob), `30 4C 00` = 8 x 16 bytes (one per Scene; byte 11 = that Scene's memorised Super Knob).
+
+## Still not checked
+
+Arp MIDI Out + the arpeggio ladder in the Scope (needs Utility › Settings › MIDI I/O › Arp MIDI Out
+On and a held chord); Scene CC = Off → what a SCENE press transmits; FS Assign default; the Assign
+knobs' transmit (CC 17-24 with a Part selected); eyes on the panel while the deck's SysEx toggles
+fire (they were confirmed by readback instead); the Super Knob SysEx write (`30 4B 00`, read only).
 
 # Yamaha MODX / MODX+ / MONTAGE MIDI implementation — research notes
 

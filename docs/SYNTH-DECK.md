@@ -65,7 +65,8 @@ and your names** — the deck's own two-step *Delete all sounds* removes them.
 
 ## What the synth must have switched on (MODX / MONTAGE)
 
-Check on the synth — these are from documentation, not yet confirmed on the owner's unit:
+Checked on the owner's MODX8+ on 2026-10-24 where the hardware gate below says so; the rest is
+from documentation:
 
 - *Utility › Settings › MIDI I/O › Arp MIDI Out = On* for the Scope to see arpeggio notes (it also makes
   incoming MIDI bypass the arpeggiator). *Clock Out = On* and *MIDI Sync = Internal* for the beat grid.
@@ -75,6 +76,10 @@ Check on the synth — these are from documentation, not yet confirmed on the ow
   and switch numbers are per Performance (*Edit › Common › Control › Control Number*).
 - The Motion Sequencer itself transmits nothing — only the knob it drives, when that knob's CC is set.
   A Performance change made on the panel sends no Program Change: use *Read name from synth*.
+- The panel transmits nothing for ARP ON/OFF, MOTION SEQ ON/OFF, Part edits or a Performance change,
+  and the synth never echoes a Parameter Change it receives: the deck's SysEx toggles cannot be
+  Learned from the panel — they are confirmed by reading the synth back (Parameter Request).
+  *Read name from synth* files the name under the Hub's assumed program, not the synth's real one.
 - Bank Select: MSB 63 + LSB + PC loads one Performance's Part 1 into the Part on that channel (a sound
   per Part); MSB 64 loads the whole Performance (send on channel 1). LSB 0–17 = Preset pages, 32–36 =
   User, 40+ = Library; MSB 62 = Live Set slots.
@@ -85,10 +90,21 @@ Laptop: Chrome / Edge (Web MIDI) or the soundLAB desktop app. Android app: one s
 the synth in Settings › MIDI. iPad: Safari has no Web MIDI; open soundLAB in the *Web MIDI Browser*
 app with the synth on a USB adapter, or use the deck offline (library, map, tips) until then.
 
-## Hardware gate (not yet run)
+## Hardware gate (run 2026-10-24 on the MODX8+)
 
-With the MODX connected: confirm Scene CC 92 bands, Assign switch CC 86/87, the SysEx addresses for
-Arp master (30 47 03), Motion Seq master (30 48 00), Part mute (31 0p 18), Keyboard control (31 0p 17)
-and the unverified *Arp on this Part* (31 6p 00); confirm the settle time after a Performance load;
-confirm *Read name from synth* (bulk request 0E 25 00, name at 30 40 00); confirm MSB 63 vs 64
-behaviour. Anything wrong: Learn it in the Map and note it in `docs/MODX-MIDI-REFERENCE.md`.
+Record: `tasks/20261025T0010Z-modx-check-claude.md`; detail and the byte-level evidence in
+`docs/MODX-MIDI-REFERENCE.md` › *Checked on the MODX8+*. Results:
+
+- Scene CC 92 bands: confirmed both ways (panel presses transmit 0/16/…/112 on ch 1; the received
+  value shows in `30 4C 00` byte 0). Assign switches CC 86/87, Motion Seq hold 88 (a latch on the
+  panel), trigger 89, Super Knob CC 95: confirmed from panel presses.
+- SysEx: Arp master `30 47 03`, Motion Seq master `30 48 00`, Part mute `31 0p 18`, Keyboard control
+  `31 0p 17` and the formerly unverified *Arp on this Part* `31 6p 00` all take, read back and restore.
+  The panel buttons for Arp / Motion Seq transmit nothing, so a Learn cannot capture them.
+- Settle: a CC sent in the same burst as the Program Change is lost; 25 ms and up land. The 250 ms
+  default stays. *Read name from synth* returns the Performance name (bulk `0E 25 00`, block
+  `30 40 00`). MSB 63 loads one Part, MSB 64 the whole Performance, as written above.
+- Clock Out was already on (Scope: `Clock: synth 89.9 BPM`). Device Inquiry answers model byte 0x6A
+  (MODX8+), now in the map's identity table.
+- Not run: Arp MIDI Out / arpeggio notes in the Scope, Scene CC = Off capture, foot switch, Assign
+  knob transmit with a Part selected.
