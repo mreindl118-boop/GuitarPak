@@ -25,7 +25,9 @@
   the preset builder + full snapshot, key splits in the Hub (port match, LUMI thru guard, view
   renames), Live sets (pages of 16, MODX Live Set slots, stepping, foot switch, octave buttons, Go
   live, Lock, Panic), profiles (export/import), docs/SYNTH-TAB.md, help tours, tests/synthtab.test.js
-  (48). Left for the release: rebase on main (3890488), the UI session's phases A/B + C2 "One Open",
+  (48). Step 7 (A1 labels Train / LUMI, primer docs cherry-picked, One Open on the Songs page +
+  tests/oneopen.test.js; js/songs.js and one line in js/woodshed.js added to the claim, agreed with
+  the UI session). Left for the release: rebase on main (3890488), the UI session's phases A/B + C2 "One Open",
   the device test on the iPad (Matt), stamps on Matt's go.
 - Design decisions on the way (Matt, 2026-10-25): strips not knobs; the knob-row picker; Assign
   knobs named by what they control; Explain mode (didactic); data-rich slots; zones later.

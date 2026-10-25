@@ -29,8 +29,8 @@ Tick items here as they land (commit in brackets).
 - [x] 1.9 (step 6) Help tours (Deck, Live), docs/SYNTH-TAB.md, CLAUDE.md, tests/synthtab.test.js (48); synthdeck / synthdeck-scope / midihub* / nav / smoke green
 
 ## 2. UI phase A — navigation and copy — UI session
-- [ ] 2.1 One vocabulary: Practice tab -> Train; "LUMI practice" -> LUMI; Learn home reads Learn;
-      page ids unchanged; help tours, README, tests/nav.test.js labels
+- [x] 2.1 (labels, step 7) Practice tab -> Train; "LUMI practice" -> LUMI in app.js GROUPS /
+      SPACE_LABELS + tests/nav.test.js; page ids unchanged. Still open: tours / README copy (UI session)
 - [ ] 2.2 One header button style (#ctx-btn like its neighbours; capture dot + key/BPM title kept)
 - [ ] 2.3 Copy diet: audit sentences into tours/tips; Exercises home = stats strip + Start + path
 
@@ -44,9 +44,10 @@ Tick items here as they land (commit in brackets).
       then the Woodshed generators
 
 ## 4. One Open (phase C2) — mine
-- [ ] 4.1 "Open a score" under Play: .mid / .musicxml / .mxl / tab text (.pdf via the helper) ->
-      Play on synth / Practice (Woodshed) / Tab (Songs); Songs, Player and Woodshed inputs route
-      through it; Studio keeps its own
+- [x] 4.1 (step 7) "Open a score" card on the Songs page (Play tab): .mid / .midi / .musicxml /
+      .xml / .mxl / .txt -> Play on synth (Hub Player) / Practice (Woodshed.importMidi + addScore)
+      / Open as tab; tests/oneopen.test.js. The .pdf helper and re-routing the existing Player /
+      Woodshed inputs stay with the UI session; Studio keeps its own
 
 ## 5. Sheet music -> MIDI helper — UI session (1.3 if ready, else 1.4)
 - [ ] 5.1 tools/score-helper.py (Matt's vector OMR, hardened) on 127.0.0.1:4576; Connect helper

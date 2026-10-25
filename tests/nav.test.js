@@ -32,7 +32,7 @@ const tabs = sel => [...document.querySelectorAll(sel + ' .tabbar-btn')].map(b =
     noSelect: !document.getElementById('nav-select'),
     metTab: [...document.querySelectorAll('.tabbar-btn, .subtab')].some(x => /metronome/i.test(x.textContent))
   }));
-  ok(d1.tabs.join('|') === 'Learn|Guitar|Keys|Synth|Play|Practice' && d1.active === 'Learn', 'sections (1.3: Synth is its own tab): ' + d1.tabs.join('|') + ' (active ' + d1.active + ')');
+  ok(d1.tabs.join('|') === 'Learn|Guitar|Keys|Synth|Play|Train' && d1.active === 'Learn', 'sections (1.3: Synth is its own tab): ' + d1.tabs.join('|') + ' (active ' + d1.active + ')');
   ok(d1.topShown && !d1.botShown && d1.noSelect && !d1.metTab, 'top tab bar on desktop, no drop-down, no metronome tab: ' + JSON.stringify(d1));
   const clickTab = async (label, sel) => { await page.click((sel || '#tabbar') + ' .tabbar-btn:has-text("' + label + '")'); await page.waitForTimeout(120); return page.evaluate(() => App.active); };
   ok(await clickTab('Keys') === 'piano', 'Keys tab opens the piano');
@@ -44,10 +44,10 @@ const tabs = sel => [...document.querySelectorAll(sel + ' .tabbar-btn')].map(b =
   ok(await clickTab('Guitar') === 'fretboard', 'Guitar tab opens the neck');
   ok((await page.evaluate(() => [...document.querySelectorAll('#subnav .subtab')].map(b => b.textContent).join('|'))) === 'Neck|Tab|Notation|Helix', 'Guitar pills: Neck | Tab | Notation | Helix');
   ok(await clickTab('Keys') === 'synth', 'Keys remembers the last page (Synth)');
-  ok(await clickTab('Practice') === 'shed', 'Practice opens the Woodshed');
-  ok((await page.evaluate(() => [...document.querySelectorAll('#subnav .subtab')].map(b => b.textContent).join('|'))) === 'Woodshed|Trainer|Tuner', 'Practice pills: Woodshed | Trainer | Tuner');
+  ok(await clickTab('Train') === 'shed', 'Train opens the Woodshed');
+  ok((await page.evaluate(() => [...document.querySelectorAll('#subnav .subtab')].map(b => b.textContent).join('|'))) === 'Woodshed|Trainer|Tuner', 'Train pills: Woodshed | Trainer | Tuner');
   await page.click('#subnav .subtab:has-text("Tuner")'); await page.waitForTimeout(200);
-  ok(await page.evaluate(() => App.active) === 'tuner', 'Tuner is a page under Practice');
+  ok(await page.evaluate(() => App.active) === 'tuner', 'Tuner is a page under Train');
   await clickTab('Keys'); await page.evaluate(() => window.scrollTo(0, 600)); await page.waitForTimeout(150);
   await clickTab('Keys'); await page.waitForTimeout(700);
   ok(await page.evaluate(() => window.pageYOffset) < 5, 'tapping the open tab scrolls back to the top');

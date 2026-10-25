@@ -40,7 +40,7 @@ window.App = (function () {
     chords: 'Chords', piano: 'Piano', songs: 'Songs', jam: 'Jam', tuner: 'Tuner',
     trainer: 'Trainer', theory: 'Theory', settings: 'Settings', shed: 'Shed', synth: 'Synth',
     song: 'Song', arrange: 'Arrange', tracks: 'Tracks', pads: 'Pads', ideas: 'Ideas',
-    quiz: 'Exercises', midihub: 'MIDI Hub', deck: 'Synth deck', liveset: 'Live sets', lumipractice: 'LUMI practice', practiceplan: 'Practice plan', helix: 'Helix Stadium'
+    quiz: 'Exercises', midihub: 'MIDI Hub', deck: 'Synth deck', liveset: 'Live sets', lumipractice: 'LUMI', practiceplan: 'Practice plan', helix: 'Helix Stadium'
   };
   // overlays live outside both page sets: the metronome opens as a SHEET over
   // whatever page you're on (corner icon), settings toggles in place (gear)
@@ -56,7 +56,7 @@ window.App = (function () {
       { id: 'gkeys', label: 'Keys', icon: 'keys', pages: ['piano', 'synth', 'pads', 'lumipractice'] },
       { id: 'gsynth', label: 'Synth', icon: 'sliders', pages: ['deck', 'liveset', 'midihub'] }, // 1.3: the Synth tab (js/synthtab.js) - Deck / Live / Hub (= the MIDI Hub, js/midihub.js)
       { id: 'gplay', label: 'Play', icon: 'note', pages: ['songs', 'jam'] },
-      { id: 'gprac', label: 'Practice', icon: 'target', pages: ['shed', 'trainer', 'tuner'] } // the game first
+      { id: 'gprac', label: 'Train', icon: 'target', pages: ['shed', 'trainer', 'tuner'] } // 1.3 (primer A1): 'Practice' is the space, 'Train' the tab // the game first
     ],
     studio: [
       { id: 'gstudio', label: 'Studio', icon: 'sliders', pages: ['arrange', 'tracks'] }, // the DAW home

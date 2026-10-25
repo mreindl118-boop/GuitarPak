@@ -1521,7 +1521,7 @@
     get view() { return view; },
     get cal() { return cal; },
     get mic() { return mic; },
-    importMidi: importMidi,
+    importMidi: importMidi, addScore: addScore,
     importAscii: importAscii,
     importTrack: importTrack,
     guidedScore: guidedScore,

@@ -186,6 +186,12 @@ js/keylessons.js  │ SCALE LESSONS on the Keys page (mounted into #pn-lessons
                   │  hide, app hide; summary() feeds Exercises Progress.
 js/songs.js       │ (songs: user-imported ASCII tab / MIDI parsed on-device,
                   │  bar-loop player at shared tempo, key detect → fb:set)
+                  │  1.3 ONE OPEN: the "Open a score" card above Add a song
+                  │  takes .mid/.midi/.musicxml/.xml/.mxl/.txt and routes it:
+                  │  Play on synth (SLMidiHub.player.loadFile/loadScore + show),
+                  │  Practice (window.Woodshed.importMidi + addScore -> shed),
+                  │  Open as tab (App.songs.fromMidi/load, text -> the paste
+                  │  box). Suite tests/oneopen.test.js.
 js/lumi-practice.js LUMI note/triad practice under Keys (selectively recovered
                   from b8ccb55; see docs/LUMI-PRACTICE.md). Session-only
                   simulated answers by default; optional exact LUMI/MODX
