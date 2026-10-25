@@ -48,7 +48,7 @@ const J = JSON.stringify;
     };
   });
   ok(nav.active === 'midihub' && nav.group === 'Keys' && nav.pills === 'Piano|Synth|Pads|MIDI|LUMI', 'MIDI Hub remains the fourth Keys pill alongside LUMI practice: ' + nav.pills);
-  ok(nav.views === 'control,play,controls,rules,sysex,monitor,learn', 'seven views, Control first: ' + nav.views);
+  ok(nav.views === 'control,player,play,controls,rules,sysex,monitor,learn', 'eight views, Control first, then Player: ' + nav.views);
   // the shared service hears All keyboards by default (v0.79 multi-input)
   ok(nav.ports && nav.inSel === 'all' && nav.outSel === 'out1' && /In: All keyboards · Synth out: Synth Port 1/.test(nav.status), 'ports picked: All keyboards in, the synth port out: ' + nav.status);
   ok(nav.keys === '15/10' && nav.tour, 'two octaves of keys and a help tour');

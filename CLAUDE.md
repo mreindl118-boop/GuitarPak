@@ -392,6 +392,33 @@ js/midihub.js     MIDI HUB page ('midihub', Keys group, pill "MIDI", v0.78.0;
                   midihub.msb/lsb), Send all, Reset knobs. TWO-WAY: onRaw
                   moves a knob / the program number when the synth sends
                   that CC / Program Change on the selected Part.
+                  v1.1.0 PLAYER view ('player', after Control): opens .mid/
+                  .midi (own reader: tempo map, running status; program/
+                  other CC/SysEx dropped + reported), MusicXML (.musicxml/
+                  .xml: parts -> channels skipping 10, chords, ties, rests,
+                  backup/forward, tempo marks; grace/unpitched/repeats
+                  reported) and .mxl (zip, stored or deflate-raw via
+                  DecompressionStream). Plays through App.midi.
+                  bindMusicalOutput(hubOutId()) - notes + CC64 only - so
+                  Pause/Stop/Panic/onHide/pagehide/flushMusicalOutputs
+                  release everything; 8 ms ticker. midihub.plTempo (%),
+                  plVel (cap), plRoute 'file' | 'part', plLoop, plTrans
+                  (-12..12), plShift {on, fr, fs, tr, ts} = KEY SHIFTER by
+                  scale degree over ten 7-note Theory scales (shiftMap; the
+                  source key is guessed by detectSongKey on load); changing
+                  either while playing pauses/resumes so every Note Off
+                  matches its Note On. SLMidiHub.player {loadFile(name,
+                  ArrayBuffer), loadScore(score = the 1.1 reviewed practice
+                  score {bpm, len, notes:[{t, d, m, rest, partId, v}]}),
+                  show, play, pause, stop, seek, shiftNote, key, openAsTab,
+                  toMidiBytes, state}; SLMidiHub.scoreToMidi(score) = format-1
+                  MIDI (tempo track + one track per part). OPEN AS TAB:
+                  songToMidi (format 0 at the song's own tempo, notes
+                  shifted as set) -> App.songs.fromMidi -> load -> the Songs
+                  page (js/songs.js: App.songs {fromMidi, load, toAscii,
+                  current} + an Export tab button). Suite
+                  tests/midihub-player.test.js; tests/review-to-synth.test.js
+                  (on feat/review-to-synth) drives Score review -> all three.
 js/synthdeck.js   SYNTH DECK (v1.1.0): the MIDI Hub's Control view as a real
                   control surface for the synth on the cable (built around the
                   owner's MODX8+, device-agnostic by design). Mounted by
