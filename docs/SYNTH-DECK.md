@@ -1,4 +1,4 @@
-# Synth Deck — control your synth from soundLAB (1.1.0)
+# Synth Deck — control your synth from soundLAB (1.2.0)
 
 The **Synth Deck** is the Control view of the MIDI Hub (*Keys › MIDI*). It turns the Hub into a
 control surface for whatever synth is on the cable — built around the owner's Yamaha MODX8+ but

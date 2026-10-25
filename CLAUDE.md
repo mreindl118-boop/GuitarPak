@@ -419,7 +419,7 @@ js/midihub.js     MIDI HUB page ('midihub', Keys group, pill "MIDI", v0.78.0;
                   current} + an Export tab button). Suite
                   tests/midihub-player.test.js; tests/review-to-synth.test.js
                   (on feat/review-to-synth) drives Score review -> all three.
-js/synthdeck.js   SYNTH DECK (v1.1.0): the MIDI Hub's Control view as a real
+js/synthdeck.js   SYNTH DECK (v1.2.0): the MIDI Hub's Control view as a real
                   control surface for the synth on the cable (built around the
                   owner's MODX8+, device-agnostic by design). Mounted by
                   midihub.js render() into #mh-deck (Now bar + sub-tabs) and

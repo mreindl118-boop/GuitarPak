@@ -1,4 +1,4 @@
-# release/1.1.0: Helix Stadium merged + Synth Deck (Claude, 2026-10-24T19:30Z)
+# release/1.2.0 (born release/1.1.0): Helix Stadium merged + Synth Deck (Claude, 2026-10-24T19:30Z, updated 20:45Z)
 
 - Author / sole writer: Claude. Branch `release/1.1.0` (pushed), worktree
   `C:\Users\mrein\AppData\Local\Temp\sl-110`. NOT merged to `main`, not live, the
@@ -6,6 +6,15 @@
   `codex/soundlab-1.1-workflow-20261023` (also web 1.1.0; sw CACHE v126) and the peer
   session's `feat/hub-player`: first on `main` keeps 1.1.0, the other re-stamps 1.2.0
   with a higher CACHE (claim record 20261024T1800Z on coord/cowork-20261022-claude).
+
+## Version and merge order (20:45Z)
+
+The peer Claude session's Player landed on `main` first as 1.1.0 (3caa04a, sw CACHE
+v125). Under the agreed rule this branch re-stamped to web 1.2.0 / CACHE v126 and
+merged `main` in (the Player and the Synth Deck coexist in js/midihub.js). null's
+`codex/soundlab-1.1-workflow-20261023` (stamped 1.1.0 / v126) must re-stamp to 1.3.0 /
+v127 before it lands. Matt approved merging this branch to `main` on 2026-10-24 ("Yes:
+merge release/1.1.0 into main ... push it").
 
 ## What is on the branch
 
@@ -15,7 +24,7 @@
    `js/synthdeck-maps.js`, `data/modx-performances.json` (2,143 MODX names),
    `docs/SYNTH-DECK.md`, `docs/MODX-MIDI-REFERENCE.md` (research with sources +
    confidence), Hub hooks in `js/midihub.js`, help tour, README/CLAUDE.md, sw CACHE
-   v125, APP_VERSION / version.json web 1.1.0 (APK channel untouched).
+   v126, APP_VERSION / version.json web 1.2.0 (APK channel untouched).
 
 ## Verification (PC, Playwright 1.49.1)
 
