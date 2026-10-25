@@ -22,13 +22,23 @@
   `js/app.js`, `js/help.js`, `sw.js`, `tests/run.sh` (edited on the 1.1 and
   Helix branches); release bookkeeping waits for integration.
 - Created: 2026-10-24
-- Status: ready-for-review: `feat/hub-player` at `a4a741a`, not live.
+- Status: RELEASED 2026-10-24 as soundLAB 1.1.0: `main` fast-forwarded to
+  `3caa04a` (Matt: "Ship the Player now"); web-only release (APP_VERSION,
+  version.json web 1.1.0, sw CACHE guitarlab-v125; APK channel untouched).
+  claude.ai artifact republished with the full 1.1.0 file set (version 22);
+  Matt's install folder on `main` 3caa04a. Ledger:
+  `tasks/20261024T1930Z-release-1.1.0-claude.md`.
+  Earlier: ready-for-review at `a4a741a`.
   Since `6c99335`: `player.loadScore` (the 1.1 reviewed practice score),
   `SLMidiHub.scoreToMidi`, transpose + key shifter (by scale degree, source
   key guessed), the song's own tempo kept, `Open as tab` -> Songs page
   (`js/songs.js` gains `App.songs` {fromMidi, load, toAscii} + Export tab;
   added to this claim). midihub-player 31 checks.
-- Evidence: `tests/midihub-player.test.js` 20 checks; 45 of 46 suites pass
+- Evidence (3caa04a): midihub-player 31, midihub 46, midihub-wheel 5,
+  midihub-lock 21, update 9, smoke 6, nav 39, lights 71, lumidisplay 23,
+  keys 34, practice 34, game 78, colors 62, multiin 18, lumi-contexts 37,
+  pitch-lock 15, context-global 138 all pass.
+  Earlier (a4a741a): `tests/midihub-player.test.js` 20 checks; 45 of 46 suites pass
   locally (pages-deploy and release-workflow fail identically on untouched
   1.0.0 here: CRLF workflow files on this Windows checkout).
 - Scope change: `tests/midihub.test.js` needed one line (the view list now
