@@ -6,15 +6,17 @@ Matt and the order he wants them worked in. Nothing in it is implemented yet.
 
 ## Where main stands
 
-- `main` = web 1.2.0 (`3890488`), `sw.js` CACHE `guitarlab-v126`. Per the
-  coord records, web 1.3.0 / `v127` is reserved for null's notation-recognizer
-  release (`codex/soundlab-1.1-workflow-20261023`: `js/omr/*`,
-  `js/score-review.js`). Matt has since folded the Synth tab plan
-  (`feat/synth-tab`, `docs/SYNTH-TAB-PLAN.md`) and this primer into a
-  "1.3 update"; whoever stamps next records the agreed order on the coord
-  branch first. Work from this primer must NOT touch `APP_VERSION`,
-  `version.json` or the sw CACHE; the release owner (Claude) stamps, Matt
-  says go-live.
+- `main` = web 1.2.0 (`3890488`), `sw.js` CACHE `guitarlab-v126`. Decided by
+  Matt on 2026-10-25 (record `tasks/20261025T0300Z-version-order-1.3-claude.md`
+  on the coord branch): the **1.3 update** = the Synth tab (`feat/synth-tab`,
+  `docs/SYNTH-TAB-PLAN.md`; step 1 is `a31394f`: group Synth = Deck / Live /
+  Hub, the MIDI Hub left Keys) + this primer's phases, shipped as web 1.3.0
+  with a sw CACHE above whatever main has then, stamped by the Synth tab
+  session when Matt says go-live. null's notation-recognizer release
+  (`codex/soundlab-1.1-workflow-20261023`: `js/omr/*`, `js/score-review.js`,
+  plus `feat/review-to-synth`) becomes web 1.4.0. Work from this primer must
+  NOT touch `APP_VERSION`, `version.json` or the sw CACHE. Every UI branch
+  starts from or rebases on `feat/synth-tab`.
 - Never edit the install folder `C:\Users\mrein\Creative-Workspace\GuitarPak`
   directly (the Desktop app serves it live and its launcher fast-forwards
   `main`). One worktree per task under `%TEMP%`, one PR against `main`.
@@ -99,7 +101,9 @@ Phase B (two to three days; one shared sheet):
   Keep `App.openSheet`, `App.ctx(on)`, `App.help.set`, the `sheet` /
   `help:level` / `lights:display` bus events and the NO_CTX page rule, so
   quiz.js's `covered()` keeps working. Suites: nav, context-global,
-  display-master, lights, keys.
+  display-master, lights, keys. Decided: the Studio capture dot and the
+  transport button stay in the header; the panel holds key/tempo, the
+  metronome and lights & help.
 - B2 One instrument. One app-level instrument (keep store `learn.instrument`,
   emit an `instrument` bus event) shown as a chip in the Session panel;
   Exercises, the Woodshed card and `practice-progress-ui.js` read it and
@@ -208,14 +212,16 @@ merge null's branch to get Score review, wait for its release.
   claude.ai artifact without Matt's yes.
 - Do not auto-connect Web MIDI, the Helix bridge or the score helper at boot.
 
-## Open questions for Matt
+## Decisions (Matt, 2026-10-25)
 
-1. Name for the Practice tab group: Train, Tools, or keep Practice and rename
-   the space instead?
-2. Should the Session panel also carry the Studio capture dot and transport,
-   or do those stay in the header?
-3. Version order for the "1.3 update": Synth tab, this primer's phases, and
-   null's recognizer. Who stamps 1.3.0?
-4. The Synth tab makes six groups in the practice tab bar. The phone bottom
-   bar holds five comfortably; does Train fold into Keys / Guitar, or does the
-   bottom bar get a More tab?
+1. The Practice tab group is renamed **Train**; the space keeps "Practice".
+2. The Studio capture dot and the transport button stay in the header; the
+   Session panel holds key/tempo, the metronome and lights & help.
+3. The "1.3 update" = Synth tab + this primer's phases, web 1.3.0, stamped by
+   the Synth tab session on go-live; null's recognizer becomes 1.4.0.
+4. Six groups stay on the phone bar, slightly narrower; the nav suite at
+   375 px passes in one row, shrink labels if needed.
+
+Matt's words on scope: "I want all of it worked on and done confirmations
+along the way. The app should feel pretty different by the time we're done
+and a lot more usable."
