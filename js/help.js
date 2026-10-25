@@ -94,12 +94,20 @@
     ],
     midihub: [
       { sel: '#mh-views', t: 'Player', x: 'Open a MIDI or MusicXML file and play it on your synth: tempo, a loudest-note cap, transpose, and Change key to move a piece into any key or scale. Open as tab turns it into guitar tab on the Songs page.' },
-      { sel: '#mh-views', t: 'Control your synth', x: 'Control is the easy view: pick a Part, then turn the big knobs (filter, envelope, effects, volume) and step through programs. Your synth\u2019s own knobs move the ones here too.' },
+      { sel: '#mh-views', t: 'Control your synth', x: 'Control is the Synth Deck: your current sound at the top, the big knobs (filter, envelope, effects, volume), buttons for scenes, arpeggiator and Motion Sequencer, sounds you save and load with one tap, and a Scope that draws what the synth is playing. Your synth’s own knobs move the ones here too.' },
+      { sel: '#sdk-now', t: 'Your current sound', x: 'The name, Part and program the synth is on, and the port it goes to. Prev and Next step through programs, the star pins a sound up here, Save sound keeps the program plus the knobs and buttons as they are now. Nothing is sent until you tap a sound.' },
+      { sel: '#sdk-tabs', t: 'Knobs · Buttons · Sounds · Scope · Map', x: 'Knobs adds pages of extra knobs. Buttons has scenes, arp and Motion Sequencer switches, Part mute and the pedals. Sounds is your library and the synth’s banks by name. Scope shows the arpeggiator and sequencer notes against the beat and the controller curves the synth sends. Map is where every number lives: a ? means it came from documentation, so tap Learn and move the control on the synth to make it yours.' },
       { t: 'MIDI Hub', x: 'Everything on the MIDI cable, for any device: a synth, a controller, a DAW port. Connect, pick In and Out, and the Monitor shows every message decoded as you play or turn knobs.' },
-      { sel: '#mh-views', t: 'Six views', x: 'Play sends notes, bend, mod and program changes. Controls is a wall of CC sliders plus transport and clock. Rules reshape messages. SysEx talks to the deep settings. Monitor reads everything. Learn explains it all.' },
+      { sel: '#mh-views', t: 'Eight views', x: 'Player plays a MIDI or MusicXML file on the synth. Play sends notes, bend, mod and program changes. Controls is a wall of CC sliders plus transport and clock. Rules reshape messages. SysEx talks to the deep settings. Monitor reads everything. Learn explains it all.' },
       { sel: '#mh-hear', t: 'Only the device sounds', x: 'While this page is open soundLAB keeps its own piano quiet, so a synth is never doubled. Tick App voice to hear both. For every other page the same switch lives in Settings › MIDI keyboard.' },
       { sel: '#mh-thru', t: 'Thru and Rules', x: 'Thru passes In to Out through your Rules — remap a knob, transpose, force a channel, block aftertouch. Rules can also change what soundLAB itself hears, on every page.' },
       { sel: '#mh-profile', t: 'Device profiles', x: 'Generic speaks plain MIDI to anything. A profile adds named knobs and ready-made SysEx builders for that maker (Yamaha MODX/MONTAGE, Roland…) — nothing else changes.' }
+    ],
+    helix: [
+      { t: 'Helix Stadium', x: 'Control a Line 6 Helix Stadium from soundLAB. Over USB MIDI: presets, snapshots, knobs, pedals, looper and the Matrix mixer. With the bridge on this computer (node tools/helix-bridge.js) it also reads and edits the loaded preset block by block.' },
+      { sel: '#hx-armrow', t: 'Nothing sends until you arm', x: 'Output starts disarmed. Arm opens a 90-second window that every command renews; leaving the page, hiding the app or switching windows disarms it again. Reads never need arming.' },
+      { sel: '#hx-views', t: 'Six views', x: 'Rig is the pedalboard: presets, favorites, snapshots, knobs. Blocks edits the loaded preset live (bridge). Presets browses and loads (bridge). Looper & Song, Mixer, and a Monitor of every message.' },
+      { sel: '#hx-favs', t: 'Favorites', x: 'Name a preset address once, recall it with one tap. With the bridge running, the star next to a preset fills in its address for you. Saving a favorite never sends anything.' }
     ],
     pads: [
       { t: 'Drum pads', x: 'Finger drums. Eight pads play your drum track’s kit — tap them, use Z X C V / A S D F, or hit them from MIDI keys with real velocity.' },

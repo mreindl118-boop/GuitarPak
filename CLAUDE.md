@@ -315,6 +315,41 @@ js/plugins.js     window.SoundLab plugin API v1: registerPage (App.addPage),
                   cap, per-plugin enable/error) run right after boot; loaded
                   from Settings > Plugins. Docs PLUGINS.md; sample plugin
                   plugins/sample-lofi.js (Lo-fi fx + Glass bell voice).
+js/helix.js       HELIX STADIUM page ('helix', Guitar group pill "Helix",
+                  0.82.0; prefix hx-, store hx.*; built in from the former
+                  plugin, plugins/helix-stadium.js is now a stub and
+                  js/plugins.js skips an old stored copy whose code sets
+                  window.SLHelix). NOTHING CONNECTS AT BOOT: init builds the
+                  DOM only; Web MIDI on show only once midi.wanted is set
+                  (the Hub's rule: no permission prompt by itself); the bridge only
+                  after Connect bridge was pressed once (hx.bridgeAuto,
+                  default off) and retries only while visible. Read / write /
+                  control a Line 6 Helix
+                  Stadium (XL). MIDI (its own Web MIDI port when the browser
+                  lists one, else App.midi.send; the manual's CC map: CC32+PC
+                  presets, CC69 snapshots, CC38-45 knobs, CC9 buttons, looper
+                  52-62, song 10/46-51/63, Matrix mixer 11-29/+23/+46/+69 on
+                  the layer's channel) + BRIDGE = tools/helix-bridge.js (Node,
+                  zero deps: the pedal's editor protocol over the LAN, NOT USB
+                  — ZMTP 3 / OSC / msgpack on 2002 RPC, 2001 change stream,
+                  2003 telemetry — relayed as JSON on ws://127.0.0.1:4575;
+                  model/param names from tools/helix-defs.json, MIT from
+                  helixgen-core). Views Rig / Blocks (edit buffer: live
+                  /ParamValueSet + /BlockEnableSet, echoes from 2001) /
+                  Presets (containers -1 -2 -5, /LoadPresetWithCID after a
+                  confirm) / Looper & Song / Mixer / Monitor. Verified live on
+                  a Stadium XL fw 1.1.0. Built WITH null (Codex): SAFETY =
+                  output starts disarmed, Arm = 90 s window renewed per
+                  command, page exit / app hide / window blur / port or
+                  channel change / bridge drop / failed send disarm (hx.safe
+                  false = always armed); PORT ALLOW-LIST (Helix|Stadium, never
+                  MODX/MONTAGE/LUMI/ROLI/virtual/loopMIDI/thru; App.midi's
+                  shared output only when IT is the Helix); FAVORITES hx.favs
+                  (CC32+PC+snapshot, byte preview, ★ fills from the bridge's
+                  numbering); OBSERVED panel. Docs
+                  docs/HELIX-STADIUM.md, suite tests/helix.test.js (fake MIDI
+                  ports + fake bridge, incl. port isolation), hook
+                  window.SLHelix.
 js/midihub.js     MIDI HUB page ('midihub', Keys group, pill "MIDI", v0.78.0;
                   prefix mh-): read / write / reshape plain MIDI for ANY
                   device on App.midi's ports — device-AGNOSTIC by design,
@@ -384,6 +419,47 @@ js/midihub.js     MIDI HUB page ('midihub', Keys group, pill "MIDI", v0.78.0;
                   current} + an Export tab button). Suite
                   tests/midihub-player.test.js; tests/review-to-synth.test.js
                   (on feat/review-to-synth) drives Score review -> all three.
+js/synthdeck.js   SYNTH DECK (v1.2.0): the MIDI Hub's Control view as a real
+                  control surface for the synth on the cable (built around the
+                  owner's MODX8+, device-agnostic by design). Mounted by
+                  midihub.js render() into #mh-deck (Now bar + sub-tabs) and
+                  #mh-deck2 (panels) with HUB_API (= SLMidiHub.api); App.
+                  synthDeck / window.SLSynthDeck; init is idempotent (render()
+                  re-runs on Import / Reset Hub). Sub-tabs: Knobs (the Hub card
+                  + knob PAGES via api.wireKnobs handlers), Buttons (toggle /
+                  momentary / radio / trigger from the MAP; held momentaries
+                  drained on blur / hide / Part change / midi:beforeoutput),
+                  Sounds (library midihub.decklib cap 200: save/edit/star/
+                  search/duplicate/two-step delete/export/import; LOAD =
+                  Bank MSB, LSB, PC back to back, settle (deck.settleMs 250),
+                  then paced values; recallPlan(id) feeds the byte preview and
+                  the tests; bank browser with MSB 63 'Into this Part' /
+                  64 'Whole performance' and the MODX factory names from
+                  data/modx-performances.json; Read name from synth = Yamaha
+                  bulk request 0E 25 00, name block 30 40 00), Scope
+                  (js/synthdeck-scope.js, window.SLSynthScope: canvas note
+                  roll per channel + CC lanes + clock from incoming F8 / the
+                  Hub clock / met.bpm; feed()/frame()/state() test hooks, rAF
+                  only while the tab is visible), Map (every control's kind /
+                  channel scope / number or SysEx address / on-off / conf
+                  badge; MIDI Learn + Learn 2 moves; Reset map). Maps are
+                  DATA in js/synthdeck-maps.js (generic / yamaha / roland;
+                  conf verified | documented | unverified | learned per entry;
+                  num null never sends) from docs/MODX-MIDI-REFERENCE.md.
+                  ONE tx funnel: api.send (Rules-on-app-controls, ledger,
+                  echo suppression) after refusing a LUMI-named resolved
+                  output; nothing sends on load/show/tab/Part/profile/Import/
+                  Reset/Learn/save; UI state moves only for bytes actually
+                  sent. Stores midihub.deck (settings + per-profile map
+                  overrides) / decklib / deckvals / names; Hub Export covers
+                  them, Reset Hub keeps decklib + names. hubKnobs(profile)
+                  lets the map redefine the Hub card's own knobs (null =
+                  built-ins). Docs docs/SYNTH-DECK.md; suites synthdeck +
+                  synthdeck-scope.
+data/             app data files: modx-performances.json (2,143 MODX factory
+                  Performance names by LSB/PC, parsed from a public Cakewalk
+                  .ins list; MSB 63 and 64 share the layout). In sw ASSETS,
+                  the artifact build and the APK asset copy.
 js/pads.js        drum-pad controller page ('pads', PRACTICE Instrument group
                   since v0.64.0; still records to st.tracks + studio-armed
                   MIDI works): 8 velocity pads on the pad drum track's live
@@ -459,6 +535,9 @@ android/          APK project — build.ps1 (no Gradle: javac→d8→aapt→zipa
 ios/              WKWebView wrapper (XcodeGen project.yml + Swift; needs a Mac
                   to build — the PWA is the primary iPad install)
 releases/         built signed APK (committed; raw URL = download link)
+tools/helix-bridge.js  Helix Stadium bridge for the Helix page, js/helix.js (run
+                  `node tools/helix-bridge.js [host]`; finds p35x1.local / mDNS)
+tools/helix-defs.json  Stadium model + parameter id table the bridge serves
 tools/artifact_build.py  stages the multi-file claude.ai artifact (see below)
 version.json      auto-update feed (source of truth for latest version)
 ```
@@ -478,7 +557,7 @@ version.json      auto-update feed (source of truth for latest version)
   bar, clock, key and MIDI service are shared across both — that's the point.
 - SECTION TAB BAR (v0.70.0; app.js GROUPS + populateNav): the main nav is a
   tab bar of GROUPS (icon + label), not a drop-down — practice: Learn
-  (quiz=Exercises HOME/chords/theory), Guitar (fretboard/tab/notation), Keys
+  (quiz=Exercises HOME/chords/theory), Guitar (fretboard/tab/notation/helix), Keys
   (piano/synth/pads/midihub), Play (songs/jam), Practice (shed/trainer/tuner);
   studio: Studio (arrange=Timeline HOME / tracks=Editor), Sketch (song/ideas).
   Rendered twice: #tabbar inside the top bar (> 900px) and #tabbar-m fixed

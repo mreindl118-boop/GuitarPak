@@ -13,6 +13,11 @@ A complete working example ships in this repo: [`plugins/sample-lofi.js`](plugin
 — it adds a "Lo-fi" FX and a "Glass bell" synth voice. Load it from Settings
 to try the pipeline, then copy it as your starting point.
 
+A plugin is also a good place to prototype a whole page. The Helix Stadium
+page started as `plugins/helix-stadium.js` and became built in (*Guitar ›
+Helix*, `js/helix.js`) in 0.82.0 when it outgrew the 100 KB cap; see
+[docs/HELIX-STADIUM.md](docs/HELIX-STADIUM.md).
+
 ## The API (`window.SoundLab`, apiVersion 1)
 
 | Member | What it does |

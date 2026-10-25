@@ -1,6 +1,6 @@
 {
   "version": "0.75.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/soundLAB-alpha.apk",
-  "web": "1.1.0",
-  "notes": "Player in the MIDI tab: open a MIDI or MusicXML file and play it on your synth (notes and pedal only), with tempo, a loudest-note cap, transpose and a key shifter that moves a piece into any key or scale. Open as tab turns it into guitar tab on the Songs page, and Songs can export the tab as text."
+  "web": "1.2.0",
+  "notes": "Synth Deck in the MIDI Hub (Keys › MIDI): a Now bar with your current sound, Buttons for scenes, arpeggiator, Motion Sequencer, Part mute and switches, extra knob pages, a Sounds library you build and load with one tap (plus the MODX factory names, bank browser and Read name from synth), a Scope that draws what the arpeggiator and sequencer send against the clock, and a Map where every number is editable and MIDI-learnable. Helix Stadium page (Guitar › Helix) merged. 1.1.0 (the MIDI tab Player): Player in the MIDI tab: open a MIDI or MusicXML file and play it on your synth (notes and pedal only), with tempo, a loudest-note cap, transpose and a key shifter that moves a piece into any key or scale. Open as tab turns it into guitar tab on the Songs page, and Songs can export the tab as text."
 }
