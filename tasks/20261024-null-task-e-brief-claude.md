@@ -46,10 +46,11 @@ session's Synth Deck, also aimed at 1.1), `tasks/20261024-piano-recognition-plan
    brings it in; only `feat/review-to-synth` still needs taking.
 3. Version (settled by Matt, 2026-10-24): `feat/hub-player` IS 1.1.0 and
    is on `main` (`3caa04a`, sw CACHE guitarlab-v125). The Synth Deck
-   lands next as 1.2.0 (CACHE v126). Your recognizer release is **1.3.0**:
-   APP_VERSION 1.3.0, version.json `web` 1.3.0, sw CACHE above whatever
-   `main` has when you rebase (v127 if 1.2.0 landed), APK channel
-   untouched. Rebase on current `main`, not on 1.0.0.
+   landed as 1.2.0 (CACHE v126). AMENDED 2026-10-25 (Matt): the "1.3 update" is the
+   Synth tab + UI update (Claude); your recognizer release is **1.4.0**:
+   APP_VERSION 1.4.0, version.json `web` 1.4.0, sw CACHE above whatever
+   `main` has when you rebase, APK channel untouched. Rebase on current
+   `main`, not on 1.0.0. See tasks/20261025T0300Z-version-order-1.3-claude.md.
 4. Run every suite in `tests/run.sh` plus `review-to-synth` and the
    `midihub*` ones before handing off. Note: `tests/score-review.test.js`
    times out on Matt's PC at the first PDF render even on your untouched
