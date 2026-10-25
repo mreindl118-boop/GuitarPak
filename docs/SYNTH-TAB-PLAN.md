@@ -18,9 +18,21 @@ Matt's words and ours:
 - Now bar: sound name (library → typed name → MODX factory name → "Program n"), Part, bank/program,
   port; Prev / Next sound; **Save preset** (opens the preset builder with everything captured).
 - The current Live set's page: 4 × 4 slot grid, the active slot highlighted, prev/next page.
-- Super Knob large; four **favourite knobs** (user-chosen from the map; defaults Cutoff, Reverb,
-  Attack, Assign 1); a row of chips for the toggles that matter live (Arp, Motion seq, Split, the
-  Scenes as a 1-8 strip).
+- **Strips, not knobs** (Matt, 2026-10-25: "the knobs were clunky"): every continuous control on
+  the Deck is a horizontal slider strip, 44 px tall, tap or drag anywhere along it, drag away from
+  it for fine steps, the value in big type. The Super Knob is one full-width strip; under it four
+  strips with a **row picker** that mirrors the MODX's knob-function button: Favourites (yours;
+  defaults Cutoff, Reverb, Attack, Assign knob 1) · Tone · Envelope · Effects · Assign 1-4 ·
+  Assign 5-8. Naming: "Assign knob n" = the Assignable Knobs (CC 17-24); "Assign 1 / 2" = the two
+  Assignable SWITCHES by the Super Knob (CC 86 / 87) and they are chips, not strips.
+- Chips for what matters live: Arp, Motion seq, Split, Assign 1, Assign 2, Sustain; the Scenes as a
+  1-8 strip.
+- **Didactic** (Matt: "it should help me learn what things can be done with the MODX as I use it"):
+  an **Explain** toggle in the Deck header; on, every strip, chip and button shows a one-line
+  caption naming the MODX panel control it mirrors, what it does and the message it sends (one
+  source of wording, shared with the Deck tour and the Hub's Learn page); "Try this" nudges read
+  from the loaded Performance (an arpeggio on Part 2 -> "tap Arp and hold a chord"); long-press a
+  control in Explain mode opens its Learn entry. Off = a clean performance screen.
 - A **Perform / Edit** toggle. Edit reveals today's deck tabs (Knobs pages, Buttons, Sounds library
   with the bank browser and Read name from synth, Scope, Map). Nothing is lost; it is folded away.
 - Touch rules: 44 px minimum targets, no hover-only affordances, knobs by drag with a value readout,
