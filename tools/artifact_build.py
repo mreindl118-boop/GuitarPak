@@ -18,7 +18,7 @@ import os, re, shutil, sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ASSET_DIRS = ['js', 'css', 'fonts', 'icons', 'samples', 'data']
-ASSET_EXT = {'.js', '.css', '.woff2', '.ttf', '.svg', '.png', '.mp3'}
+ASSET_EXT = {'.js', '.css', '.woff2', '.ttf', '.svg', '.png', '.mp3', '.json'}  # .json: data/modx-performances.json (1.2.0)
 
 
 def page_html():
