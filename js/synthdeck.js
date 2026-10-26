@@ -58,7 +58,7 @@
   function hex(b) { return api ? api.hex(b) : b.map(function (x) { return ('0' + x.toString(16).toUpperCase()).slice(-2); }).join(' '); }
   function q(sel, root) { return (root || box2 || document).querySelector(sel); }
   function qa(sel, root) { return Array.prototype.slice.call((root || box2 || document).querySelectorAll(sel)); }
-  function active() { return !!(window.App && App.active === 'midihub'); }
+  function active() { return App.active === 'midihub' || App.active === 'deck' || App.active === 'liveset'; } // the Synth tab's pages host the deck too (js/synthtab.js)
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
 
   // ---- store: four blobs, validated / migrated on read, debounced writes ----
@@ -113,6 +113,18 @@
         if (isObj(src.ctl)) for (var i in src.ctl) if (typeof src.ctl[i] === 'number') { part.ctl[i] = clamp(src.ctl[i], 0, 127); any = true; }
       }
       if (any) o.parts[pk] = part;
+    }
+    // 1.3 full snapshot (docs/SYNTH-TAB-PLAN.md): what the Synth tab brings back besides the synth
+    if (isObj(p.snap)) {
+      var sn = {};
+      if (typeof p.snap.colour === 'string' && /^[a-z]{1,12}$/.test(p.snap.colour)) sn.colour = p.snap.colour;
+      if (isObj(p.snap.app) && typeof p.snap.app.root === 'number') sn.app = { root: clamp(Math.round(p.snap.app.root), 0, 11), scale: typeof p.snap.app.scale === 'string' ? p.snap.app.scale.slice(0, 24) : 'major', mode: typeof p.snap.app.mode === 'number' ? clamp(Math.round(p.snap.app.mode), 0, 11) : 0 };
+      if (isArr(p.snap.fav) && p.snap.fav.length === 4 && p.snap.fav.every(function (n) { return typeof n === 'number' && n >= 0 && n < 128; })) sn.fav = p.snap.fav.slice();
+      if (isObj(p.snap.split)) { // the Hub's key split (SLMidiHub.split): {off:true} = this preset switches the split off
+        if (p.snap.split.off) sn.split = { off: true };
+        else if (typeof p.snap.split.at === 'number') sn.split = { at: clamp(Math.round(p.snap.split.at), 1, 127), at2: typeof p.snap.split.at2 === 'number' ? clamp(Math.round(p.snap.split.at2), 1, 127) : null, parts: isArr(p.snap.split.parts) ? p.snap.split.parts.slice(0, 2).map(function (n) { return clamp(num(n, 2), 1, 16); }) : [2], port: typeof p.snap.split.port === 'string' ? p.snap.split.port.slice(0, 40) : '', sus: p.snap.split.sus !== false, on: p.snap.split.on !== false };
+      }
+      if (Object.keys(sn).length) o.snap = sn;
     }
     return o;
   }
@@ -1281,11 +1293,25 @@
     // F0 43 0n 7F 1C bb bb mm aH aM aL dd… F7 (Yamaha bulk dump block)
     if (b[1] !== 0x43 || (b[2] & 0xF0) !== 0x00 || b[3] !== 0x7F || b[4] !== 0x1C) return;
     var sx = api.profile().sysex, ml = sx ? sx.model.length : 1, al = sx ? (sx.addrLen || 3) : 3, a0 = 7 + ml;
-    if (b.length < a0 + al + 1 || hex(b.slice(a0, a0 + al)) !== readJob.addr) return;
+    if (b.length < a0 + al + 1) return;
+    var addr = hex(b.slice(a0, a0 + al));
+    if (addr === hex([0x30, 0x50, 0x00]) && b.length >= a0 + al + 128) { // the eight Assign knob display names (checked on a MODX8+ dump 2026-10-24: "Assigned" when blank)
+      var arr = [];
+      for (var j = 0; j < 8; j++) { var s2 = ''; for (var k2 = 0; k2 < 16; k2++) { var c2 = b[a0 + al + j * 16 + k2]; s2 += (c2 >= 32 && c2 < 127) ? String.fromCharCode(c2) : ' '; } s2 = s2.replace(/\s+$/, '').replace(/^\s+/, ''); arr.push(/^assigned$/i.test(s2) ? '' : s2.slice(0, 16)); }
+      var an = App.store.get('midihub.assignnames', null) || {};
+      an[readJob.msb + '/' + readJob.lsb + '/' + readJob.pc] = arr; App.store.set('midihub.assignnames', an);
+      readJob.assigned = true; App.emit('deck:assignnames', { names: arr });
+      if (readJob.named) readOff();
+      return;
+    }
+    if (addr !== readJob.addr || readJob.named) return;
     var start = typeof readJob.off === 'number' ? readJob.off : a0 + al, s = '';
     for (var i = start; i < Math.min(b.length - 1, start + readJob.len); i++) { var c = b[i]; s += (c >= 32 && c < 127) ? String.fromCharCode(c) : ' '; }
     s = s.replace(/\s+$/, '').replace(/^\s+/, '');
-    var job = readJob; readOff();
+    var job = readJob;
+    // the Assign names block follows the name block in the dump: keep listening a moment for it
+    job.named = true; clearTimeout(job.t); job.t = setTimeout(function () { if (readJob === job) readJob = null; }, 1500);
+    if (job.assigned) readOff();
     if (!s) return toast('The synth answered, but with an empty name');
     var key = job.msb + '/' + job.lsb; names[key] = names[key] || {}; names[key][String(job.pc - 1)] = s.slice(0, 48);
     persist('names'); paintNow(); renderBankGrid(); renderTiles();
@@ -1345,13 +1371,29 @@
     var tags = isArr(o.tags) ? o.tags : String(o.tags || '').split(',');
     tags = tags.map(function (t) { return String(t).trim().slice(0, 20); }).filter(function (t) { return t; }).slice(0, 8);
     var now = Date.now();
-    if (it) { it.name = name; it.tags = tags; it.prog = prog; it.parts = parts; it.updated = now; it.dev = profileKey(); }
-    else { it = { id: uid('p_'), name: name, star: false, tags: tags, dev: profileKey(), prog: prog, parts: parts, created: now, updated: now, used: 0 }; lib.items.push(it); }
+    var snap = it && it.snap ? it.snap : {};
+    if (typeof o.colour === 'string') snap.colour = o.colour.slice(0, 12);
+    if (o.incApp === true) snap.app = appState(); else if (o.incApp === false) delete snap.app;
+    if (isArr(o.fav) && o.fav.length === 4) snap.fav = o.fav.slice();
+    if (o.incSplit === true) { var hs = window.SLMidiHub && SLMidiHub.split ? SLMidiHub.split.get() : null; snap.split = hs ? { at: hs.at, at2: hs.at2 || null, parts: hs.parts.slice(), port: hs.port || '', sus: hs.sus !== false, on: hs.on !== false } : { off: true }; }
+    else if (o.incSplit === false) delete snap.split;
+    if (!Object.keys(snap).length) snap = null;
+    if (it) { it.name = name; it.tags = tags; it.prog = prog; it.parts = parts; it.updated = now; it.dev = profileKey(); if (snap) it.snap = snap; else delete it.snap; }
+    else { it = { id: uid('p_'), name: name, star: false, tags: tags, dev: profileKey(), prog: prog, parts: parts, created: now, updated: now, used: 0 }; if (snap) it.snap = snap; lib.items.push(it); }
     persist('decklib');
     if (mounted) { renderTiles(); paintNow(); openRow = it.id; paintBytes(it.id); }
     if (!savedOnce && mounted) { savedOnce = true; tab('sounds'); revealTile(it.id); }
     toast((o.id ? 'Updated ' : 'Saved ') + name);
     return it;
+  }
+  // the app's own state a preset carries (the context bar's key / scale / mode; the LUMI layout follows)
+  function appState() {
+    var r = App.store.get('fb.root', 9), s = App.store.get('fb.scale', 'minorPent'), m = App.store.get('fb.mode', 0);
+    return { root: typeof r === 'number' ? ((r % 12) + 12) % 12 : 9, scale: typeof s === 'string' ? s : 'minorPent', mode: typeof m === 'number' ? m : 0 };
+  }
+  function applyApp(app) {
+    if (!app || typeof app.root !== 'number') return;
+    App.emit('fb:set', { source: 'synthdeck', root: app.root, scale: app.scale, mode: app.mode });
   }
   function openSaveForm(id) {
     var f = els['save-form'], it = id ? findPreset(id) : null;
@@ -1476,7 +1518,7 @@
     if (els.lstop) els.lstop.hidden = true;
     var it = findPreset(job.id);
     if (stopped) ldStatus('Load stopped at ' + job.i + '/' + job.plan.length);
-    else { if (it) { it.used = Date.now(); persist('decklib'); } lastLoaded = job.id; ldStatus('Loaded ' + job.name + ' → ' + (api.hubOutName() || 'output')); }
+    else { if (it) { it.used = Date.now(); persist('decklib'); if (it.snap && it.snap.app) applyApp(it.snap.app); if (it.snap && it.snap.split && window.SLMidiHub && SLMidiHub.split) SLMidiHub.split.set(it.snap.split.off ? null : it.snap.split); } lastLoaded = job.id; ldStatus('Loaded ' + job.name + ' → ' + (api.hubOutName() || 'output')); }
     paintButtons(); paintPageKnobs(); paintNow(); if (mounted) renderTiles();
     job.resolve({ sent: job.sent, planned: job.plan.length, stopped: !!stopped });
   }
@@ -1647,8 +1689,51 @@
   }
 
   // ============================================================ PUBLIC ====
+  // ---- PERFORM: what the Synth tab's play face (js/synthtab.js) needs ----
+  // Everything still goes through sendCtl / the Hub's turn(), so the LUMI
+  // guard, Rules-on-app-controls, the ledger and the switch states hold.
+  function tapCtl(id) {
+    var ctl = ctlById(id); if (!ctl) return false;
+    if (unsure(ctl)) { toast('No number yet — set it in Map or tap Learn'); return false; }
+    if (ctl.ui === 'toggle') { var next = getState(ctl) === 1 ? 0 : 1; if (!sendCtl(ctl, next ? 'on' : 'off')) return false; setState(ctl, next); paintButtons(); return true; }
+    if (ctl.ui === 'radio') { if (!sendCtl(ctl, 'val')) return false; setState(ctl, typeof ctl.val === 'number' ? ctl.val : 0); paintButtons(); return true; }
+    if (ctl.ui === 'trigger') return sendCtl(ctl, 'val');
+    return false;
+  }
+  function ctlInfo(id) {
+    var ctl = ctlById(id); if (!ctl) return null;
+    var st = getState(ctl), on = ctl.ui === 'radio' ? (st != null && st === (typeof ctl.val === 'number' ? ctl.val : 0)) : st === 1;
+    return { id: ctl.id, name: ctl.name, ui: ctl.ui, on: on, unsure: unsure(ctl), conf: ctl.conf, num: ctl.num };
+  }
+  var PERFORM = {
+    ready: function () { return !!(api && deck && lib); }, // the Hub mounts the deck after the Synth tab's pages init
+    now: function () { var t = nowText(), p = hubProg(); return { name: t.name, sub: t.sub, bad: t.bad, msb: p.msb, lsb: p.lsb, pc: p.pc, part: api.ch(), out: api.hubOutName ? (api.hubOutName() || '') : '', match: matchPreset() }; },
+    step: stepProgram,
+    presets: function () { return lib ? lib.items.slice() : []; },
+    load: load,
+    openSave: function () { tab('sounds'); openSaveForm(null); },
+    kv: function (cc) { return api ? api.kv(cc) : 0; },
+    turn: function (cc, v) { if (!api || !txCheck([0xB0])) return false; api.turn(cc, v); return true; },
+    knobs: function () { return api ? api.allKnobs() : []; },
+    ccName: function (cc) { return api && api.ccName ? api.ccName(cc) : null; },
+    tap: tapCtl, ctl: ctlInfo,
+    save: save, find: findPreset, appState: appState,
+    // Live: all notes off + sustain off on every channel, through the deck's funnel
+    // profiles (js/synthlive.js): the whole library + names as JSON, and a replace that swaps them
+    exportJSON: exportJSON,
+    replaceSounds: function (obj) { lib.items.length = 0; for (var k in names) if (k !== 'v') delete names[k]; var r = importJSON(obj || {}); persist('decklib'); persist('names'); if (mounted) { renderTiles(); paintNow(); } return r; },
+    panic: function () { if (!txCheck([0xB0])) return false; var n = 0; for (var c = 0; c < 16; c++) { if (tx([0xB0 | c, 123, 0], 'raw')) n++; tx([0xB0 | c, 120, 0], 'raw'); tx([0xB0 | c, 64, 0], 'raw'); } return n > 0; },
+    // a bank/program (e.g. a MODX Live Set slot: MSB 62, LSB page, PC slot) on the current Part
+    program: function (msb, lsb, pc) { if (!txCheck([0xC0])) return false; api.sendProgram(pc, msb, lsb); paintNow(); return true; },
+    persist: function () { persist('decklib'); if (mounted) { renderTiles(); paintNow(); } },
+    // the Performance's own names for Assign knobs 1-8 (Read name from synth fills them), or null
+    assignNames: function () { var p = hubProg(), an = App.store.get('midihub.assignnames', null); var a = an && an[p.msb + '/' + p.lsb + '/' + p.pc]; return Array.isArray(a) ? a : null; },
+    readName: readName
+  };
+
   var DECK = {
     version: VERSION,
+    perform: PERFORM,
     init: init, stop: stop, onPart: onPart, onBack: onBack,
     hubKnobs: hubKnobs, map: function (pk) { return deck ? map(pk) : null; }, setControl: setControl, resetMap: resetMap, learn: learn,
     presets: function () { return lib ? lib.items.slice() : []; }, save: save, load: load, recallPlan: recallPlan, cancelLoad: function () { return cancelLoad(); },

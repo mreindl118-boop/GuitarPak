@@ -1,5 +1,9 @@
 # Synth Deck — control your synth from soundLAB (1.2.0)
 
+> 1.3: the deck is the **Deck** pill of the Synth tab (docs/SYNTH-TAB.md): a strips-based play
+> face, presets with a full snapshot, key splits, Live sets and profiles. Everything below still
+> exists under **Edit** and **Hub**.
+
 The **Synth Deck** is the Control view of the MIDI Hub (*Keys › MIDI*). It turns the Hub into a
 control surface for whatever synth is on the cable — built around the owner's Yamaha MODX8+ but
 device-agnostic: every number it sends lives in an editable, MIDI-learnable **Map**, and a generic

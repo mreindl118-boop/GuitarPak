@@ -1,5 +1,5 @@
 /* GuitarLab service worker — cache-first so the app works fully offline once visited. */
-var CACHE = 'guitarlab-v126';
+var CACHE = 'guitarlab-v127';
 var ASSETS = [
   '.',
   'index.html',
@@ -47,6 +47,8 @@ var ASSETS = [
   'js/synthdeck-maps.js',
   'js/synthdeck-scope.js',
   'js/synthdeck.js',
+  'js/synthtab.js',
+  'js/synthlive.js',
   'data/modx-performances.json',
   'js/lumi-practice.js',
   'js/xp.js',
