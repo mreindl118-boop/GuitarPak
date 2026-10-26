@@ -123,8 +123,10 @@ async function contextSnapshot(page) {
         ok(style.ink !== style.paper && style.svg !== 'none', theme + ' clef uses visible themed ink and background');
         const contrast = await page.evaluate(() => {
           const luma = color => color.match(/[\d.]+/g).slice(0, 3).map(Number).map(v => v / 255).map(v => v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4).reduce((sum, v, i) => sum + v * [.2126, .7152, .0722][i], 0);
+          // a ghost button (transparent background) sits on its nearest painted ancestor - the top bar
+          const paperOf = el => { for (let e = el; e; e = e.parentElement) { const bg = getComputedStyle(e).backgroundColor, a = bg.match(/[\d.]+/g); if (a && (a.length < 4 || Number(a[3]) > 0)) return bg; } return 'rgb(255, 255, 255)'; };
           return ['ctx-btn', 'cx-root', 'cx-scale', 'cx-bpm', 'cx-sig'].every(id => {
-            const s = getComputedStyle(document.getElementById(id)), ink = luma(s.color), paper = luma(s.backgroundColor);
+            const el = document.getElementById(id), s = getComputedStyle(el), ink = luma(s.color), paper = luma(paperOf(el));
             return (Math.max(ink, paper) + .05) / (Math.min(ink, paper) + .05) >= 4.5;
           });
         });
