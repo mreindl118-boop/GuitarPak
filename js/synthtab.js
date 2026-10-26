@@ -119,6 +119,7 @@
           '<button type="button" data-mode="edit" class="' + (mode() === 'edit' ? 'active' : '') + '" aria-pressed="' + (mode() === 'edit') + '">Edit</button>' +
         '</div>' +
       '</div>' +
+      '<div id="st-conn" role="status" hidden></div>' + // why a tap reaches nothing + the fix (the deck's connection bar)
       '<div class="st-perform" id="st-perform"' + (mode() === 'perform' ? '' : ' hidden') + '>' +
         '<div class="card st-now" id="st-now">' +
           '<div class="st-nowname" id="st-nowname"></div><div class="muted small" id="st-nowsub"></div>' +
@@ -161,7 +162,7 @@
           '<p class="muted small" id="st-pnote"></p>' +
         '</form>' +
       '</div></div>';
-    ['perform', 'edit', 'nowname', 'nowsub', 'prev', 'next', 'save', 'pins', 'superval', 'chips', 'scenes', 'sheet', 'sheetclose', 'form', 'pid', 'pname', 'ptags', 'colours', 'incs', 'capture', 'psave', 'pnote', 'splitbox', 'splittext', 'splitat', 'splitpart', 'splitlearn'].forEach(function (id) { els[id] = q('#st-' + id); });
+    ['conn', 'perform', 'edit', 'nowname', 'nowsub', 'prev', 'next', 'save', 'pins', 'superval', 'chips', 'scenes', 'sheet', 'sheetclose', 'form', 'pid', 'pname', 'ptags', 'colours', 'incs', 'capture', 'psave', 'pnote', 'splitbox', 'splittext', 'splitat', 'splitpart', 'splitlearn'].forEach(function (id) { els[id] = q('#st-' + id); });
     var h = ''; for (var n = 36; n <= 84; n++) h += '<option value="' + n + '"' + (n === 60 ? ' selected' : '') + '>' + noteName(n) + '</option>'; els.splitat.innerHTML = h;
     h = ''; for (var k = 1; k <= 16; k++) h += '<option value="' + k + '"' + (k === 2 ? ' selected' : '') + '>' + k + '</option>'; els.splitpart.innerHTML = h;
     els.form.addEventListener('submit', function (e) { e.preventDefault(); submitSheet(); });
@@ -173,7 +174,8 @@
     var p = P(); if (!face || !p) return;
     var now = p.now();
     els.nowname.textContent = now.name;
-    els.nowsub.textContent = now.sub + (now.out ? ' → ' + now.out : '');
+    els.nowsub.textContent = now.sub; // already ends '→ <port>' (or the reason there is none)
+    if (p.connBar) p.connBar(els.conn);
     els.nowsub.classList.toggle('bad', !!now.bad);
     // the active Live set's page as one-tap slots; without a set, the pinned sounds
     var lv = window.SLSynthLive, lset = lv ? lv.active() : null;
@@ -426,6 +428,8 @@
       // values the synth changes (two-way knobs, program changes) show up without a tap
       App.on('midi:raw', function () { if (App.active === 'deck' && !drag) schedulePaint(); });
       App.on('midi:state', function () { if (App.active === 'deck') schedulePaint(); });
+      // a refused tap: repaint the connection bar now and give it a nudge so the eye goes there
+      App.on('synth:conn', function (d) { if (App.active !== 'deck') return; paint(); if (d && d.refused && P() && P().nudgeBar) P().nudgeBar(els.conn); });
       App.on('deck:assignnames', function () { if (App.active === 'deck') render(); }); // the strips take the Performance's knob names
       App.on('midihub:split', function () { if (App.active === 'deck') { paintChips(); if (els.sheet && !els.sheet.hidden) paintSplitBox(); } });
       App.on('synthlive:slot', function () { if (App.active === 'deck') schedulePaint(); });

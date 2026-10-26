@@ -54,7 +54,9 @@
   function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
   function uid(p) { return (p || 'u_') + Date.now().toString(36).slice(-5) + Math.floor(Math.random() * 46656).toString(36); }
   function esc(s) { return api ? api.esc(s) : String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
-  function toast(m) { if (api && api.toast) api.toast(m); }
+  // the Hub's toast lives inside the Hub page: on the Deck / Live pages a
+  // refusal must show where the tap was, so it goes to the app's toast there
+  function toast(m) { if (App.active !== 'midihub' && App.toast) App.toast(m); else if (api && api.toast) api.toast(m); }
   function hex(b) { return api ? api.hex(b) : b.map(function (x) { return ('0' + x.toString(16).toUpperCase()).slice(-2); }).join(' '); }
   function q(sel, root) { return (root || box2 || document).querySelector(sel); }
   function qa(sel, root) { return Array.prototype.slice.call((root || box2 || document).querySelectorAll(sel)); }
@@ -369,16 +371,87 @@
     if (ctl.kind === 'pc') return { bytes: [0xC0 | c, data & 127], origin: undefined };
     return { bytes: [0xB0 | c, ctl.num & 127, data & 127], origin: undefined };
   }
-  function refuse(msg) { var now = Date.now(); if (now - lastRefuse > 400) toast(msg); lastRefuse = now; }
+  // one toast per burst (a refused strip drag calls this every frame); true = this call spoke
+  var lastRefuseOn = '';
+  function refuse(msg) { var now = Date.now(), fresh = now - lastRefuse > 400 || lastRefuseOn !== App.active; if (fresh) toast(msg); lastRefuse = now; lastRefuseOn = App.active; return fresh; }
   function outIsLumi() { return /lumi/i.test(api.hubOutName() || ''); }
   function txCheck(bytes) {
-    var why = !api.hasOut() ? 'No MIDI output — pick one above' : outIsLumi() ? 'That output is the LUMI (key lights) — pick the synth under Synth out' :
+    var c = !api.hasOut() || outIsLumi() ? connState() : null;
+    var why = c && c.kind !== 'ok' ? c.refuse :
       (bytes && bytes[0] === 0xF0 && !api.sysexOk) ? 'SysEx not allowed by the browser — reconnect MIDI and allow SysEx' : null;
     if (!why) return true;
-    refuse(why);
+    var fresh = refuse(why);
     if (mounted) { paintNow(); paintNative(); } // the Now bar shows the same reason
+    if (fresh) App.emit('synth:conn', { refused: why }); // the Deck / Live connection bar repaints + nudges
     return false;
   }
+
+  // ---- CONNECTION (the Deck and Live pages' bar): why a tap would reach
+  // nothing, with the fix in place — Connect MIDI, or pick the synth. The Hub
+  // page has its own In / Synth out row, so outside it this is the only place
+  // a player sees it. Native bridges (Android / iOS) have ONE output, shared
+  // with the key lights: picking the synth there moves that output.
+  function connState() {
+    var m = api && api.midi();
+    var onHub = App.active === 'midihub'; // the Hub page shows its own In / Synth out row
+    if (!m || !m.supported) return { kind: 'nomidi', refuse: 'Not sent: no MIDI in this browser',
+      text: 'No MIDI in this browser, so nothing reaches the synth. On a computer use Chrome or Edge; on an iPad, the Web MIDI Browser app with the synth on a USB adapter.' };
+    if (!m.ready) return { kind: 'off', refuse: 'Not sent: MIDI is off — tap Connect MIDI', text: 'MIDI is off, so the controls cannot reach the synth yet.' };
+    var lumi = api.hasOut() && outIsLumi();
+    if (api.hasOut() && !lumi) return { kind: 'ok' };
+    var native = !!(m.platform && m.platform !== 'web');
+    var outs = (m.outputs || []).filter(function (p) { return !/lumi|microsoft gs wavetable/i.test(p.name || ''); }); // Windows' built-in GM synth is not the synth on the cable
+    if (!outs.length) return { kind: 'nosynth', refuse: 'Not sent: no synth connected',
+      text: (lumi ? 'Only the LUMI (key lights) is connected' : 'No MIDI output found') + ': connect the synth (its USB cable, or a MIDI interface) and it shows up here.' };
+    return { kind: 'pick', native: native, outs: outs,
+      refuse: 'Not sent: ' + (lumi ? 'the output is the LUMI (key lights)' : 'no synth chosen') + (onHub ? ' — pick the synth under Synth out' : ' — pick the synth'),
+      text: native ? (lumi ? 'This device sends MIDI to one place at a time, and it is the LUMI (key lights).' : 'No MIDI output chosen.') + ' Send to:'
+        : (lumi ? 'Synth out is the LUMI (key lights).' : 'No synth output chosen.') + ' Send to:',
+      note: native && lumi ? 'The key lights stop while the synth has the output; Settings › MIDI switches it back.' : '' };
+  }
+  function connChanged() { if (mounted) { paintNow(); paintNative(); } App.emit('synth:conn', {}); }
+  function connPick(id) {
+    var m = api.midi(), extra = ''; if (!m) return;
+    if (m.platform && m.platform !== 'web') {
+      m.setOutput(id); // the one native output (the same call Settings › MIDI makes)
+      // key lights are note-ons: on a synth they would PLAY, so they go off (the clef's LED toggle brings them back)
+      if (m.lightsOn && !m.lumi && m.setLedMode) { m.setLedMode('off'); extra = ' · key lights off'; }
+    } else api.setOut(id);
+    connChanged();
+    var c = connState();
+    toast(c.kind === 'ok' ? 'Sending to ' + (api.hubOutName() || 'the synth') + extra : c.refuse);
+  }
+  function connect() {
+    var m = api.midi(); if (!m) return;
+    m.enable().then(function () { connChanged(); var c = connState(); toast(c.kind === 'ok' ? 'MIDI on — sending to ' + (api.hubOutName() || 'the synth') : c.refuse); })
+      .catch(function () { toast('MIDI access was declined — allow MIDI for this site in the browser’s settings'); connChanged(); });
+  }
+  // paint the bar into el (hidden when all is well); wires its own taps once
+  function connBar(el) {
+    if (!el || !api) return;
+    var c = connState();
+    el.hidden = c.kind === 'ok';
+    if (c.kind === 'ok') { el.innerHTML = ''; return; }
+    var h = '<span class="sdk-conntext">' + esc(c.text) + '</span>';
+    if (c.kind === 'off') h += '<button type="button" class="btn sm primary" data-conn="connect">Connect MIDI</button>';
+    if (c.kind === 'pick') h += '<span class="sdk-connouts">' + c.outs.slice(0, 4).map(function (p) { return '<button type="button" class="btn sm primary" data-conn-out="' + esc(String(p.id)) + '">' + esc(p.name || String(p.id)) + '</button>'; }).join('') + '</span>';
+    if (c.note) h += '<span class="sdk-connnote muted small">' + esc(c.note) + '</span>';
+    el.innerHTML = h;
+    el.classList.add('sdk-conn');
+    if (!el._connWired) {
+      el._connWired = true;
+      el.addEventListener('click', function (e) {
+        var b = e.target.closest('button'); if (!b || !el.contains(b)) return;
+        if (b.dataset.conn === 'connect') connect();
+        else if (b.dataset.connOut != null) {
+          var m = api.midi(), id = b.dataset.connOut;
+          var port = m && (m.outputs || []).filter(function (p) { return String(p.id) === id; })[0];
+          connPick(port ? port.id : id);
+        }
+      });
+    }
+  }
+  function nudgeBar(el) { if (!el || el.hidden) return; el.classList.remove('nudge'); void el.offsetWidth; el.classList.add('nudge'); }
   // THE funnel: every byte the deck sends goes through here
   function tx(bytes, origin) {
     if (!api || !isArr(bytes) || !bytes.length) return false;
@@ -588,7 +661,7 @@
   }
   function outLabel() {
     if (!api.hasOut()) return { text: 'no output', bad: true };
-    if (outIsLumi()) return { text: 'LUMI (key lights) — pick the synth under Synth out', bad: true };
+    if (outIsLumi()) return { text: 'LUMI (key lights)' + (App.active === 'midihub' ? ' — pick the synth under Synth out' : ''), bad: true }; // elsewhere the connection bar has the fix
     return { text: api.hubOutName() || 'output', bad: false };
   }
   function nowText() {
@@ -1645,6 +1718,10 @@
       '.sdk-pin.active{color:var(--accent-ink);border-color:var(--accent-line);background:var(--accent-soft)}' +
       '.sdk-ldrow{margin-top:6px}.sdk-ldrow:empty{display:none}#sdk-ldst{font-size:12.5px;color:var(--muted)}#sdk-ldst:empty{display:none}' +
       '#sdk-native{margin-top:8px}#sdk-native.info{color:var(--warn)}' +
+      '.sdk-conn{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin:0 0 12px;padding:10px 12px;border:1px solid var(--warn);border-radius:12px;background:var(--card2);font-size:14px}.sdk-conn[hidden]{display:none}' +
+      '.sdk-conntext{flex:1 1 220px;min-width:0}.sdk-connouts{display:flex;flex-wrap:wrap;gap:8px}.sdk-conn .btn{min-height:var(--h-ctl,40px)}.sdk-connnote{flex-basis:100%}' +
+      '.sdk-conn.nudge{animation:sdk-nudge .45s ease}@keyframes sdk-nudge{0%,100%{transform:none}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}' +
+      '@media (prefers-reduced-motion:reduce){.sdk-conn.nudge{animation:none;outline:2px solid var(--warn)}}' +
       '.sdk-form{margin-top:12px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--card2)}.sdk-form .row{margin-bottom:8px}.sdk-form .row:last-child{margin-bottom:0}' +
       '.sdk-form input[type=text]{min-width:0;width:200px;max-width:100%}.sdk-form .seg button{min-height:40px}' +
       '.seg.sdk-tabs{display:flex;width:100%;margin:0 0 12px;box-sizing:border-box}.sdk-tabs button{flex:1;min-height:44px;font-size:14px;padding:4px 6px}' +
@@ -1728,7 +1805,12 @@
     persist: function () { persist('decklib'); if (mounted) { renderTiles(); paintNow(); } },
     // the Performance's own names for Assign knobs 1-8 (Read name from synth fills them), or null
     assignNames: function () { var p = hubProg(), an = App.store.get('midihub.assignnames', null); var a = an && an[p.msb + '/' + p.lsb + '/' + p.pc]; return Array.isArray(a) ? a : null; },
-    readName: readName
+    readName: readName,
+    // the connection bar (Deck / Live): state, paint into an element, nudge on a refusal
+    conn: function () { return api ? connState() : { kind: 'off' }; },
+    connBar: connBar, nudgeBar: nudgeBar,
+    // can a channel message go out now? false = refused (toast + the bar says why)
+    check: function () { return !!api && txCheck([0xB0]); }
   };
 
   var DECK = {

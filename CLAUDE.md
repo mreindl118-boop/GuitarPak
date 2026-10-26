@@ -665,6 +665,10 @@ version.json      auto-update feed (source of truth for latest version)
   listeners that make SOUND register with App.on(evt, fn, true) — the third
   arg puts them first, ahead of visual listeners. App.keys.play(midi, when,
   dur, gain) = the Keys page's sampled piano for other modules (quiz).
+- App.toast(msg, ms?) (v1.3.1): the ONE app-wide status toast (#app-toast,
+  role=status) for a tap that did nothing visible elsewhere — use it instead of
+  a toast element inside a page that may be hidden (the Hub's #mh-toast only
+  shows on the Hub page; the Synth Deck routes its refusals here off it).
 - New bus events: `note:input` {on, midi, vel, src, dur?} — user played a note
   on an on-screen instrument (piano QWERTY/touch emit it; capture listens
   alongside midi:note), `space` {space} after a workspace switch.

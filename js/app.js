@@ -90,7 +90,7 @@ window.App = (function () {
   //            when an APK is actually built. Older APKs read nothing else, so
   //            this must never run ahead of the real file: when it did, the
   //            Android app kept downloading the same old APK in a loop.
-  var APP_VERSION = '1.3.0';
+  var APP_VERSION = '1.3.1';
   var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
 
   function verNum(v) {
@@ -1655,6 +1655,24 @@ window.App = (function () {
   }
   ['fb:set', 'fb:scale', 'scale:lock'].forEach(function (event) { on(event, checkLockBoundary); });
 
+  // one app-wide toast (#app-toast, a status line over every page): what a
+  // page says when a tap did nothing — a refused MIDI send, a capture
+  var toastT = null;
+  function toast(msg, ms) {
+    var el = document.getElementById('app-toast');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'app-toast';
+      el.setAttribute('role', 'status');
+      el.setAttribute('aria-live', 'polite');
+      document.body.appendChild(el);
+    }
+    el.textContent = String(msg == null ? '' : msg);
+    el.hidden = false;
+    if (toastT) clearTimeout(toastT);
+    toastT = setTimeout(function () { el.hidden = true; toastT = null; }, ms || 3200);
+  }
+
   return {
     register: register,
     icon: icon,
@@ -1668,6 +1686,7 @@ window.App = (function () {
     on: on,
     emit: emit,
     injectCSS: injectCSS,
+    toast: toast,
     showBar: showBar,
     help: help,
     colors: colors,

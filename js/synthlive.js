@@ -106,6 +106,9 @@
   var COLOURS = { amber: '#ffab47', teal: '#2fb8a0', blue: '#4f8df5', pink: '#e06aa0', green: '#7dc45a', grey: '#8a8580' };
   function go(d, idx) {
     var page = pageOf(d), sl = page && page[idx], p = P(); if (!sl || !p) return false;
+    // nothing can go out (MIDI off, no synth, the LUMI): the slot stays where it was
+    // and the connection bar says why — the stage must never show a sound that was not sent
+    if (p.check && !p.check()) return false;
     d.slot = idx; save(d);
     if (sl.preset) p.load(sl.preset).then(function () { paint(); App.emit('synthlive:slot', { idx: idx }); });
     else if (sl.modx) { p.program(62, sl.modx.lsb, sl.modx.pc); paint(); App.emit('synthlive:slot', { idx: idx }); }
@@ -136,6 +139,7 @@
     }
     var fs = g('fsCC', null);
     root.innerHTML =
+      '<div id="st-lvconn" role="status" hidden></div>' + // the deck's connection bar: why a slot would reach nothing + the fix
       (live ? '' :
       '<div class="st-lvtop">' +
         '<label class="field st-lvsel">Set<select id="st-lvset">' + d.sets.map(function (x) { return '<option value="' + esc(x.id) + '"' + (x.id === s.id ? ' selected' : '') + '>' + esc(x.name) + '</option>'; }).join('') + '</select></label>' +
@@ -167,7 +171,8 @@
       (live ? '<div class="st-lvacts"><button type="button" class="btn st-big" id="st-lvprev">‹ Prev</button><button type="button" class="btn st-big" id="st-lvnextb">Next ›</button><button type="button" class="btn st-big st-panic" id="st-lvpanic">Panic</button></div>' +
         '<p class="muted small st-lvhint">Screen stays on. ' + (locked ? 'Locked: hold a slot to load it.' : 'Lock to make slots press-and-hold.') + '</p>' : '') +
       '<div class="st-lvpick" id="st-lvpick" hidden></div>';
-    ['lvset', 'lvgrid', 'lvpick'].forEach(function (id) { els[id] = q('#st-' + id); });
+    ['lvset', 'lvgrid', 'lvpick', 'lvconn'].forEach(function (id) { els[id] = q('#st-' + id); });
+    var p = P(); if (p && p.connBar) p.connBar(els.lvconn);
   }
   function nextName(d) {
     var s = active(d); if (!s) return '—';
@@ -289,6 +294,9 @@
         var fs = g('fsCC', null); if (fs == null || b[1] !== fs || b[2] === 0) return;
         if (App.active === 'liveset' || App.active === 'deck') debounced(1);
       });
+      // ports come and go, a refused tap: repaint (the connection bar) and nudge it
+      App.on('midi:state', function () { if (App.active === 'liveset' && picking == null) render(); });
+      App.on('synth:conn', function (d) { if (App.active !== 'liveset' || picking != null) return; render(); var p = P(); if (d && d.refused && p && p.nudgeBar) p.nudgeBar(els.lvconn); });
       // a LUMI's octave buttons (option): down = previous, up = next
       App.on('midi:range', function (r) {
         if (!r || !r.lumi || r.prev == null || !g('octStep', false)) return;
@@ -297,7 +305,12 @@
       });
       render();
     },
-    onShow: function () { if (App.midi && App.midi.mute) App.midi.mute('synthlive', App.store.get('midihub.hear', false) !== true); render(); },
+    onShow: function () {
+      if (App.midi && App.midi.mute) App.midi.mute('synthlive', App.store.get('midihub.hear', false) !== true);
+      var m = App.midi; // MIDI was on last time: reconnect quietly (as the Deck does)
+      if (m && m.supported && !m.ready && App.store.get('midi.wanted', false)) m.enable().then(render).catch(function () { });
+      render();
+    },
     onHide: function () { if (live) setLive(false); closePicker(); learnFs = false; if (App.midi && App.midi.mute) App.midi.mute('synthlive', false); },
     onBack: function () { if (picking != null) { closePicker(); return true; } if (live) { setLive(false); return true; } if (editing) { editing = false; render(); return true; } return false; }
   });

@@ -38,6 +38,25 @@ the design boards Matt chose from: the "Synth Deck design options" artifact (opt
   `turn()`), so the LUMI guard, Rules-on-app-controls and the musical ledger apply. Nothing is sent
   on show, on a tab switch or on a profile switch.
 
+## Connection bar (1.3.1)
+
+A tap that cannot reach the synth is never silent. `connState()` in `js/synthdeck.js` names the one
+thing in the way, and `perform.connBar(el)` paints it at the top of the Deck face (`#st-conn`) and the
+Live page (`#st-lvconn`), hidden while all is well:
+
+- **No MIDI in this browser** (Safari on an iPad): where it works instead.
+- **MIDI is off** (never connected in this browser): *Connect MIDI* (`App.midi.enable()`).
+- **Synth out is the LUMI / none chosen**: one button per port that is not a LUMI or Windows' GS
+  Wavetable; a tap sets the Hub's Synth out (`SLMidiHub.api.setOut`, the same store as its select).
+  On **Android / iOS** the app has ONE output shared with the key lights, so the tap moves that output
+  (`App.midi.setOutput`, as Settings › MIDI does) and, if key lights would paint a non-LUMI output, sets
+  the LED mode off — lights are note-ons and would play on the synth.
+- **Only the LUMI is connected**: connect the synth's cable.
+
+A refused tap (`txCheck`) toasts where the player is — `App.toast` (the app-wide `#app-toast`) on the
+Deck / Live pages, the Hub's own `#mh-toast` on the Hub page — emits `synth:conn {refused}` and nudges
+the bar. A Live slot is marked loaded only when its program could go out (`perform.check()`).
+
 ## Presets (the builder)
 
 *Save preset* opens a sheet: name, tags, colour, and what the preset remembers — **Sound**
@@ -95,3 +114,6 @@ statechange path), offline (PWA + localStorage; export as the backup), readable 
 and slot badges; splits (rule + port, chip, bytes per zone, pedal copy, presets, the LUMI thru guard);
 Live sets (slots, MODX slot bytes, stepping, foot switch, Go live / lock / panic / exit, the Deck
 grid); profiles; the phone and iPad layouts. The LUMI bucket must stay empty throughout.
+`tests/synthconn.test.js`: the connection bar in every cut-off state (MIDI off, Synth out on the
+LUMI, only a LUMI + GS Wavetable, no Web MIDI, the Android bridge on the LUMI), the refusal toasts,
+the Live slot that stays put, and the same tap sending after the one-tap fix.
