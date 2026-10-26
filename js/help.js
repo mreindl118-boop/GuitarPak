@@ -92,6 +92,18 @@
       { sel: '#st-list', t: 'Your tracks', x: 'Each row: arm Live (your MIDI/typing keys play its instrument), rename, Mute / Solo, volume, Edit to open its editor, × to delete.' },
       { sel: '#st-editor', t: 'The editor', x: 'Whatever’s selected opens here — drum steps (press and drag to paint), the piano roll (press empty space and DRAG to draw a note; drag notes to move, drag their right edge to stretch, tap to remove), synth voice knobs, or the sampler’s file + root note. Every track also has an FX slot.' }
     ],
+    deck: [
+      { sel: '#st-now', t: 'Your synth, on this screen', x: 'The sound the synth is on, its Part and program. Prev and Next step programs; Save preset keeps the sound, the strips, the buttons, the Scene, the key split and the app’s key as one preset. The grid under it is your Live set page (or your pinned sounds).' },
+      { sel: '.st-strips', t: 'Strips, not knobs', x: 'Tap or drag anywhere along a strip; drag up or down away from it for fine steps. The Super Knob is the wide one. The row picker is the synth’s knob-function button: Favourites is yours, the others follow the MODX rows; Assign knobs are named by what the Performance wired them to.' },
+      { sel: '#st-chips', t: 'Buttons and Scenes', x: 'Arp and Motion seq are the panel buttons; Split sends the keys below a point to another Part; Assign 1 and 2 are the two switches by the Super Knob; Scenes 1–8 recall what the Performance stored in them.' },
+      { sel: '#st-explain', t: 'Explain', x: 'Switch on the ? and every control gets a line about what it does on the synth and what it sends. Edit shows everything the deck has: knob pages, every button, your Sounds with the bank browser, the Scope and the Map.' }
+    ],
+    liveset: [
+      { sel: '#st-lvgrid', t: 'Pages of 16', x: 'A Live set is pages of 16 slots, like the synth’s own Live Sets. Edit slots, then tap a slot to put a preset on it (or a MODX Live Set slot). Tap a filled slot to load it; Next and Prev step through them across pages.' },
+      { sel: '.st-lvopts', t: 'Hands-free', x: 'Learn a foot switch once and every press steps to the next slot. With a LUMI, its octave buttons can step too.' },
+      { sel: '#st-lvgo', t: 'Go live', x: 'Only the grid, the sound you are on and the next one. Lock makes every slot a press-and-hold so nothing changes by accident; Panic silences every channel; the screen stays on.' },
+      { sel: '.st-lvprof', t: 'Profiles', x: 'A profile is a whole setup: your sounds, sets and Deck settings. Make one per player or per gig, export it as a file, import it on another device.' }
+    ],
     midihub: [
       { sel: '#mh-views', t: 'Player', x: 'Open a MIDI or MusicXML file and play it on your synth: tempo, a loudest-note cap, transpose, and Change key to move a piece into any key or scale. Open as tab turns it into guitar tab on the Songs page.' },
       { sel: '#mh-views', t: 'Control your synth', x: 'Control is the Synth Deck: your current sound at the top, the big knobs (filter, envelope, effects, volume), buttons for scenes, arpeggiator and Motion Sequencer, sounds you save and load with one tap, and a Scope that draws what the synth is playing. Your synth’s own knobs move the ones here too.' },

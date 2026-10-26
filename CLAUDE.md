@@ -186,6 +186,12 @@ js/keylessons.js  │ SCALE LESSONS on the Keys page (mounted into #pn-lessons
                   │  hide, app hide; summary() feeds Exercises Progress.
 js/songs.js       │ (songs: user-imported ASCII tab / MIDI parsed on-device,
                   │  bar-loop player at shared tempo, key detect → fb:set)
+                  │  1.3 ONE OPEN: the "Open a score" card above Add a song
+                  │  takes .mid/.midi/.musicxml/.xml/.mxl/.txt and routes it:
+                  │  Play on synth (SLMidiHub.player.loadFile/loadScore + show),
+                  │  Practice (window.Woodshed.importMidi + addScore -> shed),
+                  │  Open as tab (App.songs.fromMidi/load, text -> the paste
+                  │  box). Suite tests/oneopen.test.js.
 js/lumi-practice.js LUMI note/triad practice under Keys (selectively recovered
                   from b8ccb55; see docs/LUMI-PRACTICE.md). Session-only
                   simulated answers by default; optional exact LUMI/MODX
@@ -392,6 +398,16 @@ js/midihub.js     MIDI HUB page ('midihub', Keys group, pill "MIDI", v0.78.0;
                   midihub.msb/lsb), Send all, Reset knobs. TWO-WAY: onRaw
                   moves a knob / the program number when the synth sends
                   that CC / Program Change on the selected Part.
+                  v1.3.0 KEY SPLITS + PORT MATCH: a rule can match the source
+                  port (m.port substring; Thru carries the port through
+                  applyRules); SLMidiHub.split {get,set,enable,text,rules}
+                  makes rules tagged split ("notes below C4 on the LUMI ->
+                  Part 2", only note on/off, the hold pedal copied to every
+                  zone's Part); the Rules view has a Split row; Thru never
+                  forwards to a LUMI-named output; views renamed Deck / Keys
+                  / CCs (ids unchanged). The MIDI Hub is the 'Hub' pill of
+                  the SYNTH group (app.js GROUPS gsynth: deck, liveset,
+                  midihub), no longer under Keys.
                   v1.1.0 PLAYER view ('player', after Control): opens .mid/
                   .midi (own reader: tempo map, running status; program/
                   other CC/SysEx dropped + reported), MusicXML (.musicxml/
@@ -460,6 +476,20 @@ data/             app data files: modx-performances.json (2,143 MODX factory
                   Performance names by LSB/PC, parsed from a public Cakewalk
                   .ins list; MSB 63 and 64 share the layout). In sw ASSETS,
                   the artifact build and the APK asset copy.
+js/synthtab.js    SYNTH TAB (1.3, docs/SYNTH-TAB.md): pages 'deck' (the play face
+                  over the Synth Deck: Now bar, STRIPS not knobs with a row
+                  picker that mirrors the MODX knob-function button, Assign
+                  knobs named from the Performance dump, chips + Scenes,
+                  EXPLAIN captions, Perform <-> Edit = the Hub's borrowed
+                  Control view, the preset builder sheet = full snapshot
+                  {colour, app key/scale, fav strips, split}) - everything
+                  through App.synthDeck.perform.* so the deck's funnel holds.
+js/synthlive.js   page 'liveset': Live sets in pages of 16 (presets or MODX
+                  Live Set slots MSB 62), stepping (Next/Prev, foot switch CC
+                  synthtab.fsCC, LUMI octave buttons option), GO LIVE (bars
+                  fold away, keep-awake, Lock = press-and-hold, Panic),
+                  PROFILES (whole setups: library + sets + settings; export /
+                  import JSON). SLSynthLive hook; suite tests/synthtab.test.js.
 js/pads.js        drum-pad controller page ('pads', PRACTICE Instrument group
                   since v0.64.0; still records to st.tracks + studio-armed
                   MIDI works): 8 velocity pads on the pad drum track's live
@@ -558,7 +588,7 @@ version.json      auto-update feed (source of truth for latest version)
 - SECTION TAB BAR (v0.70.0; app.js GROUPS + populateNav): the main nav is a
   tab bar of GROUPS (icon + label), not a drop-down — practice: Learn
   (quiz=Exercises HOME/chords/theory), Guitar (fretboard/tab/notation/helix), Keys
-  (piano/synth/pads/midihub), Play (songs/jam), Practice (shed/trainer/tuner);
+  (piano/synth/pads/lumipractice), SYNTH (1.3: deck/liveset/midihub), Play (songs/jam), Practice (shed/trainer/tuner);
   studio: Studio (arrange=Timeline HOME / tracks=Editor), Sketch (song/ideas).
   Rendered twice: #tabbar inside the top bar (> 900px) and #tabbar-m fixed
   along the bottom (<= 900px) — #tabbar-m sits OUTSIDE <header> because the

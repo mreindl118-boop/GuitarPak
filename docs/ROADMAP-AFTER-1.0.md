@@ -66,3 +66,6 @@ navigation refactor is included in the 1.0 addendum or this queued file work.
 
 The separate teacher Google Doc/text lesson aide remains deferred; see
 [its bounded design](FUTURE-LESSON-AIDE.md).
+
+See also [the 2026-10-25 primer](PRIMER-UI-AND-SCORE-2026-10-25.md) for the UI
+streamlining order and the sheet-music-to-MIDI helper path Matt asked for.

@@ -47,6 +47,8 @@ var ASSETS = [
   'js/synthdeck-maps.js',
   'js/synthdeck-scope.js',
   'js/synthdeck.js',
+  'js/synthtab.js',
+  'js/synthlive.js',
   'data/modx-performances.json',
   'js/lumi-practice.js',
   'js/xp.js',

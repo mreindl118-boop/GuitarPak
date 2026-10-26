@@ -47,7 +47,7 @@ const J = JSON.stringify;
       tour: !!(window.Help && Help.TOURS.midihub && Help.TOURS.midihub.length)
     };
   });
-  ok(nav.active === 'midihub' && nav.group === 'Keys' && nav.pills === 'Piano|Synth|Pads|MIDI|LUMI', 'MIDI Hub remains the fourth Keys pill alongside LUMI practice: ' + nav.pills);
+  ok(nav.active === 'midihub' && nav.group === 'Synth' && nav.pills === 'Deck|Live|Hub', 'MIDI Hub is the Hub pill of the Synth tab (1.3): ' + nav.pills);
   ok(nav.views === 'control,player,play,controls,rules,sysex,monitor,learn', 'eight views, Control first, then Player: ' + nav.views);
   // the shared service hears All keyboards by default (v0.79 multi-input)
   ok(nav.ports && nav.inSel === 'all' && nav.outSel === 'out1' && /In: All keyboards · Synth out: Synth Port 1/.test(nav.status), 'ports picked: All keyboards in, the synth port out: ' + nav.status);
