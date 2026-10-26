@@ -55,17 +55,55 @@ or row change, when you pin, edit or remove a favourite, or when you toggle Expl
 ## USB like the desktop app
 
 On firmware 1.4 the Stadium's "USB editing" is a network link over the USB cable (a CDC-NCM
-interface): the same editor services the bridge already speaks over Wi-Fi become reachable at the
-pedal's USB address. So the plan is not a USB driver or WebUSB — it is the bridge finding the pedal
-over that link (mDNS `p35x1.local` or the link's IPv6 address). Prerequisites, all Matt's calls:
-update the pedal to 1.4.x with the Line 6 app, plug it into the laptop, and check that Windows binds
-its in-box UsbNcm driver (a new network adapter appears). Until then the USB badge reads *needs
-setup* with that explanation, and MIDI + Wi-Fi cover everything the page does today.
+interface, the pedal shows up as a network adapter): the same editor services the bridge already
+speaks over Wi-Fi (TCP 2001 stream, 2002 commands, 2003 telemetry) answer at the pedal's address on
+that link. The pedal gives itself an IPv6 ULA on the link — the device is `<prefix>::1`, this
+computer gets another address in the same /64 — and still answers mDNS (`p35x1.local`) there.
+Nothing about the protocol changes, so there is no USB driver, no WebUSB and no new code path on the
+page: **the bridge finds the pedal over the link** (phase 4, `tools/helix-bridge.js`):
+
+- it looks for a USB network adapter (Windows 11's in-box *UsbNcm Host Device*), takes that
+  adapter's `fd..` IPv6 address, derives the pedal's `::1` and **probes port 2002** there;
+- an answer makes the USB link its **preferred** transport; no adapter or no answer and it **falls
+  back to Wi-Fi** (mDNS `_stadiumserver._tcp` / `p35x1.local`, or the manual address);
+- its status reports what it found: `transport` = `usb` | `net` | `manual` (the link in use) and
+  `transports.usb` = `{present, adapter:{name, description}, local, candidate, reachable}` plus
+  `transports.net` = `{host, ip}`; `{op:'transport', want:'usb'|'net'|'auto'}` from the page asks
+  it to move, and the page sends its stored wish (`hx.transport`, default `auto`) on every connect.
+
+On the page (`App.helix.routes.usb`, the USB badge): **online** = the bridge is on the link (the Now
+sub-line says *via USB* or *via MIDI + USB*; the net badge reads *Wi-Fi idle*); **available** = the
+pedal answers on the link but the bridge is on Wi-Fi — **tap the badge** to ask the bridge to move
+(a bridge message, never a byte to the pedal; the badge reads *connecting* until the bridge reports
+the move); **needs setup** = the bridge is up but found no USB link (the caption names firmware 1.4
+and the pedal's firmware when read) or found one the pedal did not answer on (the caption names the
+adapter and asks about firmware 1.4 / Remote Access); **absent** = no bridge. A tap in any other
+state toggles that honest caption under the badges. `routes.usb.prefer('usb'|'net'|'auto')` stores
+the wish; `state().routes.usb` carries `{status, caption, adapter, candidate}` and `state().via` /
+`App.helix.dest()` name the routes in use.
+
+**After the 1.4 update, on this laptop** (the pedal was on 1.1.0, which has no USB link; the
+Windows binding is unverified on this pedal), in this order:
+
+1. Plug the pedal in. *Device Manager › Network adapters* shows a **UsbNcm / NCM** network adapter
+   (if the pedal only appears under *Other devices* or *Sound, video and game controllers*, Windows
+   did not bind the NCM driver — see `docs/HELIX-USB.md`).
+2. `ipconfig /all` shows an **`fd..` IPv6** address on that adapter (the pedal is the same prefix
+   with `::1`).
+3. Start the bridge: it logs **`usb: Helix answered`** (else what it tried: no adapter, no `fd..`
+   address, or no answer on 2002 — then check *Global Settings › Remote Access* on the pedal).
+4. On the Helix page the **USB badge turns green** and the Now sub-line says *via USB*.
+
+`tools/helix-usb-inventory.ps1` runs steps 1–3 read-only in one go (the pedal's USB functions and
+their drivers, the adapter, its IPv6 addresses, whether `p35x1.local` resolves, whether `::1`
+answers on 2002; `-Json` for a task record). The protocol notes and the driver fallbacks are in
+`docs/HELIX-USB.md`; the research behind the plan is summarised in `docs/HELIX-STADIUM.md`.
 
 ## Not in this phase
 
 The signal-chain strip with block bypass dots and per-block parameter strips (phase 2), the Go-live
-stage layout with Lock and a 60 px Panic (phase 3), the Matrix mixer row (needs firmware 1.4), the
-bridge's USB-link discovery (phase 4), and a unit table for parameters (dB, ms, Hz). Hardware checks
-still open: setlist CC32 = 5 + position, a pin recall with a snapshot, the arm flow on strips, and
-whether *Send MIDI PC* / *Send Snapshot CC* are on so tiles follow the footswitches.
+stage layout with Lock and a 60 px Panic (phase 3), the Matrix mixer row (needs firmware 1.4), a
+transport picker in the Edit face's bridge strip (today: `App.helix.routes.usb.prefer`), and a unit
+table for parameters (dB, ms, Hz). Hardware checks still open: the USB link itself (steps 1–4 above),
+setlist CC32 = 5 + position, a pin recall with a snapshot, the arm flow on strips, and whether *Send
+MIDI PC* / *Send Snapshot CC* are on so tiles follow the footswitches.

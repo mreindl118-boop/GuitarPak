@@ -201,8 +201,8 @@ const gated = page => page.evaluate(async () => {
   ok(r.sent === 0 && !r.writes.some(a => WRITES.includes(a)) && !r.ws && r.dialogs === 0, 'startup silence: zero bytes, no bridge socket (hx.bridgeAuto off), no dialog on open: ' + J({ sent: r.sent, ws: r.ws }));
   ok(r.mode === 'perform' && r.dmode === 'perform' && r.stored === 'perform' && !r.performHidden && r.editHidden && r.modeBtns === 'perform*,edit', 'Perform is the default face: #hxd-perform shown, #hxd-edit folded, seg ' + r.modeBtns);
   ok(r.armst === 'DISARMED' && !r.armed && /^Arm/.test(r.armBtn) && r.live === 'polite', 'disarmed on the visit: #hxd-armst ' + r.armst + ', button "' + r.armBtn + '", #hxd-armmsg aria-live ' + r.live);
-  ok(r.badges === 'midi:online,net:absent,usb:needs-setup', 'route badges: ' + r.badges);
-  ok(/firmware 1\.4/.test(r.usbCap) || /firmware 1\.4/.test(r.topText), 'the USB badge carries the honest caption (firmware 1.4): ' + (r.usbCap || r.topText.replace(/\s+/g, ' ').slice(0, 120)));
+  ok(r.badges === 'midi:online,net:absent,usb:absent', 'route badges (USB is absent until the bridge is up: the bridge is what finds the link): ' + r.badges);
+  ok(/Start the bridge/.test(r.usbCap) && (/firmware 1\.4/.test(r.usbCap) || /firmware 1\.4/.test(r.topText)), 'the USB badge carries the honest caption (start the bridge; firmware 1.4): ' + (r.usbCap || r.topText.replace(/\s+/g, ' ').slice(0, 120)));
   ok(/User 1A/.test(r.nowname) && !r.nowbad && (r.prov === 'none' || r.prov === null), 'Now bar names the address when nothing was read (User 1A), routes present so not .bad, provenance none: ' + J({ name: r.nowname, sub: r.nowsub, prov: r.prov }));
   ok(!r.saveShown, '#hxd-save is hidden without the bridge');
   ok(r.snaps === '0,1,2,3,4,5,6,7' && (r.snapActive === '' || r.snapActive === '0:none' || r.snapActive === '0:') && r.sheetHidden && r.sheetRole === 'dialog' && r.sheetModal != null, 'eight snapshot buttons (snapshot 1 may show as the current one, but with no sent / echo / state provenance: "' + r.snapActive + '"); the sheet is a hidden modal dialog: ' + J({ hidden: r.sheetHidden, role: r.sheetRole, modal: r.sheetModal }));
@@ -630,6 +630,59 @@ const gated = page => page.evaluate(async () => {
   });
   ok(!r.dis && r.row !== 'mix' && r.sent === 0 && r.strips.length <= 4, 'the Block row opens once the bridge is up (' + r.strips.length + ' param strips, no MIDI bytes): ' + J(r.strips));
   if (r.write) ok(r.write.length >= 1 && r.write[0].length === 6 && r.write[0][4] >= 0 && r.write[0][4] <= 1, 'a param strip writes /ParamValueSet [path, slot, 0, pid, value, -1] over the bridge: ' + J(r.write)); else note('the Block row showed no numeric param strip (no block open) — nothing to write');
+
+  console.log('# USB link (fw 1.4): the bridge reports its transport; the badges, the Now sub-line, the tap');
+  // the bridge's status shape from phase 4: transport = the link in use, transports = what it found on this computer
+  const USB = { present: true, reachable: true, adapter: { name: 'Ethernet 3', description: 'UsbNcm Host Device' }, local: 'fd12::2', candidate: 'fd12::1' };
+  const status = (page, transport, usb) => page.evaluate(([transport, usb]) => { window.__ws._push({ op: 'status', version: 't', host: 'p35x1.local', ip: transport === 'usb' ? 'fd12::1' : '10.0.0.5', ports: { 2001: true, 2002: true, 2003: true }, defs: true, transport, transports: { usb, net: { host: 'p35x1.local', ip: '10.0.0.5' } } }); }, [transport, usb]);
+  const badges = page => page.evaluate(() => ({ b: [...document.querySelectorAll('#hxd-routes .hxd-rbadge')].map(b => b.dataset.route + ':' + b.dataset.status).join(','), labels: [...document.querySelectorAll('#hxd-routes .hxd-rbadge .hxd-rname')].map(e => e.textContent).join('|'), usb: document.querySelector('#hxd-routes .hxd-rbadge[data-route="usb"]').title, net: document.querySelector('#hxd-routes .hxd-rbadge[data-route="net"]').title, sub: document.getElementById('hxd-nowsub').textContent.trim(), bad: document.getElementById('hxd-nowsub').classList.contains('bad'), st: App.helix.state().routes.usb, via: App.helix.state().via, dest: App.helix.dest(), online: App.helix.devOnline(), cap: window.__vis(document.getElementById('hxd-routecap')) ? document.getElementById('hxd-routecap').textContent : '' }));
+  n0 = await N(page); nn = await netLen(page);
+  let stateN = await page.evaluate(() => { window.__stateN = 0; App.helix.on('state', d => { if (d && d.what === 'routes') window.__stateN++; }); return 0; });
+  await status(page, 'usb', USB); await wait(page, 60);
+  r = await badges(page);
+  ok(r.b === 'midi:online,net:available,usb:online' && r.online, 'transport usb: the USB badge is online, net available (bridge up, Wi-Fi idle), the device still online: ' + r.b);
+  ok(/via MIDI \+ USB/.test(r.sub) && !r.bad && J(r.via) === J(['MIDI', 'USB']) && /USB link fd12::1/.test(r.dest) && /Helix Stadium MIDI/.test(r.dest), 'the Now sub-line says via MIDI + USB (the MIDI port exists); helix.dest() names the link: "' + r.sub + '" / "' + r.dest + '"');
+  ok(r.st.status === 'online' && r.st.adapter && r.st.adapter.name === 'Ethernet 3' && r.st.candidate === 'fd12::1' && /fd12::1/.test(r.usb) && /Ethernet 3/.test(r.usb) && /USB/.test(r.net) && /Wi-Fi/.test(r.labels), 'state().routes.usb carries {status, caption, adapter, candidate}; the badge titles name the link and the idle Wi-Fi: ' + J({ usb: r.usb, net: r.net, labels: r.labels }));
+  await status(page, 'net', { present: true, reachable: false, adapter: USB.adapter, local: 'fd12::2', candidate: 'fd12::1' }); await wait(page, 40);
+  r = await badges(page);
+  ok(r.b === 'midi:online,net:online,usb:needs-setup' && /did not answer/.test(r.usb) && /Ethernet 3/.test(r.usb) && /Remote Access/.test(r.usb) && /via MIDI \+ net/.test(r.sub), 'a link that is present but silent: USB needs-setup with the "did not answer" caption (names the adapter), net online, via MIDI + net: ' + J({ b: r.b, usb: r.usb }));
+  await status(page, 'net', null); await wait(page, 40);
+  r = await badges(page);
+  ok(r.b === 'midi:online,net:online,usb:needs-setup' && /firmware 1\.4/.test(r.usb) && /No USB link found/.test(r.usb) && /fw 1\.1\.0/.test(r.usb), 'transports.usb null: needs-setup with the firmware 1.4 caption + the pedal\'s fw: ' + r.usb);
+  // tap while needs-setup: no bridge message, the caption line toggles under the badges
+  nn = await netLen(page);
+  await tap(page, '#hxd-routes .hxd-rbadge[data-route="usb"]'); await wait(page, 40);
+  r = await badges(page);
+  const capOn = r.cap;
+  await tap(page, '#hxd-routes .hxd-rbadge[data-route="usb"]'); await wait(page, 40);
+  r = await badges(page);
+  ok(/firmware 1\.4/.test(capOn) && r.cap === '' && (await page.evaluate(nn => window.__net.slice(nn).filter(m => m.op === 'transport').length, nn)) === 0, 'tapping the USB badge while needs-setup toggles #hxd-routecap with the honest text and asks the bridge nothing: "' + capOn.slice(0, 60) + '…"');
+  await status(page, 'net', USB); await wait(page, 40);
+  r = await badges(page);
+  ok(r.b === 'midi:online,net:online,usb:available' && /USB ready/.test(r.labels) && /Tap to use USB/.test(r.usb), 'reachable but on Wi-Fi: USB available ("USB ready"), the caption invites the tap: ' + J({ b: r.b, usb: r.usb }));
+  nn = await netLen(page); n0 = await N(page);
+  await tap(page, '#hxd-routes .hxd-rbadge[data-route="usb"]'); await wait(page, 40);
+  w = await page.evaluate(nn => window.__net.slice(nn).filter(m => m.op === 'transport').map(m => m.want), nn);
+  r = await badges(page);
+  ok(J(w) === J(['usb']) && (await N(page)) === n0 && (await writesSince(page, nn)).length === 0, 'the tap sends {op:\'transport\', want:\'usb\'} to the bridge and nothing to the MIDI port, no device write: ' + J(w));
+  ok(r.b === 'midi:online,net:online,usb:connecting' && /USB…/.test(r.labels) && /Switching/.test(r.usb), 'USB reads connecting (pulsing dot) until the bridge reports the move: ' + r.b);
+  await status(page, 'usb', USB); await wait(page, 40);
+  r = await badges(page);
+  ok(r.b === 'midi:online,net:available,usb:online' && /via MIDI \+ USB/.test(r.sub) && !r.st.switching, 'the bridge reports transport usb: online again, the switch is over: ' + r.b);
+  stateN = await page.evaluate(() => window.__stateN);
+  ok(stateN >= 6, 'every status pushed a \'state\' routes event (' + stateN + ' for 6 statuses + the tap)');
+  // the preference: hx.transport, sent at once and again on every (re)connect
+  nn = await netLen(page);
+  r = await page.evaluate(nn => { const p = App.helix.routes.usb.prefer('net'); return { p, stored: App.store.get('hx.transport'), sent: window.__net.slice(nn).filter(m => m.op === 'transport').map(m => m.want), bad: App.helix.routes.usb.prefer('wifi') }; }, nn);
+  ok(r.p === 'net' && r.stored === 'net' && J(r.sent) === J(['net']) && r.bad === 'net', 'routes.usb.prefer(\'net\') stores hx.transport and tells the bridge; a bad value is ignored: ' + J(r));
+  await page.evaluate(() => App.helix.routes.usb.prefer('auto'));
+  // the bridge drops: USB absent (nothing can find the link), Wi-Fi reconnecting; the preference goes out again on the reconnect
+  nn = await netLen(page);
+  r = await page.evaluate(async () => { window.__ws.close(); await new Promise(r => setTimeout(r, 40)); return { b: [...document.querySelectorAll('#hxd-routes .hxd-rbadge')].map(b => b.dataset.route + ':' + b.dataset.status).join(','), usb: document.querySelector('#hxd-routes .hxd-rbadge[data-route="usb"]').title, armed: App.helix.armed(), sub: document.getElementById('hxd-nowsub').textContent.trim() }; });
+  ok(r.b === 'midi:online,net:connecting,usb:absent' && /Start the bridge/.test(r.usb) && !r.armed && /via MIDI$/.test(r.sub), 'bridge closed: USB absent with the "start the bridge" caption, net reconnecting, output disarmed, via MIDI only: ' + J({ b: r.b, sub: r.sub }));
+  r = await page.evaluate(async nn => { App.helix.routes.net.connect(); await new Promise(r => setTimeout(r, 120)); return { b: [...document.querySelectorAll('#hxd-routes .hxd-rbadge')].map(b => b.dataset.route + ':' + b.dataset.status).join(','), tr: window.__net.slice(nn).filter(m => m.op === 'transport').map(m => m.want), online: App.helix.devOnline() }; }, nn);
+  ok(r.online && r.b === 'midi:online,net:online,usb:needs-setup' && J(r.tr) === J(['auto']), 'reconnected (the fake bridge names no transports): net online, USB needs-setup, hx.transport (auto) sent on the reconnect: ' + J(r));
+  await page.evaluate(() => { App.helix.arm(true); });
   r = await page.evaluate(() => ({ dialogs: window.__dialogs, active: document.querySelectorAll('.hxd-chip.active').length, sentTo: [...new Set(window.__sentTo)].join(',') }));
   ok(r.dialogs === 0 && dialogs.length === 0, 'no window.confirm / prompt / alert on the page (' + r.dialogs + ')');
   ok(errs.length === 0, 'no page errors (desktop)' + (errs.length ? ': ' + errs.join(' | ') : ''));
@@ -650,7 +703,7 @@ const gated = page => page.evaluate(async () => {
       now: s.getAttribute('aria-valuenow'), chan: window.__sent.filter(b => b[0] < 0xF0).length, ws: !!window.__ws };
   });
   const isoN0 = r.n0;
-  ok(r.mode === 'none' && r.badges === 'midi:absent,net:absent,usb:needs-setup' && r.bad, 'no Helix port: MIDI absent, net absent, the Now bar is .bad: ' + r.badges);
+  ok(r.mode === 'none' && r.badges === 'midi:absent,net:absent,usb:absent' && r.bad, 'no Helix port: MIDI absent, net absent, USB absent (no bridge), the Now bar is .bad: ' + r.badges);
   ok(!r.armed && r.armst === 'DISARMED' && (r.armDisabled || /Nothing to arm/.test(r.msg)), 'Arm refuses with nothing connected (' + (r.armDisabled ? 'button disabled' : 'message') + '): ' + r.msg);
   ok(r.chan === 0 && r.now === '64' && !r.ws, 'a strip tap and a chip send no channel message anywhere; the bridge stays closed until Connect');
   await tap(iso.page, '#hxd-routes .hxd-rbadge[data-route="net"]'); await wait(iso.page, 700);

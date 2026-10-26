@@ -257,7 +257,9 @@
     els.prov.title = { sent: 'Grey: what soundLAB sent', echo: 'Amber: the pedal’s MIDI echo', state: 'Green: read back over the bridge', none: 'Nothing known yet' }[src || 'none'];
     var sn = dev.snapNames && dev.snapNames[st.snap], parts = ['Snapshot ' + (st.snap + 1) + (sn ? ' “' + sn + '”' : '')];
     if (s.fw && s.fw.str) parts.push('fw ' + s.fw.str + (s.fw.src === 'confirmed' ? ' (you said)' : ''));
-    var via = []; if (s.routes.midi.status === 'online') via.push('MIDI'); if (s.routes.net.status === 'online') via.push('net');
+    // 'via MIDI + net' over Wi-Fi, 'via USB' / 'via MIDI + USB' when the bridge is on the pedal's USB link (the engine's via())
+    var via = Array.isArray(s.via) ? s.via : [];
+    if (!Array.isArray(s.via)) { if (s.routes.midi.status === 'online') via.push('MIDI'); if (s.routes.usb && s.routes.usb.status === 'online') via.push('USB'); else if (s.routes.net.status === 'online') via.push('net'); }
     parts.push(via.length ? 'via ' + via.join(' + ') : 'no route — connect the Helix');
     els.nowsub.textContent = parts.join(' · ');
     els.nowsub.classList.toggle('bad', !via.length);
@@ -282,8 +284,8 @@
     $$('.hxd-rbadge', els.routes).forEach(function (b) {
       var id = b.getAttribute('data-route'), st = r[id].status, label;
       if (id === 'midi') label = st === 'online' ? 'MIDI' : st === 'available' ? 'MIDI port only' : r.midi.requested ? 'No MIDI' : 'MIDI';
-      else if (id === 'net') label = st === 'online' ? 'Bridge' : st === 'connecting' ? 'Bridge…' : st === 'available' ? 'Bridge up' : 'Bridge';
-      else label = 'USB';
+      else if (id === 'net') label = st === 'online' ? 'Bridge' : st === 'connecting' ? 'Bridge…' : st === 'available' ? (r.usb.status === 'online' ? 'Wi-Fi idle' : 'Bridge up') : 'Bridge';
+      else label = st === 'connecting' ? 'USB…' : st === 'available' ? 'USB ready' : 'USB'; // the dot carries the status; needs-setup / absent read plain
       b.setAttribute('data-status', st);
       b.querySelector('.hxd-rname').textContent = label;
       b.title = routeDetail(id);
@@ -294,8 +296,8 @@
   function routeDetail(id) {
     var s = S(), r = s.routes;
     if (id === 'midi') return r.midi.status === 'online' ? 'MIDI to ' + r.midi.dest + ' on channel ' + s.channels.global + (r.midi.mode === 'app' ? ' (soundLAB’s shared output)' : '') : r.midi.err ? r.midi.err : r.midi.requested ? 'No "Helix Stadium MIDI" port listed. Check the USB-C cable and USB MIDI in Global Settings › MIDI.' : 'Tap to connect over MIDI (the Helix’s own USB or 5-pin port).';
-    if (id === 'net') return r.net.status === 'online' ? 'Bridge at ' + r.net.url + ' · Helix at ' + (r.net.ip || r.net.host) : r.net.status === 'available' ? 'Bridge up at ' + r.net.url + ', looking for the Helix' : r.net.status === 'connecting' ? 'Connecting to ' + r.net.url + ' … (run: node tools/helix-bridge.js)' : 'Tap to connect the bridge (node tools/helix-bridge.js on this computer).';
-    return r.usb.caption;
+    if (id === 'net') return r.net.status === 'online' ? 'Bridge at ' + r.net.url + ' · Helix at ' + (r.net.ip || r.net.host) + (r.net.transport === 'manual' ? ' (manual address)' : '') : r.net.status === 'available' ? (r.usb.status === 'online' ? 'Bridge at ' + r.net.url + ' · the Helix is on the USB link, so Wi-Fi is not in use.' : 'Bridge up at ' + r.net.url + ', looking for the Helix') : r.net.status === 'connecting' ? 'Connecting to ' + r.net.url + ' … (run: node tools/helix-bridge.js)' : 'Tap to connect the bridge (node tools/helix-bridge.js on this computer).';
+    return r.usb.caption; // the engine's honest line per status (firmware 1.4 / no link / no answer / ready / live)
   }
 
   // ---- paint: snapshots ------------------------------------------------------------------------
@@ -639,6 +641,9 @@
     var s = S();
     if (id === 'midi' && s.routes.midi.status !== 'online') { E.routes.midi.connect(false); routeCap = 'midi'; }
     else if (id === 'net' && s.routes.net.status === 'absent') { E.routes.net.connect(); routeCap = 'net'; }
+    // USB: with the bridge up and the pedal answering on the link, a tap asks the bridge to move there ({op:'transport'} —
+    // a bridge message, never a byte to the pedal); any other status toggles the honest caption line under the badges
+    else if (id === 'usb' && s.routes.usb.status === 'available') { if (E.routes.usb.connect()) { routeCap = 'usb'; toast('Asking the bridge to use the USB link…'); } else routeCap = routeCap === id ? '' : id; }
     else routeCap = routeCap === id ? '' : id; // the Connections details
     paintRoutes();
   }
@@ -861,6 +866,7 @@
       '.hxd-routes{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}.hxd-rbadge{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:var(--card2);font-size:13px;font-weight:600;cursor:pointer;user-select:none;color:var(--muted)}',
       '.hxd-rbadge:focus-visible{outline:2px solid var(--accent);outline-offset:2px}.hxd-rdot{width:8px;height:8px;border-radius:50%;background:var(--line)}',
       '.hxd-rbadge[data-status=online]{color:var(--text);border-color:var(--accent-line)}.hxd-rbadge[data-status=online] .hxd-rdot{background:var(--green)}.hxd-rbadge[data-status=available] .hxd-rdot,.hxd-rbadge[data-status=connecting] .hxd-rdot{background:var(--warn)}.hxd-rbadge[data-status=needs-setup] .hxd-rdot{background:transparent;border:1px dashed var(--muted)}',
+      '.hxd-rbadge[data-status=connecting] .hxd-rdot{animation:hxdpulse .9s infinite}',
       '@media (hover:hover){.hxd-rbadge:hover{border-color:var(--accent-line);color:var(--text)}}',
       '.hxd-cap{margin:6px 0 0;padding:8px 10px;border-radius:10px;background:var(--accent-soft);color:var(--accent-ink);font-size:13px;line-height:1.4}.hxd-cap[hidden]{display:none}',
       '#hxd-perform{display:grid;gap:12px}#hxd-perform[hidden]{display:none}#hxd-perform.hxd-dragging{touch-action:none;user-select:none;cursor:grabbing}',

@@ -35,7 +35,11 @@
  *
  * Nothing connects at boot: init() only wires listeners. Web MIDI is asked
  * for by the page; the bridge connects only after Connect bridge once
- * (hx.bridgeAuto) and retries only while the page is visible.
+ * (hx.bridgeAuto) and retries only while the page is visible. The bridge
+ * reaches the pedal over Wi-Fi or, on firmware 1.4, the USB network link; its
+ * status says which (transport) and what it found (transports) — routes.usb
+ * / routes.net report it, routes.usb.connect() asks it to move to USB and
+ * routes.usb.prefer('usb'|'net'|'auto') stores hx.transport.
  * Store keys hx.* (shared with js/helix.js). No DOM, no window.confirm except
  * as the fallback above.
  */
@@ -306,7 +310,15 @@
   function ago(ms) { var s = Math.round(ms / 1000); return s < 2 ? 'just now' : s < 60 ? s + ' s ago' : Math.round(s / 60) + ' min ago'; }
 
   // ---- BRIDGE: WebSocket to tools/helix-bridge.js ------------------------------------
-  var br = { ws: null, open: false, status: null, rid: 1000, pend: {}, retry: null, want: false, tele: 'off' };
+  // TRANSPORTS (phase 4): the bridge's status carries transport 'usb' | 'net' |
+  // 'manual' | null (how it reaches the pedal right now) and transports {usb:
+  // {present, adapter:{name, description}|null, local, candidate, reachable}
+  // | null, net:{host, ip}} (what it found). On firmware 1.4 the pedal's "USB
+  // editing" is a network link over the cable (CDC-NCM): the SAME services at
+  // the link's <prefix>::1. {op:'transport', want:'usb'|'net'|'auto'} asks the
+  // bridge to move; hx.transport ('auto') is sent on every (re)connect.
+  var br = { ws: null, open: false, status: null, rid: 1000, pend: {}, retry: null, want: false, tele: 'off', sw: null };
+  var SWITCH_MS = 20000; // a transport request shows 'connecting' at most this long
   function brUrl() { return String(g('bridge', 'ws://127.0.0.1:4575')).trim() || 'ws://127.0.0.1:4575'; }
   function brConnect() {
     br.want = true;
@@ -315,17 +327,75 @@
     var ws;
     try { ws = new WebSocket(brUrl()); } catch (e) { routesChanged(); return brRetry(); }
     br.ws = ws;
-    ws.onopen = function () { br.open = true; routesChanged(); brTele(br.tele, true); }; // the reads start once its status says the pedal is reachable
+    ws.onopen = function () { br.open = true; routesChanged(); brTele(br.tele, true); brTransport(transportPref()); }; // the reads start once its status says the pedal is reachable
     ws.onmessage = function (ev) { var m; try { m = JSON.parse(ev.data); } catch (e) { return; } onBridge(m); };
-    ws.onclose = function () { var was = br.open; br.open = false; br.status = null; br.ws = null; if (was) { disarm('The bridge disconnected, so output is disarmed.'); toast('Bridge disconnected'); } routesChanged(); brRetry(); };
+    ws.onclose = function () { var was = br.open; br.open = false; br.status = null; br.ws = null; br.sw = null; if (was) { disarm('The bridge disconnected, so output is disarmed.'); toast('Bridge disconnected'); } routesChanged(); brRetry(); };
     ws.onerror = function () { /* close follows */ };
   }
   function brRetry() { if (!br.want || br.retry || !visible) return; br.retry = setTimeout(function () { br.retry = null; if (br.want && !br.open) brConnect(); }, 4000); }
-  function brClose() { br.want = false; if (br.ws) { try { br.ws.close(); } catch (e) { /* ok */ } } br.ws = null; br.open = false; br.status = null; routesChanged(); }
+  function brClose() { br.want = false; if (br.ws) { try { br.ws.close(); } catch (e) { /* ok */ } } br.ws = null; br.open = false; br.status = null; br.sw = null; routesChanged(); }
   function brSend(o) { if (!br.open) return false; try { br.ws.send(JSON.stringify(o)); return true; } catch (e) { return false; } }
   function brTele(level, force) { if (level !== br.tele || force) { br.tele = level; brSend({ op: 'telemetry', level: level }); } }
   function devOnline() { return !!(br.open && br.status && br.status.ports && br.status.ports['2002']); }
-  function netStatus() { return devOnline() ? 'online' : br.open ? 'available' : br.want ? 'connecting' : 'absent'; }
+  // which link the bridge is on: 'usb' | 'net' | 'manual' | null (an older bridge names none = Wi-Fi)
+  function transport() { return br.open && br.status && typeof br.status.transport === 'string' ? br.status.transport : null; }
+  function usbT() { var t = br.open && br.status && br.status.transports; return t && t.usb && typeof t.usb === 'object' ? t.usb : null; }
+  function usbSwitching() { return !!(br.open && br.sw && br.sw.want === 'usb' && Date.now() - br.sw.t < SWITCH_MS); }
+  function netStatus() {
+    if (devOnline()) return transport() === 'usb' ? 'available' : 'online'; // over USB the bridge is up but Wi-Fi is not in use
+    return br.open ? 'available' : br.want ? 'connecting' : 'absent';
+  }
+  function usbStatus() {
+    if (!br.open) return 'absent';
+    var u = usbT();
+    if (transport() === 'usb' && devOnline()) return 'online';
+    if (usbSwitching()) return 'connecting';
+    if (u && u.present && u.reachable) return 'available';
+    return 'needs-setup';
+  }
+  function transportPref() { var w = g('transport', 'auto'); return w === 'usb' || w === 'net' ? w : 'auto'; }
+  // ask the bridge to move; a non-auto wish is remembered as a pending switch (-> 'connecting')
+  function brTransport(want) {
+    if (want !== 'usb' && want !== 'net' && want !== 'auto') return false;
+    if (!brSend({ op: 'transport', want: want })) return false;
+    br.sw = want === 'auto' ? null : { want: want, t: Date.now() };
+    logRow('net', 'out', 'transport ' + want);
+    routesChanged();
+    return true;
+  }
+  function switchDone(m) {
+    var w = br.sw && br.sw.want, u = m.transports && m.transports.usb;
+    if (!w) return true;
+    if (w === 'usb') return m.transport === 'usb' || !(u && u.present); // moved, or there is no link to move to
+    return m.transport === 'net' || m.transport === 'manual';
+  }
+  function usbPrefer(want) {
+    if (want === undefined) return transportPref();
+    if (want !== 'usb' && want !== 'net' && want !== 'auto') return transportPref();
+    set('transport', want);
+    if (br.open) brTransport(want);
+    return want;
+  }
+  // tap on the USB badge: move the bridge to the link when it can, else start the bridge (as the net badge does)
+  function usbConnect() {
+    if (!br.open) { set('bridgeAuto', true); brConnect(); return true; }
+    var st = usbStatus();
+    if (st === 'online' || st === 'connecting') return true;
+    if (st === 'available') return brTransport('usb');
+    return false; // needs-setup: nothing to connect to (the caption says what is missing)
+  }
+  // the routes a command would travel: ['MIDI'] + ['USB' | 'net']
+  function via() { var v = []; if (hasMidiOut()) v.push('MIDI'); if (usbStatus() === 'online') v.push('USB'); else if (netStatus() === 'online') v.push('net'); return v; }
+  function netHost() { var s = br.status || {}, n = s.transports && s.transports.net || {}; return s.host || n.host || ''; }
+  function netIp() { var s = br.status || {}, n = s.transports && s.transports.net || {}; return s.ip || n.ip || ''; }
+  // where a command goes, as one line: the MIDI port + channel, the USB link's address or the network address
+  function destText() {
+    var p = [];
+    if (hasMidiOut()) p.push(midiDest() + ' · ch ' + chGlobal());
+    if (usbStatus() === 'online') { var u = usbT() || {}; p.push('USB link ' + (u.candidate || netIp() || netHost())); }
+    else if (netStatus() === 'online') p.push('network ' + (netIp() || netHost()));
+    return p.join(' + ');
+  }
   // one RPC = one reply correlated by the request id we put first; collect=true
   // keeps gathering frames (chunked listings) until they stop for 300 ms
   function rpc(addr, args, opts) {
@@ -340,7 +410,13 @@
     });
   }
   function onBridge(m) {
-    if (m.op === 'status') { var wasOn = devOnline(); br.status = m; routesChanged(); emit('dev', { what: 'status' }); if (!wasOn && devOnline()) { emit('dev', { what: 'online' }); devRefresh(); } return; }
+    if (m.op === 'status') { // every status repaints the routes ('state' routes); a finished transport switch clears its 'connecting'
+      var wasOn = devOnline(); br.status = m;
+      if (br.sw && switchDone(m)) br.sw = null;
+      routesChanged(); emit('dev', { what: 'status' });
+      if (!wasOn && devOnline()) { emit('dev', { what: 'online' }); devRefresh(); }
+      return;
+    }
     if (m.op === 'defs') { Object.keys(m.models || {}).forEach(function (k) { dev.defs[k] = m.models[k]; }); emit('dev', { what: 'defs' }); return; }
     if (m.op === 'error') { logRow('net', 'in', 'bridge error: ' + m.text + (m.addr ? ' (' + m.addr + ')' : '')); toast('Bridge: ' + m.text); return; }
     if (m.op !== 'msg') return;
@@ -542,7 +618,22 @@
   function verNum(s) { var p = String(s || '').split('.'); return (parseInt(p[0], 10) || 0) * 1e6 + (parseInt(p[1], 10) || 0) * 1e3 + (parseInt(p[2], 10) || 0); }
   function fwOk(minFw) { if (!minFw) return true; var f = fwInfo().str; return !!f && verNum(f) >= verNum(minFw); }
   function setFwConfirmed(s) { set('fwConfirmed', s ? String(s) : ''); emit('state', { what: 'fw' }); }
-  function usbCaption() { var f = fwInfo().str; return 'USB editing needs firmware 1.4 on the pedal (it adds a USB network link that the bridge can use). This pedal: fw ' + (f || 'unknown') + '.'; }
+  // the USB badge's honest line for its status (the deck's title + caption line)
+  function usbCaption() {
+    var st = usbStatus(), u = usbT(), f = fwInfo().str, fwNote = f ? ' This pedal: fw ' + f + '.' : '';
+    var name = u && u.adapter && u.adapter.name ? u.adapter.name : u && u.iface ? u.iface : 'USB network adapter', at = u && u.candidate ? ' at ' + u.candidate : '';
+    if (st === 'absent') return 'Start the bridge on this computer; it finds the pedal over Wi-Fi or the USB link. USB editing needs firmware 1.4 on the pedal.';
+    if (st === 'online') return 'Helix over the USB link' + at + ' (' + name + ').';
+    if (st === 'connecting') return 'Switching the bridge to the USB link' + at + ' …';
+    if (st === 'available') return 'USB link found (' + name + '): the pedal answers' + at + ', but the bridge is on Wi-Fi. Tap to use USB.';
+    if (u && u.present) return 'USB link found (' + name + ') but the pedal did not answer on it — is it on firmware 1.4 with Remote Access on?' + fwNote;
+    return 'USB editing needs firmware 1.4 on the pedal; it adds a USB network link the bridge can use. No USB link found yet.' + fwNote;
+  }
+  function usbInfo() {
+    var u = usbT() || {};
+    return { status: usbStatus(), caption: usbCaption(), adapter: u.adapter && typeof u.adapter === 'object' ? { name: u.adapter.name || '', description: u.adapter.description || '' } : null,
+      candidate: u.candidate || '', local: u.local || '', present: !!u.present, reachable: !!u.reachable, prefer: transportPref(), switching: usbSwitching() };
+  }
 
   // ---- confirm (destructive ops): the deck's sheet, else window.confirm ------------------
   var ui = { confirm: null };
@@ -789,9 +880,10 @@
       armed: armed(), safe: safe(), on: arm.on, until: arm.until, msg: armMsg, mode: modeApi(), fw: fwInfo(),
       routes: {
         midi: { status: midiStatus(), dest: midiDest(), mode: midi.mode, inp: midi.inp ? midi.inp.name : '', out: midi.out ? midi.out.name : '', err: midi.err, requested: !!midi.access },
-        net: { status: netStatus(), host: br.status && br.status.host || '', ip: br.status && br.status.ip || '', ports: br.status && br.status.ports || null, want: br.want, open: br.open, url: brUrl(), defs: !!(br.status && br.status.defs) },
-        usb: { status: 'needs-setup', caption: usbCaption() }
+        net: { status: netStatus(), host: netHost(), ip: netIp(), ports: br.status && br.status.ports || null, want: br.want, open: br.open, url: brUrl(), defs: !!(br.status && br.status.defs), transport: transport() },
+        usb: usbInfo()
       },
+      via: via(), dest: destText(),
       dev: { product: dev.info, name: dev.info ? dev.info.name : '', active: dev.active, snap: st.snap, snapNames: dev.snapNames, blocks: dev.blocks, setlists: dev.setlists, lists: dev.lists, tuner: dev.tuner, alive: dev.alive },
       st: { setlist: st.setlist, prog: st.prog, snap: st.snap, snapAfter: st.snapAfter, kv: st.kv, exp: st.exp, xy: st.xy, fsmode: st.fsmode, lastIn: st.lastIn, lastOut: st.lastOut },
       channels: { global: chGlobal(), ctl: chCtl() }
@@ -842,8 +934,9 @@
       midi: { status: midiStatus, connect: midiConnect, dest: midiDest, mode: function () { return midi.mode; }, requested: function () { return !!midi.access; } },
       net: { status: netStatus, connect: function () { set('bridgeAuto', true); brConnect(); }, disconnect: function () { set('bridgeAuto', false); brClose(); }, url: brUrl,
         setUrl: function (u) { set('bridge', String(u == null ? '' : u)); if (br.want) { brClose(); brConnect(); } }, telemetry: brTele, online: devOnline },
-      usb: { status: function () { return 'needs-setup'; }, caption: usbCaption }
+      usb: { status: usbStatus, caption: usbCaption, connect: usbConnect, prefer: usbPrefer, info: usbInfo, transport: transport }
     },
+    via: via, dest: destText,
     ui: ui,
     op: op, plan: planOf, cancel: function () { return cancelPlan('cancelled'); }, opInfo: opInfo, values: values,
     favs: favs, saveFav: saveFav, removeFav: removeFav, favById: favById, addrOf: addrOf, favFromItem: favFromItem, favActive: favActive, recallFav: recallFav, recallBytes: recallBytes,

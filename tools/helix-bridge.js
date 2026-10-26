@@ -13,9 +13,21 @@
  *                 :2001 SUB     change stream (edit buffer, properties, heartbeat)
  *                 :2003 SUB     DSP telemetry (tuner pitch, meters)
  *
- * Run:  node tools/helix-bridge.js                 (finds p35x1.local / mDNS)
- *       node tools/helix-bridge.js 192.168.1.23    (a known address)
- *       node tools/helix-bridge.js --port 4575 --defs tools/helix-defs.json -v
+ * Run:  node tools/helix-bridge.js                 (USB link, else p35x1.local / mDNS)
+ *       node tools/helix-bridge.js 192.168.1.23    (a known address: transport 'manual')
+ *       node tools/helix-bridge.js --prefer usb|net|auto --port 4575 --defs tools/helix-defs.json -v
+ *
+ * TRANSPORTS (v0.2.0): on firmware 1.4 the pedal's "USB editing" is a CDC-NCM
+ * network adapter over the USB cable (Windows 11: the in-box UsbNcm driver).
+ * The pedal gives itself <IPv6 ULA prefix>::1 on that link and the host another
+ * address of the same /64, so the bridge finds it by reading its OWN interfaces
+ * (os.networkInterfaces): every ULA address names a candidate <prefix>::1, the
+ * link-local fe80::1%zone is the lower-priority fallback, each probed on :2002.
+ * The same three ZMTP ports answer there - nothing else changes. Order:
+ * a host on the command line / {op:'host'} wins ('manual'); else --prefer auto
+ * (default) and usb try the USB link first ('usb'), falling back to dns/mDNS
+ * ('net'); --prefer net never looks at USB. 'usb' also keeps watching for the
+ * link while connected over the network and moves over when it appears.
  *
  * Wire JSON (browser -> bridge):
  *   {op:'rpc', addr:'/ProductInfoGet', args:[['i', 7]]}      send on :2002
@@ -23,13 +35,26 @@
  *   {op:'telemetry', level:'off'|'tuner'|'all'}              what of :2003 to relay
  *   {op:'lookup', models:[758, 310]}                          model/param names
  *   {op:'host', host:'192.168.1.23'}                          reconnect elsewhere
- *   {op:'status'}
+ *                                                             ('' = back to discovery)
+ *   {op:'transport', want:'usb'|'net'|'auto'}                 prefer a transport, reconnect
+ *   {op:'status'}                                             (re-scans USB, 5 s throttle)
  * (bridge -> browser):
  *   {op:'msg', port, addr, tags, args}   every frame; blob args are {b64, dec}
  *                                        (dec = decoded msgpack, 4CC keys as text)
- *   {op:'status', host, ip, ports:{2001,2002,2003}, defs, version}
+ *   {op:'status', host, ip, ports:{2001,2002,2003}, defs, version,
+ *               transport: 'usb'|'net'|'manual'|null (null until a port is up),
+ *               prefer: 'usb'|'net'|'auto',
+ *               transports: {usb: last USB scan {present, reachable, candidate,
+ *                                 local, iface, linkLocal, adapter:{name,
+ *                                 description, status}|null, candidates, at}
+ *                                 | null (not scanned yet),
+ *                            net: {host, ip}}}
  *   {op:'defs', models:{id:{name, category, params}}}
  *   {op:'error', text}
+ *
+ * As a MODULE (require('./helix-bridge.js')) nothing listens or connects; the
+ * pure helpers (usbCandidates, probeTcp, discoverUsb, parseAdapters, the
+ * msgpack/OSC codecs) are exported for tests/helix-bridge-usb.test.js.
  *
  * SAFETY: the device has no authentication; this bridge listens on the loopback
  * address only, so only pages on this computer can reach it. Everything the
@@ -43,26 +68,33 @@ var crypto = require('crypto');
 var dns = require('dns');
 var dgram = require('dgram');
 var fs = require('fs');
+var os = require('os');
 var path = require('path');
+var childProcess = require('child_process');
 var EventEmitter = require('events');
 
-var VERSION = '0.1.0';
+var VERSION = '0.2.0';
 var DEFAULT_HOST = 'p35x1.local';
 var MDNS_SERVICE = '_stadiumserver._tcp.local';
 
 // ---- command line ---------------------------------------------------------
-var argv = process.argv.slice(2);
-var opt = { host: null, port: 4575, defs: path.join(__dirname, 'helix-defs.json'), verbose: false };
-for (var ai = 0; ai < argv.length; ai++) {
-  var a = argv[ai];
-  if (a === '--port' || a === '-p') opt.port = parseInt(argv[++ai], 10) || 4575;
-  else if (a === '--defs') opt.defs = argv[++ai];
-  else if (a === '-v' || a === '--verbose') opt.verbose = true;
-  else if (a === '-h' || a === '--help') {
-    console.log('usage: node tools/helix-bridge.js [device-host-or-ip] [--port 4575] [--defs tools/helix-defs.json] [-v]');
-    process.exit(0);
-  } else opt.host = a;
+// (parsed only when run as a script - see the bottom of the file)
+var opt = { host: null, port: 4575, defs: path.join(__dirname, 'helix-defs.json'), verbose: false, prefer: 'auto' };
+function parseArgs(argv) {
+  for (var ai = 0; ai < argv.length; ai++) {
+    var a = argv[ai];
+    if (a === '--port' || a === '-p') opt.port = parseInt(argv[++ai], 10) || 4575;
+    else if (a === '--defs') opt.defs = argv[++ai];
+    else if (a === '--prefer') opt.prefer = preferValue(argv[++ai]);
+    else if (a === '-v' || a === '--verbose') opt.verbose = true;
+    else if (a === '-h' || a === '--help') {
+      console.log('usage: node tools/helix-bridge.js [device-host-or-ip] [--prefer usb|net|auto] [--port 4575] [--defs tools/helix-defs.json] [-v]');
+      process.exit(0);
+    } else opt.host = a;
+  }
+  return opt;
 }
+function preferValue(v) { v = String(v || '').toLowerCase(); return v === 'usb' || v === 'net' ? v : 'auto'; }
 function log() { console.log.apply(console, [new Date().toISOString().slice(11, 19)].concat([].slice.call(arguments))); }
 function dbg() { if (opt.verbose) log.apply(null, arguments); }
 
@@ -300,18 +332,182 @@ Zmtp.prototype.parse = function () {
 
 // ---- the device ---------------------------------------------------------------
 var device = {
-  host: opt.host || DEFAULT_HOST, ip: null, socks: {}, timer: null, stopped: false,
+  host: DEFAULT_HOST, manual: false, prefer: 'auto',   // set from opt by start()
+  ip: null, netIp: null, transport: null,              // ip = the address the sockets use; transport 'usb'|'net'|'manual'
+  socks: {}, timer: null, usbTimer: null, gen: 0, stopped: false,
   ports: { 2002: 'DEALER', 2001: 'SUB', 2003: 'SUB' }
 };
 function portState() { var o = {}; Object.keys(device.ports).forEach(function (p) { o[p] = !!(device.socks[p] && device.socks[p].ready); }); return o; }
+function anyPortReady() { var s = portState(); return Object.keys(s).some(function (p) { return s[p]; }); }
 
 function resolveHost(host, cb) {
   if (net.isIP(host)) return cb(null, host);
-  dns.lookup(host, { family: 4 }, function (err, addr) {
-    if (!err && addr) return cb(null, addr);
+  dns.lookup(host, { all: true }, function (err, addrs) {
+    var pick = pickAddress(addrs);
+    if (!err && pick) return cb(null, pick);
     if (host !== DEFAULT_HOST) return cb(err || new Error('unresolved'));
     mdnsFind(2500, function (ip) { cb(ip ? null : new Error('no Stadium found by mDNS (' + MDNS_SERVICE + ')'), ip); });
   });
+}
+// dns.lookup all:true -> the IPv4 entry, else a routable IPv6 one (a link-local
+// answer carries no zone here, so it could not be connected to anyway)
+function pickAddress(addrs) {
+  var v4 = null, v6 = null;
+  (addrs || []).forEach(function (a) {
+    if (!a || !a.address) return;
+    if (a.family === 4) { if (!v4) v4 = a.address; }
+    else if (a.family === 6 && !v6) { var g = ip6Groups(a.address); if (g && !isLinkLocal(g)) v6 = a.address; }
+  });
+  return v4 || v6;
+}
+
+// ---- USB network link (firmware 1.4: CDC-NCM) -------------------------------------
+// The pedal is <ULA prefix>::1 on the USB adapter and this host holds another
+// address of the same /64 - so our own interface table names the candidates.
+// Nothing is sent to the device beyond a TCP connect on :2002 (destroyed at once).
+var USB_PROBE_MS = 800, USB_CACHE_MS = 5000, USB_WATCH_MS = 10000, ADAPTER_CACHE_MS = 20000;
+var ADAPTER_RE = /ncm|helix|stadium|line ?6/i;
+function ip6Groups(addr) { // 'fd12:3456:789a:1::2' -> [0xfd12, 0x3456, 0x789a, 1, 0, 0, 0, 2]; null when not a plain IPv6 text
+  var s = String(addr || '').split('%')[0];
+  if (!net.isIPv6(s) || s.indexOf('.') >= 0) return null;
+  var halves = s.split('::');
+  if (halves.length > 2) return null;
+  var head = halves[0] ? halves[0].split(':') : [], tail = halves.length === 2 && halves[1] ? halves[1].split(':') : [];
+  var fill = 8 - head.length - tail.length;
+  if (fill < 0 || (halves.length === 1 && fill !== 0)) return null;
+  var g = head.concat(halves.length === 2 ? new Array(fill).fill('0') : [], tail).map(function (h) { return parseInt(h, 16); });
+  return g.length === 8 && g.every(function (n) { return n >= 0 && n <= 0xffff; }) ? g : null;
+}
+function ip6Text(g) { return g.map(function (n) { return n.toString(16); }).join(':'); }
+function ip6Prefix64(addr) { var g = ip6Groups(addr); return g ? ip6Text(g.slice(0, 4)) : null; }
+function isUla(g) { return ((g[0] >> 8) & 0xfe) === 0xfc; }        // fc00::/7
+function isLinkLocal(g) { return (g[0] & 0xffc0) === 0xfe80; }     // fe80::/10
+function isHostOne(g) { return g[4] === 0 && g[5] === 0 && g[6] === 0 && g[7] === 1; }
+// os.networkInterfaces()-shaped table -> [{iface, local, candidate, linkLocal?}], ULAs first.
+// The zone of a link-local candidate is numeric on Windows (libuv reads it with
+// atoi there) and the interface NAME elsewhere (if_nametoindex).
+function usbCandidates(ifaces, platform) {
+  platform = platform || process.platform;
+  var ula = [], ll = [], seen = {};
+  Object.keys(ifaces || {}).forEach(function (name) {
+    (ifaces[name] || []).forEach(function (a) {
+      if (!a || a.internal || (a.family !== 'IPv6' && a.family !== 6)) return;
+      var g = ip6Groups(a.address);
+      if (!g || isHostOne(g)) return;                 // we ARE ::1 of this prefix: the pedal cannot be
+      var cand;
+      if (isUla(g)) {
+        cand = ip6Text(g.slice(0, 4)) + '::1';
+        if (seen[cand]) return; seen[cand] = true;
+        ula.push({ iface: name, local: a.address, candidate: cand });
+      } else if (isLinkLocal(g)) {
+        var zone = platform === 'win32' ? (a.scopeid > 0 ? String(a.scopeid) : null) : name;
+        if (!zone) return;
+        cand = 'fe80::1%' + zone;
+        if (seen[cand]) return; seen[cand] = true;
+        ll.push({ iface: name, local: a.address, candidate: cand, linkLocal: true });
+      }
+    });
+  });
+  return ula.concat(ll);
+}
+// true when something accepts a TCP connection within ms; the socket is destroyed at once
+function probeTcp(host, port, ms) {
+  return new Promise(function (resolve) {
+    var done = false, s;
+    function fin(ok) { if (done) return; done = true; try { s.destroy(); } catch (e) { /* ok */ } resolve(ok); }
+    try { s = net.connect({ host: host, port: port }); } catch (e) { return resolve(false); }
+    s.once('connect', function () { fin(true); });
+    s.once('error', function () { fin(false); });
+    s.setTimeout(ms || USB_PROBE_MS, function () { fin(false); });
+  });
+}
+// Get-NetAdapter ... | ConvertTo-Json -Compress -> [{name, description, status}] (one adapter = a bare object)
+function parseAdapters(json) {
+  var v; try { v = JSON.parse(String(json || '').trim()); } catch (e) { return []; }
+  if (!v) return [];
+  if (!Array.isArray(v)) v = [v];
+  return v.filter(function (a) { return a && typeof a === 'object'; })
+    .map(function (a) { return { name: String(a.Name || ''), description: String(a.InterfaceDescription || ''), status: a.Status === null || a.Status === undefined ? '' : String(a.Status) }; });
+}
+function matchAdapter(adapters) { // the NCM / Line 6 adapter, by description first (a user may rename an adapter)
+  var byDesc = (adapters || []).filter(function (a) { return ADAPTER_RE.test(a.description); })[0];
+  return byDesc || (adapters || []).filter(function (a) { return ADAPTER_RE.test(a.name); })[0] || null;
+}
+var adapterCache = { at: 0, list: null, waiting: null };
+function listAdapters(cb) { // win32 only, informational, errors ignored, cached ADAPTER_CACHE_MS (PowerShell is slow)
+  if (process.platform !== 'win32') return cb([]);
+  if (adapterCache.list && Date.now() - adapterCache.at < ADAPTER_CACHE_MS) return cb(adapterCache.list);
+  if (adapterCache.waiting) { adapterCache.waiting.push(cb); return; }
+  adapterCache.waiting = [cb];
+  var ps = 'Get-NetAdapter | Select-Object Name,InterfaceDescription,Status | ConvertTo-Json -Compress';
+  childProcess.execFile('powershell', ['-NoProfile', '-Command', ps], { timeout: 3000, windowsHide: true, maxBuffer: 1 << 20 }, function (err, out) {
+    var list = err ? (adapterCache.list || []) : parseAdapters(out);
+    adapterCache.list = list; adapterCache.at = Date.now();
+    var cbs = adapterCache.waiting; adapterCache.waiting = null;
+    cbs.forEach(function (f) { f(list); });
+  });
+}
+// Promise<{present, reachable, candidate, local, iface, linkLocal, adapter, candidates, at}>
+// src (tests): {ifaces: table|fn, candidates: [...], adapters: [...]|json, port, platform}
+function discoverUsb(ms, src) {
+  src = src || {}; ms = ms || USB_PROBE_MS;
+  var port = src.port || 2002;
+  var cands = src.candidates || usbCandidates(typeof src.ifaces === 'function' ? src.ifaces() : (src.ifaces || os.networkInterfaces()), src.platform);
+  var ula = cands.filter(function (c) { return !c.linkLocal; });
+  var adaptersP = new Promise(function (res) {
+    if (src.adapters !== undefined) return res(Array.isArray(src.adapters) ? src.adapters : parseAdapters(src.adapters));
+    listAdapters(res);
+  });
+  // all candidates probed together: a ULA answer wins at once, a link-local one only once every ULA probe is in
+  var hitP = new Promise(function (res) {
+    var pending = cands.length, llHit = null, done = false;
+    if (!pending) return res(null);
+    cands.forEach(function (c) {
+      probeTcp(c.candidate, port, ms).then(function (ok) {
+        pending--;
+        if (done) return;
+        if (ok && !c.linkLocal) { done = true; return res(c); }
+        if (ok && !llHit) llHit = c;
+        if (pending === 0) { done = true; res(llHit); }
+      });
+    });
+  });
+  return hitP.then(function (hit) {
+    return adaptersP.then(function (adapters) {
+      var ad = matchAdapter(adapters);
+      if (!ad && hit) ad = adapters.filter(function (a) { return a.name === hit.iface; })[0] || null;
+      var first = hit || ula[0] || null;
+      // present = the link looks there even when nothing answers: a matching
+      // adapter, an answer, or (without an adapter table: not Windows / PowerShell
+      // failed) any ULA at all - a home router hands out ULAs too, so with the
+      // table in hand a bare ULA on the Wi-Fi is not the pedal
+      return {
+        present: !!(ad || hit || (ula.length && !adapters.length)), reachable: !!hit,
+        candidate: first ? first.candidate : null, local: first ? first.local : null, iface: first ? first.iface : null,
+        linkLocal: !!(hit && hit.linkLocal),
+        adapter: ad ? { name: ad.name, description: ad.description, status: ad.status } : null,
+        candidates: cands.length, at: new Date().toISOString()
+      };
+    });
+  });
+}
+// the bridge's view of the link: the last result, one scan in flight at a time,
+// a cache of USB_CACHE_MS unless forced, and one log line per change of state
+var usbState = { last: null, at: 0, busy: null, seen: null };
+function usbScan(force, src) {
+  if (!force && usbState.last && Date.now() - usbState.at < USB_CACHE_MS) return Promise.resolve(usbState.last);
+  if (usbState.busy) return usbState.busy;
+  usbState.busy = discoverUsb(USB_PROBE_MS, src).then(function (r) {
+    usbState.busy = null; usbState.last = r; usbState.at = Date.now();
+    var key = r.reachable ? 'on:' + r.candidate : 'off';
+    if (key !== usbState.seen) {
+      usbState.seen = key;
+      if (r.reachable) log('usb: Helix answered on ' + r.candidate + ' via ' + (r.adapter ? r.adapter.name + ' (' + r.adapter.description + ')' : r.iface));
+      else log('usb: no USB network link (needs fw 1.4 + the UsbNcm adapter)' + (r.adapter ? ' - adapter "' + r.adapter.name + '" is ' + (r.adapter.status || 'listed') + ', nothing answers on :2002' : ''));
+    }
+    return r;
+  }, function () { usbState.busy = null; return usbState.last; });
+  return usbState.busy;
 }
 // one-shot mDNS PTR query for the Stadium's service; the device answers with
 // PTR + SRV + A in one datagram (port 2001 in the SRV is the change stream).
@@ -357,29 +553,75 @@ function parseMdnsA(msg) {
   return ips;
 }
 
+// which address to open: manual host > USB link (prefer auto/usb) > dns/mDNS
+function pickTransport(cb) { // cb(err, ip, transport)
+  if (device.manual) return resolveHost(device.host, function (err, ip) { cb(err, ip, 'manual'); });
+  if (device.prefer === 'net') return resolveHost(device.host, function (err, ip) { cb(err, ip, 'net'); });
+  usbScan(true).then(function (r) {
+    if (r && r.reachable) return cb(null, r.candidate, 'usb');
+    resolveHost(device.host, function (err, ip) { cb(err, ip, 'net'); });
+  });
+}
 function connectDevice() {
   if (device.stopped) return;
-  resolveHost(device.host, function (err, ip) {
+  var gen = ++device.gen;
+  pickTransport(function (err, ip, transport) {
+    if (gen !== device.gen || device.stopped) return;   // a host / transport change superseded this attempt
     if (err || !ip) { log('device: cannot resolve', device.host, '-', err && err.message, '(retrying)'); broadcastStatus(); return scheduleReconnect(); }
-    if (ip !== device.ip) log('device:', device.host, '->', ip);
-    device.ip = ip;
+    if (ip !== device.ip) {
+      log('device:', transport === 'usb' ? 'USB link' : device.host, '->', ip, '(' + transport + ')');
+      closeSocks();                                     // never two addresses at once
+    }
+    device.ip = ip; device.transport = transport;
+    if (transport !== 'usb') device.netIp = ip;
     Object.keys(device.ports).forEach(function (p) {
       if (device.socks[p] && (device.socks[p].ready || device.socks[p].sock)) return;
       var z = device.socks[p] = new Zmtp(ip, +p, device.ports[p]);
-      z.on('ready', function () { log('device: port', p, device.ports[p], 'ready'); broadcastStatus(); });
-      z.on('message', function (frames) { onDeviceMessage(+p, frames); });
+      z.on('ready', function () { if (device.socks[p] !== z) return; log('device: port', p, device.ports[p], 'ready'); broadcastStatus(); });
+      z.on('message', function (frames) { if (device.socks[p] === z) onDeviceMessage(+p, frames); });
       z.on('error', function (e) { dbg('device: port', p, 'error', e.message); });
-      z.on('close', function (was) { if (was) log('device: port', p, 'closed'); broadcastStatus(); scheduleReconnect(); });
+      z.on('close', function (was) { if (device.socks[p] !== z) return; if (was) log('device: port', p, 'closed'); broadcastStatus(); scheduleReconnect(); });
       z.connect();
     });
+    usbWatch();
   });
 }
 function scheduleReconnect() { if (device.timer || device.stopped) return; device.timer = setTimeout(function () { device.timer = null; connectDevice(); }, 4000); }
+function closeSocks() {
+  var old = device.socks; device.socks = {};
+  Object.keys(old).forEach(function (p) { old[p].close(); });
+}
+function reconnectNow() { device.ip = null; device.transport = null; closeSocks(); if (device.timer) { clearTimeout(device.timer); device.timer = null; } connectDevice(); }
 function setHost(h) {
-  device.host = h || DEFAULT_HOST; device.ip = null;
-  Object.keys(device.socks).forEach(function (p) { device.socks[p].close(); });
-  device.socks = {};
-  connectDevice();
+  device.manual = !!h; device.host = h || DEFAULT_HOST;
+  reconnectNow();
+}
+// the page re-sends its preference on every connect, so an unchanged one never
+// touches a running session; a changed one reconnects only when it would move
+// the bridge (usb <-> net; a manual host always wins), or when nothing is up yet
+function setTransport(want) {
+  want = preferValue(want);
+  var changed = want !== device.prefer, up = anyPortReady();
+  device.prefer = want;
+  if (changed) log('transport: prefer', want);
+  var move = changed && !device.manual && up && ((want === 'usb' && device.transport !== 'usb') || (want === 'net' && device.transport !== 'net'));
+  if (move || (changed && !up)) reconnectNow();
+  else usbWatch();
+  broadcastStatus();
+}
+// prefer usb: while the sockets run over the network, look for the USB link every
+// USB_WATCH_MS and move over when it appears (auto only picks USB at connect time)
+function usbWatch() {
+  if (device.usbTimer) { clearTimeout(device.usbTimer); device.usbTimer = null; }
+  if (device.prefer !== 'usb' || device.manual || device.transport !== 'net' || device.stopped) return;
+  device.usbTimer = setTimeout(function () {
+    device.usbTimer = null;
+    if (device.prefer !== 'usb' || device.transport !== 'net') return;
+    usbScan(true).then(function (r) {
+      if (r && r.reachable && device.prefer === 'usb' && device.transport === 'net') { log('usb: link appeared - moving over'); reconnectNow(); }
+      else usbWatch();
+    });
+  }, USB_WATCH_MS);
 }
 
 // A ZMQ message is one or more frames. :2001 prefixes a small sequence frame
@@ -412,10 +654,12 @@ function dspKind(args) { // tuner = {id__:{eid_:10}} single float; meters = eid 
 
 // ---- model / param names (tools/helix-defs.json) ---------------------------------
 var defs = null;
-try {
-  defs = JSON.parse(fs.readFileSync(opt.defs, 'utf8'));
-  log('defs:', Object.keys(defs.model_names || {}).length, 'models from', path.relative(process.cwd(), opt.defs) || opt.defs);
-} catch (e) { log('defs: none (' + e.message + ') - blocks will show numeric ids'); }
+function loadDefs() {
+  try {
+    defs = JSON.parse(fs.readFileSync(opt.defs, 'utf8'));
+    log('defs:', Object.keys(defs.model_names || {}).length, 'models from', path.relative(process.cwd(), opt.defs) || opt.defs);
+  } catch (e) { log('defs: none (' + e.message + ') - blocks will show numeric ids'); }
+}
 function lookupModels(ids) {
   var out = {};
   (ids || []).forEach(function (id) {
@@ -430,7 +674,14 @@ function lookupModels(ids) {
 // ---- WebSocket server (RFC 6455, text frames) ------------------------------------
 var clients = [];
 var WS_GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
-function statusJSON() { return { op: 'status', version: VERSION, host: device.host, ip: device.ip, ports: portState(), defs: !!defs, clients: clients.length }; }
+function statusJSON() {
+  return {
+    op: 'status', version: VERSION, host: device.host, ip: device.ip, ports: portState(), defs: !!defs, clients: clients.length,
+    transport: anyPortReady() ? device.transport : null, prefer: device.prefer,
+    transports: { usb: usbState.last, net: { host: device.host, ip: device.netIp } }
+  };
+}
+function usbKey(r) { return r ? [r.reachable, r.candidate, r.present, r.adapter && r.adapter.name].join('|') : ''; }
 function broadcast(o) { var s = JSON.stringify(o); clients.forEach(function (c) { c.sendText(s); }); }
 function broadcastStatus() { broadcast(statusJSON()); }
 
@@ -506,20 +757,43 @@ function onClient(c, text) {
       c.sendJSON({ op: 'defs', models: lookupModels(m.models) });
       break;
     case 'host':
-      log('page asks for host', m.host);
+      log('page asks for host', m.host || '(discovery)');
       setHost(String(m.host || '').trim());
       break;
-    case 'status':
-      c.sendJSON(statusJSON());
+    case 'transport':
+      log('page asks for transport', m.want);
+      setTransport(m.want);
       break;
+    case 'status': {
+      c.sendJSON(statusJSON());
+      // and a fresh look at the USB link (cached 5 s); everyone hears when it changed
+      var before = usbKey(usbState.last);
+      usbScan(false).then(function (r) { if (usbKey(r) !== before) broadcastStatus(); });
+      break;
+    }
     default:
       c.sendJSON({ op: 'error', text: 'unknown op ' + m.op });
   }
 }
 
-server.listen(opt.port, '127.0.0.1', function () {
-  log('soundLAB Helix bridge v' + VERSION + ' listening on ws://127.0.0.1:' + opt.port + '  (Ctrl+C to stop)');
-  connectDevice();
-});
-server.on('error', function (e) { log('cannot listen on 127.0.0.1:' + opt.port + ' - ' + e.message); process.exit(1); });
-process.on('SIGINT', function () { device.stopped = true; Object.keys(device.socks).forEach(function (p) { device.socks[p].close(); }); server.close(); process.exit(0); });
+// ---- start (as a script) / export (as a module) ------------------------------------
+function start() {
+  device.host = opt.host || DEFAULT_HOST; device.manual = !!opt.host; device.prefer = opt.prefer;
+  loadDefs();
+  server.listen(opt.port, '127.0.0.1', function () {
+    log('soundLAB Helix bridge v' + VERSION + ' listening on ws://127.0.0.1:' + opt.port + '  (Ctrl+C to stop)');
+    log('device:', device.manual ? device.host + ' (manual)' : 'prefer ' + device.prefer + (device.prefer === 'net' ? ' (' + device.host + ')' : ' (USB link, else ' + device.host + ')'));
+    connectDevice();
+  });
+  server.on('error', function (e) { log('cannot listen on 127.0.0.1:' + opt.port + ' - ' + e.message); process.exit(1); });
+  process.on('SIGINT', function () { device.stopped = true; closeSocks(); server.close(); process.exit(0); });
+}
+if (require.main === module) { parseArgs(process.argv.slice(2)); start(); }
+module.exports = {
+  VERSION: VERSION, DEFAULT_HOST: DEFAULT_HOST, USB_PROBE_MS: USB_PROBE_MS, USB_CACHE_MS: USB_CACHE_MS,
+  parseArgs: parseArgs, preferValue: preferValue, opt: opt, device: device,
+  ip6Groups: ip6Groups, ip6Prefix64: ip6Prefix64, usbCandidates: usbCandidates, probeTcp: probeTcp,
+  parseAdapters: parseAdapters, matchAdapter: matchAdapter, discoverUsb: discoverUsb, usbScan: usbScan, usbState: usbState,
+  pickAddress: pickAddress, resolveHost: resolveHost, statusJSON: statusJSON,
+  msgpack: msgpack, mpDecode: mpDecode, decodeBlob: decodeBlob, oscEncode: oscEncode, oscDecode: oscDecode, fourcc: fourcc
+};
