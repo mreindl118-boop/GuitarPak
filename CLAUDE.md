@@ -341,7 +341,12 @@ js/helix-deck.js  HELIX DECK (feat/helix-deck, after 1.2.0): the Synth Deck
                   + XY pad, chips, Explain captions, page-owned sheets).
                   USB "editing" on fw 1.4 = a CDC-NCM network link over the
                   cable: the SAME bridge reaches the pedal over it (no WebUSB;
-                  the vendor bulk interface is firmware-update only). Docs
+                  the vendor bulk interface is firmware-update only). PHASE 4:
+                  the bridge probes every ULA <prefix>::1 on port 2002 (USB
+                  first, --prefer usb|net|auto, page {op:'transport'}), status
+                  carries transport + transports; tools/helix-usb-inventory.ps1
+                  = read-only checklist after the firmware update; docs/
+                  HELIX-USB.md; suite tests/helix-bridge-usb (pure Node). Docs
                   docs/HELIX-DECK.md (+ HELIX-DECK-SPEC.md); suites helix +
                   helix-deck. Script order helix-map -> helix-routes -> helix
                   -> helix-deck, before help.js.
