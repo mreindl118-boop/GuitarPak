@@ -23,3 +23,15 @@
 - Not in phase 1: the chain strip with bypass dots + per-block strips (phase 2), Go-live stage with
   Lock and a 60 px Panic (phase 3), the Matrix row (fw 1.4), the bridge's USB-link discovery (phase 4),
   a unit table for parameters.
+
+## Phase 4 built (2026-10-26T05:00Z) — USB = the bridge over the pedal's USB network link
+
+Matt (2026-10-26): "Yes: I will update the Stadium to 1.4 with the Line 6 app. Then plan phase 4."
+On `feat/helix-deck` (pushed): `tools/helix-bridge.js` 0.2.0 probes every unique-local IPv6
+`<prefix>::1` on port 2002 (USB first, `--prefer usb|net|auto`, page `{op:'transport', want}`),
+status carries `transport` + `transports` (Windows names the UsbNcm adapter); the page's USB badge
+and Now bar follow it; `tools/helix-usb-inventory.ps1` (read-only) + `docs/HELIX-USB.md` = the
+checklist after the firmware update. Suites: helix-bridge-usb 88 (pure Node), helix 56, helix-deck
+140, nav/smoke/context-global green on the PC. Unverified until the pedal is on 1.4 and plugged in:
+Windows binding the NCM adapter, IPv4 on the link, Require-PIN semantics. No driver, no WebUSB,
+nothing sent to any device by this work.
