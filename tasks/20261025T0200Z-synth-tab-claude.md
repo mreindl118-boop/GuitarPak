@@ -27,7 +27,9 @@
   live, Lock, Panic), profiles (export/import), docs/SYNTH-TAB.md, help tours, tests/synthtab.test.js
   (48). Step 7 (A1 labels Train / LUMI, primer docs cherry-picked, One Open on the Songs page +
   tests/oneopen.test.js; js/songs.js and one line in js/woodshed.js added to the claim, agreed with
-  the UI session). Left for the release: rebase on main (3890488), the UI session's phases A/B + C2 "One Open",
+  the UI session). 2026-10-26: pushed on Matt's go ("push feat/synth-tab and open a pull request
+  against main; the UI phases can follow in their own PR") and open as PR #88 (04b2963, rebased on
+  main 3890488). Left for the release: rebase on main (3890488), the UI session's phases A/B + C2 "One Open",
   the device test on the iPad (Matt), stamps on Matt's go.
 - Design decisions on the way (Matt, 2026-10-25): strips not knobs; the knob-row picker; Assign
   knobs named by what they control; Explain mode (didactic); data-rich slots; zones later.
