@@ -34,3 +34,9 @@ send each landing to the Synth tab session."
 - Suites green on the PC against the branch: context-global 88, nav 40, smoke, quiz,
   learn-instruments, game, performance, practice, practice-progress-ui.
 - Phase B not started; waits for Matt's go in the UI session's chat.
+
+## Rebased (2026-10-26)
+
+- `feat/ui-phase-a` now sits on `origin/feat/synth-tab` f7bd32f (its context-matrix fix): A2 a330814,
+  A3 aec93a4, tests 33b6c9a. Every changed file is byte-identical to the pre-rebase commits
+  (8952007 / 26b0668 / 07011bd); the suite results above stand. Still not pushed.
