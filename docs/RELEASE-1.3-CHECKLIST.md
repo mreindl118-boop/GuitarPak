@@ -30,9 +30,11 @@ Tick items here as they land (commit in brackets).
 
 ## 2. UI phase A — navigation and copy — UI session
 - [x] 2.1 (labels, step 7) Practice tab -> Train; "LUMI practice" -> LUMI in app.js GROUPS /
-      SPACE_LABELS + tests/nav.test.js; page ids unchanged. Still open: tours / README copy (UI session)
-- [ ] 2.2 One header button style (#ctx-btn like its neighbours; capture dot + key/BPM title kept)
-- [ ] 2.3 Copy diet: audit sentences into tours/tips; Exercises home = stats strip + Start + path
+      SPACE_LABELS + tests/nav.test.js; page ids unchanged. Tours / README / CLAUDE.md copy: feat/ui-phase-a (A3)
+- [x] 2.2 One header button style (#ctx-btn like its neighbours; capture dot + key/BPM title kept) (feat/ui-phase-a 8952007)
+- [x] 2.3 Copy diet: audit sentences into tours/tips (Exercises tour gains "Your instrument", the Woodshed tour
+      the score-scope note); the Learn-by-instrument card is one line + a tips disclosure; the Exercises home
+      strip note is the goal + lifetime XP; Progress-card wording stays (pinned by its suite) (feat/ui-phase-a A3)
 
 ## 3. UI phase B — one Session panel — UI session
 - [ ] 3.1 One right-side panel: Key & tempo / Metronome / Lights & help; one header button showing

@@ -1160,7 +1160,7 @@
         '<div class="card" style="margin-top:12px;background:var(--card2)"><h3 style="margin-top:0">Guided performance</h3>' +
           '<p class="small">See what to play on the piano roll and keyboard. <b>Wait for Me</b> follows your notes and chords; <b>Play at Tempo</b> keeps time and gives a full accuracy report. MIDI and touch/typing keys work without LUMI.</p>' +
           '<div class="row"><button type="button" class="btn primary" id="ws-guided-melody">Melody and rhythm</button><button type="button" class="btn" id="ws-guided-chords">Chord journey</button></div>' +
-          '<p class="small muted">Original exercises follow the treble-clef root/scale. Your library’s MIDI, Studio and generated scores can use either mode below. PDFs and images do not contain parsed targets.</p></div>' +
+          '</div>' +
         '<div class="row" style="margin-top:12px">' +
           '<button type="button" class="btn sm" id="ws-gen-scale">+ Scale (your key)</button>' +
           '<button type="button" class="btn sm" id="ws-gen-hanon">+ Hanon</button>' +
