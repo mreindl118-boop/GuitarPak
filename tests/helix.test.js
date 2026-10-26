@@ -10,6 +10,11 @@
 // port), plus the built-in rules: nothing connects at boot, the bridge only
 // after Connect bridge was pressed once, and an old stored copy of the plugin
 // is skipped instead of run.
+// Helix deck (docs/HELIX-DECK-SPEC.md): with js/helix-deck.js loaded the page
+// opens on the Perform face, so the suite switches to Edit (SLHelix.mode) for
+// the six views, and confirms (Load / safe mode off) go through the deck's
+// sheet (#hxd-confirmok) instead of window.confirm; the dialog auto-accept
+// stays as the fallback so the suite passes with the engine alone too.
 const { chromium } = require('playwright');
 const env = require('./env');
 let fails = 0;
@@ -70,6 +75,8 @@ async function newPage(browser, opts) {
   return { ctx, page, errs };
 }
 const J = JSON.stringify;
+// the deck's confirm sheet: click OK when it is open (window.confirm is the fallback without the deck)
+const CONFIRM_OK = "(async () => { await new Promise(r => setTimeout(r, 40)); const sh = document.getElementById('hxd-sheet'), b = document.getElementById('hxd-confirmok'); if (sh && b && !sh.hidden) { b.click(); await new Promise(r => setTimeout(r, 40)); return true; } return false; })()";
 const net = (page, addr) => page.evaluate((addr) => window.__net.filter(m => m.op === 'rpc' && m.addr === addr).map(m => m.args.slice(1).map(a => a[1])), addr);
 const armState = (page) => page.evaluate(() => ({ st: document.getElementById('hx-armst').textContent, msg: document.getElementById('hx-armmsg').textContent, armed: SLHelix.armed }));
 
@@ -90,13 +97,18 @@ const armState = (page) => page.evaluate(() => ({ st: document.getElementById('h
   const nav = await page.evaluate(async () => {
     App.switchTo('helix');
     await new Promise(r => setTimeout(r, 700));
+    // the deck opens the page on Perform; the six views live behind Edit
+    const face0 = SLHelix.mode(), deck = !!window.SLHelixDeck, editHidden0 = document.getElementById('hxd-edit').hidden;
+    SLHelix.mode('edit');
     return { active: App.active, tab: (document.querySelector('#tabbar .tabbar-btn.active') || {}).textContent, views: [...document.querySelectorAll('#hx-views button')].map(b => b.dataset.view).join(','),
       midi: document.getElementById('hx-midist').textContent, mode: SLHelix.midi.mode, bridge: document.getElementById('hx-brst').textContent, dev: document.getElementById('hx-devst').textContent,
       dest: document.getElementById('hx-dest').textContent, sent: window.__sent.length, writes: window.__net.filter(m => m.op === 'rpc').map(m => m.addr),
-      pills: [...document.querySelectorAll('#subnav .subtab')].map(b => b.textContent).join('|') };
+      pills: [...document.querySelectorAll('#subnav .subtab')].map(b => b.textContent).join('|'),
+      face0, deck, editHidden0, face: SLHelix.mode(), editHidden: document.getElementById('hxd-edit').hidden, viewsShown: [...document.querySelectorAll('.hx-view')].filter(v => !v.hidden).length };
   });
   ok(nav.active === 'helix' && /Guitar/.test(nav.tab || '') && nav.pills === 'Neck|Tab|Notation|Helix', 'Helix is the fourth Guitar pill: ' + nav.tab + ' / ' + nav.pills);
   ok(nav.views === 'rig,blocks,presets,looper,mixer,monitor', 'six views: ' + nav.views);
+  ok(nav.face0 === (nav.deck ? 'perform' : 'edit') && nav.editHidden0 === nav.deck && nav.face === 'edit' && !nav.editHidden && nav.viewsShown === 1, (nav.deck ? 'the deck opens the page on Perform (views folded); ' : 'no deck loaded: the views show; ') + 'SLHelix.mode(\'edit\') shows the six views: ' + J({ face0: nav.face0, face: nav.face, editHidden: nav.editHidden }));
   ok(nav.mode === 'web' && /Helix Stadium MIDI/.test(nav.midi), 'found the Helix MIDI port itself: ' + nav.midi);
   ok(/Helix at 10\.0\.0\.5/.test(nav.bridge), 'bridge says the Helix is reachable: ' + nav.bridge);
   ok(/stadium/.test(nav.dev) && /fw 1\.1\.0/.test(nav.dev) && /1A MyVibe/.test(nav.dev), 'product info + active preset resolved: ' + nav.dev.replace(/\s+/g, ' '));
@@ -237,7 +249,10 @@ const armState = (page) => page.evaluate(() => ({ st: document.getElementById('h
     const rows = [...document.querySelectorAll('.hx-preset')];
     const chips = [...document.querySelectorAll('#hx-conts .chip')].map(c => c.textContent).join('|');
     const stars = document.querySelectorAll('.hx-star').length;
-    rows[1].click(); await new Promise(r => setTimeout(r, 80));
+    rows[1].click(); await new Promise(r => setTimeout(r, 40));
+    // the deck asks in its sheet (Load is destructive); without it window.confirm was auto-accepted
+    const sh = document.getElementById('hxd-sheet'), okb = document.getElementById('hxd-confirmok'); if (sh && okb && !sh.hidden) okb.click();
+    await new Promise(r => setTimeout(r, 80));
     document.querySelector('[data-star="226"]').click();
     document.querySelector('#hx-conts [data-cont="241"]').click(); await new Promise(r => setTimeout(r, 400));
     const setlistRows = [...document.querySelectorAll('.hx-preset')].map(x => x.textContent).join('|');
@@ -260,8 +275,10 @@ const armState = (page) => page.evaluate(() => ({ st: document.getElementById('h
   ok(a.off && a.st === 'DISARMED' && /Press Arm/.test(a.msg), 'leaving the page disarms, and coming back starts disarmed: ' + a.msg);
   r = await page.evaluate(async () => { SLHelix.arm(); const n = window.__sent.length; window.__failNext = true; document.getElementById('hx-tap').click(); const after = SLHelix.armed; return { sent: window.__since(n), after, msg: document.getElementById('hx-armmsg').textContent }; });
   ok(r.sent.length === 0 && !r.after && /send failed/i.test(r.msg), 'a failed send disarms: ' + r.msg);
-  r = await page.evaluate(async () => { const s = document.getElementById('hx-safe'); s.checked = false; s.dispatchEvent(new Event('change')); const n = window.__sent.length; document.getElementById('hx-tap').click(); return { sent: window.__since(n), st: document.getElementById('hx-armst').textContent, armHidden: document.getElementById('hx-arm').hidden, stored: App.store.get('hx.safe') }; });
-  ok(J(r.sent) === J([[0xB0, 64, 127]]) && r.st === 'SAFE MODE OFF' && r.armHidden && r.stored === false, 'safe mode off (after a confirm) sends without arming: ' + J(r));
+  await page.evaluate(() => { const s = document.getElementById('hx-safe'); s.checked = false; s.dispatchEvent(new Event('change')); });
+  const confirmed = await page.evaluate(CONFIRM_OK); // the deck's sheet (async) or nothing (window.confirm already accepted)
+  r = await page.evaluate(async () => { const n = window.__sent.length; document.getElementById('hx-tap').click(); return { sent: window.__since(n), st: document.getElementById('hx-armst').textContent, armHidden: document.getElementById('hx-arm').hidden, stored: App.store.get('hx.safe') }; });
+  ok(J(r.sent) === J([[0xB0, 64, 127]]) && r.st === 'SAFE MODE OFF' && r.armHidden && r.stored === false, 'safe mode off (after a confirm' + (confirmed ? ' in the deck sheet' : '') + ') sends without arming: ' + J(r));
 
   console.log('# monitor + hygiene');
   r = await page.evaluate(() => { SLHelix.showView('monitor'); return { rows: document.querySelectorAll('.hx-mrow').length, midi: document.querySelectorAll('.hx-mrow.midi').length, net: document.querySelectorAll('.hx-mrow.net').length }; });

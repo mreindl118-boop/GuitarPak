@@ -1,7 +1,9 @@
 # Helix Stadium in soundLAB
 
 The **Helix** page (*Guitar › Helix*, `js/helix.js`) reads, writes and
-controls a Line 6 **Helix Stadium / Stadium XL**. It is built in since 0.82.0;
+controls a Line 6 **Helix Stadium / Stadium XL**. Since the Helix deck
+([HELIX-DECK.md](HELIX-DECK.md)) it opens on a **Perform** face; the views
+described below live under **Edit**. It is built in since 0.82.0;
 it began as a plugin (`plugins/helix-stadium.js`, now a stub) and outgrew the
 100 KB plugin cap. Nothing connects when soundLAB starts: the page asks for
 MIDI access when you open it only once you have said yes to MIDI somewhere in
@@ -17,8 +19,14 @@ The Stadium's USB connection does **not** carry the editor protocol on
 firmware 1.1 — the editor talks over the network (ZeroMQ + OSC). USB gives
 audio, class-compliant MIDI, an HID interface and a vendor bulk interface.
 Line 6 added USB editing in app/firmware 1.4 (release notes dated 2026-10-13;
-hardware firmware 1.4.1 on 2026-10-20); this pedal runs 1.1.0, and whether 1.4
-carries the same protocol over that bulk interface is unexplored.
+hardware firmware 1.4.1 on 2026-10-20). Research on 2026-10-26 (community
+`helix-stadium-tools`, verified on a Stadium XL fw 1.4.0): that USB editing is a
+CDC-NCM **network link over the cable** — the pedal appears as a network adapter
+and the same ZeroMQ/OSC services (TCP 2001/2002/2003, mDNS `_stadiumserver._tcp`,
+`p35x1.local`, an IPv6 ULA ending in `::1`) answer over it. The vendor bulk
+interface is only the firmware-update path (a framed text protocol). So soundLAB's
+USB route is the bridge reaching the pedal over that adapter once the pedal runs
+1.4 and Windows binds its in-box UsbNcm driver; this pedal runs 1.1.0 today.
 
 **On this PC, MIDI worked without a Line 6 driver.** null's device inventory
 (2026-10-22, Windows 11 build 26200) found the Stadium's MIDI on Microsoft's

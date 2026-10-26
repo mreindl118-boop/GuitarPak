@@ -116,7 +116,8 @@
       { sel: '#mh-thru', t: 'Thru and Rules', x: 'Thru passes In to Out through your Rules — remap a knob, transpose, force a channel, block aftertouch. Rules can also change what soundLAB itself hears, on every page.' },
       { sel: '#mh-profile', t: 'Device profiles', x: 'Generic speaks plain MIDI to anything. A profile adds named knobs and ready-made SysEx builders for that maker (Yamaha MODX/MONTAGE, Roland…) — nothing else changes.' }
     ],
-    helix: [
+    // the Helix deck builds these from js/helix-map.js's EXPLAIN wording (one source for captions and tour); the list below is the fallback
+    helix: (window.SLHelixMap && typeof SLHelixMap.tour === 'function' && SLHelixMap.tour().length) ? SLHelixMap.tour() : [
       { t: 'Helix Stadium', x: 'Control a Line 6 Helix Stadium from soundLAB. Over USB MIDI: presets, snapshots, knobs, pedals, looper and the Matrix mixer. With the bridge on this computer (node tools/helix-bridge.js) it also reads and edits the loaded preset block by block.' },
       { sel: '#hx-armrow', t: 'Nothing sends until you arm', x: 'Output starts disarmed. Arm opens a 90-second window that every command renews; leaving the page, hiding the app or switching windows disarms it again. Reads never need arming.' },
       { sel: '#hx-views', t: 'Six views', x: 'Rig is the pedalboard: presets, favorites, snapshots, knobs. Blocks edits the loaded preset live (bridge). Presets browses and loads (bridge). Looper & Song, Mixer, and a Monitor of every message.' },

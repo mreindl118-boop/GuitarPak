@@ -321,6 +321,30 @@ js/plugins.js     window.SoundLab plugin API v1: registerPage (App.addPage),
                   cap, per-plugin enable/error) run right after boot; loaded
                   from Settings > Plugins. Docs PLUGINS.md; sample plugin
                   plugins/sample-lofi.js (Lo-fi fx + Glass bell voice).
+js/helix-deck.js  HELIX DECK (feat/helix-deck, after 1.2.0): the Synth Deck
+                  model on the Helix page. js/helix-map.js = pure data
+                  (window.SLHelixMap: every control's CC/address, channel,
+                  conf, minFw, one EXPLAIN sentence; tour() builds
+                  TOURS.helix from the same wording); js/helix-routes.js =
+                  App.helix, the engine moved out of helix.js (routes midi /
+                  net / usb-stub, null's arm gate unchanged, OPS table with
+                  the exact bytes + timing: recall CC32 -> PC +30 ms -> CC69
+                  +300 ms, bridge load then /activateSnapshot +700 ms, param
+                  40 ms coalesce; values with PROVENANCE sent | echo | state;
+                  favorites = ADDRESSES never value dumps; events 'state',
+                  'dev', 'value', 'stream', 'ledger'; no DOM); js/helix.js =
+                  the shell (same hx- ids; mount points #hxd-top / #hxd-
+                  perform; the six views under #hxd-edit, shown when hx.mode
+                  = 'edit'; ui.confirm replaces window.confirm/prompt);
+                  js/helix-deck.js = the Perform face (hxd-: Now bar, route
+                  badges, snapshots, pins as tiles, strips with a row picker
+                  + XY pad, chips, Explain captions, page-owned sheets).
+                  USB "editing" on fw 1.4 = a CDC-NCM network link over the
+                  cable: the SAME bridge reaches the pedal over it (no WebUSB;
+                  the vendor bulk interface is firmware-update only). Docs
+                  docs/HELIX-DECK.md (+ HELIX-DECK-SPEC.md); suites helix +
+                  helix-deck. Script order helix-map -> helix-routes -> helix
+                  -> helix-deck, before help.js.
 js/helix.js       HELIX STADIUM page ('helix', Guitar group pill "Helix",
                   0.82.0; prefix hx-, store hx.*; built in from the former
                   plugin, plugins/helix-stadium.js is now a stub and
