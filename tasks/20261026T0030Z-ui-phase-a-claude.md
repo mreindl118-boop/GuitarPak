@@ -25,3 +25,12 @@ send each landing to the Synth tab session."
   group lines in GROUPS, `js/omr/*`, release stamps.
 - Suites run on the PC against the worktree (context-global, nav, smoke, quiz, learn-instruments,
   game, performance, practice, practice-progress-ui); results in the A3 commit message.
+
+## Landed (2026-10-26)
+
+- `feat/ui-phase-a` = 04b2963 + A2 8952007 + A3 26b0668 + tests 07011bd (context suite: matrix gains
+  deck/liveset; clef assertions = at least 34 px and the same box as its neighbours; contrast
+  helper resolves ghost/tinted backgrounds through the top bar). Not pushed; PR on Matt's go.
+- Suites green on the PC against the branch: context-global 88, nav 40, smoke, quiz,
+  learn-instruments, game, performance, practice, practice-progress-ui.
+- Phase B not started; waits for Matt's go in the UI session's chat.
