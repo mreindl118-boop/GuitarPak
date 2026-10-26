@@ -372,7 +372,7 @@
   function refuse(msg) { var now = Date.now(); if (now - lastRefuse > 400) toast(msg); lastRefuse = now; }
   function outIsLumi() { return /lumi/i.test(api.hubOutName() || ''); }
   function txCheck(bytes) {
-    var why = !api.hasOut() ? 'No MIDI output — pick one above' : outIsLumi() ? 'That output is the LUMI (key lights) — pick the synth under Synth out' :
+    var why = !api.hasOut() ? (App.active === 'midihub' ? 'No MIDI output — pick one under Synth out' : 'Not connected to a synth — connect at the top of the page') : outIsLumi() ? 'That output is the LUMI (key lights) — pick the synth under Synth out' :
       (bytes && bytes[0] === 0xF0 && !api.sysexOk) ? 'SysEx not allowed by the browser — reconnect MIDI and allow SysEx' : null;
     if (!why) return true;
     refuse(why);

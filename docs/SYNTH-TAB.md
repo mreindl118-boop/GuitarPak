@@ -38,6 +38,27 @@ the design boards Matt chose from: the "Synth Deck design options" artifact (opt
   `turn()`), so the LUMI guard, Rules-on-app-controls and the musical ledger apply. Nothing is sent
   on show, on a tab switch or on a profile switch.
 
+### Connecting (1.3.1)
+
+The Deck and Live pages show a panel until the synth is reachable, and dim their controls:
+
+| State | What it says | What it offers |
+|---|---|---|
+| No Web MIDI | This browser can’t reach MIDI devices; on iPad/iPhone it names MIDIWeb Browser and Web MIDI Browser | nothing to press |
+| Never connected | Connect your synth | **Connect** (the one browser prompt) |
+| Waiting | Allow MIDI devices in the browser’s prompt | — |
+| Blocked | MIDI is blocked for this site; allow it in the site settings | **Try again** |
+| No output | Plug the synth in by USB; or choose where to send | an output picker when ports exist |
+| LUMI as output | The LUMI never gets synth messages | an output picker |
+
+On show the page reconnects without a prompt when MIDI was switched on before or the browser
+already allows it. A tap on a dimmed control shakes the panel instead of silently doing nothing.
+
+The chips, Scenes and slots update in place and the page repaints only for controllers, program
+changes and SysEx replies. A MODX with MIDI clock out sends about 36 clock ticks a second; until
+1.3.1 each one rebuilt the buttons, so a finger often lifted off a different element and the tap was
+lost (found on the MODX8+ on 2026-10-26).
+
 ## Presets (the builder)
 
 *Save preset* opens a sheet: name, tags, colour, and what the preset remembers — **Sound**
