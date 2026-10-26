@@ -1291,7 +1291,7 @@
 
   function renderHome() {
     var tabs = [['path', 'Path'], ['topics', 'Topics'], ['progress', 'Progress']];
-    root.innerHTML = '<div class="qz-view"><p class="small muted" id="qz-category">' + esc(App.practiceInstrument ? App.practiceInstrument.label() : 'Piano') + ' exercises · shared theory and instrument-specific modes. New course completion stays with this category.</p>' + pendingHTML() + statsStrip() +
+    root.innerHTML = '<div class="qz-view"><p class="small muted" id="qz-category">' + esc(App.practiceInstrument ? App.practiceInstrument.label() : 'Piano') + ' exercises</p>' + pendingHTML() + statsStrip() +
       '<div class="seg qz-hometabs" role="tablist" aria-label="Exercises">' + tabs.map(function (t) {
         return '<button type="button" role="tab" data-qzh="' + t[0] + '">' + t[1] + '</button>';
       }).join('') + '</div><div id="qz-homebody"></div></div>';
@@ -1861,7 +1861,8 @@
     var X = XP(), st = X.streak(), lv = X.level(), t = X.today(), g = X.goal(), p = prog();
     var summary = practiceSummary(), minutes = (summary.today.engagedSeconds || 0) / 60;
     var pct = Math.round(100 * minutes / g), ci = currentNode(p), nl = nodeLevel(NODES[ci], p);
-    var note = 'Lifetime earned: ' + Number(summary.lifetimeEarnedXP || 0).toLocaleString() + ' XP. Consistency can decay after inactivity; it is not a measured skill level. Daily goal: ' + g + ' engaged minutes.';
+    // 1.3 (primer A3): the habit-meter caveat moved to the Exercises tour
+    var note = 'Daily goal: ' + g + ' engaged minutes. Lifetime: ' + Number(summary.lifetimeEarnedXP || 0).toLocaleString() + ' XP.';
     return '<div class="card qz-strip">' +
       '<div class="qz-stat' + (st.today ? ' lit' : '') + '">' + ico('flame', 26) + '<div><b>' + st.n + '</b><span>day streak</span></div></div>' +
       '<div class="qz-stat">' + goalRing(pct, 40) + '<div><b>' + minutes.toFixed(1) + '<small>/' + g + '</small></b><span>engaged minutes today</span></div></div>' +

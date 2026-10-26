@@ -588,7 +588,7 @@ version.json      auto-update feed (source of truth for latest version)
 - SECTION TAB BAR (v0.70.0; app.js GROUPS + populateNav): the main nav is a
   tab bar of GROUPS (icon + label), not a drop-down — practice: Learn
   (quiz=Exercises HOME/chords/theory), Guitar (fretboard/tab/notation/helix), Keys
-  (piano/synth/pads/lumipractice), SYNTH (1.3: deck/liveset/midihub), Play (songs/jam), Practice (shed/trainer/tuner);
+  (piano/synth/pads/lumipractice), SYNTH (1.3: deck/liveset/midihub), Play (songs/jam), Train (shed/trainer/tuner; 1.3: the Practice tab became Train, the space keeps the name);
   studio: Studio (arrange=Timeline HOME / tracks=Editor), Sketch (song/ideas).
   Rendered twice: #tabbar inside the top bar (> 900px) and #tabbar-m fixed
   along the bottom (<= 900px) — #tabbar-m sits OUTSIDE <header> because the

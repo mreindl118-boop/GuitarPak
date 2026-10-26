@@ -58,7 +58,7 @@
     shed: [
       { t: 'The Woodshed', x: 'Gamified practice: pick an exercise or song and play it for score — Perfect/Great/Good/Miss timing, combos, stars, XP, streaks. Every run is captured as a take in your Studio Ideas.' },
       { t: 'Four ways to practice', x: 'Run = straight through, no mercy. Phrases = short chunks loop until you nail them twice. Wait = it freezes until you play the right note (great for learning). Ladder = tempo climbs as you pass.' },
-      { t: 'Feed it music', x: 'Generate scales, Hanon and rudiments; import MIDI files; paste ASCII tab (Wait mode ready instantly); or pull in any Studio track. Calibrate timing once per input so scoring is honest.' }
+      { t: 'Feed it music', x: 'Generate scales, Hanon and rudiments; import MIDI files; paste ASCII tab (Wait mode ready instantly); or pull in any Studio track. Generated exercises follow the treble-clef root and scale; MIDI, Studio and generated scores work in either guided mode. PDFs and images are not parsed scores. Calibrate timing once per input so scoring is honest.' }
     ],
     tuner: [
       { t: 'Tuner', x: 'A chromatic tuner using your microphone. Press Start, allow mic access, and play one string at a time — the needle shows how far off you are; green means in tune.' }
@@ -68,7 +68,8 @@
     ],
     quiz: [
       { t: 'Exercises', x: 'A course in short levels of 10 questions: Notes, Intervals, Chords, Scales and Key signatures. Every right answer earns XP; quick answers and runs of 5 earn more.' },
-      { sel: '.qz-strip', t: 'Your day', x: 'Your streak grows each day you finish a level or play for 5 minutes on any page. The ring fills toward your daily XP goal, and XP raises your level. Seven days in a row earns a streak freeze that covers a missed day.' },
+      { sel: '#learn-instrument', t: 'Your instrument', x: 'Exercises count for the instrument picked here. Notation, ear training and theory are shared by every instrument; a run keeps the instrument it started with, and history from before instruments were tracked stays as Legacy / unassigned.' },
+      { sel: '.qz-strip', t: 'Your day', x: 'Your streak grows each day you finish a level or play for 5 minutes on any page. The ring fills toward your daily XP goal, and XP raises your consistency level: a habit meter that fades after a break, not a skill level. Seven days in a row earns a streak freeze that covers a missed day.' },
       { sel: '.qz-hometabs', t: 'Path, Topics, Progress', x: 'The Path walks you through the course step by step, and each step opens the next. Topics lets you practice anything. Progress shows your XP, practice time and how your answer speed improves.' },
       { t: 'Sprints, streaks and jumps', x: 'Tap a step on the path for its levels, a 60-second sprint (as many right answers as you can) and an Endless streak (questions until your first miss), each against your own record. The answer clock (Off, 8, 5 or 3 s) times every Endless and drill question: answer on instinct before it runs out. Already know it? Tap a locked step and Jump here: 9 out of 10 opens the path up to there.' }
     ],
