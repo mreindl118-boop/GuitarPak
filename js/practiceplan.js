@@ -175,7 +175,9 @@
     var selected = instrument();
     if (!compatible(item, s.plan, selected)) { message = 'This block is preserved for ' + label(itemInstrument(item, s.plan)) + '. Choose that Learn category before launching.'; if (el('pp-status')) el('pp-status').textContent = message; return false; }
     var sess = session(s), st = sess.items[id] || { instrument: selected, done: false, seconds: 0, reason: '' };
-    sess.items[id] = st; saveSession(sess);
+    // the block last opened (the controller remote's Next / Back start
+    // from it) lives in the day's record, so a reload keeps the place
+    sess.items[id] = st; sess.last = id; saveSession(sess);
     var observed = !!item.lessonId || item.page === 'quiz' || item.page === 'shed';
     App.store.set('pp.running', st.done || !observed ? null : { student: s.id, instrument: selected, day: dayKey(), plan: s.plan.id, item: id, base: telemetry(item, selected), previous: st.seconds, previousIds: st.sessionIds || [], startedAt: new Date().toISOString() });
     App.store.set('met.bpm', item.bpm); App.emit('tempo', { bpm: item.bpm, source: 'practiceplan' });
@@ -184,6 +186,30 @@
     if (item.page === 'fretboard') App.emit('fb:practice', { root: item.root, scale: item.scale, bpm: item.bpm });
     else { App.switchTo(item.page); if (item.lessonId) App.keysLessons.open(item.lessonId, selected); }
     return true;
+  }
+  // CONTROLLER REMOTE (js/remote.js, app.js onRemote). NEXT opens the next
+  // block not measured complete: the first one after the block last opened
+  // from here, else the first one (casual tools never complete, so 'the first
+  // not done' alone would reopen the same Tuner block forever). BACK opens
+  // the last block again. No Stop: the plan has no run of its own. Typed
+  // text a launch would wipe (paint() refills the fields on return) holds
+  // the pedal back: a foot bumped while writing lesson notes loses nothing.
+  function unsaved(s) {
+    if (el('pp-notes') && el('pp-notes').value !== (s.plan.source || '')) return (pending ? 'Accept' : 'Review') + ' or clear your lesson notes first';
+    if (el('pp-link') && el('pp-link').value.trim() !== (s.student.docUrl || '')) return 'Review or clear the Google Doc link first';
+    return '';
+  }
+  function remote(action) {
+    var s = state(), items = s.availableItems, last = -1, item = null;
+    items.forEach(function (i, n) { if (i.id === s.session.last) last = n; });
+    if (action === 'next') {
+      var open = items.filter(function (i) { return !(s.session.items[i.id] && s.session.items[i.id].done); });
+      item = open.filter(function (i) { return items.indexOf(i) > last; })[0] || open[0];
+    } else if (action === 'back' && last >= 0) item = items[last];
+    if (!item) return false;
+    var why = unsaved(s);
+    if (why) { if (App.toast) App.toast(why); return false; }
+    return launch(item.id) ? (action === 'next' ? 'Block: ' : 'Again: ') + item.title : false;
   }
   function preview(text, options) { pending = mapText(text, options); paintPreview(); return copy(pending); }
   function accept() {
@@ -302,5 +328,8 @@
   // retain the shell's normal pill spacing and labels.
   CSS += '@media(max-width:600px){#subnav:has(.subtab[data-page="practiceplan"]) .subtab{padding-left:9px;padding-right:9px}}';
   App.practicePlan = { rules: RULES, preview: preview, accept: accept, state: state, refresh: refresh, launch: launch };
-  App.register('practiceplan', { init: init, onShow: function () { paint(); if (!uiTimer) uiTimer = setInterval(paintProgress, 3000); }, onHide: function () { refresh(); clearInterval(uiTimer); uiTimer = null; }, onKey: function (e) { if (e.key === 'Escape' && pending) { pending = null; paintPreview(); } } });
+  App.register('practiceplan', { init: init, onShow: function () { paint(); if (!uiTimer) uiTimer = setInterval(paintProgress, 3000); }, onHide: function () { refresh(); clearInterval(uiTimer); uiTimer = null; }, onKey: function (e) { if (e.key === 'Escape' && pending) { pending = null; paintPreview(); } },
+    onRemote: function (action) { return remote(action); },
+    remoteKey: true // nothing on this page listens to the keys
+  });
 })();

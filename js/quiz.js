@@ -1708,6 +1708,7 @@
     cur.fin = XP().finishLevel({ instrument: cur.instrument, sessionId: cur.sessionId, status: 'complete', passed: s > 0 && !cur.drill, perfect: score === 10 && !cur.drill });
     cur.finished = true;
     cur.xp += cur.fin.bonus;
+    cur.doneT = Date.now(); // the remote lets the result be read first
     view = 'done';
     render();
     reveal(root);
@@ -2335,6 +2336,7 @@
     cur.finished = true;
     cur.xp += cur.fin.bonus;
     cur.score = score;
+    cur.doneT = Date.now();
     view = 'done';
     render();
     reveal(root);
@@ -2473,6 +2475,129 @@
       back();
       e.preventDefault();
     }
+  }
+
+  // ---- the controller remote (js/remote.js): a pedal, a synth button or a
+  // page turner moves the course on with both hands on the instrument. NEXT =
+  // the button you'd tap next, BACK = hear it again / retry, STOP = End run.
+  // Nothing while the page is out of sight (app.js folds sheets away first).
+  // Show answer is a miss (and ends an Endless run), so a remote never
+  // reveals on one press, nor on a press that lands on a question that just
+  // appeared (the auto-advance after a right answer races the pedal).
+  var R_FRESH = 1500, R_ARM = 3000, R_DONE = 1000, remoteArm = null;
+  function remote(action) {
+    if (covered()) return false;
+    if (action === 'next') return remoteNext();
+    if (action === 'back') return remoteBack();
+    if (action === 'stop') return remoteStop();
+    return false;
+  }
+  function remoteNext() {
+    var p = prog(), now = (window.performance || Date).now(), nd, nl, i;
+    if (view === 'home') {
+      i = homeTab === 'path' && selNode >= 0 ? selNode : -1;
+      if (i >= 0) { // the open node card's primary: Start / Level n / Jump here
+        nd = NODES[i];
+        if (!unlocked(i, p)) return startLevel(nd.levels[0].id, { jump: i }) ? 'Jump test' : false;
+      } else {
+        i = currentNode(p); nd = NODES[i];
+        if (!nd) return false;
+        if (!nodeDone(nd, p) && nd.unit.learn) { // a new step opens with its lesson (selectNode toggles)
+          if (homeTab !== 'path') setHomeTab('path');
+          if (selNode !== i) selectNode(i);
+          return 'Lesson';
+        }
+      }
+      nl = nodeLevel(nd, p); // = #qz-cont / the card's Start
+      return startLevel(nl.id) ? (nodeDone(nd, p) ? 'Level ' + nl.n : 'Start') : false;
+    }
+    if (view === 'topic') { // the first unit with work left, its mode chip, its first open level
+      var t = TOPIC[topicId], uid = t ? firstOpenUnit(t, p) : null, u = null, md = null;
+      if (t) t.units.forEach(function (x) { if (x.id === uid) u = x; });
+      var modes = u ? availableModes(u) : [], mk = u ? openMode[u.id] || firstOpenMode(u, p) : null;
+      modes.forEach(function (m) { if (m.key === mk) md = m; });
+      md = md || modes[0];
+      var lv = md ? md.levels.filter(function (l) { return !passed(p, l); })[0] || md.levels[0] : nextLevel();
+      return lv && startLevel(lv.id) ? 'Level ' + lv.n : false;
+    }
+    if (view === 'run' && cur) {
+      if (cur.answered) { nextQ(); return view === 'done' ? 'Finish' : 'Next'; }
+      var q = cur.q, skip = !!(cur.sprint && !cur.sprint.endless);
+      if (q.kind === 'set' && Object.keys(cur.tap).length) { checkTaps(); return 'Check'; }
+      // HUD labels stay short (one line on a phone); the toast says the rest
+      if (cur.sprint && cur.sprint.endless) { // a choice without a playable answer ignores MIDI
+        var scr = q.kind === 'choice' && q.pcAnswer == null;
+        if (App.toast) App.toast(scr ? 'Endless: tap the answer on screen, or press Stop to end the run' : 'Endless: play the answer, or press Stop to end the run');
+        return scr ? 'Answer on screen' : 'Play the answer';
+      }
+      if (now - (cur.t0 || 0) < R_FRESH) return 'Answer first';
+      if (!remoteArm || remoteArm.q !== q || now - remoteArm.t > R_ARM) {
+        remoteArm = { q: q, t: now };
+        if (App.toast) App.toast(skip ? 'Press Next again to skip' : 'Press Next again to show the answer');
+        return skip ? 'Again = skip' : 'Again = answer';
+      }
+      remoteArm = null;
+      resolve(false, null); // = Show answer / Skip
+      return cur && cur.answered ? (skip ? 'Skipped' : 'Answer shown') : false;
+    }
+    if (view === 'done' && cur) {
+      if (cur.doneT && Date.now() - cur.doneT < R_DONE) return 'Results'; // just landed: read it first
+      var b = root.querySelector('.qz-done .qz-acts > .btn.primary');
+      if (!b) return false;
+      var lab = b.textContent.trim();
+      b.click(); // Next level / Try again / Sprint again / Go again / Back to the path …
+      return lab || true;
+    }
+    return false;
+  }
+  function remoteBack() {
+    if (view === 'run' && cur) {
+      if (!cur.q || !cur.q.audio || !cur.q.audio.length) return false;
+      playQ(cur.q); // = Space / the play button
+      return 'Again';
+    }
+    if (view === 'done' && cur) {
+      if (cur.doneT && Date.now() - cur.doneT < R_DONE) return 'Results'; // a 'hear it again' racing the end
+      var l = cur.lvl, nd = l.node;
+      if (cur.sprint) { var en = cur.sprint.endless; return startSprint(nd.i, en) ? (en ? 'Go again' : 'Sprint again') : false; }
+      if (cur.jump != null) return cur.score >= 9 ? false : startLevel(nd.levels[0].id, { jump: nd.i }) ? 'Jump again' : false;
+      if (cur.drill) {
+        if (cur.drillPool.length) return startLevel(l.id, { drill: cur.drillPool.slice() }) ? 'Drill again' : false;
+        return startLevel(l.id) ? 'Back to the level' : false;
+      }
+      return startLevel(l.id) ? 'Try again' : false;
+    }
+    if (view === 'topic') { back(); return 'Exercises'; }
+    if (view === 'home' && selNode >= 0) { selNode = -1; paintHomeBody(); return 'Card closed'; }
+    if (view === 'home' && homeTab !== 'path') { setHomeTab('path'); return 'Path'; }
+    return false;
+  }
+  // The reserved double-tap key (the LUMI's lowest) may be claimed here,
+  // except while it could be the answer: answers are graded by pitch class,
+  // so a strike of it then can only be right (or the fresh correction after a
+  // miss), and a bass-clef C3 is exactly that key at the LUMI's home octave.
+  function answerPcs(q) {
+    if (!q) return [];
+    if (q.kind === 'set') return Object.keys(q.pcs || {}).map(Number);
+    if (q.kind === 'single' && q.pc != null) return [q.pc];
+    if (q.kind === 'choice' && q.pcAnswer != null) return [q.pcAnswer];
+    return [];
+  }
+  function remoteKey() {
+    if (view !== 'run' || !cur || !cur.q) return true;
+    var q = cur.q;
+    // answered: only the correction (a miss, not in a sprint, a single answer) still takes a note
+    if (cur.answered && (cur.lastOk || cur.sprint || q.kind === 'set')) return true;
+    var lo = App.midi && App.midi.range ? App.midi.range().lo : 48;
+    return answerPcs(q).map(function (pc) { return mod(pc, 12); }).indexOf(mod(lo, 12)) < 0;
+  }
+  function remoteStop() {
+    if (view === 'run' && cur) { var en = !!(cur.sprint && cur.sprint.endless); back(); return en ? 'Run ended' : 'Stopped'; }
+    if (view === 'done' && cur) {
+      if (cur.doneT && Date.now() - cur.doneT < R_DONE) return 'Results'; // a Stop that just ended the run
+      stopSprint(); toPath(cur.lvl.node.i); return 'Path';
+    }
+    return false;
   }
 
   var CSS =
@@ -2840,6 +2965,8 @@
       if (homeTab !== 'path') { setHomeTab('path'); return true; }
       return false;
     },
-    onKey: onKey
+    onKey: onKey,
+    onRemote: remote,
+    remoteKey: remoteKey
   });
 })();

@@ -29,6 +29,7 @@
   var ccInt = null;
   var ccEnd = 0;
   var ccN = 0;
+  var ccDoneAt = 0; // when the last run ran out (the remote's late-press guard)
 
   // card 4: ear trainer
   var earPair = null;
@@ -241,6 +242,7 @@
     App.wake.acquire('tr-cc');
     ccN = 0;
     ccEnd = Date.now() + 60000;
+    ccDoneAt = 0;
     els.ccNum.textContent = '0';
     els.ccResult.textContent = '';
     els.ccStart.disabled = true;
@@ -260,6 +262,7 @@
   function ccFinish() {
     if (ccInt) { clearInterval(ccInt); ccInt = null; }
     ccRunning = false;
+    ccDoneAt = Date.now();
     App.wake.release('tr-cc');
     els.ccClock.textContent = '0';
     // chime: two quick high plucks
@@ -282,6 +285,7 @@
     if (ccInt) { clearInterval(ccInt); ccInt = null; }
     var wasRunning = ccRunning;
     ccRunning = false;
+    ccDoneAt = 0; // a cancelled run did not run out
     App.wake.release('tr-cc');
     ccN = 0;
     els.ccClock.textContent = '60';
@@ -604,6 +608,31 @@
     clearAnsClasses();
   }
 
+  // the CONTROLLER REMOTE (js/remote.js): a foot for the hands-busy cards.
+  // NEXT = count a change while a chord-change run goes (like Space), else
+  // Play interval; BACK = Replay; STOP = the run's Reset, else the session
+  // clock's Pause. Nothing here listens to MIDI notes, so the reserved
+  // double-tap key costs nothing.
+  function remote(action) {
+    if (action === 'next') {
+      if (ccRunning) { ccCount(); return 'Change ' + ccN; }
+      // the minute just ran out: a late press must not play an interval
+      if (ccDoneAt && Date.now() - ccDoneAt < 1500) return 'Time’s up';
+      try { App.getAudio(); } catch (e) { /* audio unavailable: the pair still shows */ }
+      earNewPair();
+      return 'New interval';
+    }
+    if (action === 'back') {
+      if (!earPair) return false;
+      try { App.getAudio(); } catch (e) { /* as above */ }
+      earSound();
+      return 'Again';
+    }
+    if (ccRunning) { ccReset(true); return 'Run cancelled'; }
+    if (sessRunning) { sessPause(); return 'Session paused'; }
+    return false;
+  }
+
   function onKey(e) {
     if (e.code === 'Space' || e.key === ' ') {
       if (ccRunning) {
@@ -617,6 +646,8 @@
     init: init,
     onShow: onShow,
     onHide: onHide,
-    onKey: onKey
+    onKey: onKey,
+    onRemote: remote,
+    remoteKey: true
   });
 })();

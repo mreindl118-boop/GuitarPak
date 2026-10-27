@@ -367,6 +367,22 @@
       p.tap(id); paintChips(); return;
     }
   }
+  // the CONTROLLER REMOTE (js/remote.js): NEXT / BACK step the active Live
+  // set like its foot switch (js/synthlive.js), else the program like Prev /
+  // Next above — both through the deck's funnel (LUMI guard, refusals). STOP
+  // has nothing to end here; the preset builder sheet is a form in progress.
+  function remote(action) {
+    if (action === 'stop' || (els.sheet && !els.sheet.hidden)) return false;
+    var dir = action === 'back' ? -1 : 1, lv = window.SLSynthLive, lset = lv ? lv.active() : null;
+    if (lset && lv.remoteStep && lset.pages.some(function (pg) { return pg.some(function (sl) { return !!sl; }); })) { var r = lv.remoteStep(dir); schedulePaint(); return r; }
+    var p = P(); if (!p) return false;
+    // refused (Synth out is the LUMI, no MIDI...): nothing moved — the deck's
+    // toast and the connection bar say why (synthlive.js re-says a repeat the
+    // deck skips, so the remote's 'Nothing to move on here' never covers it)
+    if (p.check && (lv && lv.refused ? lv.refused(p) : !p.check())) return false;
+    p.step(dir); paint();
+    return p.now().name || (dir > 0 ? 'Next' : 'Back');
+  }
   // Favourites: cycle a strip's CC through the Hub's knobs with a small sheet-less picker
   function pickFavs() {
     var all = P().knobs(), cur = favs();
@@ -454,7 +470,9 @@
       if (els.sheet && !els.sheet.hidden) { closeSheet(); return true; }
       if (mode() === 'edit') { set('mode', 'perform'); render(); return true; }
       return !!(App.synthDeck && App.synthDeck.onBack && App.synthDeck.onBack());
-    }
+    },
+    onRemote: function (action) { return remote(action); },
+    remoteKey: false // the lowest key plays the synth here
   });
   var paintT = 0;
   function schedulePaint() { if (paintT) return; paintT = setTimeout(function () { paintT = 0; paint(); }, 60); }

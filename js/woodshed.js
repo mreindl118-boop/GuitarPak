@@ -27,13 +27,19 @@
  * ASCII tab paste (pitches only — timing marked approximate: Wait mode
  * immediately, scored modes after assuming even eighths), and any Studio
  * synth track. Library in ws.lib with auto difficulty.
+ * Controller remote (js/remote.js): onRemote = remote() in the module
+ * section (Guided performance delegates to PerformancePlayer.remote);
+ * remoteKey only where NEXT acts and no note is being judged (never the
+ * library). Guided performance leaves App.midi on All inputs (a pedal on
+ * any port keeps working) and re-points a single input only while it shows.
  */
 (function () {
   'use strict';
 
   var els = {};
   var progressUI = null;
-  var view = 'lib';          // lib | session | report | cal
+  var view = 'lib';          // lib | session | report | cal (| performance)
+  var reportAt = 0;          // when the report last appeared (remote race guard)
   var WIN = { perfect: 30, great: 60, good: 100 };
   var PHRASE_BEATS = 8;
 
@@ -455,7 +461,7 @@
       guide: App.store.get('ws.guide', mode !== 'run'),
       phrase: 0, cleanPasses: 0,
       targets: [], judged: [], combo: 0, maxCombo: 0, strays: 0,
-      waitIdx: 0, running: false, startT: 0, timer: null,
+      waitIdx: 0, running: false, startT: 0, timer: null, autoT: 0,
       counts: { perfect: 0, great: 0, good: 0, miss: 0 },
       played: []
     };
@@ -516,6 +522,7 @@
 
   function startRun() {
     var ctx = App.getAudio();
+    if (S.autoT) { clearTimeout(S.autoT); S.autoT = 0; } // a Phrases pass about to restart itself
     recordRun('stopped');
     S.creditInstrument=selectedInstrument();S.xpSession=uid('woodshed');S.xpLast=Date.now();S.xpSeconds=0;S.xpActivity=null;S.xpRecorded=false;if(App.xp)App.xp.beginSession({id:S.xpSession,instrument:S.creditInstrument,source:'woodshed'});
     buildTargets();
@@ -538,6 +545,8 @@
   }
 
   function endRun(finished) {
+    // a stop / page leave also cancels the Phrases loop's pending next pass
+    if (S.autoT) { clearTimeout(S.autoT); S.autoT = 0; }
     recordRun(finished?'complete':'stopped');
     if (S.timer) { clearInterval(S.timer); S.timer = null; }
     S.running = false;
@@ -661,7 +670,8 @@
       } else {
         flash(clean ? 'Clean! ' + (2 - S.cleanPasses) + ' more' : 'Again — ' + acc + '%');
       }
-      setTimeout(function () { if (S && view === 'session') startRun(); }, 900);
+      var sess = S;
+      S.autoT = setTimeout(function () { sess.autoT = 0; if (S === sess && view === 'session') startRun(); }, 900);
       return;
     }
     if (S.mode === 'ladder') {
@@ -1237,13 +1247,7 @@
         '<div class="muted small" style="margin-top:8px">Play with your MIDI keys anywhere, the typing keys or touch keys on the Piano page' +
           (S.sc.instrument === 'drums' ? ', or the Pads' : '') + '. Switch the view live — same clock underneath.</div>' +
       '</div>';
-    document.getElementById('ws-back').addEventListener('click', function () {
-      endRun(false);
-      micStop();
-      S = null;
-      view = 'lib';
-      render();
-    });
+    document.getElementById('ws-back').addEventListener('click', leaveSession);
     document.getElementById('ws-go').addEventListener('click', function () { startRun(); });
     document.getElementById('ws-disp').addEventListener('click', function (e) {
       var b = e.target.closest('[data-wsd]');
@@ -1351,16 +1355,29 @@
           '<button type="button" class="btn" id="ws-tolib">Library</button>' +
         '</div>' +
       '</div>';
-    document.getElementById('ws-again').addEventListener('click', function () {
-      view = 'session';
-      renderSession();
-      startRun();
-    });
-    document.getElementById('ws-tolib').addEventListener('click', function () {
-      S = null;
-      view = 'lib';
-      render();
-    });
+    reportAt = Date.now();
+    document.getElementById('ws-again').addEventListener('click', again);
+    document.getElementById('ws-tolib').addEventListener('click', toLibrary);
+  }
+
+  // the session's ← and the report's Again / Library buttons (the remote
+  // calls these too)
+  function leaveSession() {
+    endRun(false);
+    micStop();
+    S = null;
+    view = 'lib';
+    render();
+  }
+  function again() {
+    view = 'session';
+    renderSession();
+    startRun();
+  }
+  function toLibrary() {
+    S = null;
+    view = 'lib';
+    render();
   }
 
   function startSession(sc, mode) {
@@ -1462,6 +1479,65 @@
 
   // ---------------- module ----------------
 
+  // CONTROLLER REMOTE (js/remote.js): a pedal / synth button does what the
+  // session's own buttons do. Guided performance answers for itself
+  // (PerformancePlayer.remote). Classic session: NEXT = Count-in / Start
+  // (a run that is counting in or playing ignores it, as does a Phrases pass
+  // about to restart itself); BACK = restart the run (Phrases: the phrase
+  // before, the first one restarts); STOP = end the run unscored and stay
+  // here, or ← Library when nothing is running. Report: NEXT / BACK = Again,
+  // STOP = Library (none of them in the instant it appears, so a press that
+  // races the run's own end never hides the score). Library and calibration:
+  // nothing (false).
+  function remote(action) {
+    if (view === 'performance') return window.PerformancePlayer && PerformancePlayer.remote ? PerformancePlayer.remote(action) : false;
+    if (!S) return false;
+    if (view === 'report') {
+      if (action !== 'next' && action !== 'back' && action !== 'stop') return false;
+      if (Date.now() - reportAt < 600) return 'Results'; // the run just ended: let the score show
+      if (action === 'stop') { toLibrary(); return 'Library'; }
+      again();
+      return 'Again';
+    }
+    if (view !== 'session') return false;
+    // Wait mode is armed (running, no clock) as soon as the session shows:
+    // it counts as a run once Start was pressed or a note was played
+    var busy = S.running && !!(S.timer || S.waitIdx > 0);
+    var startLabel = S.mode === 'wait' ? 'Start' : 'Count-in';
+    if (action === 'stop') {
+      if (busy || S.autoT) { endRun(false); paintHud(); return 'Stopped'; }
+      leaveSession();
+      return 'Library';
+    }
+    if (action === 'back') {
+      if (S.mode === 'phrase' && S.phrase > 0) {
+        S.phrase--;
+        S.cleanPasses = 0;
+        startRun();
+        return 'Phrase ' + (S.phrase + 1) + ' of ' + phraseCount(S.sc);
+      }
+      var wasOn = busy || S.autoT;
+      startRun();
+      return wasOn ? 'Restart' : startLabel;
+    }
+    if (action !== 'next') return false;
+    if (S.autoT) return 'Starting…';
+    if (busy) return S.mode !== 'wait' && App.getAudio().currentTime < S.startT ? 'Starting…' : 'Playing…'; // Wait has no count-in
+    startRun();
+    return startLabel;
+  }
+
+  // the reserved double-tap key (remote.dbl) only where NEXT acts and no
+  // note is being judged: a session or report that is not running (never
+  // during a run: Wait mode judges from the moment it shows), a guided
+  // performance that is not counting in / playing / paused. The library (NEXT
+  // does nothing there) and calibration keep every key.
+  function remoteKey() {
+    if (view === 'performance') return !!(window.PerformancePlayer && PerformancePlayer.remoteKey && PerformancePlayer.remoteKey());
+    if (view === 'cal' || view === 'lib' || !S) return false;
+    return !S.running;
+  }
+
   function performanceStart(sc, mode, opts) {
     if(progressUI){progressUI.unmount();progressUI=null;}
     if (S) endRun(false);
@@ -1530,8 +1606,14 @@
 
   App.register('shed', {
     init: init,
-    onShow: function () { if (view === 'lib') renderLib(); },
+    onShow: function () {
+      if (view === 'lib') renderLib();
+      // the player hands App.midi back on hide; point it at its input again
+      if (view === 'performance' && window.PerformancePlayer && PerformancePlayer.show) PerformancePlayer.show();
+    },
     onHide: function () { if (S) endRun(false); if (window.PerformancePlayer) PerformancePlayer.hide(); micStop(); lightsOff(); },
+    onRemote: remote,
+    remoteKey: remoteKey,
     onKey: function (e) {
       if (view !== 'session' || !S) return;
       // QWERTY drumming/tapping: Z/X = L/R pads in the shed (drums), any-key tap for cal

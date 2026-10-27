@@ -199,7 +199,34 @@
   // or button, the reserved double-tap key) and goes NOWHERE else: no
   // 'midi:raw' (Thru, Woodshed grading, the Deck), no filter, no dispatch.
   // The release of a note the app already received is never claimed.
-  var inputClaim = null;
+  var inputClaim = null, claimAllPorts = null;
+  // REMOTE ON EVERY PORT: with ONE keyboard chosen as the input, a pedal or
+  // button on another port (the synth's foot switch while the LUMI is the
+  // input) still reaches the claim — and nothing else of that port does.
+  // Only while the remote has something bound (claimAllPorts()).
+  function claimOnly(bytes, id, name) {
+    if (!inputClaim) return;
+    var data = Array.prototype.slice.call(bytes), i = 0;
+    while (i < data.length) {
+      var st = data[i], len = st >= 0x80 && st < 0xf0 ? MSG_LEN[st & 0xf0] : 0;
+      if (!len) { i++; continue; } // realtime, SysEx and stray data are never gestures
+      if (i + len > data.length) break;
+      var msg = data.slice(i, i + len); i += len;
+      if (msg.slice(1).some(function (b) { return b > 127; })) continue;
+      var claimed = false;
+      try { claimed = inputClaim(msg.slice(), { portId: id, port: name }) === true; } catch (e) { claimed = false; }
+      if (claimed) App.emit('midi:remote', { bytes: msg, portId: id, port: name });
+    }
+  }
+  function wantClaimPorts() { try { return !!(inputClaim && claimAllPorts && claimAllPorts()); } catch (e) { return false; } }
+  function attachClaimPorts() {
+    if (native || !access || allIn) return;
+    var want = wantClaimPorts();
+    access.inputs.forEach(function (p) {
+      if (inputs.indexOf(p) !== -1) return;
+      try { p.onmidimessage = want && p.state !== 'disconnected' ? function (e) { if (e && e.data) claimOnly(e.data, p.id, p.name || ''); } : null; } catch (e) {}
+    });
+  }
   function claimedByRemote(state, message) {
     if (!inputClaim || message[0] < 0x80 || message[0] >= 0xf0) return false;
     var t = message[0] & 0xf0;
@@ -505,6 +532,7 @@
       listen(input);
       App.store.set('midi.inputId', input.id);
     }
+    attachClaimPorts();
     announce();
   }
 
@@ -558,7 +586,10 @@
     },
     onmidi: function (inputPortId, bytes) {
       if (!nativeReady || !bytes) return;
-      if (nativeInId !== null && nativeInId !== ALL && inputPortId !== 0 && inputPortId !== nativeInId) return;
+      if (nativeInId !== null && nativeInId !== ALL && inputPortId !== 0 && inputPortId !== nativeInId) {
+        if (wantClaimPorts()) claimOnly(bytes, inputPortId, portName(nativePorts.inputs, inputPortId) || ''); // the remote hears every port
+        return;
+      }
       srcName = portName(nativePorts.inputs, inputPortId) || '';
       srcId = inputPortId;
       try { splitAndDispatch(bytes); } finally { srcId = null; srcName = ''; }
@@ -1182,8 +1213,10 @@
     setInputFilter: function (fn) { inputFilter = typeof fn === 'function' ? fn : null; },
     get inputFilter() { return inputFilter; },
     // the controller remote's claim (js/remote.js): runs before 'midi:raw'
-    setInputClaim: function (fn) { inputClaim = typeof fn === 'function' ? fn : null; },
+    // opts.allPorts() true = also hear the ports that are not the chosen input (for the claim only)
+    setInputClaim: function (fn, opts) { inputClaim = typeof fn === 'function' ? fn : null; claimAllPorts = opts && typeof opts.allPorts === 'function' ? opts.allPorts : null; attachClaimPorts(); },
     get inputClaim() { return inputClaim; },
+    refreshClaim: function () { attachClaimPorts(); },
     setInput: setInput,
     setOutput: setOutput,
     bluetooth: function () { if (native) post({ cmd: 'bluetooth' }); },

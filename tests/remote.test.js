@@ -55,7 +55,7 @@ async function newPage(browser, seed, native) {
   await page.evaluate(() => {
     window.__rm = []; window.__rmKey = true;
     App.addPage('rmtest', 'RM test', 'practice', { init: function () {}, remoteKey: function () { return window.__rmKey; },
-      onRemote: function (a, info) { window.__rm.push(a + ':' + info.via); return a === 'back' ? false : a === 'stop' ? 'Halted' : true; } });
+      onRemote: function (a, info) { window.__rm.push(a + ':' + info.via); if (a === 'back' && window.__rmSay) App.toast(window.__rmSay); return a === 'back' ? false : a === 'stop' ? 'Halted' : true; } });
   });
   return { ctx, page, errs };
 }
@@ -152,6 +152,11 @@ const BOUND = { next: { midi: { t: 'cc', n: 86, ch: null, port: 'MODX-1' }, key:
     const step1 = __q('.hp-card, #hp-card') ? (__q('.hp-card, #hp-card').textContent || '').slice(0, 30) : '';
     o.tourMoved = step0 !== step1; await __wait(270);
     App.remote.fire('stop', 'test'); await __wait(80); o.tourClosed = !window.Help.isOpen();
+    // a page that says its own reason keeps it (no 'nothing here' on top)
+    App.switchTo('rmtest'); await __wait(150); window.__rmSay = 'Load a song first'; await __wait(270);
+    o.own = App.remote.fire('back', 'test') + '|' + __toast(); window.__rmSay = '';
+    // owns(): the bound gestures, for pages that read a port themselves
+    o.owns = App.remote.owns([0xB0, 86, 127], { port: 'MODX-1' }) + '|' + App.remote.owns([0xB0, 86, 127], { port: 'LUMI Keys BLOCK' }) + '|' + App.remote.owns([0x90, 108, 1], {}) + '|' + App.remote.owns([0x90, 60, 1], {});
     // a page without onRemote
     App.switchTo('chords'); await __wait(200); __clearToast(); await __wait(270);
     o.none = App.remote.fire('next', 'test') + '|' + __toast();
@@ -163,6 +168,8 @@ const BOUND = { next: { midi: { t: 'cc', n: 86, ch: null, port: 'MODX-1' }, key:
   ok(rt.sheet === 'null|next:test', 'an open sheet closes and the page gets NEXT: ' + rt.sheet);
   ok(rt.tourMoved && rt.tourClosed, 'a help tour takes Next (next step) and Stop (closes) first');
   ok(rt.none === 'false|Nothing to move on here', 'a page without onRemote: the "nothing here" toast');
+  ok(rt.own === 'false|Load a song first', 'a page that toasted its own reason keeps it: ' + rt.own);
+  ok(rt.owns === 'true|false|true|false', 'owns() knows the bound gestures, port-aware: ' + rt.owns);
   ok(/^settings\|.*Next works\|next:test:0:test$/.test(rt.settings), 'in Settings a press only shows that it works: ' + rt.settings);
   ok(!errs.length, 'no page errors: ' + J(errs)); await ctx.close();
 
@@ -178,6 +185,9 @@ const BOUND = { next: { midi: { t: 'cc', n: 86, ch: null, port: 'MODX-1' }, key:
     o.on = __rm.slice();
     const inp = document.createElement('input'); document.body.appendChild(inp); inp.focus();
     await __wait(270); o.typing = __key('PageDown', 'PageDown', inp) + '|' + __rm.length; inp.remove();
+    // a picker left focused (a select after a tap): the pedal wins, the value stays, focus lets go
+    const sel = document.createElement('select'); sel.innerHTML = '<option>a</option><option>b</option>'; document.body.appendChild(sel); sel.focus();
+    await __wait(270); o.select = __key('ArrowDown', 'ArrowDown', sel) + '|' + __rm.length + '|' + sel.value + '|' + (document.activeElement === sel); sel.remove();
     const r = new KeyboardEvent('keydown', { key: 'PageDown', code: 'PageDown', repeat: true, bubbles: true, cancelable: true });
     await __wait(270); document.body.dispatchEvent(r); o.repeat = __rm.length + '|' + r.defaultPrevented;
     return o;
@@ -185,7 +195,8 @@ const BOUND = { next: { midi: { t: 'cc', n: 86, ch: null, port: 'MODX-1' }, key:
   ok(pt.offPrevented === false && pt.off === 0, 'off by default: Page Down still scrolls');
   ok(pt.onPrevented === true && pt.on.join() === 'next:key,back:key,next:key', 'page turner on: Page Down / Down = Next, Left = Back, scrolling prevented: ' + pt.on.join());
   ok(pt.typing === 'false|3', 'never while typing in a field');
-  ok(pt.repeat === '3|true', 'a held key repeats nothing (but still does not scroll)');
+  ok(pt.select === 'true|4|a|false', 'a focused select: the page turner advances, the select keeps its value and lets go of focus: ' + pt.select);
+  ok(pt.repeat === '4|true', 'a held key repeats nothing (but still does not scroll)');
   ok(!errs.length, 'no page errors: ' + J(errs)); await ctx.close();
 
   console.log('# double-tap the lowest key (opt-in, pages that allow it)');
@@ -219,13 +230,40 @@ const BOUND = { next: { midi: { t: 'cc', n: 86, ch: null, port: 'MODX-1' }, key:
   ok(dt.offSwitch === 2, 'switch off: the key is a normal key again');
   ok(!errs.length, 'no page errors: ' + J(errs)); await ctx.close();
 
+  console.log('# one keyboard chosen as the input: the remote still hears the other ports');
+  ({ ctx, page, errs } = await newPage(browser, { 'remote.map': BOUND, 'midi.inputId': 'li', 'midi.allIn.v1': true }));
+  const sp = await page.evaluate(async () => {
+    const o = {};
+    App.switchTo('rmtest'); await __wait(200); __rm.length = 0; __raw.length = 0; __notes.length = 0;
+    o.input = App.midi.inputId;
+    __press(86); await __wait(30); o.pedal = __rm.join() + '|' + __raw.length; // CC 86 from the MODX (not the chosen input)
+    __send([0x90, 60, 90]); __send([0x80, 60, 0]); __press(20); await __wait(20);
+    o.otherStill = __notes.length + '|' + __raw.length; // the rest of the MODX stays unheard
+    __send([0x90, 62, 90], 'li'); __send([0x80, 62, 0], 'li'); await __wait(20); o.lumi = __notes.length;
+    // a first Learn hears the MODX too
+    App.remote.clear('next'); App.remote.clear('back'); App.remote.clear('stop'); await __wait(20);
+    __press(86); await __wait(30); o.unboundQuiet = __rm.length;
+    App.switchTo('settings'); await __wait(200); __q('[data-rmlearn="next"]').click(); await __wait(20);
+    __press(30); await __wait(30); o.learned = JSON.stringify(App.remote.map.next.midi);
+    return o;
+  });
+  ok(sp.input === 'li' && sp.pedal === 'next:cc|0', 'with the LUMI chosen as the input, the MODX pedal still fires NEXT: ' + J(sp));
+  ok(sp.otherStill === '0|0' && sp.lumi === 2, 'everything else from the unchosen port stays unheard; the chosen keyboard plays');
+  ok(sp.unboundQuiet === 1, 'with nothing bound the unchosen port is not listened to');
+  ok(/"t":"cc","n":30.*"port":"MODX-1"/.test(sp.learned), 'Learn hears the unchosen port: ' + sp.learned);
+  ok(!errs.length, 'no page errors: ' + J(errs)); await ctx.close();
+
   console.log('# the Android bridge');
   ({ ctx, page, errs } = await newPage(browser, { 'remote.map': BOUND }, true));
   const an = await page.evaluate(async () => {
     App.switchTo('rmtest'); await __wait(200); __rm.length = 0; __raw.length = 0;
     __press(86); await __wait(30);
-    return { plat: App.midi.platform, rm: __rm.slice(), raw: __raw.length, remote: __remote.length };
+    const o = { plat: App.midi.platform, rm: __rm.slice(), raw: __raw.length, remote: __remote.length };
+    App.midi.setInput(7); await __wait(30); __rm.length = 0; await __wait(270); // the LUMI chosen: the MODX pedal still counts
+    __press(86); await __wait(30); o.single = __rm.join() + '|' + __raw.length;
+    return o;
   });
+  ok(an.single === 'next:cc|0', 'native: with one input chosen, a pedal on another port still fires: ' + an.single);
   ok(an.plat === 'android' && an.rm.join() === 'next:cc' && an.raw === 0 && an.remote === 2, 'the native bridge path is claimed and fires the same: ' + J(an));
   const hid = await page.evaluate(async () => {
     Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });

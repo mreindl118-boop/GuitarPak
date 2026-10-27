@@ -98,7 +98,7 @@ window.App = (function () {
   //            when an APK is actually built. Older APKs read nothing else, so
   //            this must never run ahead of the real file: when it did, the
   //            Android app kept downloading the same old APK in a loop.
-  var APP_VERSION = '1.3.1';
+  var APP_VERSION = '1.4.0';
   var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
 
   function verNum(v) {
@@ -1708,6 +1708,7 @@ window.App = (function () {
     }
     el.textContent = String(msg == null ? '' : msg);
     el.hidden = false;
+    toast.n = (toast.n || 0) + 1; // the remote checks whether a page already said why
     if (toastT) clearTimeout(toastT);
     toastT = setTimeout(function () { el.hidden = true; toastT = null; }, ms || 3200);
   }

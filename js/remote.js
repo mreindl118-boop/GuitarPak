@@ -150,11 +150,14 @@
       App.emit('remote', { action: action, via: via, handled: false, test: true });
       return 'settings';
     }
+    var told = App.toast ? App.toast.n || 0 : 0;
     try { r = App.remoteAction(action, { via: via }); } catch (e) { console.error('remote', e); r = false; }
+    // a page that toasted its own reason ('Load a song first') keeps it
+    told = !!App.toast && (App.toast.n || 0) !== told;
     if (r) {
       hud(typeof r === 'string' ? r : NAMES[action], action);
-      soundHint();
-    } else if (App.toast) App.toast(NOTHING[action]);
+      if (!told) soundHint();
+    } else if (App.toast && !told) App.toast(NOTHING[action]);
     App.emit('remote', { action: action, via: via, handled: !!r, label: typeof r === 'string' ? r : '' });
     return r;
   }
@@ -189,11 +192,19 @@
   // ---- keys: learned keys and the page-turner switch ----
   var PT = { next: ['PageDown', 'ArrowRight', 'ArrowDown'], back: ['PageUp', 'ArrowLeft', 'ArrowUp'] };
   function ptOn() { return g('pt', false) === true; }
+  // a text field keeps every key; a picker (a select, a slider, a number
+  // box) left focused after a tap would otherwise turn a page-turner press
+  // into a changed instrument or tempo — there the pedal wins and the
+  // control lets go of focus
+  var TEXT_INPUT = /^(text|search|email|url|tel|password)$/i;
   function typing(t) {
     if (!t || !t.tagName) return false;
-    if (t.isContentEditable || t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT') return true;
+    return !!(t.isContentEditable || t.tagName === 'TEXTAREA' || (t.tagName === 'INPUT' && TEXT_INPUT.test(t.type || 'text')));
+  }
+  function picker(t) {
+    if (!t || !t.tagName) return false;
     var role = t.getAttribute && t.getAttribute('role');
-    return role === 'slider' || role === 'spinbutton';
+    return t.tagName === 'SELECT' || t.tagName === 'INPUT' || role === 'slider' || role === 'spinbutton';
   }
   function keyAction(e) {
     var m = map();
@@ -217,6 +228,7 @@
     var a = keyAction(e);
     if (!a) return;
     e.preventDefault(); e.stopPropagation(); // a page turner must not also scroll or press a focused button
+    if (picker(e.target) && e.target.blur) e.target.blur();
     if (e.repeat) return;
     fire(a, 'key');
   }
@@ -228,11 +240,13 @@
     if (learning && learning.action === action) { learnOff('Learn cancelled'); return; }
     learning = { action: action };
     clearTimeout(learnT); learnT = setTimeout(function () { learnOff('Learn timed out'); }, LEARN_MS);
+    refreshPorts(); // a first Learn hears every port, not only the chosen keyboard
     paint();
   }
   function learnOff(msg) {
     if (!learning) return;
     learning = null; clearTimeout(learnT);
+    refreshPorts();
     if (msg && App.toast) App.toast(msg);
     paint();
   }
@@ -335,7 +349,12 @@
     '.rm-what{grid-column:1/-1;grid-row:2;overflow-wrap:anywhere}.rm-row .btn{min-height:var(--h-ctl,40px)}.rm-row .btn[hidden]{display:none}' +
     '.rm-latch{grid-column:1/-1;display:flex;gap:6px;align-items:center}.rm-note{margin:6px 0 0}');
 
-  if (App.midi && App.midi.setInputClaim) App.midi.setInputClaim(claim);
+  // the claim also hears ports that are not the chosen input, but only while
+  // something is bound there to hear
+  function wantsPorts() { var m = map(); return !!learning || g('dbl', false) === true || ACTIONS.some(function (a) { return !!m[a].midi; }); }
+  if (App.midi && App.midi.setInputClaim) App.midi.setInputClaim(claim, { allPorts: wantsPorts });
+  function refreshPorts() { if (App.midi && App.midi.refreshClaim) App.midi.refreshClaim(); }
+  App.on('remote:map', refreshPorts);
   document.addEventListener('keydown', onKeyDown, true);
   document.addEventListener('visibilitychange', function () { if (document.hidden) learnOff(); });
   App.on('midi:state', function () { paint(); });
@@ -353,6 +372,13 @@
     summary: function () { var m = map(), out = []; ACTIONS.forEach(function (a) { var t = bindingText(a, m); if (t) out.push(NAMES[a] + ': ' + t); }); return out.join(' · '); },
     fire: fire, // (action, via) — tests and on-screen equivalents
     mount: mount, paint: paint,
-    claim: claim // the midi.js claim fn (tests)
+    claim: claim, // the midi.js claim fn (tests)
+    // is this message one of the remote's bound gestures? For a page that
+    // reads a port itself (App.midi.subscribeInput bypasses the claim)
+    owns: function (bytes, src) {
+      if (!bytes || bytes.length < 2) return false;
+      var m = map();
+      return ACTIONS.some(function (a) { return !!m[a].midi && matches(m[a].midi, bytes, src || {}); });
+    }
   };
 })();

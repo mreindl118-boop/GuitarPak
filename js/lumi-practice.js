@@ -9,10 +9,10 @@
   var root, els = {}, visible = false, running = false, mode = 'simulated';
   var inputId = '', outputId = '', low = 48, channel = 0, kind = 'note', flow = 'guided';
   var synthOutputId = '', localControlOff = false;
-  var advanceTimer = null, feedback = 'waiting', feedbackText = 'Waiting for an answer.';
+  var advanceTimer = null, advancedAt = 0, feedback = 'waiting', feedbackText = 'Waiting for an answer.';
   var held = {}, target = [], serial = 0, correct = 0, attempts = 0, answered = false;
   var unsubscribe = null, armed = false, tested = null, pending = [], outputTimer = null;
-  var answerDecoder = null, answerGeneration = 0, attachedInputId = '', attachedFingerprint = '';
+  var answerDecoder = null, answerGeneration = 0, attachedInputId = '', attachedFingerprint = '', attachedName = '';
   var outputLease = null, leasedOutputId = '';
   var status = 'Ready for simulated practice. Device output is OFF.';
   var result = 'Start a session, then play or select the target notes and check your answer.';
@@ -82,12 +82,12 @@
     return true;
   }
   function detachInput() {
-    answerGeneration++; answerDecoder = null; attachedInputId = ''; attachedFingerprint = '';
+    answerGeneration++; answerDecoder = null; attachedInputId = ''; attachedFingerprint = ''; attachedName = '';
     if (unsubscribe) { try { unsubscribe(); } catch (e) {} }
     unsubscribe = null;
   }
   function stop(reason) {
-    cancelAdvance();
+    cancelAdvance(); advancedAt = 0;
     if (App.practiceRouter) App.practiceRouter.stop(reason || 'Practice stopped.');
     var released = releaseOutput();
     releaseLease();
@@ -132,6 +132,9 @@
       decoder.data = []; decoder.status = statusByte < 0xf0 ? decoder.running : 0;
       var type = statusByte & 0xf0;
       if (type !== 0x90 && type !== 0x80) continue;
+      // a key the controller remote learned (NEXT = the top key) is its
+      // gesture, never an answer: this subscription bypasses its claim
+      if (App.remote && typeof App.remote.owns === 'function' && App.remote.owns([statusByte, data[0], data[1]], { port: attachedName })) continue;
       var key = (statusByte & 15) + ':' + data[0];
       if (type === 0x90 && data[1] > 0) held[key] = data[0]; else delete held[key];
       changed = true;
@@ -151,6 +154,7 @@
     detachInput();
     if (!supportsPorts() || !hasPort('inputs', inputId)) return false;
     attachedInputId = inputId; attachedFingerprint = answerFingerprint();
+    attachedName = (ports('inputs').filter(function (p) { return p.id === inputId; })[0] || {}).name || '';
     answerDecoder = { status: 0, running: 0, data: [], sysex: false };
     var decoder = answerDecoder, generation = answerGeneration;
     try { unsubscribe = midi().subscribeInput(inputId, function (message) { receive(message, decoder, generation); }); }
@@ -209,7 +213,7 @@
           advanceTimer = null;
           if (!visible || !running || flow !== 'guided' || !compareNotes(target, answerNotes()).correct) return;
           if (mode === 'hardware' && (!supportsPorts() || !hasPort('inputs', inputId))) { stop('Answer input changed during feedback. Start again.'); return; }
-          correct++; attempts++; nextTarget();
+          correct++; attempts++; advancedAt = Date.now(); nextTarget();
         }, 700);
       }
     }
@@ -253,6 +257,35 @@
     else result = 'Try again.' + (judged.missing.length ? ' Missing: ' + names(judged.missing) + '.' : '') +
       (judged.extra.length ? ' Unexpected: ' + names(judged.extra) + '.' : '') + (!actual.length ? ' No answer notes held.' : '');
     paint();
+  }
+  // CONTROLLER REMOTE (js/remote.js, app.js onRemote): a pedal or a synth
+  // button does what the session buttons do. NEXT = Start / Check answer,
+  // then Next target (manual) / skip this target, uncounted (Wait until
+  // correct); STOP = Stop & release notes; no Back (no earlier target). Test,
+  // arm, disarm and the synth sound route stay on-screen acknowledgements.
+  // A session that ended on the way (no input, nothing fits the scale) is
+  // toasted: the player may not be looking at the status line.
+  function remoteDone(label, fail) {
+    if (running) return label;
+    if (App.toast && status) App.toast(status, 4000);
+    return fail || 'Stopped';
+  }
+  function remote(action) {
+    if (action === 'stop') {
+      if (!running && !pending.length) return false; // the Stop button is disabled too
+      stop('Stopped. Start again when ready.'); return 'Stopped';
+    }
+    if (action !== 'next') return false;
+    if (!running) { start(); return remoteDone('Start', 'Not started'); }
+    if (flow === 'guided') {
+      // the exact target was held: the advance counts it in a moment, or just
+      // did — a pedal pressed right after the right notes is that same move,
+      // never a skip of the target it just brought up
+      if (advanceTimer || Date.now() - advancedAt < 900) return 'Moving on…';
+      nextTarget(); return remoteDone('Skip');
+    }
+    if (!answered) { checkAnswer(); return remoteDone(answered ? 'Correct' : 'Try again'); }
+    nextTarget(); return remoteDone('Next target');
   }
   function simulatedNote(n) {
     if (!visible || !running || mode !== 'simulated') return;
@@ -452,7 +485,11 @@
   App.register('lumipractice', {
     init: init,
     onShow: function () { visible = true; refreshPorts(); },
-    onHide: function () { stop('Practice page left. Session stopped and output disarmed.'); visible = false; }
+    onHide: function () { stop('Practice page left. Session stopped and output disarmed.'); visible = false; },
+    onRemote: function (action) { return remote(action); },
+    // the double-tap key only in simulated mode: hardware answers arrive on
+    // their own port subscription, which the remote's claim never sees
+    remoteKey: function () { return mode !== 'hardware'; }
   });
   window.SLLumiPractice = {
     noteName: noteName, compareNotes: compareNotes,

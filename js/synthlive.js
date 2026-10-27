@@ -126,6 +126,50 @@
   }
   var lastStep = 0;
   function debounced(dir) { var now = Date.now(); if (now - lastStep < 150) return false; lastStep = now; return step(dir); }
+  // the CONTROLLER REMOTE (js/remote.js) here and on the Deck: step like the
+  // foot switch (the same debounce) and say where it landed. A bound CC is
+  // claimed before 'midi:raw', so it never also reaches the foot-switch
+  // listener below — one press, one step.
+  function remoteStep(dir) {
+    var d = data(), s = active(d);
+    if (!s || !s.pages.some(function (p) { return p.some(function (sl) { return !!sl; }); })) return false;
+    var p = P(); if (p && p.check && refused(p)) return false;
+    if (!debounced(dir)) return false;
+    d = data(); var pg = pageOf(d), sl = pg && d.slot != null ? pg[d.slot] : null;
+    return slotName(sl) || 'Slot ' + ((d.slot | 0) + 1);
+  }
+  // a refused send (Synth out is the LUMI, no MIDI...): nothing moved, so the
+  // answer is false and the deck's refusal toast says why. It skips a repeat
+  // inside 400 ms; say it again then, or the remote would cover it with its
+  // own 'Nothing to move on here'.
+  function refused(p) {
+    var n = App.toast ? App.toast.n || 0 : 0;
+    if (p.check()) return false;
+    if (App.toast && (App.toast.n || 0) === n) { var c = p.conn ? p.conn() : null; toast((c && c.refuse) || 'Not sent: the synth is not connected'); }
+    return true;
+  }
+  // NEXT / BACK = Next › / ‹ Prev; STOP has nothing to end (Panic stays a
+  // screen button: it cuts held notes). Edit mode and the slot picker are
+  // the screen's. While the foot switch is being learned, the remote's own
+  // pedal (claimed before 'midi:raw') cannot be learned: say so, keep listening.
+  var ACT = { next: 'Next', back: 'Back', stop: 'Stop' };
+  function remote(action, info) {
+    if (learnFs) {
+      var key = info && info.via === 'key';
+      toast('That ' + (key ? 'key' : 'pedal') + ' is the remote’s ' + (ACT[action] || 'Next') + ' — press another switch, or tap Learn to cancel');
+      return (key ? 'Key' : 'Pedal') + ' is the remote';
+    }
+    if (action === 'stop' || editing || picking != null) return false;
+    return remoteStep(action === 'back' ? -1 : 1);
+  }
+  // foot-switch Learn listens for 20 s (as the remote's own Learn does), so a
+  // mod wheel or knob moved much later is never taken for the switch
+  var LEARN_MS = 20000, learnT = 0;
+  function setLearnFs(on) {
+    learnFs = !!on;
+    clearTimeout(learnT); learnT = 0;
+    if (learnFs) learnT = setTimeout(function () { learnT = 0; if (!learnFs) return; learnFs = false; toast('Foot switch Learn timed out'); if (App.active === 'liveset' && root) render(); }, LEARN_MS);
+  }
 
   // ---- render ----
   function render() {
@@ -213,7 +257,7 @@
     if (t.closest('#st-lvgo')) { setLive(true); return; }
     if (t.closest('#st-lvexit')) { setLive(false); return; }
     if (t.closest('#st-lvlock')) { locked = !locked; render(); return; }
-    if (t.closest('#st-lvfs')) { learnFs = !learnFs; render(); return; }
+    if (t.closest('#st-lvfs')) { setLearnFs(!learnFs); render(); return; }
     if (t.closest('#st-lvfsclr')) { set('fsCC', null); render(); return; }
     if (t.closest('#st-lvpprev')) { d.page = Math.max(0, d.page - 1); save(d); render(); return; }
     if (t.closest('#st-lvpnext')) { d.page = Math.min(s.pages.length - 1, d.page + 1); save(d); render(); return; }
@@ -290,7 +334,7 @@
       // a foot switch: learn its CC once, then every press steps the set
       App.on('midi:raw', function (d) {
         var b = d && d.bytes; if (!b || (b[0] & 0xF0) !== 0xB0 || b.length < 3) return;
-        if (learnFs && App.active === 'liveset') { learnFs = false; set('fsCC', b[1]); toast('Foot switch: CC ' + b[1]); render(); return; }
+        if (learnFs && App.active === 'liveset') { setLearnFs(false); set('fsCC', b[1]); toast('Foot switch: CC ' + b[1]); render(); return; }
         var fs = g('fsCC', null); if (fs == null || b[1] !== fs || b[2] === 0) return;
         if (App.active === 'liveset' || App.active === 'deck') debounced(1);
       });
@@ -311,13 +355,15 @@
       if (m && m.supported && !m.ready && App.store.get('midi.wanted', false)) m.enable().then(render).catch(function () { });
       render();
     },
-    onHide: function () { if (live) setLive(false); closePicker(); learnFs = false; if (App.midi && App.midi.mute) App.midi.mute('synthlive', false); },
-    onBack: function () { if (picking != null) { closePicker(); return true; } if (live) { setLive(false); return true; } if (editing) { editing = false; render(); return true; } return false; }
+    onHide: function () { if (live) setLive(false); closePicker(); setLearnFs(false); if (App.midi && App.midi.mute) App.midi.mute('synthlive', false); },
+    onBack: function () { if (picking != null) { closePicker(); return true; } if (live) { setLive(false); return true; } if (editing) { editing = false; render(); return true; } return false; },
+    onRemote: function (action, info) { return remote(action, info); },
+    remoteKey: false // the lowest key plays the synth here
   });
 
   window.SLSynthLive = { // for the Deck's grid and the tests
     data: data, active: function () { return active(); }, page: function () { var d = data(); return pageOf(d); }, pageIndex: function () { return data().page; }, slot: function () { return data().slot; },
-    go: function (i) { return go(data(), i); }, step: step, setLive: setLive, get live() { return live; }, get locked() { return locked; }, lock: function (on) { locked = !!on; render(); },
+    go: function (i) { return go(data(), i); }, step: step, remoteStep: remoteStep, refused: refused, setLive: setLive, get learning() { return learnFs; }, get live() { return live; }, get locked() { return locked; }, lock: function (on) { locked = !!on; render(); },
     slotName: slotName, slotBadges: slotBadges, render: render,
     profiles: profiles, profile: activeProfile, newProfile: newProfile, switchProfile: switchProfile, exportProfile: exportProfile, importProfile: importProfile
   };

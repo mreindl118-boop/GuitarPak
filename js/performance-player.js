@@ -5,6 +5,7 @@
   'use strict';
   var root, engine, timer, options, score, voice, lastGuide = '', lastMessage = '', lastCurrent = '';
   var virtual = {}, base = 48, rawStatus = {}, listenersReady = false, inputIds = [], inputToken = null, metrics = null, audioInput=null,audioStopping=false,pendingProgress=[];
+  var appInput = null, routedInput = null; // App.midi's own input / the one the player pointed it at (null = untouched)
   var INSTRUMENTS=['piano','synth','guitar','bass','drums','voice','other'];
   var KEY_CODES = ['KeyA','KeyW','KeyS','KeyE','KeyD','KeyF','KeyT','KeyG','KeyY','KeyH','KeyU','KeyJ','KeyK'];
   var typing = {};
@@ -68,7 +69,7 @@
     if (!root) return;
     if (event && ['pause','stop','complete','restart','section','transpose'].indexOf(event.type) !== -1) cleanup();
     paint(s);
-    if (s.status === 'complete' && !options.reported) { options.reported=true;finishMetrics('complete');clearTimer(); saveResult(s); report(s); }
+    if (s.status === 'complete' && !options.reported) { options.reported=true;options.doneAt=Date.now();finishMetrics('complete');clearTimer(); saveResult(s); report(s); }
   }
   function saveResult(s) {
     if (options.saved) return;
@@ -110,8 +111,59 @@
     engine.stop(); engine.releaseInput(); cleanup(); clearTimer(); paint(engine.snapshot());
     if(silent!==true)report(engine.snapshot());
   }
+  function leave(){var back=options.onBack;close();if(back)back();}
+  // CONTROLLER REMOTE (js/remote.js, via Woodshed's onRemote): the same
+  // functions as the buttons. NEXT = Start / Resume / Again (counting in or
+  // playing ignores it); BACK = Restart (Again on a report); STOP = Stop
+  // (partial report), with nothing running ← Library. In the instant a run
+  // completes all three only let its report show. false = nothing here.
+  function remote(action){
+    if(!engine||!root)return false;
+    var st=engine.snapshot().status;
+    if(st==='countin'||st==='running'){
+      if(action==='back'){start(true);return 'Restart';}
+      if(action==='stop'){stop();return 'Stopped';}
+      return action==='next'?st==='countin'?'Starting…':'Playing…':false;
+    }
+    if(action!=='next'&&action!=='back'&&action!=='stop')return false;
+    if(st==='complete'&&Date.now()-(options.doneAt||0)<600)return 'Results'; // just finished: let the report show (STOP too)
+    if(action==='stop'){if(st==='paused'){stop();return 'Stopped';}leave();return 'Library';}
+    if(action==='back'&&st==='idle')return false;
+    if(options.inputKind==='audio'&&hasChords()){if(App.toast)App.toast('Audio input cannot grade chords: choose the arpeggio version or MIDI.');return 'Can’t start';}
+    var p,label;
+    if(action==='back'){p=start(true);label=st==='paused'?'Restart':'Again';}
+    else if(st==='paused'){p=resume();label='Resume';}
+    else if(st==='complete'){p=start(true);label='Again';}
+    else{p=start(false);label='Start';}
+    // audio input opens the device first: say so when it did not start
+    if(p&&p.then)p.then(function(){if(root&&engine&&!active(engine.snapshot())&&App.toast)App.toast(el('audio-status').textContent||'Audio input did not start.');});
+    return label;
+  }
+  // may the remote's reserved double-tap key be claimed? Only when no note
+  // can be judged: not counting in, playing or paused
+  function remoteKey(){var s=engine&&root?engine.snapshot():null;return !!s&&['idle','stopped','complete'].indexOf(s.status)!==-1;}
+  // INPUT ROUTE: raw() grades only the player's own input, so App.midi just
+  // has to DELIVER that port. All inputs (the app default) already does, and
+  // keeps a remote pedal / synth button on any other port working (js/
+  // remote.js claims it in midi.js): never narrow it. Only an app listening to
+  // one OTHER port is pointed at the player's, while the Woodshed shows the
+  // player; hide / close / unload give the app its own choice back (unless
+  // another input was picked meanwhile).
+  function routeInput(){
+    if(!root||!options||!App.midi||!App.midi.setInput)return;
+    var cur=App.midi.inputId,id=options.inputId;
+    if(cur==='all'||String(cur)===String(id))return;
+    if(id!=='all'&&!App.midi.inputs.some(function(p){return String(p.id)===String(id);}))return;
+    if(routedInput===null)appInput=cur;
+    App.midi.setInput(id);routedInput=App.midi.inputId;
+  }
+  function unrouteInput(){
+    var was=appInput,routed=routedInput;appInput=routedInput=null;
+    if(routed===null||was==null||!App.midi||!App.midi.setInput||String(App.midi.inputId)!==String(routed))return;
+    App.midi.setInput(was);
+  }
   function close() {
-    stop(true);
+    stop(true);unrouteInput();
     if (voice && voice.dispose) voice.dispose(); voice = null;
     if(audioInput)audioInput.dispose();audioInput=null;
     root = null; engine = null; score = null; rawStatus = {}; inputToken=null;inputIds=[];metrics=null;
@@ -282,7 +334,7 @@
       '<p id="pf-xp" class="small muted"></p><div id="pf-progress-unsaved" hidden><button type="button" class="btn sm" id="pf-progress-retry">Retry saving progress</button><button type="button" class="btn sm" id="pf-progress-export">Export unsaved sessions</button></div><p id="pf-display-state" class="small muted"></p><p id="pf-lock-state" class="small muted"></p><details class="pf-unsupported"><summary>Source details and scoring limits</summary><ul id="pf-source-warnings"></ul><ul>'+warnings.map(function(w){return '<li>'+esc(w)+'</li>';}).join('')+'</ul></details></div><div id="pf-report" class="card" tabindex="-1" hidden></div></div>';
     el('progress-retry').onclick=retryProgress;el('progress-export').onclick=exportPending;el('instrument').value=options.instrument;el('instrument').onchange=function(){changeInstrument(this.value,true);};el('mode').value=options.mode; el('tempo').value=options.tempo; el('countin').value=options.countIn;
     el('section-end').value=score.len+1; el('octave').value=base;
-    el('back').onclick=function(){var back=options.onBack;close();if(back)back();};
+    el('back').onclick=leave;
     el('start').onclick=function(){start(false);}; el('restart').onclick=function(){start(true);}; el('stop').onclick=stop;
     el('pause').onclick=function(){if(engine.snapshot().status==='paused')resume();else pause();};
     el('tempo').onchange=function(){var n=Math.max(20,Math.min(300,Number(this.value)||score.bpm));this.value=n;options.tempo=n;engine.setTempo(n);App.store.set('ws.performance.tempo',n);cleanup(true);paint(engine.snapshot());};
@@ -290,7 +342,7 @@
     el('octave').onchange=function(){releaseVirtual();base=Number(this.value);keyboard();paint(engine.snapshot());};
     el('sound').onchange=function(){if(!this.checked&&voice)voice.allNotesOff();};
     el('midi-enable').onclick=function(){App.midi.enable().then(refreshInputs).catch(function(e){el('feedback').textContent='MIDI unavailable: '+e.message;});};
-    el('input').onchange=function(){pause('Input changed. Release held keys and resume.');engine.releaseInput();rawStatus={};options.inputId=this.value;App.store.set('ws.performance.input',this.value);App.midi.setInput(this.value);};
+    el('input').onchange=function(){pause('Input changed. Release held keys and resume.');engine.releaseInput();rawStatus={};options.inputId=this.value;App.store.set('ws.performance.input',this.value);routeInput();};
     el('keyboard').addEventListener('pointerdown',function(e){var b=e.target.closest('[data-pf-note]');if(!b)return;e.preventDefault();try{b.setPointerCapture(e.pointerId);}catch(ignore){}note({midi:Number(b.dataset.pfNote),on:true,velocity:100,source:'virtual'});});
     ['pointerup','pointercancel','lostpointercapture'].forEach(function(event){el('keyboard').addEventListener(event,function(e){var b=e.target.closest('[data-pf-note]');if(!b)return;note({midi:Number(b.dataset.pfNote),on:false,source:'virtual'});});});
     el('input-kind').value=options.inputKind;el('input-kind').onchange=function(){pause('Input source changed. Start a new run when ready.');engine.releaseInput();options.inputKind=this.value;App.store.set('ws.performance.inputKind',this.value);configure();};
@@ -353,16 +405,16 @@
     App.on('colors',function(){if(live()){lastGuide='';paint(engine.snapshot());}});
     window.addEventListener('blur',function(){if(live()&&active(engine.snapshot()))pause('Window lost focus. Resume when ready.');});
     document.addEventListener('visibilitychange',function(){if(document.hidden&&live())pause('Page hidden. Resume when ready.');});
-    window.addEventListener('pagehide',function(){if(root&&engine)stop(true);});
+    window.addEventListener('pagehide',function(e){if(root&&engine)stop(true);if(!(e&&e.persisted))unrouteInput();});
     document.addEventListener('keydown',function(e){if(!live()||options.inputKind==='audio'||e.repeat||e.ctrlKey||e.metaKey||e.altKey||/INPUT|SELECT|TEXTAREA/.test(e.target.tagName))return;var i=KEY_CODES.indexOf(e.code);if(i<0)return;e.preventDefault();typing[e.code]=base+i;note({midi:base+i,on:true,source:'qwerty',velocity:100});});
     document.addEventListener('keyup',function(e){if(typing[e.code]==null)return;var m=typing[e.code];delete typing[e.code];note({midi:m,on:false,source:'qwerty'});});
   }
   function changeInstrument(id, publish){if(INSTRUMENTS.indexOf(id)<0)return;if(engine&&options&&options.instrument!==id){stop(true);options.instrument=id;App.store.set('ws.performance.instrument',id);if(el('instrument'))el('instrument').value=id;paint(engine.snapshot());paintProgress();}if(publish&&App.practiceInstrument)App.practiceInstrument.set(id);}
   function open(container,sc,opts){close();root=container;score=sc;options=Object.assign({mode:'wait',tempo:sc.bpm,countIn:App.store.get('ws.performance.countIn',4),inputId:App.store.get('ws.performance.input','all'),instrument:App.practiceInstrument?App.practiceInstrument.get():App.store.get('ws.performance.instrument','piano'),inputKind:App.store.get('ws.performance.inputKind','midi'),clock:function(){return App.getAudio().currentTime;}},opts||{});
     base=Math.max(24,Math.min(96,Math.floor(Math.min.apply(null,score.notes.map(function(n){return n.m;}))/12)*12));lastMessage='';lastCurrent='';installListeners();build();
-    if(App.midi&&(options.inputId==='all'||App.midi.inputs.some(function(p){return String(p.id)===String(options.inputId);})))App.midi.setInput(options.inputId);
+    routeInput();
     if(INSTRUMENTS.indexOf(options.instrument)===-1)options.instrument='piano';el('instrument').value=options.instrument;
     configure();paintProgress();
   }
-  window.PerformancePlayer={open:open,close:close,stop:stop,pause:pause,hide:function(){pause('Practice paused when leaving this page.');if(engine)engine.releaseInput();},note:note,tick:function(){if(engine){engagement();engine.tick();}},snapshot:function(){if(!engine)return null;return Object.assign({},engine.snapshot(),{practice:metrics?{id:metrics.id,instrument:metrics.instrument,recorded:metrics.recorded}:null});},listenAudio:listenAudio,get audioInput(){return audioInput;},get engine(){return engine;}};
+  window.PerformancePlayer={open:open,close:close,stop:stop,pause:pause,remote:remote,remoteKey:remoteKey,hide:function(){pause('Practice paused when leaving this page.');if(engine)engine.releaseInput();unrouteInput();},show:routeInput,note:note,tick:function(){if(engine){engagement();engine.tick();}},snapshot:function(){if(!engine)return null;return Object.assign({},engine.snapshot(),{practice:metrics?{id:metrics.id,instrument:metrics.instrument,recorded:metrics.recorded}:null});},listenAudio:listenAudio,get audioInput(){return audioInput;},get engine(){return engine;}};
 })();
