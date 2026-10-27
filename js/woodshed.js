@@ -1495,7 +1495,7 @@
     if (view === 'report') {
       if (action !== 'next' && action !== 'back' && action !== 'stop') return false;
       if (Date.now() - reportAt < 600) return 'Results'; // the run just ended: let the score show
-      if (action === 'stop') { toLibrary(); return 'Library'; }
+      if (action === 'stop') return false; // stay with the score: Next / Back = Again (the Library is a screen tap)
       again();
       return 'Again';
     }
@@ -1506,8 +1506,7 @@
     var startLabel = S.mode === 'wait' ? 'Start' : 'Count-in';
     if (action === 'stop') {
       if (busy || S.autoT) { endRun(false); paintHud(); return 'Stopped'; }
-      leaveSession();
-      return 'Library';
+      return false; // nothing running: stay here, Next starts again (the Library is a screen tap)
     }
     if (action === 'back') {
       if (S.mode === 'phrase' && S.phrase > 0) {
@@ -1521,6 +1520,14 @@
       return wasOn ? 'Restart' : startLabel;
     }
     if (action !== 'next') return false;
+    // Phrases loop by themselves: Next moves on to the next phrase (the
+    // player's call; the two-clean-passes advance still happens by itself)
+    if (S.mode === 'phrase' && (busy || S.autoT) && S.phrase < phraseCount(S.sc) - 1) {
+      S.phrase++;
+      S.cleanPasses = 0;
+      startRun();
+      return 'Phrase ' + (S.phrase + 1) + ' of ' + phraseCount(S.sc);
+    }
     if (S.autoT) return 'Starting…';
     if (busy) return S.mode !== 'wait' && App.getAudio().currentTime < S.startT ? 'Starting…' : 'Playing…'; // Wait has no count-in
     startRun();

@@ -35,7 +35,7 @@
   var ICON = { next: 'right', back: 'left', stop: 'stop' };
   var NOTHING = { next: 'Nothing to move on here', back: 'Nothing to go back to here', stop: 'Nothing to stop here' };
   var NOTE = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-  var DBL_MS = 350, DEBOUNCE_MS = 250, LEARN_MS = 20000;
+  var DBL_MS = 350, DEBOUNCE_MS = 250, LEARN_MS = 20000, TRIGGER_GAP_MS = 400;
 
   function g(k, d) { return App.store.get('remote.' + k, d); }
   function set(k, v) { App.store.set('remote.' + k, v); }
@@ -119,16 +119,30 @@
       var a = ACTIONS[i], b = m[a].midi;
       if (!b || !matches(b, bytes, src)) continue;
       if (b.t === 'cc') {
-        var key = held, last = ccLast[key] == null ? 0 : ccLast[key], v = bytes[2];
-        ccLast[key] = v;
-        if (b.latch ? (v >= 64) !== (last >= 64) : (last < 64 && v >= 64)) fire(a, 'cc');
+        // a press: on after off; the first message after a reload; or, for a
+        // pedal that only ever sends 'on' (trigger / instant-command modes),
+        // 'on' again after a quiet gap. Latching = every switch on or off.
+        var key = held, last = ccLast[key], v = bytes[2], now = Date.now();
+        ccLast[key] = { v: v, t: now };
+        var press = b.latch ? (!last || (v >= 64) !== (last.v >= 64))
+          : v >= 64 && (!last || last.v < 64 || now - last.t > TRIGGER_GAP_MS);
+        if (press) fire(a, 'cc');
       } else if (b.t === 'pc') fire(a, 'pc');
       else if (on) { notesHeld[held] = true; fire(a, 'note'); }
       else if (off) return false; // not ours (the press went through before it was learned)
       return true;
     }
-    // the reserved double-tap key (opt-in, pages that allow it)
-    if ((on || off) && bytes[1] === ctrlKey() && dblActive() && (!lumiIn() || /lumi/i.test((src && src.port) || ''))) {
+    // the reserved double-tap key (opt-in, pages that allow it). After the
+    // LUMI's octave-down button its lowest key sends a note below the window:
+    // that strike moves the window first (as a played note would), so it is
+    // the remote key at once. (After octave-up the app learns the new window
+    // from the first note played in the new top octave.)
+    var fromKeys = !lumiIn() || /lumi/i.test((src && src.port) || '');
+    if (on && fromKeys && App.midi && App.midi.learnRange && dblActive()) {
+      var rg = App.midi.range();
+      if (bytes[1] < rg.lo || bytes[1] > rg.hi) App.midi.learnRange(bytes[1]);
+    }
+    if ((on || off) && bytes[1] === ctrlKey() && fromKeys && dblActive()) {
       if (off) return false; // its press went through (the page changed between)
       dblHeld[held] = true;
       var now = Date.now();
@@ -203,8 +217,13 @@
   }
   function picker(t) {
     if (!t || !t.tagName) return false;
+    return t.tagName === 'SELECT' || t.tagName === 'INPUT' || stepper(t);
+  }
+  // a slider / knob / number box steps itself with the arrow keys: it keeps
+  // them (the Deck's strips, the Hub's knobs); Page Up / Down still advance
+  function stepper(t) {
     var role = t.getAttribute && t.getAttribute('role');
-    return t.tagName === 'SELECT' || t.tagName === 'INPUT' || role === 'slider' || role === 'spinbutton';
+    return role === 'slider' || role === 'spinbutton' || (t.tagName === 'INPUT' && /^(range|number)$/i.test(t.type || ''));
   }
   function keyAction(e) {
     var m = map();
@@ -225,6 +244,7 @@
       return;
     }
     if (typing(e.target)) return;
+    if (/^Arrow/.test(e.key) && e.target && e.target.tagName && stepper(e.target)) return;
     var a = keyAction(e);
     if (!a) return;
     e.preventDefault(); e.stopPropagation(); // a page turner must not also scroll or press a focused button
@@ -258,13 +278,13 @@
     if (t === 0xb0 && bytes[2] >= 64 && bytes[1] !== 0 && bytes[1] !== 32 && bytes[1] < 120) b = { t: 'cc', n: bytes[1] };
     else if (t === 0xc0) b = { t: 'pc', n: bytes[1] };
     else if (t === 0x90 && bytes[2] > 0) b = { t: 'note', n: bytes[1] };
-    if (!b) return t === 0xb0 && bytes[2] < 64 && bytes[1] !== 0 && bytes[1] !== 32; // a release before the press: swallow it too
-    b.ch = ch; b.port = (src && src.port) || '';
+    if (!b) return false; // releases, knobs below the middle, the sustain pedal letting go: they carry on as usual
+    b.ch = null; b.port = (src && src.port) || ''; // any channel: a synth may send it on the Part's channel; the port tells devices apart
     var a = learning.action, m = map();
-    ACTIONS.forEach(function (x) { if (x !== a && m[x].midi && m[x].midi.t === b.t && m[x].midi.n === b.n && m[x].midi.ch === b.ch) m[x].midi = null; });
+    ACTIONS.forEach(function (x) { if (x !== a && m[x].midi && m[x].midi.t === b.t && m[x].midi.n === b.n) m[x].midi = null; });
     m[a].midi = cleanMidi(b);
     if (b.t === 'note') notesHeld[(src && src.portId) + ':' + ch + ':' + b.n] = true;
-    if (b.t === 'cc') ccLast[(src && src.portId) + ':' + ch + ':' + b.n] = bytes[2];
+    if (b.t === 'cc') ccLast[(src && src.portId) + ':' + ch + ':' + b.n] = { v: bytes[2], t: Date.now() };
     lastFire[a] = Date.now(); // the learning press does not also fire
     learning = null; clearTimeout(learnT);
     saveMap(m);
@@ -309,7 +329,7 @@
       '</div>';
     });
     h += '</div>' +
-      '<label class="set-check"><input type="checkbox" id="rm-pt"' + (ptOn() ? ' checked' : '') + '><span>Page turner pedal<small>Page Down, Right or Down = Next; Page Up, Left or Up = Back. For a Bluetooth page turner; on a computer keyboard these keys stop scrolling the page.</small></span></label>' +
+      '<label class="set-check"><input type="checkbox" id="rm-pt"' + (ptOn() ? ' checked' : '') + '><span>Page turner pedal<small>Page Down, Right or Down = Next; Page Up, Left or Up = Back. For a Bluetooth page turner; on a computer keyboard these keys then stop scrolling the page and changing lists (sliders keep their arrows).</small></span></label>' +
       '<label class="set-check"><input type="checkbox" id="rm-dbl"' + (g('dbl', false) ? ' checked' : '') + '><span>Double-tap the lowest key = Next<small>For a LUMI with no pedal: the leftmost key (it moves with the octave buttons) becomes the remote key on practice pages — it does not play or count as an answer there. Keys lessons have their own double-tap (start / stop).</small></span></label>' +
       '<details class="tips"><summary>Which buttons work?</summary><p class="muted small">Any button or pedal that sends MIDI: a foot switch on the synth (Yamaha MODX / MONTAGE: UTILITY › Settings › Controller › FS Assign set to a free CC number), the MODX Assign switches 1 / 2 (CC 86 / 87 — they also do what the Performance assigns them), a MIDI pedal box, or a key you never play (the top key of an 88). A Bluetooth page turner works as keys. Press Learn, then the button: it is ready at once, and it only advances — it never sustains, sounds or answers.</p></details>';
     host.innerHTML = h;
@@ -338,10 +358,10 @@
   }
 
   App.injectCSS('remote',
-    '#remote-hud{position:fixed;left:50%;top:38%;transform:translate(-50%,-50%) scale(.96);z-index:450;pointer-events:none;display:flex;align-items:center;gap:10px;' +
+    '#remote-hud{position:fixed;left:16px;right:16px;margin:0 auto;width:fit-content;top:38%;transform:translateY(-50%) scale(.96);z-index:450;pointer-events:none;display:flex;align-items:center;gap:10px;' +
       'padding:14px 26px;border-radius:999px;background:var(--card);border:2px solid var(--accent);color:var(--text);box-shadow:0 12px 40px rgba(0,0,0,.45);' +
-      'font:400 30px/1 var(--font-display,inherit);letter-spacing:.04em;opacity:0;transition:opacity .18s ease,transform .18s ease;max-width:calc(100vw - 32px)}' +
-    '#remote-hud.show{opacity:1;transform:translate(-50%,-50%) scale(1)}#remote-hud .ic{color:var(--accent-ink);flex:0 0 auto}#remote-hud span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+      'font:400 clamp(22px,6.4vw,30px)/1.15 var(--font-display,inherit);letter-spacing:.04em;opacity:0;transition:opacity .18s ease,transform .18s ease;max-width:calc(100vw - 32px);box-sizing:border-box}' +
+    '#remote-hud.show{opacity:1;transform:translateY(-50%) scale(1)}#remote-hud .ic{color:var(--accent-ink);flex:0 0 auto}#remote-hud span{overflow-wrap:anywhere;text-align:center;max-height:2.4em;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}@media (max-width:520px){#remote-hud{border-radius:22px;padding:12px 20px}}' +
     '.rm-list{display:grid;gap:8px;margin:10px 0 12px}' +
     '.rm-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:6px 8px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:10px;transition:border-color .2s,background .2s}' +
     '.rm-row.fired{border-color:var(--accent-line);background:var(--accent-soft)}' +

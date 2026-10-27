@@ -1481,10 +1481,13 @@
     var q = cur.q, box = el('qz-ans');
     if (!box) return;
     if (q.kind === 'choice') {
+      var keys = keyAnswerable(q) && keyboardIn();
       box.innerHTML = '<div class="qz-choices' + (q.choices.length <= 2 ? ' two' : '') + '">' + q.choices.map(function (c, i) {
-        return '<button type="button" class="qz-ch" data-qzc="' + esc(c.id) + '">' +
-          (i < 9 ? '<span class="k" aria-hidden="true">' + (i + 1) + '</span>' : '') + esc(c.label) + '</button>';
-      }).join('') + '</div>';
+        return '<button type="button" class="qz-ch" data-qzc="' + esc(c.id) + '"' + (keys ? ' aria-keyshortcuts="' + choiceKeyName(q, i) + '"' : '') + '>' +
+          (i < 9 ? '<span class="k" aria-hidden="true">' + (i + 1) + '</span>' : '') +
+          (keys ? '<span class="kb" title="Play this key to pick it">' + choiceKeyName(q, i) + '</span>' : '') + esc(c.label) + '</button>';
+      }).join('') + '</div>' +
+        (keys && !cur.answered ? '<div class="qz-hint">Or play the white key shown on an answer' + (q.choices.length > 7 ? ' (from the bottom C of your keyboard)' : ', in any octave') + '.</div>' : '');
       return;
     }
     var hint = cur.answered ? '' : '<div class="qz-hint">' + (q.hint ? q.hint + ' ' : '') + (q.kind === 'set'
@@ -1719,6 +1722,28 @@
     resolve(id === cur.q.correct, id);
   }
 
+  // ANSWER BY KEY (hands-free): a choice question with no playable answer
+  // (ear, intervals, chords, scales, key signatures, theory) takes a WHITE
+  // key per choice — up to 7 choices: C D E F G A B in any octave; more: the
+  // white keys up from the C at the bottom of the keyboard's window (a LUMI's
+  // two octaves hold 14). The choices show their key while a keyboard is in.
+  var KEY_WHITE = [0, 2, 4, 5, 7, 9, 11], KEY_LETTER = 'CDEFGAB';
+  function keyAnswerable(q) { return !!q && q.kind === 'choice' && q.pcAnswer == null && !!q.choices && q.choices.length > 1; }
+  function keyBase() { var lo = App.midi && App.midi.range ? App.midi.range().lo : 48; return lo - mod(lo, 12); }
+  function choiceKeyIndex(q, midi) {
+    var w = KEY_WHITE.indexOf(mod(midi, 12));
+    if (w < 0) return -1;
+    if (q.choices.length <= 7) return w;
+    var oct = Math.floor((midi - keyBase()) / 12);
+    return oct < 0 ? -1 : oct * 7 + w;
+  }
+  function choiceKeyName(q, i) {
+    var n = KEY_LETTER.charAt(i % 7);
+    return q.choices.length <= 7 ? n : n + (Math.floor(keyBase() / 12) - 1 + Math.floor(i / 7));
+  }
+  function keyboardIn() { var m = App.midi; return !!(m && m.ready && m.inputs && m.inputs.length); }
+  function keyChoiceFor(q, midi) { var i = choiceKeyIndex(q, midi); return i >= 0 && i < q.choices.length ? q.choices[i] : null; }
+
   function choiceForPc(q, pc) {
     for (var i = 0; i < q.choices.length; i++) if (q.choices[i].pc === pc) return q.choices[i].id;
     return null;
@@ -1730,12 +1755,19 @@
     if (cur.answered) {
       // A fresh correction advances without re-grading the miss or granting XP.
       // Sprints retain their existing feedback/advance timing.
+      var kc = keyAnswerable(q) && src === 'midi' ? keyChoiceFor(q, midi) : null;
       if (!cur.lastOk && !cur.sprint &&
-          ((q.kind === 'choice' && q.pcAnswer != null && src !== 'tap' && pc === q.pcAnswer) ||
+          ((kc && kc.id === q.correct) || // the right answer's key, after a miss: move on
+           (q.kind === 'choice' && q.pcAnswer != null && src !== 'tap' && pc === q.pcAnswer) ||
            (q.kind === 'single' && pc === q.pc && (q.string == null || !pos || pos.s === q.string)))) nextQ();
       return;
     }
     if (q.kind === 'choice') {
+      if (keyAnswerable(q)) { // a white key picks a choice (the keyboard as a remote)
+        var pick = src === 'midi' ? keyChoiceFor(q, midi) : null;
+        if (pick) answerChoice(pick.id);
+        return;
+      }
       if (q.pcAnswer == null || src === 'tap') return;
       if (pc === q.pcAnswer) resolve(true, q.correct);
       else resolve(false, choiceForPc(q, pc), midi);
@@ -2527,8 +2559,8 @@
       // HUD labels stay short (one line on a phone); the toast says the rest
       if (cur.sprint && cur.sprint.endless) { // a choice without a playable answer ignores MIDI
         var scr = q.kind === 'choice' && q.pcAnswer == null;
-        if (App.toast) App.toast(scr ? 'Endless: tap the answer on screen, or press Stop to end the run' : 'Endless: play the answer, or press Stop to end the run');
-        return scr ? 'Answer on screen' : 'Play the answer';
+        if (App.toast) App.toast(scr ? 'Endless: play the white key on your answer, or press Stop to end the run' : 'Endless: play the answer, or press Stop to end the run');
+        return scr ? 'Pick with a key' : 'Play the answer';
       }
       if (now - (cur.t0 || 0) < R_FRESH) return 'Answer first';
       if (!remoteArm || remoteArm.q !== q || now - remoteArm.t > R_ARM) {
@@ -2588,6 +2620,7 @@
     var q = cur.q;
     // answered: only the correction (a miss, not in a sprint, a single answer) still takes a note
     if (cur.answered && (cur.lastOk || cur.sprint || q.kind === 'set')) return true;
+    if (keyAnswerable(q)) return false; // every white key picks an answer here
     var lo = App.midi && App.midi.range ? App.midi.range().lo : 48;
     return answerPcs(q).map(function (pc) { return mod(pc, 12); }).indexOf(mod(lo, 12)) < 0;
   }
@@ -2680,6 +2713,7 @@
     '.qz-ch{position:relative;min-height:52px;padding:10px 14px;border-radius:12px;border:1px solid var(--ctl-border);background:var(--card2);color:var(--text);font:600 16px/1.25 var(--font-body);cursor:pointer;transition:border-color .12s ease,background-color .15s ease,opacity .15s ease}' +
     '.qz-ch:hover:not(:disabled),.qz-ch:focus-visible{border-color:var(--accent)}' +
     '.qz-ch .k{display:none}' +
+    '.qz-ch .kb{position:absolute;top:5px;right:8px;font:700 11px/1 var(--font-body);color:var(--accent-ink);letter-spacing:.02em}' +
     '@media (hover:hover) and (pointer:fine){.qz-ch .k{display:block;position:absolute;top:5px;left:8px;font-size:10px;font-weight:600;color:var(--muted);opacity:.7}}' +
     '.qz-ch.ok{border-color:var(--green);background:color-mix(in srgb,var(--green) 22%,var(--card2))}' +
     '.qz-ch.bad{border-color:var(--red);background:color-mix(in srgb,var(--red) 22%,var(--card2))}' +
@@ -2882,6 +2916,10 @@
         if (h.src !== 'midi') return;
         if (changed || (ports && h.portId != null && !ports.some(function (p) { return String(p.id) === h.portId; }))) delete inputHeld[key];
       });
+    });
+    // the white-key labels on choices follow the keyboard (plugged in, octave buttons)
+    ['midi:state', 'midi:range'].forEach(function (ev) {
+      App.on(ev, function () { if (App.active === 'quiz' && view === 'run' && cur && cur.q && !cur.answered && keyAnswerable(cur.q)) paintAns(); });
     });
     App.on('midi:note', function (d) {
       if (!d || !Number.isInteger(d.midi) || d.midi < 0 || d.midi > 127) return;

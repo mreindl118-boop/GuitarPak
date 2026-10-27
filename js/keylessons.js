@@ -177,8 +177,9 @@
           var n = nextLesson();
           return n ? 'Next lesson: ' + n.name + ' · ' + handName(n.hand) : 'All lessons done';
         }
+        if (!last.inf && !last.up) { retry(last.r); return 'Again'; } // the level the results show (after a Back retry too)
         start(false);
-        return last.inf ? 'Go again' : last.up ? 'Next level' : 'Again';
+        return last.inf ? 'Go again' : 'Next level';
       }
       return false;
     }
@@ -746,7 +747,7 @@
       return;
     }
     switch (b.id) {
-      case 'kl-start': start(false); break;
+      case 'kl-start': if (view === 'done' && last && !last.inf && !last.up) retry(last.r); else start(false); break; // Again = the level just played
       case 'kl-listen': start(true); break;
       case 'kl-stop': if (R && R.inf) finish(); else stopAll(false); break;
       case 'kl-speedup': App.store.set('kl.speedup', !speedup()); paint(); break;

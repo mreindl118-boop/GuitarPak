@@ -1825,7 +1825,8 @@
     scopeFrame: function () { if (window.SLSynthScope && SLSynthScope.frame) return SLSynthScope.frame(); },
     scopeState: function () { return window.SLSynthScope && SLSynthScope.state ? SLSynthScope.state() : null; },
     get scopeRunning() { return !!(window.SLSynthScope && SLSynthScope.running); },
-    get held() { return Object.keys(heldSet); }
+    get held() { return Object.keys(heldSet); },
+    get learning() { return !!learning; } // Map Learn is listening (the remote leaves the Deck alone meanwhile)
   };
   window.SLSynthDeck = DECK;
   if (window.App) App.synthDeck = DECK;

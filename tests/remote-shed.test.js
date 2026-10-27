@@ -10,9 +10,9 @@
 // and a fake LUMI (double-tap of its lowest key only where NEXT acts and
 // nothing is judged: never the library; during a run that key plays and is
 // graded). STOP in the instant a run ends keeps its report too. The player
-// never narrows App.midi's All inputs to its own port, so a remote on another
-// port keeps working; a single app input it re-points comes back on hide /
-// ← Library.
+// points App.midi at its own keyboard while it shows (a remote on another
+// port keeps working: midi.js claims on every port) and gives the app's own
+// input back on hide / ← Library.
 const { chromium } = require('playwright');
 const env = require('./env');
 let fails = 0;
@@ -66,6 +66,7 @@ async function newPage(browser, seed) {
     window.endPass = () => { WS().startT = App.getAudio().currentTime - 200; }; // the clock ran past the end
     window.cs = () => { const S = WS(); return { view: Woodshed.view, running: !!(S && S.running), timer: !!(S && S.timer), xp: S ? S.xpSession : null, phrase: S ? S.phrase : null, autoT: !!(S && S.autoT) }; };
     window.reportShown = () => { const r = document.getElementById('pf-report'); return !!r && !r.hidden; };
+    window.toLib = () => { R('stop'); const b = document.getElementById('ws-back') || document.getElementById('ws-tolib') || document.getElementById('pf-back'); if (b) b.click(); };
     window.perfOpen = (score, countIn) => {
       window.__t = 0; App.switchTo('shed');
       Woodshed.performanceStart(score, 'wait', { clock: () => window.__t });
@@ -115,6 +116,7 @@ async function newPage(browser, seed) {
     o.backIdle = R('back') + '|' + cs().running + '|' + starts; // nothing ran: BACK = the Count-in
     R('stop');
     o.stopIdle = R('stop') + '|' + Woodshed.view + '|' + (WS() === null) + '|' + !!document.getElementById('ws-guided-melody');
+    document.getElementById('ws-back').click(); await __wait(30); o.leave = Woodshed.view; // the Library is a screen tap
     return o;
     function J(x) { return JSON.stringify(x); }
   });
@@ -126,7 +128,7 @@ async function newPage(browser, seed) {
   ok(run.back === 'Restart|true|2|true', 'BACK while playing restarts the run (a new run from the count-in): ' + run.back);
   ok(run.stop === 'Stopped' && /"view":"session","running":false,"timer":false/.test(run.afterStop), 'STOP ends the run and stays in the session: ' + run.afterStop);
   ok(run.backIdle === 'Count-in|true|3', 'BACK with nothing running starts the count-in: ' + run.backIdle);
-  ok(run.stopIdle === 'Library|lib|true|true', 'STOP with nothing running = ← (back to the library): ' + run.stopIdle);
+  ok(run.stopIdle === 'false|session|false|false' && run.leave === 'lib', 'STOP with nothing running stays in the session (Next starts again; ← is a screen tap): ' + run.stopIdle);
 
   console.log('# report: Again / Library, never in the instant it appears');
   const rp = await page.evaluate(async () => {
@@ -144,6 +146,7 @@ async function newPage(browser, seed) {
     o.stopGuard = R('stop') + '|' + Woodshed.view + '|' + !!document.getElementById('ws-again');
     await __wait(650);
     o.stop = R('stop') + '|' + Woodshed.view + '|' + (WS() === null);
+    document.getElementById('ws-tolib').click(); await __wait(30);
     return o;
   });
   ok(rp.report === 'report|true', 'a finished run shows the report');
@@ -152,7 +155,7 @@ async function newPage(browser, seed) {
   ok(rp.again === 'Again|session|true|1', 'report NEXT = Again (back in the session, a new run): ' + rp.again);
   ok(rp.back === 'Again|session|true|2', 'report BACK = Again: ' + rp.back);
   ok(rp.stopGuard === 'Results|report|true', 'STOP in the instant the report appears keeps it on screen: ' + rp.stopGuard);
-  ok(rp.stop === 'Library|lib|true', 'report STOP = Library: ' + rp.stop);
+  ok(rp.stop === 'false|report|false', 'report STOP stays with the score (Next / Back = Again): ' + rp.stop);
 
   console.log('# Phrases: the phrase before, the pending next pass');
   const ph = await page.evaluate(async () => {
@@ -167,9 +170,10 @@ async function newPage(browser, seed) {
     o.gap = J(cs());
     o.gapKey = App.remoteKeyPage();
     const s0 = starts;
-    o.gapNext = R('next') + '|' + (starts - s0);
+    o.gapNext = R('next') + '|' + (starts - s0) + '|' + cs().phrase; // the player moves on: the next phrase, one run
     await __wait(1000);
-    o.afterGap = cs().running + '|' + (starts - s0) + '|' + cs().autoT; // started once, by the loop
+    o.afterGap = cs().running + '|' + (starts - s0) + '|' + cs().autoT; // started once (the pending pass was cancelled)
+    o.lastNext = R('next') + '|' + cs().phrase; // the last phrase, playing: nothing to skip to
     endPass(); await __wait(150);
     o.gapStop = R('stop') + '|' + cs().autoT; const s1 = starts;
     await __wait(1000);
@@ -179,7 +183,7 @@ async function newPage(browser, seed) {
     App.switchTo('quiz'); await __wait(1000);
     o.leave = cs().running + '|' + (starts - s2);
     App.switchTo('shed'); await __wait(80);
-    R('stop');
+    toLib(); // end what runs, then the Library (a screen tap: Stop no longer leaves)
     return o;
     function J(x) { return JSON.stringify(x); }
   });
@@ -187,8 +191,9 @@ async function newPage(browser, seed) {
   ok(ph.firstRun === 'Restart|0|2', 'Phrases, first phrase running: BACK restarts it: ' + ph.firstRun);
   ok(ph.prev === 'Phrase 2 of 3|1|0|true|3', 'Phrases: BACK = the phrase before (clean passes reset, a new pass): ' + ph.prev);
   ok(/"running":false/.test(ph.gap) && /"autoT":true/.test(ph.gap) && ph.gapKey === true, 'a finished pass waits 900 ms for the next one: ' + ph.gap);
-  ok(ph.gapNext === 'Starting…|0', 'NEXT in that gap does not start a second run: ' + ph.gapNext);
-  ok(ph.afterGap === 'true|1|false', 'the loop restarts the pass exactly once: ' + ph.afterGap);
+  ok(ph.gapNext === 'Phrase 3 of 3|1|2', 'NEXT in the loop moves on to the next phrase (one run): ' + ph.gapNext);
+  ok(ph.afterGap === 'true|1|false', 'the pending pass does not start a second run: ' + ph.afterGap);
+  ok(/^(Starting…|Playing…)\|2$/.test(ph.lastNext), 'NEXT on the last phrase while it runs does nothing: ' + ph.lastNext);
   ok(ph.gapStop === 'Stopped|false' && ph.afterStop === 'false|0|session', 'STOP in the gap cancels the pending pass and stays in the session: ' + ph.gapStop + ' / ' + ph.afterStop);
   ok(ph.leave === 'false|0', 'leaving the Woodshed in the gap cancels the pending pass (no run in the background): ' + ph.leave);
 
@@ -201,13 +206,13 @@ async function newPage(browser, seed) {
     o.playing = R('next') + '|' + starts;
     o.stop = R('stop') + '|' + cs().running + '|' + Woodshed.view;
     o.again = R('next') + '|' + cs().running + '|' + starts;
-    R('stop'); R('stop');
+    toLib(); // end what runs, then the Library (a screen tap: Stop no longer leaves)
     // a note already played without Start: NEXT never throws that progress away
     openRow('Remote run', 'wait'); await __wait(40);
     App.emit('note:input', { on: true, midi: WS().targets[0].n.m, vel: 90, src: 'qwerty' });
     o.played = WS().waitIdx + '|' + R('next') + '|' + WS().waitIdx;
     o.playedStop = R('stop') + '|' + cs().running;
-    R('stop');
+    toLib(); // end what runs, then the Library (a screen tap: Stop no longer leaves)
     return o;
     function J(x) { return JSON.stringify(x); }
   });
@@ -234,6 +239,7 @@ async function newPage(browser, seed) {
     PerformancePlayer.pause(); o.pStop = R('stop') + '|' + st() + '|' + reportShown();
     o.stopBack = R('back') + '|' + st(); R('stop');
     o.lib = R('stop') + '|' + Woodshed.view + '|' + !!document.getElementById('ws-guided-melody') + '|' + st();
+    document.getElementById('pf-back').click(); await __wait(30); o.libView = Woodshed.view;
     o.libNext = R('next');
     return o;
   });
@@ -247,7 +253,7 @@ async function newPage(browser, seed) {
   ok(pf.pBack === 'Restart|countin', 'performance paused: BACK = Restart: ' + pf.pBack);
   ok(pf.pStop === 'Stopped|stopped|true', 'performance paused: STOP = Stop: ' + pf.pStop);
   ok(pf.stopBack === 'Again|countin', 'performance stopped: BACK = Again: ' + pf.stopBack);
-  ok(pf.lib === 'Library|lib|true|none' && pf.libNext === false, 'performance with nothing running: STOP = ← Library: ' + pf.lib);
+  ok(pf.lib === 'false|performance|false|stopped' && pf.libView === 'lib' && pf.libNext === false, 'performance with nothing running: STOP stays (← Library is a screen tap; NEXT does nothing in the Library): ' + pf.lib);
 
   console.log('# Guided performance: running, complete, chords on audio input');
   const pc = await page.evaluate(async () => {
@@ -266,13 +272,14 @@ async function newPage(browser, seed) {
     o.doneStop = R('stop') + '|' + Woodshed.view + '|' + st() + '|' + reportShown();
     await __wait(650);
     o.doneLib = R('stop') + '|' + Woodshed.view + '|' + st();
+    document.getElementById('pf-back').click(); await __wait(30);
     // a chord score on audio input cannot start: the HUD and a toast say why
     App.switchTo('shed'); await __wait(40);
     document.getElementById('ws-guided-chords').click(); await __wait(40);
     const k = document.getElementById('pf-input-kind'); k.value = 'audio'; k.dispatchEvent(new Event('change', { bubbles: true }));
     o.audio = R('next') + '|' + st() + '|' + toast();
     k.value = 'midi'; k.dispatchEvent(new Event('change', { bubbles: true }));
-    R('stop');
+    toLib(); // end what runs, then the Library (a screen tap: Stop no longer leaves)
     return o;
   });
   ok(pc.start === 'Start|running' && pc.playing === 'Playing…|running|false', 'performance without count-in: NEXT = Start, then NEXT does nothing while it plays: ' + pc.playing);
@@ -280,7 +287,7 @@ async function newPage(browser, seed) {
   ok(pc.guard === 'Results|Results|complete', 'NEXT / BACK in the instant it completes only let the report show: ' + pc.guard);
   ok(pc.again === 'Again|running' && pc.back === 'Again|running', 'complete: NEXT and BACK = Again: ' + pc.again + ' / ' + pc.back);
   ok(pc.doneStop === 'Results|performance|complete|true', 'STOP in the instant it completes keeps the report on screen: ' + pc.doneStop);
-  ok(pc.doneLib === 'Library|lib|none', 'complete: STOP = ← Library: ' + pc.doneLib);
+  ok(pc.doneLib === 'false|performance|complete', 'complete: STOP stays with the report: ' + pc.doneLib);
   ok(/^Can’t start\|idle\|Audio input cannot grade chords/.test(pc.audio), 'chords on audio input: nothing starts, the HUD and a toast say why: ' + pc.audio);
 
   console.log('# end to end: a MODX button (CC 86 / 87 / 85)');
@@ -294,7 +301,7 @@ async function newPage(browser, seed) {
     await __wait(300); __press(87); await __wait(40);
     o.back = cs().running + '|' + hud();
     await __wait(300); __press(85); await __wait(300); __press(85); await __wait(40);
-    o.lib = Woodshed.view + '|' + hud();
+    o.lib = Woodshed.view + '|' + toast();
     // the player: its own 'midi:raw' parser never sees the remote's CCs
     perfOpen(TWO, 0);
     await __wait(300); __press(86); await __wait(40);
@@ -305,15 +312,16 @@ async function newPage(browser, seed) {
     o.raws = raws.filter(b => /^176 (85|86|87) /.test(b)).length;
     await __wait(300); __press(85); await __wait(40);
     o.pLib = Woodshed.view;
+    document.getElementById('pf-back').click(); await __wait(30);
     return o;
   });
   ok(e2e.next === 'true|Count-in|next:cc:1', 'CC 86 from the MODX = NEXT: the run counts in, the HUD says Count-in: ' + e2e.next);
   ok(e2e.stop === 'false|session|Stopped', 'CC 85 = STOP: the run ends, the HUD says Stopped: ' + e2e.stop);
   ok(e2e.back === 'true|Count-in', 'CC 87 = BACK: with nothing running it counts in again: ' + e2e.back);
-  ok(e2e.lib === 'lib|Library', 'CC 85 twice: stop, then back to the library: ' + e2e.lib);
+  ok(e2e.lib === 'session|Nothing to stop here', 'CC 85 twice: stop, then nothing more to stop (stays in the session): ' + e2e.lib);
   ok(e2e.pNext === 'running|Start' && /^stopped\|Stopped\|0$/.test(e2e.pStop), 'the player starts and stops from the MODX; nothing counts as a wrong or extra note: ' + e2e.pNext + ' / ' + e2e.pStop);
   ok(e2e.raws === 0, 'the remote CCs never reach midi:raw listeners');
-  ok(e2e.pLib === 'lib', 'the player: STOP with nothing running goes back to the library');
+  ok(e2e.pLib === 'performance', 'the player: STOP with nothing running stays with it');
 
   console.log('# calibration');
   const cal = await page.evaluate(async () => {
@@ -344,12 +352,12 @@ async function newPage(browser, seed) {
     const before = WS().played.length; notes.length = 0;
     __strike(lo); await __wait(60); __strike(lo); await __wait(40);
     o.during = (WS().played.length - before) + '|' + notes.filter(n => n === '+' + lo).length + '|' + rem.length;
-    R('stop'); R('stop');
+    toLib(); // end what runs, then the Library (a screen tap: Stop no longer leaves)
     // Wait mode is judged from the moment it shows: the key is a note
     openRow('Remote run', 'wait'); await __wait(40); notes.length = 0;
     __strike(lo); await __wait(40);
     o.wait = WS().waitIdx + '|' + WS().counts.perfect + '|' + notes.filter(n => n === '+' + lo).length + '|' + rem.length;
-    R('stop'); R('stop');
+    toLib(); // end what runs, then the Library (a screen tap: Stop no longer leaves)
     // Guided performance: idle double-tap starts, then the key is the target
     perfOpen(TWO, 0); await __wait(300); notes.length = 0; raws.length = 0;
     __strike(lo); await __wait(500);
@@ -359,7 +367,7 @@ async function newPage(browser, seed) {
     __strike(lo); await __wait(40);
     const s = PerformancePlayer.snapshot();
     o.pPlay = s.results.matched + '|' + s.current.notes.join() + '|' + rem.length;
-    R('stop'); R('stop');
+    toLib(); // end what runs, then the Library (a screen tap: Stop no longer leaves)
     return o;
   });
   ok(dt.lo === 48, 'the lowest key is the LUMI default C3 (48)');
@@ -380,7 +388,8 @@ async function newPage(browser, seed) {
     const o = {};
     const stored = () => localStorage.getItem('guitarlab.midi.inputId');
     const change = (id, v) => { const e = document.getElementById(id); e.value = v; e.dispatchEvent(new Event('change', { bubbles: true })); };
-    // the app hears All inputs (the default): the player filters by port itself
+    // the app heard All inputs (the default): the player points it at its own
+    // keyboard while it shows; the MODX remote still works (claimed on every port)
     perfOpen(TWO, 0); await __wait(300);
     o.open = document.getElementById('pf-input').value + '|' + App.midi.inputId + '|' + stored();
     raws.length = 0; rem.length = 0;
@@ -394,15 +403,15 @@ async function newPage(browser, seed) {
     o.raws = raws.filter(b => /^176 (85|86|87) /.test(b)).length;
     await __wait(300); __press(85); await __wait(40); // Stop
     o.stop = st() + '|' + hud();
-    // changing the player's input never narrows the app either
+    // changing the player's input moves the app with it
     change('pf-input', 'in-modx'); change('pf-input', 'in-lumi');
     o.change = App.midi.inputId + '|' + stored();
-    await __wait(300); __press(85); await __wait(40); // ← Library
+    document.getElementById('pf-back').click(); await __wait(40); // ← Library (a screen tap)
     o.lib = Woodshed.view + '|' + App.midi.inputId + '|' + stored();
     openRow('Remote run', 'run'); await __wait(300);
     __press(86); await __wait(40);
     o.run = cs().running + '|' + hud();
-    R('stop'); R('stop');
+    toLib(); // end what runs, then the Library (a screen tap: Stop no longer leaves)
     // the app hears ONE other port (the MODX): the player points it at the
     // LUMI only while it shows, and gives the MODX back after
     App.midi.setInput('in-modx'); await __wait(20);
@@ -413,24 +422,25 @@ async function newPage(browser, seed) {
     App.switchTo('shed'); await __wait(60);
     o.shown = App.midi.inputId + '|' + Woodshed.view;
     __strike(48); o.shownNote = st(); // idle: nothing is graded, nothing throws
-    o.close = R('stop') + '|' + Woodshed.view + '|' + App.midi.inputId + '|' + stored();
+    document.getElementById('pf-back').click(); await __wait(30);
+    o.close = 'Library|' + Woodshed.view + '|' + App.midi.inputId + '|' + stored();
     openRow('Remote run', 'run'); await __wait(300);
     __press(86); await __wait(40);
     o.run2 = cs().running + '|' + hud();
-    R('stop'); R('stop');
+    toLib(); // end what runs, then the Library (a screen tap: Stop no longer leaves)
     // an input picked elsewhere while the player shows is kept on close
     perfOpen(TWO, 0); await __wait(60);
     App.midi.setInput('all'); await __wait(20);
-    R('stop');
+    document.getElementById('pf-back').click(); await __wait(30);
     o.kept = Woodshed.view + '|' + App.midi.inputId + '|' + stored();
     return o;
   });
-  ok(pi.open === 'in-lumi|all|"all"', 'opening the player with the LUMI as its input leaves the app on All inputs: ' + pi.open);
+  ok(pi.open === 'in-lumi|in-lumi|"in-lumi"', 'opening the player with the LUMI as its input points the app at the LUMI while it shows (as before): ' + pi.open);
   ok(pi.next === 'running|Start|next:cc:1', 'CC 86 from the MODX starts the performance: ' + pi.next);
   ok(pi.graded === '0|0|1' && pi.raws === 0, 'the MODX\'s notes are not graded, the LUMI\'s are, the CCs never reach midi:raw: ' + pi.graded);
   ok(pi.stop === 'stopped|Stopped', 'CC 85 stops the performance: ' + pi.stop);
-  ok(pi.change === 'all|"all"', 'changing the player\'s input never narrows the app: ' + pi.change);
-  ok(pi.lib === 'lib|all|"all"', 'after ← Library the app still hears every input (nothing saved narrowed): ' + pi.lib);
+  ok(pi.change === 'in-lumi|"in-lumi"', 'changing the player\'s input points the app at the new one: ' + pi.change);
+  ok(pi.lib === 'lib|all|"all"', 'after ← Library the app hears every input again (nothing saved narrowed): ' + pi.lib);
   ok(pi.run === 'true|Count-in', 'and CC 86 still starts a classic run: ' + pi.run);
   ok(pi.route === 'in-lumi', 'an app on one other port is pointed at the player\'s input while it shows: ' + pi.route);
   ok(pi.hidden === 'in-modx|"in-modx"', 'leaving the Woodshed gives the app its own input back: ' + pi.hidden);

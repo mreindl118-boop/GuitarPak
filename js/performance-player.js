@@ -127,7 +127,7 @@
     }
     if(action!=='next'&&action!=='back'&&action!=='stop')return false;
     if(st==='complete'&&Date.now()-(options.doneAt||0)<600)return 'Results'; // just finished: let the report show (STOP too)
-    if(action==='stop'){if(st==='paused'){stop();return 'Stopped';}leave();return 'Library';}
+    if(action==='stop'){if(st==='paused'){stop();return 'Stopped';}return false;} // nothing running: stay, Next starts again
     if(action==='back'&&st==='idle')return false;
     if(options.inputKind==='audio'&&hasChords()){if(App.toast)App.toast('Audio input cannot grade chords: choose the arpeggio version or MIDI.');return 'Can’t start';}
     var p,label;
@@ -151,8 +151,11 @@
   // another input was picked meanwhile).
   function routeInput(){
     if(!root||!options||!App.midi||!App.midi.setInput)return;
+    // the app hears the player's keyboard only while the player shows (as it
+    // always did) and gets its own input back after; a remote pedal on any
+    // other port still works (midi.js claims on every port)
     var cur=App.midi.inputId,id=options.inputId;
-    if(cur==='all'||String(cur)===String(id))return;
+    if(id==null||String(cur)===String(id))return;
     if(id!=='all'&&!App.midi.inputs.some(function(p){return String(p.id)===String(id);}))return;
     if(routedInput===null)appInput=cur;
     App.midi.setInput(id);routedInput=App.midi.inputId;

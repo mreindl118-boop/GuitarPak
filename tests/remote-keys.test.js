@@ -205,7 +205,7 @@ const MAP = { next: { midi: { t: 'cc', n: 86, ch: null, port: '' }, key: null },
     __kl().run.targets.forEach(t => { t.j = 'miss'; }); __kl().finish();
     o.afterFail = __prog('d-r').step; o.failPass = __kl().last.pass;
     await __wait(650);
-    o.again = __ra('next'); o.againStep = __kl().run && __kl().run.step; // a failed run: Again at the saved level
+    o.again = __ra('next'); o.againStep = __kl().run && __kl().run.step; // a failed run: Again = the level just played
     __ra('stop');
     o.up2 = __fakeDone('d-r', 5);
     await __wait(650);
@@ -237,7 +237,7 @@ const MAP = { next: { midi: { t: 'cc', n: 86, ch: null, port: '' }, key: null },
     'after a level-up BACK retries the level just played (4), the saved level stays 5: ' + J({ up: rs.up, retry: rs.retry, step: rs.retryStep, saved: rs.savedDuring }));
   ok(rs.afterClean === 5 && rs.lastUp && rs.lastStep === 4 && rs.retry2 === 'Retry' && rs.afterFail === 5 && rs.failPass === false,
     'a clean or failed retry never lowers the saved level: ' + J({ clean: rs.afterClean, fail: rs.afterFail }));
-  ok(rs.again === 'Again' && rs.againStep === 5, 'a failed result: NEXT = Again at the saved level: ' + J({ again: rs.again, step: rs.againStep }));
+  ok(rs.again === 'Again' && rs.againStep === 4, 'a failed retry of a lower level: NEXT = Again replays the level the results show (not the saved one): ' + J({ again: rs.again, step: rs.againStep }));
   ok(rs.up2.up && rs.nextLevel === 'Next level' && rs.nlStep === 6, 'a level-up: NEXT = Next level: ' + J({ nl: rs.nextLevel, step: rs.nlStep }));
   ok(!rs.fail.pass && !rs.fail.next && rs.lessons === 'Lessons' && rs.lview === 'list', 'results: STOP = Lessons (back to the list)');
   ok(rs.lateStop === 'Stopped' && rs.lsView === 'list' && rs.lsRuns === 0 && !rs.lsScored && rs.btnView === 'list' && rs.btnRuns === 0,

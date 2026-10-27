@@ -459,6 +459,22 @@ async function newPage(browser, seed) {
   ok(!errs.length, 'no page errors: ' + errs.join(' | '));
   await ctx.close();
 
+  console.log('# the Deck while its Map Learn listens');
+  ({ ctx, page, errs } = await newPage(browser, { 'remote.map': MAP, 'synthtab.live': LIVE }));
+  const ml = await page.evaluate(async () => {
+    App.switchTo('deck'); await __wait(400);
+    const o = {};
+    o.learnOn = App.synthDeck.learn('sus', true, 'num') !== false && App.synthDeck.learning;
+    __clearToast(); o.r = __ra('next'); o.toast = __toast(); o.slot = SLSynthLive.slot();
+    App.synthDeck.learn('sus', false); o.learnOff = App.synthDeck.learning;
+    await __wait(300); o.r2 = __ra('next'); o.slot2 = SLSynthLive.slot();
+    return o;
+  });
+  ok(ml.learnOn === true && ml.r === false && /Map Learn is listening/.test(ml.toast) && ml.slot === null, 'while the Map Learn listens, a remote press does not step the set and says why: ' + ml.toast);
+  ok(ml.learnOff === false && typeof ml.r2 === 'string' && ml.slot2 === 0, 'after Learn the remote steps again: ' + ml.r2);
+  ok(!errs.length, 'no page errors: ' + errs.join(' | '));
+  await ctx.close();
+
   await browser.close();
   console.log(fails ? fails + ' FAILED' : 'ALL PASS');
   process.exit(fails ? 1 : 0);

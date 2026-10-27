@@ -55,7 +55,7 @@ async function newPage(browser, seed, native) {
   await page.evaluate(() => {
     window.__rm = []; window.__rmKey = true;
     App.addPage('rmtest', 'RM test', 'practice', { init: function () {}, remoteKey: function () { return window.__rmKey; },
-      onRemote: function (a, info) { window.__rm.push(a + ':' + info.via); if (a === 'back' && window.__rmSay) App.toast(window.__rmSay); return a === 'back' ? false : a === 'stop' ? 'Halted' : true; } });
+      onRemote: function (a, info) { window.__rm.push(a + ':' + info.via); if (a === 'back' && window.__rmSay) App.toast(window.__rmSay); return a === 'back' ? false : a === 'stop' ? 'Halted' : (window.__rmLabel || true); } });
   });
   return { ctx, page, errs };
 }
@@ -95,8 +95,8 @@ const BOUND = { next: { midi: { t: 'cc', n: 86, ch: null, port: 'MODX-1' }, key:
   });
   ok(ln.rows === 'next,back,stop' && ln.notSet === 'Not set', 'three rows, nothing set by default');
   ok(/Listening/.test(ln.listening) && /\|true\|next$/.test(ln.listening) && ln.afterRelease === 'next', 'Learn listens (aria-pressed) and a release alone is not taken: ' + ln.listening);
-  ok(/"t":"cc","n":1,"ch":0,"port":"MODX-1"/.test(ln.learned) && /Next = CC 1/.test(ln.toast) && /CC 1 · ch 1 · MODX-1/.test(ln.what), 'the first CC press is learned with channel and port: ' + ln.learned);
-  ok(ln.raw.length === 0 && ln.remote.join('|') === '176 86 0|176 1 127|176 1 0', 'the stray release, the learning press and its release reach no listener (only midi:remote): ' + J(ln.remote));
+  ok(/"t":"cc","n":1,"ch":null,"port":"MODX-1"/.test(ln.learned) && /Next = CC 1/.test(ln.toast) && /^CC 1 · MODX-1$/.test(ln.what), 'the first CC press is learned with its port, on any channel (a synth may send it on the Part\u2019s channel): ' + ln.learned);
+  ok(ln.raw.join('|') === '176 86 0' && ln.remote.join('|') === '176 1 127|176 1 0', 'the learning press and its release reach no listener (only midi:remote); a stray release passes on as usual: ' + J(ln.raw) + ' ' + J(ln.remote));
   ok(/"code":"PageUp"/.test(ln.backKey), 'a key (page turner) can be learned: ' + ln.backKey);
   ok(ln.esc === null && /cancelled/.test(ln.escToast) && ln.leave === null, 'Escape and leaving Settings cancel Learn');
   ok(/"t":"note","n":108/.test(ln.note) && ln.noteNotes === 0, 'a key on the keyboard can be learned and is not played while learning: ' + ln.note);
@@ -140,6 +140,20 @@ const BOUND = { next: { midi: { t: 'cc', n: 86, ch: null, port: 'MODX-1' }, key:
   });
   ok(lt === 2, 'latching: the press and the next switch-off both fire');
 
+  const tg = await page.evaluate(async () => {
+    const o = {};
+    App.remote.setLatch('next', false); await __wait(270); __rm.length = 0;
+    // a trigger pedal: 127 on every press, never a release
+    __cc(86, 127); await __wait(450); __cc(86, 127); await __wait(450); __cc(86, 127); await __wait(20);
+    o.trigger = __rm.length;
+    // a held pedal that repeats its value quickly is still one press
+    await __wait(450); __rm.length = 0; for (let i = 0; i < 5; i++) { __cc(86, 127); await __wait(60); } __cc(86, 0); await __wait(20);
+    o.held = __rm.length;
+    return o;
+  });
+  ok(tg.trigger === 3, 'a trigger pedal (127 every press, no release) fires on every press: ' + tg.trigger);
+  ok(tg.held === 1, 'a held pedal repeating its value fast is one press: ' + tg.held);
+
   const rt = await page.evaluate(async () => {
     const o = {};
     // a sheet folds away and the page gets the action
@@ -171,6 +185,20 @@ const BOUND = { next: { midi: { t: 'cc', n: 86, ch: null, port: 'MODX-1' }, key:
   ok(rt.own === 'false|Load a song first', 'a page that toasted its own reason keeps it: ' + rt.own);
   ok(rt.owns === 'true|false|true|false', 'owns() knows the bound gestures, port-aware: ' + rt.owns);
   ok(/^settings\|.*Next works\|next:test:0:test$/.test(rt.settings), 'in Settings a press only shows that it works: ' + rt.settings);
+  ok(!errs.length, 'no page errors: ' + J(errs)); await ctx.close();
+
+  console.log('# the HUD on a phone');
+  ({ ctx, page, errs } = await newPage(browser));
+  await page.setViewportSize({ width: 375, height: 812 });
+  const hw = await page.evaluate(async () => {
+    App.switchTo('rmtest'); await __wait(150);
+    window.__rmLabel = 'Next lesson: C major · Left hand';
+    const h0 = App.remote; h0.fire('next', 'test'); await __wait(30);
+    const hud = document.getElementById('remote-hud'), sp = hud.querySelector('span');
+    const r = hud.getBoundingClientRect();
+    return { w: Math.round(r.width), left: Math.round(r.left), right: Math.round(window.innerWidth - r.right), fits: sp.scrollHeight <= sp.clientHeight + 1 && sp.scrollWidth <= sp.clientWidth + 1, sh: sp.scrollHeight, ch: sp.clientHeight, sw: sp.scrollWidth, cw: sp.clientWidth, txt: sp.textContent };
+  });
+  ok(hw.w > 200 && hw.left >= 15 && hw.right >= 15 && hw.fits, 'the HUD uses the phone\u2019s width (16 px gutters) and a long label fits: ' + J(hw));
   ok(!errs.length, 'no page errors: ' + J(errs)); await ctx.close();
 
   console.log('# page turner keys');
@@ -218,6 +246,11 @@ const BOUND = { next: { midi: { t: 'cc', n: 86, ch: null, port: 'MODX-1' }, key:
     // a key held from before the page allowed it: its release still reaches the app
     __send([0x90, lo, 90], 'li'); await __wait(10); window.__rmKey = true; __send([0x80, lo, 0], 'li'); await __wait(20);
     o.release = __notes.slice(-1)[0];
+    // the LUMI's octave-down button: its lowest key now sends lo - 12; the first strike moves the window and counts
+    await __wait(400); __rm.length = 0; __notes.length = 0;
+    __send([0x90, lo - 12, 90], 'li'); __send([0x80, lo - 12, 0], 'li'); await __wait(60);
+    __send([0x90, lo - 12, 90], 'li'); __send([0x80, lo - 12, 0], 'li'); await __wait(30);
+    o.octDown = App.midi.range().lo + '|' + __rm.join() + '|' + __notes.length;
     App.remote.setDoubleTap(false); window.__rmKey = true; __notes.length = 0; await __wait(400);
     __send([0x90, lo, 90], 'li'); __send([0x80, lo, 0], 'li'); await __wait(20); o.offSwitch = __notes.length;
     return o;
@@ -228,6 +261,7 @@ const BOUND = { next: { midi: { t: 'cc', n: 86, ch: null, port: 'MODX-1' }, key:
   ok(dt.notAllowed === '4|1', 'on a page that does not allow it (remoteKey false) the key plays and nothing fires');
   ok(dt.release === 'off ' + dt.lo, 'the release of a note that already sounded is never swallowed');
   ok(dt.offSwitch === 2, 'switch off: the key is a normal key again');
+  ok(dt.octDown === (dt.lo - 12) + '|next:dbltap|0', 'after the LUMI\u2019s octave-down button the new lowest key is the remote key at once (no strike graded): ' + dt.octDown);
   ok(!errs.length, 'no page errors: ' + J(errs)); await ctx.close();
 
   console.log('# one keyboard chosen as the input: the remote still hears the other ports');
@@ -251,6 +285,28 @@ const BOUND = { next: { midi: { t: 'cc', n: 86, ch: null, port: 'MODX-1' }, key:
   ok(sp.otherStill === '0|0' && sp.lumi === 2, 'everything else from the unchosen port stays unheard; the chosen keyboard plays');
   ok(sp.unboundQuiet === 1, 'with nothing bound the unchosen port is not listened to');
   ok(/"t":"cc","n":30.*"port":"MODX-1"/.test(sp.learned), 'Learn hears the unchosen port: ' + sp.learned);
+  ok(!errs.length, 'no page errors: ' + J(errs)); await ctx.close();
+
+  console.log('# a latching switch left on, slider arrows, running status');
+  ({ ctx, page, errs } = await newPage(browser, { 'remote.map': { next: { midi: { t: 'cc', n: 86, ch: null, port: '', latch: true }, key: null }, back: { midi: null, key: null }, stop: { midi: { t: 'cc', n: 85, ch: null, port: 'MODX-1' }, key: null } }, 'remote.pt': true, 'midi.inputId': 'li', 'midi.allIn.v1': true }));
+  const ls = await page.evaluate(async () => {
+    const o = {};
+    App.switchTo('rmtest'); await __wait(200); __rm.length = 0;
+    __cc(86, 0); await __wait(20); o.latchFirst = __rm.join(); // left on before the reload: the first switch counts
+    // a slider keeps its arrows; Page Down still advances
+    const sl = document.createElement('div'); sl.setAttribute('role', 'slider'); sl.tabIndex = 0; document.body.appendChild(sl); sl.focus();
+    await __wait(270); __rm.length = 0;
+    o.arrow = __key('ArrowRight', 'ArrowRight', sl) + '|' + __rm.length;
+    o.page = __key('PageDown', 'PageDown', sl) + '|' + __rm.join(); sl.remove();
+    // running status on a port that is not the chosen input (the MODX): press 127, release with running status
+    await __wait(270); __rm.length = 0;
+    __send([0xB0, 85, 127, 85, 0]); await __wait(300); __send([0xB0, 85, 127]); __send([85, 0]); await __wait(20);
+    o.running = __rm.join();
+    return o;
+  });
+  ok(ls.latchFirst === 'next:cc', 'a latching switch left on before the reload: its first switch still counts');
+  ok(ls.arrow === 'false|0' && /^true\|next:key$/.test(ls.page), 'a focused slider keeps its arrow keys; Page Down still advances: ' + ls.arrow + ' ' + ls.page);
+  ok(ls.running === 'stop:cc,stop:cc', 'running-status releases on an unchosen port keep the press edge right: ' + ls.running);
   ok(!errs.length, 'no page errors: ' + J(errs)); await ctx.close();
 
   console.log('# the Android bridge');

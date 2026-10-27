@@ -159,6 +159,11 @@ js/remote.js      CONTROLLER REMOTE (App.remote, 1.4.0; docs/CONTROLLER-
                   Store remote.map / remote.pt / remote.dbl; bus 'remote',
                   'remote:map'. Loaded right after midi.js. Suites
                   tests/remote.test.js (core) + tests/remote-<area>.test.js.
+                  ANSWER BY KEY (quiz.js keyAnswerable): a choice question with
+                  no playable answer takes a WHITE key per choice (<= 7: C-B
+                  any octave; more: white keys up from range().lo's C), badge
+                  .kb on each choice while a keyboard is in; the right key
+                  after a miss moves on; remoteKey is false there.
 js/metronome.js   ┐ feature modules; each registers (metronome = the corner
                   │  sheet, not a page — see OVERLAY SHEETS)
 js/fretboard.js   │ App.register(name, {init, onShow, onHide, onKey})

@@ -229,7 +229,7 @@ const MAP = {
     o.sStop = R('stop'); o.sView = SLQuiz.view;
     return o;
   });
-  ok(e1.endless && e1.n1 === (e1.screen ? 'Answer on screen' : 'Play the answer') && e1.n2 === e1.n1 && e1.unanswered, 'Endless: NEXT never reveals (a reveal would end the streak): ' + e1.n1);
+  ok(e1.endless && e1.n1 === (e1.screen ? 'Pick with a key' : 'Play the answer') && e1.n2 === e1.n1 && e1.unanswered, 'Endless: NEXT never reveals (a reveal would end the streak): ' + e1.n1);
   ok(/^Endless: (play|tap) the answer.*press Stop to end the run$/.test(e1.n1Toast), 'Endless: the toast says how to answer and that Stop ends: ' + e1.n1Toast);
   ok(e1.next === 'Next' && e1.still, 'Endless: NEXT after a right answer moves on');
   ok(e1.stop === 'Run ended' && e1.view === 'done' && e1.score === 2 && e1.rec === 2, 'Endless: STOP = End run, the streak is kept as the record: ' + e1.score);
@@ -459,7 +459,7 @@ const MAP = {
       if (!q || q.kind !== 'choice' || q.pcAnswer != null) continue;
       o.screenNode = nodes[i];
       await __wait(300); App.remote.fire('next', 'test'); await __wait(50); o.screen = fit(); o.screenToast = toast();
-      __strike(64); await __wait(40); o.ignored = !SLQuiz.cur.answered; // a played note cannot answer it
+      __strike(61); await __wait(40); o.ignored = !SLQuiz.cur.answered; // a black key picks nothing
     }
     SLQuiz.stop(); SLQuiz.clock(clk);
     return o;
@@ -468,10 +468,64 @@ const MAP = {
   ok(w1.arm.t === 'Again = answer' && w1.arm.ok, 'phone: the arm label fits the HUD: ' + w1.arm.t + ' ' + w1.arm.w);
   ok(w1.armToast === 'Press Next again to show the answer', 'phone: the toast says a second press shows the answer');
   ok(w1.skip.t === 'Again = skip' && w1.skip.ok && w1.skipToast === 'Press Next again to skip', 'phone: the sprint arm label fits, the toast says skip: ' + w1.skip.w);
-  ok(w1.play.t === (w1.playable ? 'Play the answer' : 'Answer on screen') && w1.play.ok, 'phone: the Endless label fits and matches the question type: ' + w1.play.t + ' ' + w1.play.w);
+  ok(w1.play.t === (w1.playable ? 'Play the answer' : 'Pick with a key') && w1.play.ok, 'phone: the Endless label fits and matches the question type: ' + w1.play.t + ' ' + w1.play.w);
   ok(/^Endless: (play|tap) the answer/.test(w1.playToast), 'phone: the Endless toast: ' + w1.playToast);
-  ok(!!w1.screen && w1.screen.t === 'Answer on screen' && w1.screen.ok, 'Endless on a screen-only node (' + w1.screenNode + '): NEXT says Answer on screen, not Play the answer: ' + (w1.screen && w1.screen.t));
-  ok(w1.screenToast === 'Endless: tap the answer on screen, or press Stop to end the run' && w1.ignored, 'and the toast says to tap it (a played note cannot answer it)');
+  ok(!!w1.screen && w1.screen.t === 'Pick with a key' && w1.screen.ok, 'Endless on a multiple-choice node (' + w1.screenNode + '): NEXT says Pick with a key: ' + (w1.screen && w1.screen.t));
+  ok(w1.screenToast === 'Endless: play the white key on your answer, or press Stop to end the run' && w1.ignored, 'and the toast says to play the answer\u2019s white key (a black key picks nothing)');
+
+  console.log('# multiple choice answered from the keyboard (white keys pick the choices)');
+  const kc = await page.evaluate(async () => {
+    const o = {}, WHITE = [0, 2, 4, 5, 7, 9, 11];
+    const keyFor = (q, i) => { const lo = App.midi.range().lo, base = lo - lo % 12; return q.choices.length <= 7 ? 72 + WHITE[i] : base + 12 * Math.floor(i / 7) + WHITE[i % 7]; };
+    const clk = SLQuiz.clock(); SLQuiz.clock(0);
+    // find a level whose first question is screen-only multiple choice, with up to 7 choices, and one with more
+    const lv = SLQuiz.levels(); let small = null, big = null;
+    for (let k = 0; k < lv.length && (!small || !big); k++) {
+      for (let t = 0; t < 4; t++) {
+        SLQuiz.start(lv[k]); const q = SLQuiz.q;
+        if (q && q.kind === 'choice' && q.pcAnswer == null) { if (q.choices.length <= 7 && !small) small = lv[k]; if (q.choices.length > 7 && !big) big = lv[k]; }
+        SLQuiz.stop();
+      }
+    }
+    o.found = !!small + '|' + !!big;
+    SLQuiz.start(small); await __wait(80);
+    let q = SLQuiz.q;
+    o.badges = Array.from(document.querySelectorAll('.qz-ch .kb')).map(b => b.textContent).join('');
+    o.hint = (document.querySelector('.qz-ans .qz-hint') || {}).textContent || '';
+    const ci = q.choices.findIndex(c => c.id === q.correct);
+    __strike(keyFor(q, ci)); await __wait(40);
+    o.right = SLQuiz.cur.answered + '|' + SLQuiz.cur.lastOk;
+    // a wrong key = that wrong choice; then the right key moves on (a fresh correction)
+    await __wait(1600); q = SLQuiz.q; const q1 = q;
+    const ci2 = q.choices.findIndex(c => c.id === q.correct), wrong = ci2 === 0 ? 1 : 0;
+    __strike(keyFor(q, wrong)); await __wait(40);
+    o.wrong = SLQuiz.cur.answered + '|' + SLQuiz.cur.lastOk;
+    __strike(keyFor(q, ci2)); await __wait(60);
+    o.corrected = SLQuiz.q !== q1;
+    SLQuiz.stop();
+    // more than 7 choices: the white keys up from the window's bottom C (two octaves on a LUMI)
+    if (big) {
+      SLQuiz.start(big); await __wait(80); q = SLQuiz.q;
+      o.bigBadges = Array.from(document.querySelectorAll('.qz-ch .kb')).map(b => b.textContent);
+      const cb = q.choices.findIndex(c => c.id === q.correct);
+      __strike(keyFor(q, cb)); await __wait(40);
+      o.bigRight = SLQuiz.cur.answered + '|' + SLQuiz.cur.lastOk + '|' + q.choices.length;
+      SLQuiz.stop();
+    }
+    // the reserved double-tap key never blocks an answer on these questions
+    App.remote.setDoubleTap(true); SLQuiz.start(small); await __wait(80);
+    o.keyFree = App.remoteKeyPage();
+    App.remote.setDoubleTap(false); SLQuiz.stop();
+    SLQuiz.clock(clk);
+    return o;
+  });
+  ok(kc.found === 'true|true', 'there are multiple-choice levels with up to 7 and with more choices: ' + kc.found);
+  ok(/^CD/.test(kc.badges) && /white key/.test(kc.hint), 'each choice shows its white key (C, D, E…) and a hint says so: ' + kc.badges + ' / ' + kc.hint);
+  ok(kc.right === 'true|true', 'playing the right answer\u2019s white key answers it (any octave)');
+  ok(kc.wrong === 'true|false' && kc.corrected, 'another white key is that (wrong) choice; then the right key moves on without touching the screen');
+  const oct0 = kc.bigBadges && +String(kc.bigBadges[0]).slice(1);
+  ok(Array.isArray(kc.bigBadges) && /^C\d$/.test(kc.bigBadges[0]) && kc.bigBadges[1] === 'D' + oct0 && kc.bigBadges[7] === 'C' + (oct0 + 1) && /^true\|true\|/.test(kc.bigRight), 'more than 7 choices: the keys climb from the window\u2019s bottom C over two octaves and answer: ' + JSON.stringify([kc.bigBadges && kc.bigBadges.slice(0, 9), kc.bigRight]));
+  ok(kc.keyFree === false, 'with the double-tap on, the lowest key is not reserved on a multiple-choice question (it picks the first answer)');
 
   ok(errs.length === 0, 'no page errors' + (errs.length ? ': ' + errs.join(' | ') : ''));
   await browser.close();

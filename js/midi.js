@@ -204,14 +204,22 @@
   // button on another port (the synth's foot switch while the LUMI is the
   // input) still reaches the claim — and nothing else of that port does.
   // Only while the remote has something bound (claimAllPorts()).
+  var claimRun = {}; // running status per unchosen port (a pedal's release often omits it)
   function claimOnly(bytes, id, name) {
     if (!inputClaim) return;
-    var data = Array.prototype.slice.call(bytes), i = 0;
+    var data = Array.prototype.slice.call(bytes), i = 0, sysex = false;
     while (i < data.length) {
-      var st = data[i], len = st >= 0x80 && st < 0xf0 ? MSG_LEN[st & 0xf0] : 0;
-      if (!len) { i++; continue; } // realtime, SysEx and stray data are never gestures
-      if (i + len > data.length) break;
-      var msg = data.slice(i, i + len); i += len;
+      var b0 = data[i];
+      if (b0 >= 0xf8) { i++; continue; } // realtime may sit anywhere
+      if (b0 === 0xf0) { sysex = true; claimRun[id] = 0; i++; continue; }
+      if (b0 === 0xf7) { sysex = false; i++; continue; }
+      if (sysex) { i++; continue; }
+      var st = b0 >= 0x80 ? b0 : claimRun[id], len = st >= 0x80 && st < 0xf0 ? MSG_LEN[st & 0xf0] : 0;
+      if (b0 >= 0x80) { claimRun[id] = b0 < 0xf0 ? b0 : 0; i++; }
+      if (!len) { if (b0 < 0x80) i++; continue; } // stray data, system common
+      var msg = [st];
+      while (msg.length < len && i < data.length) { if (data[i] >= 0xf8) { i++; continue; } if (data[i] >= 0x80) break; msg.push(data[i++]); }
+      if (msg.length < len) continue;
       if (msg.slice(1).some(function (b) { return b > 127; })) continue;
       var claimed = false;
       try { claimed = inputClaim(msg.slice(), { portId: id, port: name }) === true; } catch (e) { claimed = false; }
@@ -1239,6 +1247,7 @@
     repaint: function () { repaintAll(true); },
     lumiSync: function () { repaintAll(true); },
     range: range,
+    learnRange: learnRange, // the remote: a claimed LUMI strike outside the window moves it, as a played one would
     fold: fold,
     get lumi() { return isLumi(); },
     get outputName() { return outName(); },

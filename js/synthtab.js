@@ -373,6 +373,8 @@
   // has nothing to end here; the preset builder sheet is a form in progress.
   function remote(action) {
     if (action === 'stop' || (els.sheet && !els.sheet.hidden)) return false;
+    // the Map's MIDI Learn is waiting for a synth control: a remote press must not step the set under it
+    if (App.synthDeck && App.synthDeck.learning) { if (App.toast) App.toast('Map Learn is listening — move the synth control, or tap Learn to cancel'); return false; }
     var dir = action === 'back' ? -1 : 1, lv = window.SLSynthLive, lset = lv ? lv.active() : null;
     if (lset && lv.remoteStep && lset.pages.some(function (pg) { return pg.some(function (sl) { return !!sl; }); })) { var r = lv.remoteStep(dir); schedulePaint(); return r; }
     var p = P(); if (!p) return false;

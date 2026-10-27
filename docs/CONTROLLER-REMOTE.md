@@ -48,13 +48,15 @@ The active page decides, through its module hook `onRemote(action, info)`:
 | Page | Next | Back | Stop |
 |---|---|---|---|
 | Exercises | Continue the path or start the level · Next after an answer · on an unanswered question, press twice to show the answer (never in Endless) · the result screen's main button | Hear the question again · Try again · close the node card | End the run |
-| Keys lessons | Start · Next level / Again · next lesson after the top level | Retry the same level · restart the run | Stop (End run in ∞) |
-| Woodshed / Guided performance | Start · Again · Resume | Restart | End the run · stop |
+| Exercises: multiple choice | **Play the answer's white key**: each choice shows one (up to 7 choices: C D E F G A B in any octave; more: the white keys up from the window's bottom C, so a LUMI's two octaves hold 14). After a miss, the right answer's key moves on. | | |
+| Keys lessons (Keys page) | Start · Next level / Again · next lesson after the top level | Retry the level just played · restart the run (a finished run is scored first) | Stop, like the Stop button (End run in ∞) · results → the lesson list |
+| Keys / Synth page runner (while it plays or guides) | Resume · skip a note (Guide) | Restart · one note back (Guide) | Pause |
+| Woodshed / Guided performance | Start · Again · Resume · in Phrases, the next phrase | Restart · in Phrases the phrase before | End the run (stays in the session) · with nothing running, back to the Library |
 | LUMI practice | Start · Check → next target · skip a target in guided flow | — | Stop |
 | Practice plan | Launch the next block not yet done | Relaunch the last block | — |
 | Fretboard / Tab / Notation runner, Songs | Play / pause | Restart | Stop |
 | Trainer | Count a chord change · new interval | Hear it again | End the chord run / pause the session |
-| Live sets, the Deck | Next slot (or next program) | Previous | — |
+| Live sets, the Deck | Next slot (or next program; never while the Deck's Map Learn listens) | Previous | — |
 
 The order of checks:
 1. A help tour takes the action first: Next and Back move through it, Stop closes it.
