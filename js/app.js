@@ -6,7 +6,15 @@
  *     onShow(),       // optional — tab became visible
  *     onHide(),       // optional — tab hidden: stop sound/mic/timers here
  *     onKey(e)        // optional — keydown while this tab is active and focus
- *   });               //            is not in a text input / select
+ *                     //            is not in a text input / select
+ *     onBack()        // optional — Back pressed: true = handled here
+ *     onRemote(action, info) // optional — the CONTROLLER REMOTE (js/remote.js):
+ *                     //   action 'next' | 'back' | 'stop', info {via: 'cc' | 'pc' |
+ *                     //   'note' | 'key' | 'dbltap' | 'test'}; return false = nothing
+ *                     //   to do here, true = done (the HUD says Next / Back / Stop),
+ *                     //   or a short string = done, the HUD says that ('Next level')
+ *     remoteKey       // optional — true / fn(): the reserved double-tap key may be
+ *   });               //   claimed on this page (losing one key costs nothing here)
  *
  * Shared services:
  *   App.getAudio()                    lazily-created shared AudioContext (resumed)
@@ -1100,6 +1108,37 @@ window.App = (function () {
     if (active !== SPACES.practice[0]) { goBackTo(SPACES.practice[0]); return true; }
     return false;
   }
+  // CONTROLLER REMOTE (js/remote.js): a pedal, a synth button or a page
+  // turner says next | back | stop. The help tour takes it first (Next /
+  // Back / close), the clef dropdown and any sheet fold away (a player at the
+  // instrument can't see what covers the page), then the page's onRemote.
+  // Returns false (nothing to do here), true or a short label for the HUD.
+  function remoteAction(action, info) {
+    info = info || {};
+    if (window.Help && Help.isOpen && Help.isOpen()) {
+      if (action === 'stop') { Help.close(); return 'Tour closed'; }
+      var hb = document.getElementById(action === 'back' ? 'hp-back' : 'hp-next');
+      if (!hb) return false;
+      hb.click(); return action === 'back' ? 'Back' : 'Next';
+    }
+    if (ctxIsOpen()) closeCtx();
+    if (sheet) {
+      var sm = modules[sheet], sr = false;
+      if (sm && sm.onRemote) { try { sr = sm.onRemote(action, info); } catch (e) { console.error(sheet + '.onRemote', e); } }
+      if (sr) return sr;
+      closeSheet();
+    }
+    if (active === 'settings') return false;
+    var m = modules[active];
+    if (!m || !m.onRemote) return false;
+    try { return m.onRemote(action, info) || false; } catch (e) { console.error(active + '.onRemote', e); return false; }
+  }
+  // may the reserved double-tap key be claimed on the page now showing?
+  function remoteKeyPage() {
+    var m = modules[active];
+    if (!m || !m.remoteKey || sheet || active === 'settings') return false;
+    try { return typeof m.remoteKey === 'function' ? !!m.remoteKey() : !!m.remoteKey; } catch (e) { return false; }
+  }
   function dropBackHint() { if (backHint) { backHint.remove(); backHint = null; } }
   function wireBack() {
     try { history.replaceState({ sl: 'base' }, ''); } catch (e) { return; }
@@ -1687,6 +1726,8 @@ window.App = (function () {
     emit: emit,
     injectCSS: injectCSS,
     toast: toast,
+    remoteAction: remoteAction,
+    remoteKeyPage: remoteKeyPage,
     showBar: showBar,
     help: help,
     colors: colors,

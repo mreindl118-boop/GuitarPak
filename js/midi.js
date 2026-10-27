@@ -13,6 +13,8 @@
  *   'midi:bend'     {chan, semis}              pitch bend in semitones
  *   'midi:pressure' {chan, val}                channel pressure 0-127
  *   'midi:raw'      {bytes, portId}            every incoming message, untouched
+ *                                              (except one the controller remote claims:
+ *   'midi:remote'   {bytes, portId, port}       then only this — js/remote.js)
  *   'midi:out'      {bytes, portId, kind}      successful music, LED or cleanup writes
  *
  * MPE-style per-note expression works out of the box because bend/pressure
@@ -192,8 +194,21 @@
     return message && message[0] >= 0x80 && message[0] < 0xf0 && message.length === MSG_LEN[message[0] & 0xf0] &&
       Array.prototype.every.call(message, function (b, i) { return Number.isInteger(b) && b >= 0 && b <= (i ? 127 : 239); });
   }
+  // INPUT CLAIM (the controller remote, js/remote.js): ONE fn(bytes, {portId,
+  // port}) -> true = this channel message is a remote gesture (a learned pedal
+  // or button, the reserved double-tap key) and goes NOWHERE else: no
+  // 'midi:raw' (Thru, Woodshed grading, the Deck), no filter, no dispatch.
+  // The release of a note the app already received is never claimed.
+  var inputClaim = null;
+  function claimedByRemote(state, message) {
+    if (!inputClaim || message[0] < 0x80 || message[0] >= 0xf0) return false;
+    var t = message[0] & 0xf0;
+    if ((t === 0x80 || (t === 0x90 && message[2] === 0)) && state.notes['note:' + (message[0] & 15) + ':' + message[1]]) return false;
+    try { return inputClaim(message.slice(), { portId: state.id, port: state.name }) === true; } catch (e) { return false; }
+  }
   function ingressMessage(state, message) {
     withIngressSource(state, function () {
+      if (claimedByRemote(state, message)) { App.emit('midi:remote', { bytes: message.slice(), portId: state.id, port: state.name }); return; }
       // Complete logical frames retain the pre-rule pitches/channels. One tap
       // per frame lets Hub learn/Thru and performance grading share raw input.
       App.emit('midi:raw', { bytes: message.slice(), portId: state.id, port: state.name });
@@ -1166,6 +1181,9 @@
     get muted() { return muted(); },
     setInputFilter: function (fn) { inputFilter = typeof fn === 'function' ? fn : null; },
     get inputFilter() { return inputFilter; },
+    // the controller remote's claim (js/remote.js): runs before 'midi:raw'
+    setInputClaim: function (fn) { inputClaim = typeof fn === 'function' ? fn : null; },
+    get inputClaim() { return inputClaim; },
     setInput: setInput,
     setOutput: setOutput,
     bluetooth: function () { if (native) post({ cmd: 'bluetooth' }); },

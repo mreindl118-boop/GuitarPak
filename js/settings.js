@@ -179,6 +179,12 @@
           '<span class="muted small">Key lights (a LUMI shows the scale in your colors), brightness and the Help level live in one place: the keyboard icon at the top of every page.</span>' +
         '</div>' +
       '</div>' +
+      // the controller remote (js/remote.js renders the rows)
+      '<div class="card" id="set-remote-card">' +
+        '<h2>Hands-free control</h2>' +
+        '<div class="muted small">Move practice on from the instrument: a pedal, a button on your synth or a page-turner pedal does Next, Back and Stop on Exercises, Keys lessons, the Woodshed, LUMI practice, the Practice plan, Songs, the fretboard runner and Live sets.</div>' +
+        '<div id="set-remote"></div>' +
+      '</div>' +
       '<div class="card" id="set-audio-card">' +
         '<h2>Sound input &amp; output</h2>' +
         '<div class="muted small">Pick the interface soundLAB listens to (tone-in, Woodshed scoring) and plays out of. ' +
@@ -895,13 +901,15 @@
     });
 
     paintMidi();
+    if (App.remote) App.remote.mount(document.getElementById('set-remote'));
   }
 
   App.register('settings', {
     init: init,
-    onHide: function () { if (audioUI) audioUI.hide(); },
+    onHide: function () { if (audioUI) audioUI.hide(); if (App.remote) App.remote.cancelLearn(); },
     onShow: function () {
       if (audioUI) audioUI.show();
+      if (App.remote) App.remote.paint();
       // dynamic prefs may have changed elsewhere (pads click chip, wake from
       // code, volume) — re-read them when the page opens
       var c = document.getElementById('set-click');

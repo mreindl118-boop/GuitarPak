@@ -125,13 +125,24 @@
             }).join('') + '</div></div>' +
           '<div class="lc-acts"><button type="button" class="btn sm" id="lc-test"' + (lumi && m.displayEnabled === false ? ' disabled' : '') + '>Test lights</button><button type="button" class="btn sm" id="lc-resend">Re-send</button></div>'
           : '') +
+      '</div>' +
+      // the controller remote (js/remote.js): what is set, and the way to set it
+      '<div class="lc-sec"><h3>Hands-free</h3>' +
+        '<p class="muted small">' + (App.remote && App.remote.summary() ? escH(App.remote.summary()) : 'Move practice on from a pedal, a synth button or a page turner (Next / Back / Stop).') + '</p>' +
+        '<div class="lc-acts"><button type="button" class="btn sm" id="lc-remote">Set up</button></div>' +
       '</div>';
   }
+  function escH(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
 
   function onClick(e) {
     var b = e.target.closest ? e.target.closest('button') : null;
     if (!b) return;
     var a, m = M();
+    if (b.id === 'lc-remote') { // Settings › Hands-free control
+      App.closeSheet(); App.switchTo('settings');
+      setTimeout(function () { var c = document.getElementById('set-remote-card'); if (c && c.scrollIntoView) c.scrollIntoView({ block: 'start' }); }, 60);
+      return;
+    }
     if ((a = b.getAttribute('data-lchelp')) != null) { App.help.set(+a); return; }
     if ((a = b.getAttribute('data-lcon')) != null) { if (m) m.setLightsOn(a === '1'); paint(); return; }
     if ((a = b.getAttribute('data-lcdisp')) != null) { if (m) m.setDisplay(a === '1'); paint(); return; }
@@ -184,7 +195,7 @@
       el.addEventListener('click', onClick);
       el.addEventListener('input', onInput);
       el.addEventListener('change', onInput);
-      ['help:level', 'midi:state', 'midi:range', 'colors', 'lights:display', 'lights:led', 'lights:master'].forEach(function (ev) { App.on(ev, function () { if (App.sheet === 'lights') paint(); }); });
+      ['help:level', 'midi:state', 'midi:range', 'colors', 'lights:display', 'lights:led', 'lights:master', 'remote:map'].forEach(function (ev) { App.on(ev, function () { if (App.sheet === 'lights') paint(); }); });
       App.on('midi:status', function (d) { btMsg = d && d.text || ''; if (App.sheet === 'lights') paint(); });
       paint();
     },

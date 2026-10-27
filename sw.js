@@ -1,5 +1,5 @@
 /* GuitarLab service worker — cache-first so the app works fully offline once visited. */
-var CACHE = 'guitarlab-v128';
+var CACHE = 'guitarlab-v129';
 var ASSETS = [
   '.',
   'index.html',
@@ -16,6 +16,7 @@ var ASSETS = [
   'js/learn-instruments.js',
   'js/note-palette.js',
   'js/midi.js',
+  'js/remote.js',
   'js/practice-router.js',
   'js/tonein.js',
   'js/audioin.js',
