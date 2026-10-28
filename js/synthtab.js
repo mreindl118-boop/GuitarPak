@@ -119,6 +119,7 @@
           '<button type="button" data-mode="edit" class="' + (mode() === 'edit' ? 'active' : '') + '" aria-pressed="' + (mode() === 'edit') + '">Edit</button>' +
         '</div>' +
       '</div>' +
+      '<div class="card st-conn" id="st-conn" role="status" aria-live="polite" hidden></div>' +
       '<div class="st-perform" id="st-perform"' + (mode() === 'perform' ? '' : ' hidden') + '>' +
         '<div class="card st-now" id="st-now">' +
           '<div class="st-nowname" id="st-nowname"></div><div class="muted small" id="st-nowsub"></div>' +
@@ -161,7 +162,7 @@
           '<p class="muted small" id="st-pnote"></p>' +
         '</form>' +
       '</div></div>';
-    ['perform', 'edit', 'nowname', 'nowsub', 'prev', 'next', 'save', 'pins', 'superval', 'chips', 'scenes', 'sheet', 'sheetclose', 'form', 'pid', 'pname', 'ptags', 'colours', 'incs', 'capture', 'psave', 'pnote', 'splitbox', 'splittext', 'splitat', 'splitpart', 'splitlearn'].forEach(function (id) { els[id] = q('#st-' + id); });
+    ['conn', 'perform', 'edit', 'nowname', 'nowsub', 'prev', 'next', 'save', 'pins', 'superval', 'chips', 'scenes', 'sheet', 'sheetclose', 'form', 'pid', 'pname', 'ptags', 'colours', 'incs', 'capture', 'psave', 'pnote', 'splitbox', 'splittext', 'splitat', 'splitpart', 'splitlearn'].forEach(function (id) { els[id] = q('#st-' + id); });
     var h = ''; for (var n = 36; n <= 84; n++) h += '<option value="' + n + '"' + (n === 60 ? ' selected' : '') + '>' + noteName(n) + '</option>'; els.splitat.innerHTML = h;
     h = ''; for (var k = 1; k <= 16; k++) h += '<option value="' + k + '"' + (k === 2 ? ' selected' : '') + '>' + k + '</option>'; els.splitpart.innerHTML = h;
     els.form.addEventListener('submit', function (e) { e.preventDefault(); submitSheet(); });
@@ -170,24 +171,25 @@
   }
 
   function paint() {
+    if (face && els.conn) paintConn(els.conn);
     var p = P(); if (!face || !p) return;
     var now = p.now();
     els.nowname.textContent = now.name;
-    els.nowsub.textContent = now.sub + (now.out ? ' → ' + now.out : '');
+    els.nowsub.textContent = now.sub + (now.out && now.sub.indexOf(now.out) === -1 ? ' → ' + now.out : '');
     els.nowsub.classList.toggle('bad', !!now.bad);
     // the active Live set's page as one-tap slots; without a set, the pinned sounds
     var lv = window.SLSynthLive, lset = lv ? lv.active() : null;
     if (lset) {
       var page = lv.page(), cur = lv.slot();
-      els.pins.innerHTML = '<div class="st-pinhead muted small"><span>' + esc(lset.name) + ' · page ' + (lv.pageIndex() + 1) + '</span><button type="button" class="btn sm" data-golive="1">Go live</button></div>' +
+      morph(els.pins, '<div class="st-pinhead muted small"><span>' + esc(lset.name) + ' · page ' + (lv.pageIndex() + 1) + '</span><button type="button" class="btn sm" data-golive="1">Go live</button></div>' +
         '<div class="st-pingrid">' + page.map(function (sl, i) {
           var col = sl ? COLOURS[(function () { var it = sl.preset ? p.find(sl.preset) : null; return it && it.snap ? it.snap.colour : ''; })()] || '' : '';
           return '<button type="button" class="st-slot' + (sl ? '' : ' empty') + (i === cur ? ' active' : '') + '" data-lvslot="' + i + '"' + (col ? ' style="border-left:4px solid ' + col + '"' : '') + ' aria-label="Slot ' + (i + 1) + '"><span class="st-slotname">' + (i + 1) + ' ' + esc(lv.slotName(sl)) + '</span><span class="st-slotsub">' + esc(lv.slotBadges(sl)) + '</span></button>';
-        }).join('') + '</div>';
+        }).join('') + '</div>');
       els.pins.hidden = false;
     } else {
       var pins = p.presets().filter(function (it) { return it.star; }).sort(function (a, b) { return (b.used || 0) - (a.used || 0); }).slice(0, 8);
-      els.pins.innerHTML = '<div class="st-pingrid">' + pins.map(function (it) { return slotHTML(it, now.match && now.match.id === it.id); }).join('') + '</div>';
+      morph(els.pins, '<div class="st-pingrid">' + pins.map(function (it) { return slotHTML(it, now.match && now.match.id === it.id); }).join('') + '</div>');
       els.pins.hidden = !pins.length;
     }
     paintStrips();
@@ -280,16 +282,123 @@
     });
   }
   var CHIPS = ['arpMaster', 'msMaster', 'split', 'asw1', 'asw2', 'sus'];
+  // Update markup IN PLACE (1.3.1). The MODX sends a MIDI clock tick ~36 times a second; the
+  // Deck used to rebuild its chips, Scenes and slots on every incoming message, so the button
+  // under a finger was replaced between press and release and the tap was lost. Same structure
+  // = same nodes, only attributes and text change.
+  function keyOf(n) { return n.nodeType === 1 ? n.nodeName + '|' + (n.getAttribute('data-chip') || n.getAttribute('data-preset') || n.getAttribute('data-lvslot') || n.getAttribute('data-golive') || '') : '#' + n.nodeType; }
+  function syncKids(cur, next) {
+    var a = cur.childNodes, b = next.childNodes, same = a.length === b.length;
+    for (var i = 0; same && i < b.length; i++) if (keyOf(a[i]) !== keyOf(b[i])) same = false;
+    if (!same) { while (cur.firstChild) cur.removeChild(cur.firstChild); while (next.firstChild) cur.appendChild(next.firstChild); return; }
+    for (var j = 0; j < b.length; j++) {
+      var x = a[j], y = b[j];
+      if (x.nodeType !== 1) { if (x.nodeValue !== y.nodeValue) x.nodeValue = y.nodeValue; continue; }
+      var k, at;
+      for (k = x.attributes.length - 1; k >= 0; k--) { at = x.attributes[k].name; if (!y.hasAttribute(at)) x.removeAttribute(at); }
+      for (k = 0; k < y.attributes.length; k++) { at = y.attributes[k]; if (x.getAttribute(at.name) !== at.value) x.setAttribute(at.name, at.value); }
+      syncKids(x, y);
+    }
+  }
+  function morph(el, html) {
+    if (!el || el.__stHtml === html) return;
+    var tpl = document.createElement('template'); tpl.innerHTML = html;
+    syncKids(el, tpl.content); el.__stHtml = html;
+  }
   function paintChips() {
     var p = P(); if (!p) return;
-    els.chips.innerHTML = CHIPS.map(function (id) {
+    morph(els.chips, CHIPS.map(function (id) {
       if (id === 'split') { var hs = hubSplit(), s = hs ? hs.get() : null; return '<button type="button" class="chip st-chip' + (s && s.on !== false ? ' active' : '') + '" data-chip="split" aria-pressed="' + !!(s && s.on !== false) + '" title="' + esc(hs ? hs.text() : 'Key split') + '">' + (s ? 'Split ' + esc(noteName(s.at)) : 'Split') + '</button>'; }
       var st = p.ctl(id); if (!st) return '';
       return '<button type="button" class="chip st-chip' + (st.on ? ' active' : '') + (st.unsure ? ' unsure' : '') + '" data-chip="' + id + '" aria-pressed="' + !!st.on + '">' + esc(st.name) + '</button>';
-    }).join('');
+    }).join(''));
     var scenes = [];
     for (var i = 1; i <= 8; i++) { var s = p.ctl('scene' + i); scenes.push('<button type="button" class="st-scene' + (s && s.on ? ' active' : '') + '" data-chip="scene' + i + '" aria-label="Scene ' + i + '" aria-pressed="' + !!(s && s.on) + '">' + i + '</button>'); }
-    els.scenes.innerHTML = scenes.join('');
+    morph(els.scenes, scenes.join(''));
+  }
+
+  // ---- connection (1.3.1): the Synth tab connects by itself ----
+  // Before, only the Hub or Settings ever asked the browser for MIDI, so a first visit to the
+  // Synth tab showed live-looking controls that silently refused every tap. Now the tab says
+  // what is missing and offers the one step that fixes it.
+  var conn = { busy: false, denied: false, probed: false };
+  function isAppleTouch() { var n = navigator; return /iPad|iPhone|iPod/.test(n.userAgent || '') || (n.platform === 'MacIntel' && n.maxTouchPoints > 1); }
+  function connState() {
+    var m = midi();
+    if (!m || !m.supported) return { k: 'unsupported' };
+    if (!m.ready) return { k: conn.busy ? 'busy' : conn.denied ? 'denied' : 'off' };
+    var api = window.SLMidiHub && SLMidiHub.api;
+    var name = api && api.hubOutName ? api.hubOutName() || '' : (m.outputName || '');
+    var has = api && api.hasOut ? !!api.hasOut() : !!m.hasOutput;
+    if (!has) return { k: 'noout' };
+    if (/lumi/i.test(name)) return { k: 'lumi', out: name };
+    return { k: 'ok', out: name };
+  }
+  function connected() { return connState().k === 'ok'; }
+  function connect() {
+    var m = midi(); if (!m || !m.supported || m.ready || conn.busy) return Promise.resolve(m && m.ready);
+    conn.busy = true; conn.denied = false; repaintConn();
+    return m.enable().then(function () { conn.busy = false; repaintConn(); return true; },
+      function () { conn.busy = false; conn.denied = true; repaintConn(); return false; });
+  }
+  // on show: reconnect without a prompt when the browser already allows MIDI for this site
+  function autoConnect() {
+    var m = midi(); if (!m || !m.supported || m.ready || conn.busy) return;
+    if (App.store.get('midi.wanted', false) || m.native) { connect(); return; }
+    if (!navigator.permissions || !navigator.permissions.query) return;
+    navigator.permissions.query({ name: 'midi', sysex: true }).then(function (s) {
+      if (s.state === 'granted') connect(); else if (s.state === 'denied') { conn.denied = true; repaintConn(); }
+    }).catch(function () { /* the query is optional */ });
+  }
+  function outOptions(cur) {
+    var outs = (midi() && midi().outputs) || [];
+    return outs.map(function (o) { var nm = o.name || o.id; return '<option value="' + esc(o.id) + '"' + (nm === cur ? ' selected' : '') + '>' + esc(nm) + (/lumi/i.test(nm) ? ' (key lights)' : '') + '</option>'; }).join('');
+  }
+  var CONN = {
+    unsupported: function () {
+      return ['This browser can’t reach MIDI devices', isAppleTouch()
+        ? 'Safari and Chrome on iPad and iPhone have no Web MIDI, so nothing here can reach the synth. Open soundLAB in a browser app that adds MIDI (MIDIWeb Browser or Web MIDI Browser in the App Store), with the synth on a USB camera adapter.'
+        : 'Open soundLAB in Chrome or Edge to control your synth from here.', ''];
+    },
+    off: function () { return ['Connect your synth', 'Plug the synth in by USB and switch it on. The browser asks once for permission to use MIDI devices.', '<button type="button" class="btn primary st-big" data-conn="go">Connect</button>']; },
+    busy: function () { return ['Waiting for the browser', 'Allow MIDI devices in the browser’s prompt by the address bar.', '']; },
+    denied: function () { return ['MIDI is blocked for this site', 'Open the site settings from the icon left of the address, allow MIDI devices, then try again.', '<button type="button" class="btn primary st-big" data-conn="go">Try again</button>']; },
+    noout: function () {
+      var outs = (midi() && midi().outputs) || [];
+      return ['No synth output', outs.length ? 'MIDI is on. Choose where the Synth tab sends:' : 'MIDI is on, but no output is listed. Plug the synth in by USB and switch it on; it appears here by itself.',
+        outs.length ? '<select class="st-connout" data-conn="out" aria-label="Synth output"><option value="">Choose…</option>' + outOptions('') + '</select>' : ''];
+    },
+    lumi: function (s) { return ['Sending to the LUMI', 'The synth output is the LUMI key lights, which never get synth messages. Choose your synth:', '<select class="st-connout" data-conn="out" aria-label="Synth output">' + outOptions(s.out) + '</select>']; }
+  };
+  var connEls = [];
+  function paintConn(el) {
+    if (!el) return;
+    if (connEls.indexOf(el) === -1) {
+      connEls.push(el);
+      el.addEventListener('click', function (e) { var b = e.target.closest('[data-conn="go"]'); if (b) connect(); });
+      el.addEventListener('change', function (e) {
+        var s = e.target.closest('[data-conn="out"]'); if (!s || !s.value || !window.SLMidiHub) return;
+        SLMidiHub.api.set('outId', s.value); App.emit('midi:state', {}); repaintConn();
+        if (App.toast) App.toast('Synth out: ' + (SLMidiHub.api.hubOutName() || s.value));
+      });
+    }
+    var s = connState(), key = s.k + '|' + (s.out || '') + '|' + (((midi() && midi().outputs) || []).length);
+    var root = el.closest('.st-face') || el.parentElement;
+    if (root) root.classList.toggle('st-offline', s.k !== 'ok');
+    if (s.k === 'ok') { el.hidden = true; el.dataset.k = 'ok'; return; }
+    if (el.dataset.key === key && !el.hidden) return; // keep an open select steady
+    var c = CONN[s.k](s);
+    el.dataset.key = key; el.dataset.k = s.k;
+    el.innerHTML = '<div class="st-connhead">' + esc(c[0]) + '</div><p class="st-connbody">' + esc(c[1]) + '</p>' + (c[2] ? '<div class="st-connact">' + c[2] + '</div>' : '');
+    el.hidden = false;
+  }
+  function repaintConn() { connEls = connEls.filter(function (e) { return document.body.contains(e); }); connEls.forEach(paintConn); }
+  // a tap on a control while not connected points at the panel instead of doing nothing
+  function nudgeConn() {
+    var el = els.conn; if (!el || el.hidden) return;
+    el.classList.remove('st-nudge'); void el.offsetWidth; el.classList.add('st-nudge');
+    try { el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) { }
+    var b = el.querySelector('button,select'); if (b) try { b.focus({ preventScroll: true }); } catch (e) { }
   }
 
   // ---- strips: pointer anywhere along, drag off for fine steps ----
@@ -301,6 +410,7 @@
     var s = e.target.closest ? e.target.closest('.st-strip') : null; if (!s) return;
     var p = P(); if (!p) return;
     e.preventDefault();
+    if (!connected()) { nudgeConn(); return; }
     try { s.setPointerCapture(e.pointerId); } catch (x) { /* synthetic */ }
     var cc = +s.dataset.cc, v = stripVal(s, e);
     drag = { s: s, cc: cc, id: e.pointerId, x0: e.clientX, y0: e.clientY, v0: p.kv(cc), fine: false, lastSent: null };
@@ -335,6 +445,7 @@
   function onStripKey(e) {
     var s = e.target.closest ? e.target.closest('.st-strip') : null; if (!s) return;
     var cc = +s.dataset.cc, p = P(); if (!p) return;
+    if (!connected()) { if (/^Arrow|^Home$|^End$/.test(e.key)) { e.preventDefault(); nudgeConn(); } return; }
     var v = p.kv(cc), step = e.shiftKey ? 10 : 1;
     if (e.key === 'ArrowRight' || e.key === 'ArrowUp') v += step; else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') v -= step; else if (e.key === 'Home') v = 0; else if (e.key === 'End') v = 127; else return;
     e.preventDefault(); turn(cc, clamp(v, 0, 127));
@@ -346,6 +457,7 @@
     if ((b = t.closest('[data-mode]'))) { set('mode', b.dataset.mode); render(); return; }
     if ((b = t.closest('[data-row]'))) { set('row', b.dataset.row); render(); return; }
     if (!p) return;
+    if (!connected() && t.closest('#st-prev,#st-next,[data-chip],[data-preset],[data-lvslot]')) { nudgeConn(); return; }
     if (t.closest('#st-prev')) { p.step(-1); paint(); return; }
     if (t.closest('#st-next')) { p.step(1); paint(); return; }
     if (t.closest('#st-save')) { openSheet(null); return; }
@@ -387,6 +499,12 @@
         '.st-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 10px}.st-explain{width:44px;height:44px;min-height:44px;padding:0;font:700 17px/1 var(--font-body)}' +
         '.st-explain.active{background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent-ink)}' +
         '.st-mode button{min-height:44px;padding:0 16px}' +
+        '.st-conn{display:grid;gap:6px;padding:14px 16px;margin:0 0 12px;border-color:var(--accent-line);background:var(--accent-soft)}.st-conn[hidden]{display:none}' +
+        '.st-connhead{font:600 20px/1.2 var(--font-condensed);letter-spacing:.3px;color:var(--accent-ink)}.st-connbody{margin:0;font-size:14px;line-height:1.45}' +
+        '.st-connact{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}.st-connact .st-big{flex:0 1 220px}.st-connout{min-height:44px;font-size:16px;min-width:220px;max-width:100%}' +
+        '.st-offline .st-strips,.st-offline .st-chips,.st-offline .st-scenes,.st-offline #st-prev,.st-offline #st-next,.st-offline .st-pins,.st-offline .st-lvgrid,.st-offline .st-lvnav{opacity:.45}' +
+        '@keyframes st-nudge{0%,100%{transform:none}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}.st-nudge{animation:st-nudge .3s ease 2}' +
+        '@media (prefers-reduced-motion:reduce){.st-nudge{animation:none;outline:2px solid var(--accent)}}' +
         '.st-perform{display:grid;gap:12px}.st-now{display:grid;gap:8px;padding:16px 18px}' +
         '.st-nowname{font:600 32px/1.1 var(--font-condensed);letter-spacing:.3px;overflow-wrap:anywhere}.st-nowacts{display:flex;gap:8px;margin-top:4px}' +
         '.st-big{flex:1;min-height:48px;font-size:15px;font-weight:600}.st-big.primary{flex:1.4}' +
@@ -424,8 +542,13 @@
       face.addEventListener('keydown', onStripKey);
       render();
       // values the synth changes (two-way knobs, program changes) show up without a tap
-      App.on('midi:raw', function () { if (App.active === 'deck' && !drag) schedulePaint(); });
-      App.on('midi:state', function () { if (App.active === 'deck') schedulePaint(); });
+      // only messages that can change what the Deck shows: controllers, program changes and
+      // SysEx replies - never the clock (F8), active sensing (FE) or notes, which arrive constantly
+      App.on('midi:raw', function (d) {
+        var s = d && d.bytes && d.bytes[0]; if (s == null || App.active !== 'deck' || drag) return;
+        var t = s & 0xF0; if (t === 0xB0 || t === 0xC0 || s === 0xF0) schedulePaint();
+      });
+      App.on('midi:state', function () { if (App.active === 'deck') schedulePaint(); repaintConn(); });
       App.on('deck:assignnames', function () { if (App.active === 'deck') render(); }); // the strips take the Performance's knob names
       App.on('midihub:split', function () { if (App.active === 'deck') { paintChips(); if (els.sheet && !els.sheet.hidden) paintSplitBox(); } });
       App.on('synthlive:slot', function () { if (App.active === 'deck') schedulePaint(); });
@@ -435,8 +558,7 @@
       render();
       borrow();
       applyMute(true);
-      var m = midi();
-      if (m && m.supported && !m.ready && App.store.get('midi.wanted', false)) m.enable().catch(function () { });
+      autoConnect();
       if (App.synthDeck && App.synthDeck.onShow) { try { App.synthDeck.onShow(); } catch (e) { /* the deck repaints itself */ } }
       tick = setInterval(function () { if (!drag) paintStrips(); }, 400);
     },
@@ -459,6 +581,7 @@
 
   window.SLSynthTab = { // test hook
     borrowed: function () { return !!borrowed; }, mode: mode, row: function () { return g('row', 'fav'); }, favs: favs, rows: ROWS,
-    ccLabel: ccLabel, explain: explainOn, render: render, paint: paint
+    ccLabel: ccLabel, explain: explainOn, render: render, paint: paint,
+    conn: { state: connState, connected: connected, connect: connect, autoConnect: autoConnect, paint: paintConn, repaint: repaintConn }
   };
 })();
