@@ -161,12 +161,15 @@
 
   function ProcessingInstruction(target, text) {
     const element = new Element(ProcessingInstruction);
-    element.text = text ? target + ' ' + text : target;
+    element.text = pyTruthy(text) ? target + ' ' + text : target;
     return element;
   }
 
+  // _raise_serialization_error: "cannot serialize %r (type %s)"
+  function cannotSerialize(x) { return pyError('TypeError', 'cannot serialize ' + pyStr(x) + ' (type ' + V.pyTypeName(x) + ')'); }
+
   function escapeCdata(text) {
-    if (typeof text !== 'string') throw pyError('TypeError', 'cannot serialize ' + text + ' (type ' + typeof text + ')');
+    if (typeof text !== 'string') throw cannotSerialize(text);
     if (text.includes('&')) text = text.split('&').join('&amp;');
     if (text.includes('<')) text = text.split('<').join('&lt;');
     if (text.includes('>')) text = text.split('>').join('&gt;');
@@ -174,7 +177,7 @@
   }
 
   function escapeAttrib(text) {
-    if (typeof text !== 'string') throw pyError('TypeError', 'cannot serialize ' + text + ' (type ' + typeof text + ')');
+    if (typeof text !== 'string') throw cannotSerialize(text);
     if (text.includes('&')) text = text.split('&').join('&amp;');
     if (text.includes('<')) text = text.split('<').join('&lt;');
     if (text.includes('>')) text = text.split('>').join('&gt;');
@@ -191,29 +194,33 @@
 
   // ElementTree._serialize_xml with short_empty_elements=True (no indentation: homr never
   // calls ET.indent)
+  // (`if text:` is Python truthiness: a NaN text is serialized, i.e. refused, not skipped)
   function serializeXml(write, elem) {
     const tag = elem.tag, text = elem.text;
     if (tag === Comment) {
-      write('<!--' + (text === null ? 'None' : text) + '-->');
+      write('<!--' + (typeof text === 'string' ? text : pyStr(text)) + '-->');  // "<!--%s-->" % text
     } else if (tag === ProcessingInstruction) {
-      write('<?' + (text === null ? 'None' : text) + '?>');
+      write('<?' + (typeof text === 'string' ? text : pyStr(text)) + '?>');
     } else if (tag === null) {
-      if (text) write(escapeCdata(text));
+      if (pyTruthy(text)) write(escapeCdata(text));
       for (const e of elem._children) serializeXml(write, e);
     } else {
-      if (typeof tag !== 'string' || tag.startsWith('{')) throw pyError('TypeError', 'cannot serialize tag ' + String(tag));
+      if (typeof tag !== 'string') throw cannotSerialize(tag);
+      // '{uri}name' would get an ns0: prefix and an xmlns declaration in Python; homr's tags are
+      // plain names (a dynamic's name comes from the vocabulary), so the port does not do that
+      if (tag.startsWith('{')) throw pyError('NotImplementedError', 'JS port: namespaced tag ' + tag);
       write('<' + tag);
       for (const k of Object.keys(elem.attrib)) write(' ' + k + '="' + escapeAttrib(elem.attrib[k]) + '"');
-      if (text || elem._children.length) {
+      if (pyTruthy(text) || elem._children.length) {
         write('>');
-        if (text) write(escapeCdata(text));
+        if (pyTruthy(text)) write(escapeCdata(text));
         for (const e of elem._children) serializeXml(write, e);
         write('</' + tag + '>');
       } else {
         write(' />');
       }
     }
-    if (elem.tail) write(escapeCdata(elem.tail));
+    if (pyTruthy(elem.tail)) write(escapeCdata(elem.tail));
   }
 
   function tostring(element) {  // ET.tostring(element, encoding='unicode')
