@@ -296,8 +296,9 @@
   // ======================================================================================
   // import: musicxml/xmlToM21.py, for what generate_xml writes (and tolerant of more)
   // ======================================================================================
-  let SEQ = 0; // insertion counter: music21's insertIndex for equal sort keys
-  function el(kind, offset, extra) { return Object.assign({ kind: kind, offset: offset, ql: Q0, seq: SEQ++ }, extra || {}); }
+  // an element: {kind, offset (in its measure or voice), ql, ...}; arrays keep insertion order,
+  // which breaks ties of music21's sort key (its insertIndex)
+  function el(kind, offset, extra) { return Object.assign({ kind: kind, offset: offset, ql: Q0 }, extra || {}); }
 
   function pitchPs(p) { return (p.octave + 1) * 12 + STEP_PC[p.step] + (p.alter || 0); }
   // pitch.Pitch.midi: schoolyard rounding, folded into 0..127 by octaves
@@ -356,9 +357,9 @@
     let partName = null;
     if (mxScorePart) { const pn = find(mxScorePart, 'part-name'); if (pn) partName = (elText(pn) || '').trim(); }
     const inst = defaultInstrument(mxScorePart, partName);
-    inst.offset = Q0; inst.seq = SEQ++;
+    inst.offset = Q0;
     const P = {
-      lastDivisions: 10080, lastTimeSignature: null, lastMeasureWasShort: false, lastMeasureOffset: Q0,
+      lastDivisions: 10080, lastTimeSignature: null, lastMeasureOffset: Q0,
       maxStaves: 1, measures: [], staffRefs: [], bundle: bundle || { open: null, list: [] }
     };
     for (const mxMeasure of childElements(mxPart, 'measure')) parseMeasure(mxMeasure, P);
@@ -368,6 +369,8 @@
     const base = { id: partId, partName: partName, instruments: [inst], extra: [], measures: P.measures, brackets: P.brackets };
     if (P.maxStaves <= 1) {
       base.staffKey = null;
+      const bn = bestName(inst);
+      if (bn != null) base.id = bn; // parseXmlScorePart: part.id = instrument.bestName()
       return [base];
     }
     return separateOutPartStaves(base, P);
@@ -390,14 +393,14 @@
       for (const n of childElements(mx, tag)) { const v = stripped(find(n, 'voice')); if (v) vIdx.add(v); }
     }
     if (vIdx.size > 1) {
-      for (const v of Array.from(vIdx).sort()) { const vo = { id: v, items: [], seq: SEQ++ }; M.voices.push(vo); M.voicesById[v] = vo; }
+      for (const v of Array.from(vIdx).sort()) { const vo = { id: v, items: [] }; M.voices.push(vo); M.voicesById[v] = vo; }
       M.useVoices = true;
     }
     const kids = childElements(mx);
     for (let i = 0; i < kids.length; i++) {
       const c = kids[i];
       switch (c.name) {
-        case 'note': xmlToNote(c, kids[i + 1], M, P); break;
+        case 'note': xmlToNote(c, kids[i + 1], M); break;
         case 'backup': {
           const d = qDec(stripped(find(c, 'duration')));
           if (d) { M.pos = qsub(M.pos, qdiv(d, M.divisions)); if (qcmp(M.pos, Q0) < 0) M.pos = Q0; }
@@ -469,32 +472,22 @@
     for (const v of m.voices) for (const e of v.items) if (e.kind === 'note' || e.kind === 'chord' || e.kind === 'rest') return true;
     return false;
   }
-  // PartParser.adjustTimeAttributesFromMeasure
+  // PartParser.adjustTimeAttributesFromMeasure: the next measure starts after this one's highest
+  // time, except an overfull measure within tolerance (the time signature's length) and an empty
+  // one (a rest of the time signature's length is put in). Short measures only get padding.
   function adjustTimeAttributes(m, P) {
     const h = measureHighestTime(m);
     const tsQl = P.lastTimeSignature ? P.lastTimeSignature.barQl : Q(4);
-    let shift;
+    let shift = h;
     const c = qcmp(h, tsQl);
-    if (c === 0) shift = h;
-    else if (c > 0) {
+    if (c > 0) {
       const diff = qsub(h, tsQl);
-      // diff > 0.5 or a multiple of 1/16 or 1/12 (nearestMultiple(...)[1] < 1e-6)
+      // diff > 0.5, or a multiple of 1/16 or of 1/12 (nearestMultiple(...)[1] < 1e-6)
       const mult = (k) => qmul(diff, Q(k)).d === 1;
-      shift = (qcmp(diff, Q(1, 2)) > 0 || mult(16) || mult(12)) ? h : tsQl;
-    } else if (qcmp(h, Q0) === 0 && !hasNotesOrRests(m)) {
-      const r = el('rest', Q0, { ql: tsQl, fullMeasure: false, typeName: null, dots: 0, tuplets: false });
-      m.items.push(r);
+      if (!(qcmp(diff, Q(1, 2)) > 0 || mult(16) || mult(12))) shift = tsQl; // "assuming ... is correct"
+    } else if (c < 0 && qcmp(h, Q0) === 0 && !hasNotesOrRests(m)) {
+      m.items.push(el('rest', Q0, { ql: tsQl, fullMeasure: false, typeName: null, dots: 0, tuplets: false }));
       shift = tsQl;
-      P.lastMeasureWasShort = false;
-    } else {
-      shift = h;
-      if (qcmp(P.lastMeasureOffset, Q0) !== 0) {
-        if (P.lastMeasureWasShort) {
-          if (qcmp(h, tsQl) < 0) P.lastMeasureWasShort = false; // padAsAnacrusis
-        } else {
-          P.lastMeasureWasShort = qcmp(h, tsQl) < 0;
-        }
-      }
     }
     P.lastMeasureOffset = qadd(P.lastMeasureOffset, shift);
   }
@@ -516,8 +509,8 @@
     let use;
     if (t) use = M.lastVoice = t;
     else { use = M.lastVoice; if (use == null) use = '1'; }
-    let v = M.voicesById[use];
-    if (!v) { const k = String(parseInt(use, 10)); v = M.voicesById[k]; }
+    const v = M.voicesById[use]; // (the int(useVoice) lookup never matches the str keys)
+    if (!v && !/^\s*[+-]?\d+\s*$/.test(use)) throw new ImportException("invalid literal for int() with base 10: '" + use + "'");
     if (v) v.items.push(e); else M.items.push(e); // "putting outside of voices"
   }
 
@@ -564,7 +557,7 @@
     };
   }
   // MeasureParser.xmlToNote
-  function xmlToNote(mxNote, next, M, P) {
+  function xmlToNote(mxNote, next, M) {
     const nextIsChord = !!(next && next.name === 'note' && find(next, 'chord'));
     const isRest = !!find(mxNote, 'rest');
     let isChord = !!find(mxNote, 'chord');
@@ -773,22 +766,22 @@
       }
       const take = (e) => {
         if (exclude.has(e)) return null;
-        if (seen.has(e)) return Object.assign({}, e, { seq: SEQ++ }); // deepcopy
+        if (seen.has(e)) return Object.assign({}, e); // deepcopy
         seen.add(e);
         return e;
       };
       const measures = base.measures.map((m) => {
-        const cm = { number: m.number, offset: m.offset, items: [], voices: [], leftBarline: m.leftBarline, rightBarline: m.rightBarline, seq: SEQ++ };
+        const cm = { number: m.number, offset: m.offset, items: [], voices: [], leftBarline: m.leftBarline, rightBarline: m.rightBarline };
         for (const e of m.items.slice().sort(sortKeyCmp)) { const t = take(e); if (t) cm.items.push(t); }
         for (const v of m.voices) {
-          const cv = { id: v.id, items: [], seq: SEQ++ };
+          const cv = { id: v.id, items: [] };
           for (const e of v.items.slice().sort(sortKeyCmp)) { const t = take(e); if (t) cv.items.push(t); }
           cm.voices.push(cv);
         }
         flattenUnnecessaryVoices(cm);
         return cm;
       });
-      const insts = base.instruments.map((x) => (si === 0 ? x : Object.assign({}, x, { seq: SEQ++ })));
+      const insts = base.instruments.map((x) => (si === 0 ? x : Object.assign({}, x)));
       const brackets = base.brackets.map((rb) => ({
         // the template re-links the part's own measures; a measure of another part stays as it was
         measures: rb.measures.map((mm) => { const k = base.measures.indexOf(mm); return k >= 0 ? measures[k] : mm; }), number: rb.number, complete: rb.complete
@@ -1072,16 +1065,11 @@
     }
     // Stream.append: each measure goes to the highest time so far (its own highestTime long)
     let off = Q0;
-    const out = [];
-    const used = new Set();
-    for (const m0 of ms) {
-      const m = used.has(m0) ? copyMeasure(m0) : m0; // a measure appended twice is a second object in the copy
-      used.add(m);
+    for (const m of ms) {
       m.offset = off;
       off = qadd(off, measureHighestTime(m));
-      out.push(m);
     }
-    return out;
+    return ms;
   }
 
   // ======================================================================================
@@ -1143,8 +1131,6 @@
     if (!cond.some((x) => x.e.kind === 'time')) cond.push({ e: { kind: 'time', num: 4, den: 4 }, offset: Q0 });
     return cond.map((x, i) => ({ e: x.e, offset: x.offset, kind: x.e.kind, i: i })).sort((a, b) => sortKeyCmp(a, b) || a.i - b.i);
   }
-  // volume.realizeVolume: dynamics hold until the next one (extendDuration); velocity scalar
-  // 0.5 + 0.20866, times 2 * dynamic, plus each articulation's volumeShift, clipped to [0, 1]
   // ---- Python float vs Fraction: music21 keeps binary-expressible values as floats and the rest
   // as Fractions (opFrac); float + Fraction is a ROUNDED float. Elsewhere opFrac turns such sums
   // back into the exact fraction, but realizeVolume's boundary ends stay raw, so a dynamic that

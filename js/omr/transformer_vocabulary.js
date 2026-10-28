@@ -16,9 +16,15 @@
   function startsWithAny(s, prefixes) { for (const p of prefixes) if (s.startsWith(p)) return true; return false; }
 
   // ---- fractions.Fraction --------------------------------------------------------------
-  // numerator / denominator are JS integers, reduced, denominator > 0. Durations of music stay
-  // far below 2^53; any arithmetic that would leave the safe integer range throws instead of
-  // silently losing precision.
+  // numerator / denominator are JS integers, reduced, denominator > 0. Python's Fraction is
+  // unbounded; here the REDUCED parts must stay below 2^53, which they do for music: every
+  // denominator divides 2^10 * 3^2 * 5 * 7 * 11 * 13 * 17 (~8e8: the vocabulary's durations,
+  // dots, the 2/3 of a triplet, a median's /2), so a numerator would only leave the range past
+  // millions of whole notes. Intermediate products do NOT stay small: one measure of tuplets
+  // like note_11.. note_13.. note_34.. note_96.. note_128.. sums to a denominator of ~4e8 and
+  // comparing two such sums multiplies to ~1e17. So add/mul/cmp compute in Numbers while every
+  // product is exact (a safe integer) and switch to BigInt otherwise; only a reduced result
+  // beyond 2^53 throws (OverflowError) instead of silently losing precision.
   function gcd(a, b) {
     a = Math.abs(a); b = Math.abs(b);
     while (b) { const t = a % b; a = b; b = t; }
@@ -27,6 +33,25 @@
   function safe(x) {
     if (!Number.isSafeInteger(x)) throw pyError(Number.isInteger(x) ? 'OverflowError' : 'TypeError', 'Fraction: not a safe integer: ' + x);
     return x;
+  }
+  const isSafe = Number.isSafeInteger;
+  function bigGcd(a, b) {
+    if (a < 0n) a = -a;
+    if (b < 0n) b = -b;
+    while (b) { const t = a % b; a = b; b = t; }
+    return a;
+  }
+  function bigToSafe(b) {
+    const x = Number(b);  // |b| >= 2^53 never maps to a safe integer
+    if (!isSafe(x)) throw pyError('OverflowError', 'Fraction: ' + b + ' does not fit a JS number (2^53)');
+    return x;
+  }
+  // the exact n/d of two BigInts, reduced, as a Fraction of JS numbers
+  function fromBig(n, d) {
+    const g = bigGcd(n, d) || 1n;
+    n /= g; d /= g;
+    if (d < 0n) { n = -n; d = -d; }
+    return new Fraction(bigToSafe(n), bigToSafe(d));
   }
   class Fraction {
     constructor(numerator, denominator) {
@@ -46,14 +71,22 @@
     add(o) {
       o = Fraction.from(o);
       const g = gcd(this.denominator, o.denominator);
-      return new Fraction(safe(safe(this.numerator * (o.denominator / g)) + safe(o.numerator * (this.denominator / g))),
-        safe(this.denominator * (o.denominator / g)));
+      const a = this.numerator * (o.denominator / g), b = o.numerator * (this.denominator / g);
+      const d = this.denominator * (o.denominator / g);
+      // a product of integers is exact exactly when it comes out as a safe integer
+      if (isSafe(a) && isSafe(b) && isSafe(a + b) && isSafe(d)) return new Fraction(a + b, d);
+      const G = BigInt(g);
+      return fromBig(BigInt(this.numerator) * (BigInt(o.denominator) / G) + BigInt(o.numerator) * (BigInt(this.denominator) / G),
+        BigInt(this.denominator) * (BigInt(o.denominator) / G));
     }
     sub(o) { return this.add(Fraction.from(o).neg()); }
     mul(o) {
       o = Fraction.from(o);
       const g1 = gcd(this.numerator, o.denominator) || 1, g2 = gcd(o.numerator, this.denominator) || 1;
-      return new Fraction(safe((this.numerator / g1) * (o.numerator / g2)), safe((this.denominator / g2) * (o.denominator / g1)));
+      const n = (this.numerator / g1) * (o.numerator / g2), d = (this.denominator / g2) * (o.denominator / g1);
+      if (isSafe(n) && isSafe(d)) return new Fraction(n, d);
+      // already reduced by the cross gcds: fromBig throws OverflowError past 2^53
+      return fromBig(BigInt(this.numerator / g1) * BigInt(o.numerator / g2), BigInt(this.denominator / g2) * BigInt(o.denominator / g1));
     }
     div(o) {  // Python's /, true division
       o = Fraction.from(o);
@@ -64,8 +97,10 @@
     abs() { return this.numerator < 0 ? this.neg() : this; }
     cmp(o) {
       o = Fraction.from(o);
-      const a = safe(this.numerator * o.denominator), b = safe(o.numerator * this.denominator);
-      return a < b ? -1 : a > b ? 1 : 0;
+      const a = this.numerator * o.denominator, b = o.numerator * this.denominator;
+      if (isSafe(a) && isSafe(b)) return a < b ? -1 : a > b ? 1 : 0;
+      const A = BigInt(this.numerator) * BigInt(o.denominator), B = BigInt(o.numerator) * BigInt(this.denominator);
+      return A < B ? -1 : A > B ? 1 : 0;
     }
     eq(o) { return this.cmp(o) === 0; }
     ne(o) { return this.cmp(o) !== 0; }
@@ -108,6 +143,17 @@
     'rf', 'rfz', 'sfp', 'empty'];
   const DYNAMICS_MODIFIER = ['piu', 'dolce', 'poco', 'espress', 'subito', 'atempo', 'leggiero', 'pocopiu', 'sempre'];
 
+  // str.strip(): Python's whitespace (str.isspace) is not String.prototype.trim's: it includes
+  // \x1c-\x1f and \x85 but not
+  const PY_SPACE = '\t\n\x0b\x0c\r\x1c\x1d\x1e\x1f \x85\xa0        ' +
+    '        　';
+  function pyStrip(s) {
+    let a = 0, b = s.length;
+    while (a < b && PY_SPACE.includes(s[a])) a++;
+    while (b > a && PY_SPACE.includes(s[b - 1])) b--;
+    return s.slice(a, b);
+  }
+
   // A dict[str, int] is a null-prototype object: its keys keep insertion order because no token
   // is an array index ("0", "17", ...), which build_dict checks.
   function buildDict(tokens) {
@@ -116,8 +162,8 @@
     let i = 0;
     for (const t of tokens) {
       if (t in result) throw pyError('ValueError', 'Duplicated entry for ' + t);
-      if (!t.trim()) throw pyError('ValueError', 'Tokens must not be a whitespace, this makes parsing easier');
-      if (t.trim() !== t) throw pyError('ValueError', 'Tokens must not contain a whitespace, this makes parsing easier');
+      if (!pyStrip(t)) throw pyError('ValueError', 'Tokens must not be a whitespace, this makes parsing easier');
+      if (pyStrip(t) !== t) throw pyError('ValueError', 'Tokens must not contain a whitespace, this makes parsing easier');
       if (t.includes('&')) throw pyError('ValueError', '& is reserved as alternatives for chords');
       if (/^(0|[1-9][0-9]*)$/.test(t)) throw pyError('ValueError', 'JS port: an integer token would break the key order: ' + t);
       result[t] = i++;
@@ -327,6 +373,12 @@
     return p;
   }
 
+  // base & (base - 1) == 0 for base >= 1 (base 0 is handled before it is asked)
+  function isPowerOfTwo(n) {
+    while (n > 1 && n % 2 === 0) n /= 2;
+    return n === 1;
+  }
+
   function kernToSymbolDuration(kern) {
     // homr: transformer/vocabulary.py:313
     // Parse a Humdrum **kern duration string into a SymbolDuration object.
@@ -353,8 +405,9 @@
       return new SymbolDuration(new Fraction(1), dots, 1, 1, base);
     }
 
-    // If base is a power of two, it's a normal note ((base & (base - 1)) == 0 in Python's precedence)
-    if ((base & (base - 1)) === 0) {
+    // If base is a power of two, it's a normal note ((base & (base - 1)) == 0 in Python's precedence;
+    // JS's & works on 32 bits, so the test is spelled out: right for any base, not only < 2^31)
+    if (isPowerOfTwo(base)) {
       return new SymbolDuration(new Fraction(1, base), dots, 1, 1, base);
     } else {
       // Tuplet case: find next higher power of two

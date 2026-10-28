@@ -969,9 +969,23 @@
     // Adds the position of the symbol on the input image as comment. The position is estimated
     // from the attention of the transformer, it points roughly at the symbol but isn't precise.
     if (symbol.imageCoordinates === null || symbol.imageCoordinates === undefined) return;
-    const [x, y] = symbol.imageCoordinates;
-    // round() is half to even; String() of -0 is '0' like Python's int
-    xml.append(Comment(' imgpos: ' + String(py.round(x)) + ', ' + String(py.round(y)) + ' '));
+    const ic = symbol.imageCoordinates;
+    // x, y = symbol.image_coordinates: exactly two values
+    if (ic.length > 2) throw pyError('ValueError', 'too many values to unpack (expected 2)');
+    if (ic.length < 2) throw pyError('ValueError', 'not enough values to unpack (expected 2, got ' + ic.length + ')');
+    const [x, y] = ic;
+    const rx = roundToIntString(x), ry = roundToIntString(y);  // x first, as Python evaluates it
+    xml.append(Comment(' imgpos: ' + rx + ', ' + ry + ' '));
+  }
+
+  // str(round(x)) of a float: half to even; NaN and infinities raise like Python's round(), a
+  // huge value prints all its digits (String(1e21) would be '1e+21'), -0 prints '0' like an int
+  function roundToIntString(x) {
+    if (typeof x !== 'number') throw pyError('TypeError', 'type ' + (x === null ? 'NoneType' : typeof x) + " doesn't define __round__ method");
+    if (Number.isNaN(x)) throw pyError('ValueError', 'cannot convert float NaN to integer');
+    if (!Number.isFinite(x)) throw pyError('OverflowError', 'cannot convert float infinity to integer');
+    const r = py.round(x);
+    return Number.isSafeInteger(r) ? String(r) : BigInt(r).toString();
   }
 
   function buildMultiMeasureRest(symbol, attributes) {

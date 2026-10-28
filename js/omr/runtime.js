@@ -17,7 +17,10 @@
      contrib ops). segnet/encoder try 'webgpu' when navigator.gpu yields an adapter and the session
      can be created, else 'wasm'. Note: the shipping segnet/encoder are int8 (ConvInteger,
      MatMulInteger, DynamicQuantizeLinear) and neither ORT WebGPU EP implements those ops, so on
-     WebGPU ORT assigns them to its CPU EP anyway (see notes/runtime-midi.md).
+     WebGPU ORT assigns them to its CPU EP anyway. Measured on Chromium's SwiftShader WebGPU: segnet
+     comes out bit-identical to 'wasm', the encoder does not (max |diff| 0.25 on a 1x1280x512
+     output), so only ep 'wasm' keeps exact parity with the Python (CPU) reference; Node's and the
+     browser's 'wasm' outputs are identical (see notes/runtime-midi.md).
    - Models: models/omr/manifest.json (tools/omr/split_models.py) lists each model's <= 14 MB parts
      with sha256; parts are fetched, verified, joined, verified again and cached whole (key = sha256).
    - Node (tests): configure({readFile}) supplies bytes from disk; Cache Storage is absent there.

@@ -79,7 +79,10 @@ function workerRuntime(files, opts) {
   }
 
   // ---- runtime file table == the npm packages (= what jsDelivr serves for the pinned versions) ----
-  {
+  let haveNpm = true;
+  try { require.resolve('onnxruntime-web'); require.resolve('@techstark/opencv-js'); } catch (e) { haveNpm = false; }
+  if (!haveNpm) H.skip('(onnxruntime-web / @techstark/opencv-js not on NODE_PATH) pinned runtime file checks');
+  else {
     const { OMR } = workerRuntime({});
     const RF = OMR.runtime.RUNTIME_FILES;
     let all = true, checked = 0;
@@ -123,11 +126,14 @@ function workerRuntime(files, opts) {
       manifest.models[k] = { source: k + '_x.onnx', bytes: n, sha256: sha(whole), parts };
     }
     files[base + 'models/omr/manifest.json'] = new TextEncoder().encode(JSON.stringify(manifest));
-    // runtime files served from the npm packages at their CDN URLs
-    const dist = path.dirname(require.resolve('onnxruntime-web'));
+    // runtime files served at their CDN URLs (from the npm package; synthetic bytes with the pinned
+    // hashes are impossible, so without the package the loadOrt checks skip)
     const W = workerRuntime(files);
-    for (const [n, f] of Object.entries(W.OMR.runtime.RUNTIME_FILES)) {
-      if (f.pkg === 'ort' && /wasm/.test(n) && !/asyncify/.test(n)) files[W.OMR.runtime.CDN.ort + n] = new Uint8Array(fs.readFileSync(path.join(dist, n)));
+    if (haveNpm) {
+      const dist = path.dirname(require.resolve('onnxruntime-web'));
+      for (const [n, f] of Object.entries(W.OMR.runtime.RUNTIME_FILES)) {
+        if (f.pkg === 'ort' && /wasm/.test(n) && !/asyncify/.test(n)) files[W.OMR.runtime.CDN.ort + n] = new Uint8Array(fs.readFileSync(path.join(dist, n)));
+      }
     }
     const rt = W.OMR.runtime;
     rt.configure({ base, ep: 'wasm' });
@@ -154,6 +160,8 @@ function workerRuntime(files, opts) {
     try { await W2.OMR.runtime.modelBytes('encoder'); } catch (e) { err = e.message; }
     H.ok(/encoder\.onnx\.part00 failed its sha256 check/.test(err), 'a tampered part fails its sha256 check');
     // loadOrt: fetch + verify + cache the runtime files, importScripts a blob:, name .mjs/.wasm for ORT
+    if (!haveNpm) H.skip('(no onnxruntime-web package) loadOrt through the worker path');
+    else {
     let rtProg = 0, rtTotal = 0;
     const ort = await rt.loadOrt((d, t) => { rtProg = d; rtTotal = t; });
     const inf = rt.info();
@@ -179,6 +187,7 @@ function workerRuntime(files, opts) {
     await W4.OMR.runtime.loadOrt();
     H.ok(W4.log.fetches.includes(base + 'vendor/omr/ort-wasm-simd-threaded.wasm') && !W4.log.fetches.some((u) => u.startsWith('https://cdn.jsdelivr.net/')),
       'vendor override loads everything same-origin');
+    }
     // offline: manifest + models come from the cache of an earlier run
     const W5 = workerRuntime(files);
     W5.OMR.runtime.configure({ base, ep: 'wasm' });
@@ -210,7 +219,7 @@ function workerRuntime(files, opts) {
   }
 
   // ---- the real models (Node: readFile, onnxruntime-web 'wasm') ----
-  if (!H.MODELS) { H.skip('(no models): set SL_OMR_MODELS for the manifest and session checks'); H.done(); return; }
+  if (!H.MODELS || !haveNpm) { H.skip('(no models or no onnxruntime-web): set SL_OMR_MODELS and NODE_PATH for the manifest and session checks'); H.done(); return; }
   if (!fs.existsSync(path.join(MODELS_DIR, 'manifest.json'))) {
     H.skip('(models/omr not generated): run python -I tools/omr/split_models.py $SL_OMR_MODELS'); H.done(); return;
   }

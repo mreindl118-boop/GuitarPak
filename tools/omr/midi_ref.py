@@ -39,6 +39,9 @@ summary (soundLAB's definition; TranslationResult declares these fields but the 
 them): measures = most measures in a part of the parsed score, notes = note heads (chord members
 count; rests and grace notes included as written), chords = Chord objects, duration_seconds = last
 MIDI event tick / ticks_per_beat * 60 / tempo, from the polished MIDI.
+And FIXTURES/13-midi-edge.json: inputs made from the pages by small programmatic edits, for paths the
+pages miss: generate_xml's own metronome (120; 96 with sound tempo 132) against the engine's tempo,
+a key that transposes to 8 sharps, minor-mode keys, a bare <sound tempo>, a dotted-quarter beat unit.
 Nothing here is written by hand: every expectation is music21 / mido output.
 """
 import argparse
@@ -58,6 +61,7 @@ ap = argparse.ArgumentParser()
 ap.add_argument('--jobs', type=int, default=3)
 ap.add_argument('--no-pages', action='store_true')
 ap.add_argument('--no-synthetic', action='store_true')
+ap.add_argument('--no-edge', action='store_true')
 ap.add_argument('fixtures')
 ap.add_argument('pages', nargs='*')
 A = ap.parse_args()
@@ -343,9 +347,51 @@ def run_synthetic(pool):
     print('synthetic', len(cases), 'cases', errs, 'errors', file=sys.stderr)
 
 
+def run_edge(pool):
+    """Inputs made from the page inputs by small programmatic edits, for paths the pages miss."""
+    import re
+    inputs = {}
+    pages = sorted(d for d in os.listdir(FIX) if os.path.isdir(os.path.join(FIX, d)))
+    for page in pages:
+        pd = os.path.join(FIX, page)
+        lang = os.path.join(pd, '12-lang-ship-xml.json')
+        if os.path.exists(lang):
+            with open(lang, encoding='utf-8') as f:
+                variants = json.load(f)
+            # generate_xml variants with their own metronome (120; 96 + sound tempo 132)
+            for k in (2, 3):
+                if 'write' in variants[k]:
+                    inputs['%s|lang-v%d' % (page, k)] = variants[k]['write']
+    with open(os.path.join(FIX, 'belle-p1', '11-score.musicxml'), encoding='utf-8', newline='') as f:
+        belle = f.read()
+    ref = json.load(open(os.path.join(FIX, 'belle-p1', '13-midi-ref.json'), encoding='utf-8'))
+    eng = ref['inputs']['engine-112']
+    # a key that transposes to 8 sharps (mido cannot read it: the engine keeps music21's raw file)
+    inputs['belle|key6'] = belle.replace('<fifths>-1</fifths>', '<fifths>6</fifths>')
+    # minor mode keys
+    inputs['belle|minor'] = belle.replace('<fifths>-1</fifths>', '<fifths>-1</fifths><mode>minor</mode>')
+    # a <sound tempo> without a metronome mark
+    inputs['belle|sound-only'] = re.sub(r'<direction-type><metronome>.*?</metronome></direction-type>', '', eng)
+    # a dotted-quarter metronome mark
+    inputs['belle|dotted'] = eng.replace('<beat-unit>quarter</beat-unit>', '<beat-unit>quarter</beat-unit><beat-unit-dot />')
+    jobs = []
+    for name, x in inputs.items():
+        trs = (0, 2, 1) if name.endswith('key6') else (0, 2) if name.endswith('minor') else (0,)
+        for tr in trs:
+            jobs.append((x, name, 80, 0, tr, 'Edge'))
+    cases = pool.map(run_case, jobs)
+    sjobs = [(inputs[n], n + '|' + str(tr), tr) for n in inputs for tr in ((0, 2) if n.endswith(('key6', 'minor')) else (0,))]
+    scores = dict(pool.map(run_score, sjobs))
+    with open(os.path.join(FIX, '13-midi-edge.json'), 'w', encoding='utf-8') as f:
+        json.dump({'inputs': inputs, 'cases': cases, 'scores': scores}, f)
+    print('edge', len(cases), 'cases', sum(1 for c in cases if 'error' in c), 'errors', file=sys.stderr)
+
+
 if __name__ == '__main__':
     with Pool(A.jobs) as pool:
         if not A.no_pages:
             run_pages(pool)
         if not A.no_synthetic:
             run_synthetic(pool)
+        if not A.no_edge:
+            run_edge(pool)
