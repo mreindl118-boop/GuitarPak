@@ -17,9 +17,15 @@
 //   40-read-synthetic.json, 40-read-delaunay-fuzz.json  Subdiv2D / Delaunay / piecewise affine /
 //                         dewarp / canvas / black contours / layouts / measure rests / parse_staffs with
 //                         a stub transformer; 700 fuzz point sets
+//   40-read-audit.json    (tools/omr/dump_read_audit.py) the adversarial audit's edge cases:
+//                         prepare_staff_image at the page edges / below the page / overlapping staffs
+//                         (cv2.error) / grand / steep / curved / sparse / short staffs, debug off and on
+//                         (every image homr hands to Debug), parse_staffs with debug on, the canvas
+//                         helpers on empty images, ConvertToArray on non-uint8 images
 //
 // Sections (all exact unless said otherwise):
 //   synthetic   always (no models)
+//   audit       always (no models): 40-read-audit.json
 //   prep        every staff: each step vs 40-read-prep.json, canvas == 09-staff-NN.png
 //   stub        parse_staffs with Python's own tokens + attention (a stub Staff2Score): voices
 //               (strings + image_coordinates) and MusicXML byte for byte, for ship and fp16 (= 10 / 11)
@@ -37,7 +43,7 @@
 //   fp32        (SL_OMR_FP32_ENCODER=<encoder fp32 .onnx>) the same with the fp32 encoder vs
 //               40-read-fp32enc.json (the size-vs-fidelity comparison for the owner)
 // Run time (Node, 1 thread): ~40 s without models, ~10 min with, ~18 min with the fp32 comparison.
-// Env: SL_OMR_READ_PAGES=a,b limits the pages; SL_OMR_READ_SKIP=synthetic,prep,stub,decoder,full
+// Env: SL_OMR_READ_PAGES=a,b limits the pages; SL_OMR_READ_SKIP=synthetic,audit,prep,stub,decoder,full
 // skips sections.
 'use strict';
 const fs = require('fs');
@@ -368,6 +374,123 @@ async function syntheticParse(doc, pagesData) {
     else why = voicesDiff(r.value, c.voices);
     H.ok(!why && imgsOk, 'parse_staffs (stub transformer) ' + c.name + ': ' + stub.images.length + ' staff images' + (imgsOk ? '' : ' DIFFER') + ', ' +
       (c.voices ? c.voices.length + ' voices [' + c.voices.map((v) => v.length).join(', ') + '] incl. image_coordinates' : c.raises) + (why ? ' -- ' + why : ''));
+  }
+}
+
+// =============================================================================================
+// audit: 40-read-audit.json (tools/omr/dump_read_audit.py), the adversarial audit's regression set.
+// Each group failed on the code before the audit: the debug drawing of prepare_staff_image used the
+// first crop's corner instead of the second (Python rebinds top_left), remove_black_contours on an
+// empty image did not raise homr's TypeError (cv2.threshold returns None), and ConvertToArray did
+// the float32 image's division by 255 in float64.
+const pyErr = (r, want) => !!r.raises && (r.raises === want.raises || (r.raises === 'cv2.error' && want.raises === 'error')) && r.message === want.message;
+async function audit() {
+  const file = path.join(H.FIX, '40-read-audit.json');
+  if (!fs.existsSync(file)) { H.skip('no 40-read-audit.json (run tools/omr/dump_read_audit.py)'); return; }
+  const doc = H.readJson(file);
+  const M = OMR.model, BB = OMR.bounding_boxes;
+  const page = synImage(doc.page.h, doc.page.w, 1, doc.page.seed);
+  const staffs = {};
+  for (const k of Object.keys(doc.staffs)) {
+    const s = doc.staffs[k];
+    const st = new M.Staff(s.grid.map((p) => R.staffPoint(OMR, p)));
+    st.symbols = s.symbols.map((x) => new M[x.type](new BB.BoundingBox(x.box, new Int32Array(0), -1)));
+    staffs[k] = st;
+  }
+  // dump_read_audit.py's img_info, keys in its order (the debug image lists are compared as JSON)
+  const info = (img) => ({ shape: imgInfo(img).shape, dtype: np.dtypeOf(img), sha1: sha1(img) });
+  const capDebug = (on) => {
+    const d = new OMR.debug.Debug(page, 'x.png', on);
+    d.caps = [];
+    d.writeImageWithFixedSuffix = (suffix, image) => d.caps.push([suffix, info(image)]);
+    return d;
+  };
+  const capShow = (caps) => show(caps.map((x) => [x[0], x[1].sha1.slice(0, 8)]));
+
+  // -- prepare_staff_image --
+  let n = 0, okN = 0, first = '', capN = 0, capOk = 0, raisesN = 0;
+  for (const c of doc.prep) {
+    n++;
+    const regions = new OMR.staff_regions.StaffRegions(c.names.map((nm) => new M.MultiStaff([staffs[nm]], [])));
+    const d = capDebug(c.debug);
+    const r = raises(() => watch('prepareStaffImage', () => SP.prepareStaffImage(d, c.index, staffs[c.staff], page, regions)));
+    const bad = [];
+    if (c.raises) {
+      raisesN++;
+      if (!pyErr(r, c)) bad.push('raises ' + (r.raises || 'nothing') + ' "' + String(r.message).slice(0, 80) + '" vs ' + c.raises + ' "' + c.message.slice(0, 80) + '"');
+    } else if (r.raises) bad.push('JS raises ' + r.raises + ': ' + r.message);
+    else {
+      const [img, t, toPage] = r.value;
+      if (!sameInfo(img, c.canvas)) bad.push('canvas');
+      if (!eqArr(t.grid.map((p) => [p.x, p.y]), c.t_grid)) bad.push('transformed staff grid');
+      if (!eqf(t.averageUnitSize, num(c.t_unit)) || t.isGrandstaff !== c.t_grand) bad.push('transformed staff unit size / is_grandstaff');
+      for (const [p, want] of c.to_page) { const got = toPage(p.map(num)); if (!eqArr(got, want)) bad.push('to_page ' + show(p) + ' ' + show(got) + ' vs ' + show(want)); }
+    }
+    capN += c.caps.length;
+    d.caps.forEach((x, i) => { if (c.caps[i] && show(x) === show(c.caps[i])) capOk++; });
+    if (show(d.caps) !== show(c.caps)) bad.push('debug images ' + capShow(d.caps) + ' vs ' + capShow(c.caps));
+    if (!bad.length) okN++; else if (!first) first = c.layout + '/' + c.staff + (c.debug ? ' (debug)' : '') + ': ' + bad.join('; ').slice(0, 300);
+  }
+  H.ok(okN === n && capOk === capN, 'audit prepare_staff_image on a synthetic page (edges, below the page, overlapping staffs, grand / steep / curved / sparse / short staffs; ' +
+    'debug off and on): ' + okN + '/' + n + ' calls exact (canvas, transformed staff, staff_to_page; ' + raisesN + ' raise cv2.error like homr), ' +
+    capOk + '/' + capN + ' debug images identical' + (first ? ' -- ' + first : ''));
+
+  // -- parse_staffs with debug on (the _output images: circles + "i: rhythm" at the attention points) --
+  {
+    const pd = doc.parse_debug;
+    let k = 0;
+    SPT._setInference({
+      predict: () => {
+        const [toks, coords] = pd.calls[k++ % pd.calls.length];
+        return toks.map((t, j) => { const s = V.EncodedSymbol.fromString(t); s.coordinates = coords[j] === null ? null : Float32Array.from(coords[j].map(num)); return s; });
+      }
+    });
+    const multi = pd.systems.map((row) => new M.MultiStaff(row.map((nm) => staffs[nm]), []));
+    for (const g of pd.grand) staffs[g].isGrandstaff = true;
+    const d = capDebug(true);
+    let voices = null, err = '';
+    try { voices = await SP.parseStaffs(d, multi, page, OMR.transformer_configs.defaultConfig, -1); } catch (e) { err = (e.pyType || e.name) + ': ' + e.message; } finally {
+      SPT._setInference(null);
+      for (const g of pd.grand) staffs[g].isGrandstaff = false;
+    }
+    const why = err || voicesDiff(voices, pd.voices);
+    const capsOk = show(d.caps) === show(pd.caps);
+    H.ok(!why && capsOk, 'audit parse_staffs with debug on (stub transformer, a hidden staff, a grand staff): voices exact, ' + d.caps.length + ' debug images ' +
+      (capsOk ? 'identical' : 'DIFFER') + (why ? ' -- ' + why : '') + (capsOk ? '' : ' -- ' + capShow(d.caps) + ' vs ' + capShow(pd.caps)));
+  }
+
+  // -- the canvas helpers on empty / 1-pixel images --
+  {
+    let m = 0, ok = 0, f = '';
+    for (const c of doc.canvas) {
+      const img = np.full([c.h, c.w], 77, 'uint8');
+      const got = {
+        size: raises(() => SP.getTrOmrCanvasSize([c.h, c.w])),
+        black: raises(() => info(watch('removeBlackContoursAtEdgesOfImage', () => SP.removeBlackContoursAtEdgesOfImage(np.clone(img), 2.0)))),
+        center: raises(() => info(watch('centerImageOnCanvas', () => SP.centerImageOnCanvas(img, [1280, 256])))),
+        add: raises(() => info(watch('addImageIntoTrOmrCanvas', () => SP.addImageIntoTrOmrCanvas(img))))
+      };
+      for (const k of Object.keys(got)) {
+        m++;
+        const g = got[k], w = c[k];
+        if (w.raises ? pyErr(g, w) : (!g.raises && show(g.value) === show(w.value))) ok++;
+        else if (!f) f = c.h + 'x' + c.w + ' ' + k + ': ' + show(g).slice(0, 120) + ' vs ' + show(w).slice(0, 120);
+      }
+    }
+    H.ok(ok === m, 'audit get_tr_omr_canvas_size / remove_black_contours / center_image_on_canvas / add_image_into_tr_omr_canvas on empty and 1-pixel images ' +
+      '(homr\'s TypeError / ZeroDivisionError / cv2.error or the image): ' + ok + '/' + m + (f ? ' -- ' + f : ''));
+  }
+
+  // -- ConvertToArray on non-uint8 images --
+  {
+    let ok = 0, f = '';
+    const ctor = { uint8: Uint8Array, float32: Float32Array, float64: Float64Array, uint16: Uint16Array, int16: Int16Array };
+    for (const c of doc.convert) {
+      const x = S2S._transform.transform({ h: 4, w: 9, c: 1, data: ctor[c.dtype].from(c.in.map(num)) });
+      if (x.data instanceof Float32Array && eqArr(x.dims, c.shape) && eqArr(x.data, c.out)) ok++; else if (!f) f = c.dtype;
+    }
+    H.ok(ok === doc.convert.length, 'audit ConvertToArray (staff2score._transform) on ' + doc.convert.map((c) => c.dtype).join(' / ') + ' images: ' + ok + '/' + doc.convert.length +
+      ' exact' + (f ? ' -- differs: ' + f : ''));
   }
 }
 
@@ -818,6 +941,7 @@ async function main() {
   OMR.simple_logging.sink = null;
   let synDoc = null;
   if (!SKIP.has('synthetic')) synDoc = synthetic();
+  if (!SKIP.has('audit')) await audit();
 
   let pagesList = H.pages().filter((p) => H.has(p, '40-read-staffs.json') && H.has(p, '40-read-prep.json'));
   if (ONLY.length) pagesList = pagesList.filter((p) => ONLY.includes(p));

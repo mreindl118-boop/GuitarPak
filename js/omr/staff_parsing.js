@@ -89,6 +89,9 @@
   // Blanks (in place, like Python) light boxes of large contours that touch the image edge.
   function removeBlackContoursAtEdgesOfImage(gray, unitSize) {
     let thresh = cv2().threshold(gray, 97, 255, cv2().THRESH_BINARY)[1];
+    // cv2.threshold returns None for an empty image, so homr's `255 - thresh` raises; OMR.cv2
+    // returns an empty image instead
+    if (np.size(thresh) === 0) throw pyError('TypeError', "unsupported operand type(s) for -: 'int' and 'NoneType'");
     thresh = np.map(thresh, (v) => 255 - v, 'uint8');
     const contours = cv2().findContours(thresh, cv2().RETR_TREE, cv2().CHAIN_APPROX_SIMPLE)[0];
     const threshold = constants.blackSpotRemovalThreshold(unitSize);
@@ -140,7 +143,9 @@
     staffImage = dewarp.dewarp(staffImage);
     cr = OMR.image_utils.cropImageAndReturnNewTop(staffImage, regionStep2[0], regionStep2[1], regionStep2[2], regionStep2[3]);
     staffImage = cr[0];
-    const undoCrop2 = PM.undoCrop(cr[1][0], cr[1][1]);
+    // Python rebinds top_left to the second crop's corner here: the debug drawing below uses it
+    topLeft = cr[1];
+    const undoCrop2 = PM.undoCrop(topLeft[0], topLeft[1]);
     scalingFactor = 1;
 
     eprint('Dewarping staff', index, 'done');

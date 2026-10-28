@@ -72,7 +72,9 @@
   }
 
   // homr: transformer/staff2score.py:65
-  // (img / 255 - mean) / std in float64, then .astype(float32), as numpy computes it
+  // (img / 255 - mean) / std in float64, then .astype(float32), as numpy computes it. A float32
+  // image is divided by 255 in float32 (NEP 50: the Python int stays weak) before the float64
+  // mean / std; homr's canvas is uint8, so only direct callers see that path.
   class ConvertToArray {
     constructor() {
       this.mean = 0.7931;
@@ -89,6 +91,8 @@
       const d = image.data, out = new Float32Array(d.length);
       if (d instanceof Uint8Array || d instanceof Uint8ClampedArray) {
         for (let i = 0; i < d.length; i++) out[i] = this._lut[d[i]];
+      } else if (d instanceof Float32Array) {
+        for (let i = 0; i < d.length; i++) out[i] = this.normalize(Math.fround(d[i] / 255));
       } else {
         for (let i = 0; i < d.length; i++) out[i] = this.normalize(d[i] / 255);
       }

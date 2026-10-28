@@ -60,6 +60,8 @@
   // built these candidates, not to unit size, so it belongs in this rough/absolute pass
   // rather than the per-staff unit-size-relative pass below.
   function filterForTallElements(braceDot, staffs) {
+    // staffs[0]: Python raises IndexError without staffs (main.py raises "No staffs found" first)
+    if (!staffs.length) throw py.error('IndexError', 'list index out of range');
     var roughUnitSize = staffs[0].averageUnitSize;
     var symbolsLargerThanRoughEstimate = braceDot.filter(function (symbol) {
       return symbol.size[1] > constants.minHeightForBraceRough(roughUnitSize) &&

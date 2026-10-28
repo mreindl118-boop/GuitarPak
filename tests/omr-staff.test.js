@@ -14,6 +14,9 @@
 // noteheads, clefs or staff lines, which must throw homr's messages).
 // fitEllipse (predict_symbols) draws from cv::theRNG, which carries from page to page in the
 // Python process: the pages run in sorted order from a fresh RNG, like omr-boxes.
+// The adversarial audit (tools/omr/dump_staff_audit.py, dump_staff_repair_fuzz.py: photos, rotated /
+// curved / cut / partial pages, unit fuzz, system_repair fuzz, eprint logs) and an opencv.js leak
+// check run after them; SL_OMR_STAFF_ONLY=base|audit runs one part.
 'use strict';
 const crypto = require('crypto');
 const path = require('path');
@@ -76,7 +79,7 @@ function detectStaffsInImage(predictions, debug, rec) {
     averageNoteHeadHeight = unitSize;
   }
   rec.averageNoteHeadHeight = averageNoteHeadHeight;
-  eprint('Average note head height: ' + averageNoteHeadHeight);
+  eprint('Average note head height: ' + OMR.py.floatRepr(averageNoteHeadHeight)); // str(float)
 
   const allNoteheads = noteheadsWithStems.map((notehead) => notehead.notehead);
   const allStems = noteheadsWithStems.filter((note) => note.stem !== null).map((note) => note.stem);
@@ -543,10 +546,19 @@ async function auditSuite() {
     for (const n of MASKS) m[n] = mask(path.join(H.FIX, cse.masks + '-' + n + '.png'));
     OMR.cv2.resetRNG();
     const debug = new OMR.debug.Debug(null, 'audit.png', false);
-    const rec = {};
-    let err = null, multi = null;
-    try { multi = detectStaffsInImage(predictionsOf(m), debug, rec)[0]; } catch (e) { err = errText(e); }
+    const rec = {}, log = [];
+    let err = null, multi = null, repaired = null;
+    OMR.simple_logging.sink = (msg) => log.push(msg); // the progress notes the worker forwards
+    try {
+      multi = detectStaffsInImage(predictionsOf(m), debug, rec)[0];
+      repaired = SR.repairSystems(debug, multi);
+    } catch (e) { err = errText(e); } finally { OMR.simple_logging.sink = null; }
     H.ok(err === cse.error, 'audit ' + cse.name + ': ' + (cse.error === null ? 'no exception' : 'throws ' + cse.error) + (err !== cse.error ? ' -- got ' + err : ''));
+    if (cse.log) {
+      const i = cse.log.findIndex((line, k) => line !== log[k]);
+      H.ok(i < 0 && log.length === cse.log.length, 'audit ' + cse.name + ': eprint log (' + log.length + ' lines) == homr\'s' +
+        (i >= 0 ? ' -- line ' + i + ': ' + JSON.stringify(log[i]) + ' vs ' + JSON.stringify(cse.log[i]) : log.length !== cse.log.length ? ' -- ' + log.length + ' vs ' + cse.log.length + ' lines' : ''));
+    }
     const got = {}, want = {};
     if ('average_note_head_height' in cse) { got.average_note_head_height = rec.averageNoteHeadHeight; want.average_note_head_height = cse.average_note_head_height; }
     if ('unit_size_from_clefs' in cse) { got.unit_size_from_clefs = F(rec.unitSizeFromClefs); want.unit_size_from_clefs = cse.unit_size_from_clefs; }
@@ -554,7 +566,7 @@ async function auditSuite() {
     check('audit ' + cse.name + ' values', got, want, TOLX, true);
     for (const key of Object.keys(cse.stage07)) check('audit ' + cse.name + ' 07 ' + key, camelRec(rec, key), cse.stage07[key], TOL4, false, cmpPy);
     if (cse.error === null && multi) {
-      check('audit ' + cse.name + ' 08', SR.repairSystems(debug, multi), cse.repaired.multi_staffs, TOL4, false, cmpPy);
+      check('audit ' + cse.name + ' 08', repaired, cse.repaired.multi_staffs, TOL4, false, cmpPy);
       let bad = 0;
       for (const r of cse.repair) {
         if (r.build_error) continue;
@@ -711,13 +723,18 @@ async function leakSuite(cv) {
 
 (async () => {
   const cv = await H.cv();
-  if (process.env.SL_OMR_STAFF_ONLY !== 'audit') {
+  // SL_OMR_STAFF_ONLY=base: the fixture pages, edge cases and debug pictures; =audit: the audit
+  // (tools/omr/dump_staff_audit.py, dump_staff_repair_fuzz.py); unset: everything
+  const only = process.env.SL_OMR_STAFF_ONLY || '';
+  if (only !== 'audit') {
     await pagesSuite();
     await edgeSuite();
     await debugSuite();
   }
-  await repairFuzzSuite();
-  await auditSuite();
+  if (only !== 'base') {
+    await repairFuzzSuite();
+    await auditSuite();
+  }
   await leakSuite(cv);
   H.done();
 })().catch((e) => { console.log('FAIL crashed: ' + (e && e.stack || e)); process.exit(1); });

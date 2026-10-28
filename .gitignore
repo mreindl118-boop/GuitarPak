@@ -4,3 +4,7 @@ releases/*.idsig
 *.keystore
 *.jks
 *.p12
+
+# Python bytecode from the tools/omr reference dumps
+__pycache__/
+*.pyc

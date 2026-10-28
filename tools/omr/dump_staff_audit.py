@@ -4,6 +4,8 @@ fixture pages never reach, run through homr's Python as the reference.
 
 usage:
   python -I tools/omr/dump_staff_audit.py FIXTURES --seg SEGNET.onnx
+  ... --only NAME[,NAME]   run only these cases, merged into the existing JSON
+  ... --units-only         recompute only the units, merged into the existing JSON
 
 Writes FIXTURES/15-staff-audit.json and FIXTURES/15-staff-audit-<case>-<mask>.png (0/255 masks).
 
@@ -433,9 +435,23 @@ def run_case(name, masks, seed):
         wmask(os.path.join(FIX, '15-staff-audit-%s-%s.png' % (safe, n)), masks[n])
     masks = {n: mask_png(os.path.join(FIX, '15-staff-audit-%s-%s.png' % (safe, n))) for n in MASKS}
     cv2.setRNGSeed(0)
-    v, ms, err, debug = detect(predictions(masks))
+    log = []  # homr's eprint lines (the worker forwards them as progress notes)
+
+    def cap(*a, **kw):
+        log.append(' '.join(str(x) for x in a))
+    mods = [m for m in list(sys.modules.values())
+            if getattr(m, '__name__', '').startswith('homr') and getattr(m, 'eprint', None) is not None]
+    saved = [(m, m.eprint) for m in mods]
+    for m in mods:
+        m.eprint = cap
+    try:
+        v, ms, err, debug = detect(predictions(masks))
+        repaired = SR.repair_systems(debug, ms) if err is None else None
+    finally:
+        for m, fn in saved:
+            m.eprint = fn
     out = {'name': name, 'masks': '15-staff-audit-%s' % safe, 'error': err,
-           'shape': list(masks['staff'].shape)}
+           'shape': list(masks['staff'].shape), 'log': log}
     if 'average_note_head_height' in v:
         out['average_note_head_height'] = F(v['average_note_head_height'])
     if 'unit_size_from_clefs' in v:
@@ -444,7 +460,7 @@ def run_case(name, masks, seed):
         out['staffs'] = [stf(s) for s in v['staffs']]
     out['stage07'] = roundtrip(stage07(v))
     if err is None:
-        out['repaired'] = roundtrip({'multi_staffs': SR.repair_systems(debug, ms)})
+        out['repaired'] = roundtrip({'multi_staffs': repaired})
         out['repair'] = repair_cases(v['staffs'], seed, 10)
     print(name, '->', err, 'staffs', len(v.get('staffs') or []),
           'systems', None if ms is None else [len(r.staffs) for r in ms], file=sys.stderr)
