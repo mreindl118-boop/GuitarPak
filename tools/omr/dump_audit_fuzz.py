@@ -155,6 +155,16 @@ def errors():
             written.append(d._debug_file_name('x'))
         dbg.append([n, d.dir_name, d.base_filename, written])
     out['debug'] = dbg
+    # str() / repr() of floats and of the model objects (logging, eprint, skip reasons)
+    rnd = random.Random(2)
+    vals = [0.0, -0.0, 1.0, -3.0, 0.5, 1e16, 1e15, 9999999999999998.0, 123456789012345678.0, 1e21, 1e22, 1e-4, 1e-5,
+            1.5e-7, 0.00012345, 2.5e-300, 5e-324, 1.7976931348623157e308, 100.0, 12345.678, 0.1, 1 / 3, -2.5e-5, 1e100]
+    vals += [rnd.uniform(-1e6, 1e6) for _ in range(30)] + [10 ** rnd.uniform(-20, 25) for _ in range(60)]
+    out['repr'] = [[v, repr(v), '-' if math.copysign(1, v) < 0 else '+'] for v in vals]
+    box = ((12.5, 3.0), (1e-5, 40.0), -45.0)
+    out['str'] = {'box': str(RotatedBoundingBox(box, np.zeros((0, 1, 2), np.int32))), 'box_raw': box,
+                  'point': str(StaffPoint(10.0, [1.0, 2.5, 1e16, 4.0, 5.0], 0.0)),
+                  'pair': str(MultiStaff.GrandStaffPair([2, 3], 0.1 + 0.2))}
     return out
 
 
@@ -370,6 +380,36 @@ def one_page(page):
     bl = [RotatedBoundingBox(r, e, debug_id=k) for k, r in enumerate(bl_raw)]
     out['bar_lines'] = {'raw': bl_raw, 'unit': unit, 'kept': [b.debug_id for b in detect_bar_lines(bl, unit)]}
     out['errors'] = errors()
+
+    # ---- fitEllipse on degenerate point sets (< 25 points: cv2's own Jacobi SVD; >= 25 go to
+    # LAPACK dgesdd, which the port does not reproduce bit for bit), each from a fresh theRNG
+    # (setRNGSeed(0) = a new process) so the jitter path is compared in isolation ----
+    import cv2
+    fits = []
+    for t in range(200):
+        n, kind = rnd.choice([5, 6, 7, 9, 12, 16, 20, 24]), t % 8
+        if kind == 0:
+            y = rnd.randint(0, 100); pts = [[rnd.randint(0, 100), y] for _ in range(n)]
+        elif kind == 1:
+            x = rnd.randint(0, 100); pts = [[x, rnd.randint(0, 100)] for _ in range(n)]
+        elif kind == 2:
+            a = rnd.randint(0, 50); pts = [[a + k, a + rnd.choice([1, 2, 3]) * k] for k in range(n)]
+        elif kind == 3:
+            q = [rnd.randint(0, 100), rnd.randint(0, 100)]; pts = [q[:] for _ in range(n)]
+        elif kind == 4:
+            q, r = [rnd.randint(0, 100), rnd.randint(0, 100)], [rnd.randint(0, 100), rnd.randint(0, 100)]
+            pts = [rnd.choice([q, r])[:] for _ in range(n)]
+        elif kind == 5:
+            pts = [[50 + rnd.randint(0, 1), 50 + rnd.randint(0, 2)] for _ in range(n)]
+        elif kind == 6:
+            pts = [[k * 3, 10 + (1 if k == n // 2 else 0)] for k in range(n)]
+        else:
+            pts = [[rnd.uniform(0, 50), rnd.uniform(0, 20)] for _ in range(n)]
+        dt = np.float32 if kind == 7 else np.int32
+        arr = np.array(pts, dt).reshape(-1, 1, 2)
+        cv2.setRNGSeed(0)
+        fits.append({'dt': 'float32' if kind == 7 else 'int32', 'pts': arr.ravel().tolist(), 'box': call(lambda arr=arr: cv2.fitEllipse(arr))})
+    out['fit_ellipse'] = fits
     return out
 
 

@@ -100,12 +100,6 @@
   // copy a Mat's pixels back into an image (in-place drawing)
   function writeBack(img, m) { img.data.set(view(m, m.depth())); return img; }
 
-  // flat x,y pairs -> CV_32SC2 / CV_32FC2 Mat. cv2's point functions take int32 / float32
-  // arrays only (int64 is converted by the bindings, but there is no int64 typed array here): a
-  // typed array of another dtype raises cv2.error like the (-215) depth assertion in Python, e.g.
-  // a Float64Array = a float64 numpy array, which homr always casts with .astype(np.float32).
-  // Nested JS arrays are untyped: all-integer -> int32, else float32. `dtype` = the dtype the
-  // function requires (getAffineTransform: float32 only).
   // where cv2 5.0.0 asserts the point dtype (file, line, condition, function), for its message
   var PTS_ASSERT = {
     minAreaRect: ['geometry/src/convhull.cpp', 147, 'total >= 0 && (depth == CV_32F || depth == CV_32S)', 'convexHull'],
@@ -123,6 +117,11 @@
     fillConvexPoly: ['imgproc/src/drawing.cpp', 2099, 'points.checkVector(2, CV_32S) >= 0', 'fillConvexPoly'],
     drawContours: ['imgproc/src/drawing.cpp', 2242, 'npoints > 0', 'drawContours']
   };
+  // cv2's point functions take int32 / float32 arrays only (int64 is converted by the bindings,
+  // but there is no int64 typed array here): a typed array of another dtype raises cv2.error with
+  // cv2's (-215) depth assertion, e.g. a Float64Array = a float64 numpy array, which homr always
+  // casts with .astype(np.float32) first. Nested JS arrays are untyped and pass. `dtype` = the one
+  // dtype the function requires (getAffineTransform: float32; drawing: int32).
   function checkPts(p, dtype, fn) {
     if (!ArrayBuffer.isView(p)) return;
     var dt = np.dtypeOf(p);
@@ -131,6 +130,8 @@
       throw new CvError(cvAssertText(a[0], a[1], -215, 'Assertion failed', a[2], a[3]));
     }
   }
+  // flat x,y pairs -> CV_32SC2 / CV_32FC2 Mat (nested JS arrays: all-integer -> int32, else
+  // float32, or the required dtype)
   function ptsMat(p, dtype, fn) {
     checkPts(p, dtype, fn);
     var a = np.toPts(p, dtype), n = a.length >> 1, m;

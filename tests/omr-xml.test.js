@@ -199,6 +199,65 @@ if (!fs.existsSync(auditPath)) {
   // KeyError messages: str(KeyError(k)) = repr(k)
   const keyBad = au.keyerrors.filter(([s, w]) => JSON.stringify((() => { const e = errOf(() => MX.buildNoteOrRest(sym(s), 0, false, new MX.ConversionState(16, new Fraction(1)), '')); return e && [e.error, e.message]; })()) !== JSON.stringify(w));
   H.ok(keyBad.length === 0, 'audit: KeyError messages (repr of a string key) ' + (au.keyerrors.length - keyBad.length) + '/' + au.keyerrors.length + (keyBad.length ? ' first bad ' + JSON.stringify(keyBad[0]) : ''));
+
+  // second audit, the API boundary (dump_lang.py audit_boundary). Values arrive tagged.
+  const bd = au.boundary;
+  if (!bd) H.skip('audit boundary cases (12-lang-audit.json predates them: run tools/omr/dump_lang.py --audit)');
+  else {
+    const untag = (v) => {
+      if (v === null || typeof v === 'boolean') return v;
+      if ('int' in v) return Number(v.int);
+      if ('float' in v) return v.float === 'nan' ? NaN : v.float === 'inf' ? Infinity : v.float === '-inf' ? -Infinity : Number(v.float);
+      if ('str' in v) return v.str;
+      if ('list' in v) return v.list.map(untag);
+      throw new Error('bad tag ' + JSON.stringify(v));
+    };
+    const TRY = (fn) => { try { return { ok: fn() }; } catch (e) { return { error: e.name, message: e.message }; } };
+    const eq = (got, want) => (want.error ? got.error === want.error && got.message === want.message : JSON.stringify(got) === JSON.stringify(want));
+    const rep = (label, list, fn) => { const bad = list.filter((c) => !fn(c)); H.ok(!bad.length, label + ' ' + (list.length - bad.length) + '/' + list.length + (bad.length ? ' first bad ' + JSON.stringify(bad[0]).slice(0, 500) : '')); };
+    const voice = () => ['clef_G2 _ _ _ _ upper', 'note_4 C4 _ _ _ upper', 'chord . . . . .', 'note_4 E4 # _ _ upper', 'barline . . . . .'].map(sym);
+    // bool() and str() of XmlGeneratorArguments: NaN is truthy ('nan'), inf, 10**21, 1e-07, True ...
+    rep('audit2: XmlGeneratorArguments(large_page, metronome, tempo) with NaN / inf / huge / tiny / bool / str values', bd.xml_args, (c) => {
+      const a = c.args.map(untag);
+      return eq(TRY(() => MX.xmlToString(MX.generateXml(new MX.XmlGeneratorArguments(a[0], a[1], a[2]), [voice()], ''))), c.error ? c : { ok: c.ok });
+    });
+    // lcm without the product a * b (which rounds past 2^53); an lcm past 2^53 raises OverflowError
+    rep('audit2: find_common_division exact where a * b passes 2^53, OverflowError past it', bd.common_division, ([fr, want]) => {
+      const got = TRY(() => MX.findCommonDivision(fr.map((s) => { const [n, d] = s.split('/'); return new Fraction(+n, +d); })));
+      return Number.isSafeInteger(want) ? got.ok === want : got.error === 'OverflowError';
+    });
+    // the serializer with non-str texts: `if text:` is Python truthiness, the error says repr + Python type
+    const build = (where, v) => {
+      if (where === 'comment') return MX.ET.Comment(v);
+      if (where === 'pi') return MX.ET.ProcessingInstruction('t', v);
+      const e = new MX.Element(where === 'nulltag' ? null : 'a', where === 'attrib' ? { b: v } : {});
+      if (where === 'text' || where === 'nulltag') e.text = v;
+      if (where === 'tail') e.tail = v;
+      return e;
+    };
+    rep('audit2: ElementTree serializer with NaN / int / float / bool / None texts, tails, attributes, comments, PIs', bd.serializer, (c) => {
+      const v = untag(c.v);
+      return ['text', 'tail', 'attrib', 'comment', 'pi', 'nulltag'].every((w) => eq(TRY(() => MX.xmlToString(build(w, v))), c[w]));
+    });
+    H.ok(eq(TRY(() => MX.xmlToString(new MX.Element(5))), bd.serializer_tag), 'audit2: a non-str tag: ' + bd.serializer_tag.message);
+    // int() of token texts (repr in the ValueError) and str[i] by code point (clef sign / line, pitch step / octave)
+    rep('audit2: build_time_signature / build_multi_measure_rest int() of odd texts', bd.int_texts, ([rh, want]) => {
+      const attributes = new MX.Element('attributes');
+      const got = TRY(() => {
+        if (rh.startsWith('timeSignature')) MX.buildTimeSignature(new ES(rh), attributes, new MX.ConversionState(16, new Fraction(1)));
+        else MX.buildMultiMeasureRest(new ES(rh), attributes);
+        return MX.xmlToString(attributes);
+      });
+      return eq(got, want);
+    });
+    rep('audit2: build_clef / build_note_or_rest index code points (astral sign, line, step, octave)', bd.astral, ([rh, pitch, want]) => {
+      const got = TRY(() => {
+        if (pitch === null) { const at = new MX.Element('attributes'); MX.buildClef(new ES(rh, '_', '_', '_', '_', 'upper'), at); return MX.xmlToString(at); }
+        return MX.xmlToString(MX.buildNoteOrRest(new ES(rh, pitch, '_', '_', '_', 'upper'), 0, false, new MX.ConversionState(16, new Fraction(1)), ''));
+      });
+      return eq(got, want);
+    });
+  }
 }
 // fixture-free invariants: an imgpos comment never says NaN / Infinity / 1e+21
 {

@@ -273,7 +273,12 @@
 
   function _noteValue(symbols, indices) {
     // homr: triplet_restoration.py:244
-    return symbols[Math.min.apply(null, indices)].rhythm.split('_')[1];
+    // (min() of no indices and a rhythm without '_' raise like Python; the threes homr finds
+    // are never empty and are plain note values, so neither happens there)
+    if (!indices.length) { const e = new Error('min() arg is an empty sequence'); e.name = e.pyType = 'ValueError'; throw e; }
+    const parts = symbols[Math.min.apply(null, indices)].rhythm.split('_');
+    if (parts.length < 2) { const e = new Error('list index out of range'); e.name = e.pyType = 'IndexError'; throw e; }
+    return parts[1];
   }
 
   function _countByNoteValue(symbols, chosen) {

@@ -51,6 +51,14 @@ js/omr/midi.js, for paths the pages and the synthetic scores never reach:
             approximated), plus engine options at their limits on belle-p1: tempo 0 (music21
             raises ZeroDivisionError), under ~3.58 bpm (mido cannot store the set_tempo and the
             engine keeps music21's unpolished file), 112.5, 99999.
+--audit2 writes only FIXTURES/13-midi-audit2.json, the second audit's cases (same layout, run_case with
+  the whole engine GM table): random scores over the whole vocabulary x random options (tempo, every
+  menu program, transpose -12..12, titles), 9-18 parts (channel 10/11/16), options at their limits,
+  titles with characters XML 1.0 forbids (music21's expat parse fails: ParseError), dynamics whose
+  volumeScalar raises IndexError, degenerate voices, and "lenient" cases (job[7]: repeats music21
+  cannot expand, translated with the whole score unexpanded = midi.js's default, see _Lenient);
+  plus "keys"/"pitches" (Stream.transpose of every key signature / spelled pitch) and "chars"
+  ([text, expat's ParseError message or None]).
 Nothing here is written by hand: every expectation is music21 / mido output.
 """
 import argparse
@@ -72,6 +80,8 @@ ap.add_argument('--no-pages', action='store_true')
 ap.add_argument('--no-synthetic', action='store_true')
 ap.add_argument('--no-edge', action='store_true')
 ap.add_argument('--audit', action='store_true', help='only write FIXTURES/13-midi-audit.json (adversarial audit cases)')
+ap.add_argument('--audit2', action='store_true', help='only write FIXTURES/13-midi-audit2.json (second audit: options, '
+                'transposition tables, lenient repeats, not-well-formed XML, dynamics, channels)')
 ap.add_argument('fixtures')
 ap.add_argument('pages', nargs='*')
 A = ap.parse_args()
@@ -155,7 +165,41 @@ def step4(musicxml_text, tempo_bpm, gm_prog, transpose_semitones, title, instrum
         shutil.rmtree(work_dir, ignore_errors=True)
 
 
-GM_NAMES = {0: 'Acoustic Grand Piano', 24: 'Acoustic Guitar (Nylon)', 40: 'Violin'}
+# the engine's GM_INSTRUMENTS (tools/sheetlab_engine.py), by program: the name step 4 gives the
+# inserted instrument (it never reaches the MIDI bytes; other programs get a made-up name)
+GM_INSTRUMENTS = {
+    "Acoustic Grand Piano": 0, "Bright Acoustic Piano": 1, "Honky-tonk / Ragtime Piano": 3,
+    "Electric Piano (Rhodes)": 4, "Harpsichord": 6, "Celesta": 8, "Music Box": 10, "Vibraphone": 11,
+    "Marimba": 12, "Church Organ": 19, "Accordion": 21, "Acoustic Guitar (Nylon)": 24,
+    "Acoustic Guitar (Steel)": 25, "Electric Guitar (Jazz)": 26, "Electric Guitar (Clean)": 27,
+    "Acoustic Bass": 32, "Violin": 40, "Viola": 41, "Cello": 42, "String Ensemble": 48, "Choir Aahs": 52,
+    "Trumpet": 56, "Trombone": 57, "French Horn": 60, "Alto Sax": 65, "Tenor Sax": 66, "Oboe": 68,
+    "Clarinet": 71, "Flute": 73,
+}
+GM_NAMES = {v: k for k, v in GM_INSTRUMENTS.items()}
+
+
+class _Lenient:
+    """js/omr/midi.js's default for repeats music21 cannot expand: the whole score is translated
+    unexpanded. Reproduced in music21 by letting Score.expandRepeats fall back to a copy of the
+    score when its Expander raises (any part failing leaves every part unexpanded)."""
+    def __enter__(self):
+        import copy
+        import music21
+        from music21 import stream
+        self.orig = orig = stream.Score.expandRepeats
+
+        def expand(score, *a, **k):
+            try:
+                return orig(score, *a, **k)
+            except music21.repeat.ExpanderException:
+                return copy.deepcopy(score)
+        stream.Score.expandRepeats = expand
+        return self
+
+    def __exit__(self, *exc):
+        from music21 import stream
+        stream.Score.expandRepeats = self.orig
 
 
 # ---------------------------------------------------------------- dumps
@@ -236,11 +280,19 @@ def summary(score, midi, tempo):
 def run_case(job):
     xml_text, inp, tempo, program, transpose, title = job[:6]
     exports = job[6] if len(job) > 6 else True
+    lenient = job[7] if len(job) > 7 else False
     import music21
-    out, err = step4(xml_text, tempo, program, transpose, title, GM_NAMES[program], exports)
+    name = GM_NAMES.get(program, 'GM program %s' % program)
+    if lenient:
+        with _Lenient():
+            out, err = step4(xml_text, tempo, program, transpose, title, name, exports)
+    else:
+        out, err = step4(xml_text, tempo, program, transpose, title, name, exports)
     case = {'input': inp, 'tempo': tempo, 'program': program, 'transpose': transpose, 'title': title}
     if not exports:
         case['exports'] = False
+    if lenient:
+        case['lenient'] = True
     if err:
         case['error'] = err
     if 'mid' in out:
@@ -503,7 +555,247 @@ def run_audit(pool):
     print('audit', len(cases), 'cases', sum(1 for c in cases if 'error' in c), 'errors', file=sys.stderr)
 
 
+# ---------------------------------------------------------------- --audit2
+
+def audit2_voice(r, V, vocab):
+    """A random homr voice over the WHOLE vocabulary: every clef, key and time signature, extreme
+    pitches, all articulations and dynamics, grand staffs, and (in some voices) repeats/voltas."""
+    E = V.EncodedSymbol
+    rh = list(vocab.rhythm)
+    notes = [x for x in rh if x.startswith('note_') and ('G' not in x or x.split('_')[1].split('G')[0] in
+                                                          ('0', '1', '2', '4', '8', '16', '32', '64', '128'))]
+    rests = [x for x in rh if x.startswith('rest_') and 'G' not in x and not x.endswith('m')] + ['rest_3m', 'rest_2m']
+    plain = ['note_4', 'note_8', 'note_2', 'note_16', 'note_4.', 'note_1', 'note_12', 'note_6', 'note_8.', 'note_2.']
+    pitches = list(vocab.pitch)[2:]
+    mid = [p for p in pitches if p[-1] in '3456']
+    lifts = ['_'] * 12 + ['#', 'b', 'N', '##', 'bb']
+    arts = ['_'] * 20 + list(vocab.articulation)[2:]
+    slurs = ['_'] * 8 + ['slurStart', 'slurStop', 'slurStart_slurStop']
+    two = r.random() < 0.4
+    pos = (['upper'] * 5 + ['lower'] * 4 + ['upper2', 'lower2']) if two else (['upper'] * 8 + ['upper2'])
+    clefs = [x for x in rh if x.startswith('clef_') and 'TAB' not in x]
+    keys = [x for x in rh if x.startswith('keySignature')]
+    times = [x for x in rh if x.startswith('timeSignature')]
+    seq = [E(r.choice(clefs), '_', '_', '_', '_', 'upper')]
+    if two:
+        seq += [E('chord'), E(r.choice(clefs), '_', '_', '_', '_', 'lower')]
+    if r.random() < 0.9:
+        seq.append(E(r.choice(keys)))
+    if r.random() < 0.9:
+        seq.append(E(r.choice(times)))
+    rep_ = ['repeatStart', 'repeatEnd', 'repeatEndStart', 'voltaStart', 'voltaStop', 'voltaDiscontinue'] if r.random() < 0.3 else []
+    others = (['barline'] * 14 + ['doublebarline', 'bolddoublebarline', 'newline'] + rep_ +
+              [r.choice(keys), r.choice(times), r.choice(clefs)] + ['dynamic_' + d for d in V.DYNAMICS])
+    for _ in range(r.randint(5, 140)):
+        x = r.random()
+        if x < 0.58:
+            rhythm = r.choice(plain) if r.random() < 0.7 else r.choice(notes)
+            s = E(rhythm, r.choice(mid if r.random() < 0.85 else pitches), r.choice(lifts), r.choice(arts),
+                  r.choice(slurs), r.choice(pos))
+        elif x < 0.7:
+            s = E(r.choice(rests), '_', '_', '_', '_', r.choice(pos))
+        else:
+            rhythm = r.choice(others)
+            if rhythm.startswith(('clef', 'dynamic')):
+                art = r.choice(['_', '_', 'dynamic_poco', 'dynamic_piu']) if rhythm != 'dynamic_empty' else 'dynamic_dolce'
+                s = E(rhythm, '_', '_', art, '_', r.choice(pos))
+            else:
+                s = E(rhythm)
+        seq.append(s)
+        if seq[-1].rhythm.startswith(('note', 'rest')) and r.random() < 0.3:
+            seq.append(E('chord'))
+    return seq
+
+
+def xml_text(voices, args, title):
+    from homr.music_xml_generator import generate_xml
+    from homr.transformer import vocabulary as V
+    root = generate_xml(args, [V.remove_duplicated_symbols(v) for v in voices], title)
+    fd, path = tempfile.mkstemp(suffix='.musicxml')
+    os.close(fd)
+    ET.ElementTree(root).write(path, encoding='unicode', xml_declaration=True)
+    with open(path, encoding='utf-8', newline='') as f:
+        text = f.read()
+    os.remove(path)
+    return text
+
+
+def audit2_tables():
+    """Stream.transpose(n) of every key signature and of spelled pitches (score.transpose is what
+    the engine calls; KeySignature.transpose(int) alone would respell keys beyond 6 sharps/flats)."""
+    from music21 import key, note, pitch, stream
+    keys = []
+    for k in range(-7, 8):
+        for n in range(-24, 25):
+            sc, pa, m = stream.Score(), stream.Part(), stream.Measure()
+            m.insert(0, key.KeySignature(k))
+            m.append(note.Note('C4'))
+            pa.append(m)
+            sc.insert(0, pa)
+            t = sc.transpose(n)
+            keys.append([k, n, t.recurse().getElementsByClass(key.KeySignature).first().sharps])
+    pitches = []
+    for step in 'CDEFGAB':
+        for alt in (-2, -1, 0, 1, 2, None):
+            for octv in (0, 1, 4, 7, 8, 9):
+                for n in (-24, -13, -12, -7, -3, -1, 1, 2, 5, 7, 11, 12, 13, 24):
+                    sc, pa, m = stream.Score(), stream.Part(), stream.Measure()
+                    nn = note.Note(step + str(octv))
+                    if alt is not None:
+                        nn.pitch.accidental = pitch.Accidental(alt)
+                    m.append(nn)
+                    pa.append(m)
+                    sc.insert(0, pa)
+                    q = sc.transpose(n).recurse().notes.first().pitch
+                    pitches.append([step, alt, octv, n, q.step, q.accidental.alter if q.accidental is not None else None,
+                                    q.octave, q.midi])
+    return keys, pitches
+
+
+def audit2_chars(r):
+    """[text, expat's error or None]: characters XML 1.0 forbids, raw or as references, in text,
+    attributes and comments (music21 parses MusicXML with expat)."""
+    pool = ['a', 'Ü', 'é', '\U0001F600', '\n', '\r', '\r\n', '\t', ' ', '\x7f', '\x85', '\u2028', '\ufffd',
+            '&amp;', '&#65;', '&#x1F600;']
+    bad = ['\x00', '\x01', '\x08', '\x0b', '\x0c', '\x0e', '\x1f', '\ufffe', '\uffff', '&#1;', '&#x0;', '&#xFFFE;',
+           '&#55296;', '&#xDFFF;', '&#x110000;', '&#11;']
+    out = []
+    for _ in range(300):
+        def seg(k, allow_bad):
+            toks = [r.choice(pool) for _ in range(r.randint(0, k))]
+            if allow_bad and r.random() < 0.5:  # (inside a comment "&#1;" is plain text, no error)
+                toks.insert(r.randint(0, len(toks)), r.choice(bad))
+            return ''.join(toks)
+        where = r.choice(['text', 'attr', 'comment', 'multi'])
+        if where == 'text':
+            x = '<?xml version="1.0"?>\n<a>' + seg(8, False) + '<b>' + seg(10, True) + '</b>' + seg(5, True) + '</a>'
+        elif where == 'attr':
+            x = '<a x="' + seg(8, True) + '">' + seg(5, False) + '</a>'
+        elif where == 'comment':
+            x = '<a>' + seg(4, False) + '<!--' + seg(8, True) + '-->' + seg(5, True) + '</a>'
+        else:
+            x = '<a>\n' + seg(8, False) + '\r\n<c>' + seg(9, True) + '</c>\r' + seg(9, True) + '\n</a>'
+        try:
+            ET.fromstring(x)
+            msg = None
+        except ET.ParseError as e:
+            msg = str(e)
+        out.append([x, msg])
+    return out
+
+
+def run_audit2(pool):
+    """Second adversarial audit of js/omr/midi.js: what the first references never vary."""
+    import random
+    from homr.music_xml_generator import XmlGeneratorArguments
+    from homr.transformer import vocabulary as V
+    r = random.Random(20261028)
+    vocab = V.Vocabulary()
+    noargs = XmlGeneratorArguments(large_page=False, metronome=None, tempo=None)
+    inputs, jobs, sjobs = {}, [], []
+    E = lambda t: V.EncodedSymbol(*t.split(' '))  # noqa: E731
+    # 1. random scores over the whole vocabulary x random engine options (any tempo, all GM menu
+    #    programs, transpose -12..12, titles); 1-3 parts or 9-13 (channel assignment)
+    gm = sorted(GM_NAMES)
+    titles = ['', 'Belle', 'Für Elise', 'A & B <c>', '0', 'x' * 200, 'Été']
+    k = 0
+    while k < 70:
+        kk = r.random()
+        nv = 1 if kk < 0.55 else 2 if kk < 0.8 else 3 if kk < 0.9 else r.randint(9, 13)
+        voices = [audit2_voice(r, V, vocab) for _ in range(nv)]
+        tempo = r.choice([r.randint(20, 300)] * 6 + [112.5, 60.25, 99.9, 33.3])
+        meta = r.choice([None, tempo, r.randint(40, 200)])
+        try:
+            text = xml_text(voices, XmlGeneratorArguments(large_page=False, metronome=meta, tempo=meta), 'Audit %d' % k)
+        except Exception:  # noqa: BLE001 - random voices homr cannot write
+            continue
+        name = 'fuzz-%02d' % k
+        inputs[name] = text
+        tr = r.randint(-12, 12) if r.random() < 0.8 else 0
+        jobs.append((text, name, tempo, r.choice(gm), tr, r.choice(titles), False))
+        if tr:
+            sjobs.append((text, name + '|' + str(tr), tr))
+        k += 1
+    # 2. channels: a piano (2 staves, program 0) first seen in part 10 gets channel 10 (drums),
+    #    in part 11 channel 11, after 15 voice parts channel 16 ...
+    single = ['clef_G2 _ _ _ _ upper', 'keySignature_1', 'timeSignature/4', 'note_4 C5 _ _ _ upper',
+              'note_4 C5 # _ _ upper', 'note_2 C5 _ _ _ upper', 'barline']
+    double = ['clef_G2 _ _ _ _ upper', 'chord', 'clef_F4 _ _ _ _ lower', 'keySignature_1', 'timeSignature/4',
+              'note_2 G4 _ _ _ upper', 'chord', 'note_2 C3 _ _ _ lower', 'note_2 E4 _ _ _ upper', 'barline']
+    for layout in ('0000000001', '00000000011', '1000000000000', '000000000010000', '0000000000000001',
+                   '010101010101010101'):
+        name = 'parts-' + layout
+        inputs[name] = xml_text([[E(t) for t in (double if c == '1' else single)] for c in layout], noargs, 'Parts')
+        for prog in (0, 24, 52):
+            jobs.append((inputs[name], name, 112, prog, 0, 'Parts', False))
+    # 3. options at their limits on a page (programs outside the menu, negative / huge tempos,
+    #    transposes far beyond +-12)
+    with open(os.path.join(FIX, 'belle-p1', '11-score.musicxml'), encoding='utf-8', newline='') as f:
+        inputs['belle'] = f.read()
+    for prog in (1, 47, 112, 115, 118, 119, 127):
+        jobs.append((inputs['belle'], 'belle', 112, prog, 0, 'Belle', False))
+    for tempo in (-60, -0.5, 3.5763, 0.0001, 5e7, 2 ** 31, 1e300):
+        jobs.append((inputs['belle'], 'belle', tempo, 0, 0, 'Belle', False))
+    for tr in (-60, -48, 48, 60, 100):
+        jobs.append((inputs['belle'], 'belle', 112, 24, tr, 'Belle', False))
+    # 4. a title with a character XML 1.0 forbids (PDF metadata): music21 cannot parse the file
+    for i, title in enumerate(['A\x01B', 'Seite\x0c1', 'A\x00B', 'A\ufffeB', 'A\ud800B', 'A\r\nB']):
+        name = 'title-%d' % i
+        inputs[name] = xml_text([[E('clef_G2 _ _ _ _ upper'), E('note_4 C4 _ _ _ upper')]], noargs, title)
+        jobs.append((inputs[name], name, 112, 0, 0, title, False))
+    # 5. dynamics music21 cannot scale (thisDynamic[-1] of ''): IndexError only for a note in its span
+    first = inputs['belle'].index('<note>')
+    last = inputs['belle'].rindex('</measure>')
+    def dyn(mark):
+        return ('<direction placement="below"><direction-type><dynamics>' + mark +
+                '</dynamics></direction-type><staff>1</staff></direction>')
+    variants = [('s', first, dyn('<s />')), ('blank-other', first, dyn('<other-dynamic> </other-dynamic>')),
+                ('empty-other', first, dyn('<other-dynamic />')), ('z', first, dyn('<z />')),
+                ('other-s', first, dyn('<other-dynamic>s</other-dynamic>')), ('ss', first, dyn('<ss />')),
+                ('s-at-end', last, dyn('<s />')), ('s-then-p', first, dyn('<s />') + dyn('<p />'))]
+    for name, at, d in variants:
+        inputs['dyn-' + name] = inputs['belle'][:at] + d + inputs['belle'][at:]
+        jobs.append((inputs['dyn-' + name], 'dyn-' + name, 112, 0, 0, 'Dyn', False))
+    # 6. degenerate voices
+    degenerate = {
+        'empty-voice': [[]], 'clef-only': [['clef_G2 _ _ _ _ upper']], 'barline-only': [['barline']],
+        'grace-only': [['note_8G C4 _ _ _ upper']], 'rest-only': [['rest_4 _ _ _ _ upper']], 'two-empty': [[], []],
+        'measure-rest': [['clef_G2 _ _ _ _ upper', 'timeSignature/4', 'rest_3m _ _ _ _ upper', 'barline']],
+        'repeat-only': [['repeatEnd']], 'volta-only': [['voltaStart', 'note_4 C4 _ _ _ upper', 'voltaStop']],
+        'zero-dur': [['note_0 C4 _ _ _ upper']], 'extremes': [['note_4 B9 ## _ _ upper', 'note_4 C0 bb _ _ upper']],
+        'ts48': [['timeSignature/48', 'note_1 C4 _ _ _ upper', 'barline', 'note_1 C4 _ _ _ upper']],
+    }
+    for name, vs in degenerate.items():
+        inputs['degen-' + name] = xml_text([[E(t) for t in v] for v in vs], noargs, 'Degenerate')
+        for tr in (0, 5):
+            jobs.append((inputs['degen-' + name], 'degen-' + name, 112, 0, tr, 'Degenerate', False))
+    # 7. repeats music21 cannot expand, translated unexpanded (midi.js's default, see _Lenient)
+    lenient = []
+    with open(os.path.join(FIX, 'brahms-vals3-p1', '13-midi-ref.json'), encoding='utf-8') as f:
+        brahms = json.load(f)['inputs']
+    for name, text in brahms.items():
+        inputs['brahms-' + name] = text
+        lenient += [(text, 'brahms-' + name, 112, 0, 0, 'Brahms', False, True),
+                    (text, 'brahms-' + name, 80, 24, -3, 'Brahms', False, True)]
+    for name in [n for n in inputs if n.startswith('fuzz-')]:
+        if '<repeat ' in inputs[name] or '<ending ' in inputs[name]:
+            lenient.append((inputs[name], name, 112, 0, 2, 'Fuzz', False, True))
+    cases = pool.map(run_case, jobs + lenient)
+    scores = dict(pool.map(run_score, sjobs))
+    keys, pitches = audit2_tables()
+    out = {'inputs': inputs, 'cases': cases, 'scores': scores, 'keys': keys, 'pitches': pitches,
+           'chars': audit2_chars(r)}
+    with open(os.path.join(FIX, '13-midi-audit2.json'), 'w', encoding='utf-8') as f:
+        json.dump(out, f)
+    print('audit2', len(cases), 'cases', sum(1 for c in cases if 'error' in c), 'errors,',
+          sum(1 for c in cases if c.get('lenient')), 'lenient', file=sys.stderr)
+
+
 if __name__ == '__main__':
+    if A.audit2:
+        with Pool(A.jobs) as pool:
+            run_audit2(pool)
+        sys.exit(0)
     if A.audit:
         with Pool(A.jobs) as pool:
             run_audit(pool)

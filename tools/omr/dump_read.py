@@ -3,7 +3,10 @@ transformer_encoder_inference.js, transformer_decoder_inference.js, transformer_
 staff_parsing_tromr.js, staff_parsing.js; tests/omr-read.test.js).
 
 usage: python -I tools/omr/dump_read.py [--models DIR] [--fp32-enc PATH] [--modes ship,fp16,fp32enc]
-                                        [--ctx] [--no-synthetic] FIXTURES
+                                        [--ctx] [--no-synthetic | --only-synthetic] FIXTURES
+The reference fixtures ($OMR/fixtures) were made with (~6 min; then --only-synthetic, 45 s):
+  python -I tools/omr/dump_read.py --models $OMR/shipmodels --fp32-enc $OMR/models/encoder_<model>.onnx \
+      --modes ship,fp32enc,fp16 --ctx --no-synthetic $OMR/fixtures
 
 Always runs every page of FIXTURES in sorted order in one process: the pages share cv::theRNG
 through fitEllipse (see tools/omr/dump_staff.py), so a page's staffs only reproduce when the

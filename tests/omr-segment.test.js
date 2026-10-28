@@ -235,7 +235,16 @@ function checkFilter(label, preds, rep, debug) {
     const arg = (v) => typeof v === 'string' ? '\'' + v + '\'' : String(v === null ? 'None' : v === true ? 'True' : v === false ? 'False' : v);
     for (const c of doc.cases) {
       let input = null;
-      if (c.shape) {
+      if (c.fn === 'autocrop_bgra') {
+        // the synthetic photo, cut by c.sub rows / columns, with an alpha channel of 255
+        const src = H.readPng(path.join(H.FIX, c.source));
+        const [dy, dx] = c.sub, hh = src.h - dy, ww = src.w - dx;
+        input = np.zeros([hh, ww, 4], 'uint8');
+        for (let y = 0; y < hh; y++) for (let x = 0; x < ww; x++) {
+          const s = ((y + dy) * src.w + x + dx) * 3, d = (y * ww + x) * 4;
+          input.data[d] = src.data[s]; input.data[d + 1] = src.data[s + 1]; input.data[d + 2] = src.data[s + 2]; input.data[d + 3] = 255;
+        }
+      } else if (c.shape) {
         input = np.full(c.shape, c.fill === 'arange' ? 0 : c.fill, c.dtype || 'uint8');
         if (c.fill === 'arange') for (let i = 0; i < input.data.length; i++) input.data[i] = i % 251;
       }
@@ -244,6 +253,10 @@ function checkFilter(label, preds, rep, debug) {
       else if (c.fn === 'create_noise_grid') got = await outcome(() => watch('create_noise_grid', () => OMR.noise_filtering.createNoiseGrid(input, new OMR.debug.Debug(null, 'edges', false))));
       else if (c.fn === 'estimate_noise') got = await outcome(() => watch('estimate_noise', () => OMR.np.full([1], OMR.noise_filtering.estimateNoise(input))));
       else if (c.fn === 'autocrop_with_offset') got = await outcome(() => watch('autocrop', () => OMR.autocrop.autocropWithOffset(input)));
+      else if (c.fn === 'autocrop_bgra') {
+        got = await outcome(() => watch('autocrop', () => OMR.autocrop.autocropWithOffset(input)));
+        extra = ' BGRA of ' + c.source.replace(/^30-seg-|-00-input\.png$/g, '') + ' from row ' + c.sub[0] + ', column ' + c.sub[1];
+      }
       else if (c.fn === 'apply_clahe') got = await outcome(() => watch('apply_clahe', () => OMR.color_adjust.applyClahe(input)));
       else if (c.fn === 'inference') {
         // a stand-in Segnet.create: was the Segnet made (homr raises for a None step before)?

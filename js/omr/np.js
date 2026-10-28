@@ -131,15 +131,33 @@
     }
     return false;
   }
-  // str()/repr() for logging: numbers, nested arrays as tuples, objects via toString
+  // repr(float): the shortest round-trip digits (the same as JS's), but positional only for
+  // exponents -4 .. 15, an exponent of at least two digits with its sign ('1e-05', '1e+16') and
+  // '.0' on integral values ('3.0', '-0.0')
+  function floatRepr(v) {
+    if (v !== v) return 'nan';
+    if (v === Infinity) return 'inf';
+    if (v === -Infinity) return '-inf';
+    if (v === 0) return Object.is(v, -0) ? '-0.0' : '0.0';
+    var m = /^(-?)(\d)(?:\.(\d+))?e([+-]\d+)$/.exec(v.toExponential());
+    var sign = m[1], digits = m[2] + (m[3] || ''), exp = +m[4];
+    if (exp < -4 || exp >= 16) {
+      var e = Math.abs(exp), es = (exp < 0 ? '-' : '+') + (e < 10 ? '0' : '') + e;
+      return sign + digits.charAt(0) + (digits.length > 1 ? '.' + digits.slice(1) : '') + 'e' + es;
+    }
+    if (exp < 0) return sign + '0.' + '0'.repeat(-exp - 1) + digits;
+    if (digits.length <= exp + 1) return sign + digits + '0'.repeat(exp + 1 - digits.length) + '.0';
+    return sign + digits.slice(0, exp + 1) + '.' + digits.slice(exp + 1);
+  }
+  // str()/repr() for logging: numbers (as Python floats), nested arrays as tuples, objects via toString
   function repr(v) {
     if (Array.isArray(v) || ArrayBuffer.isView(v)) return '(' + Array.prototype.map.call(v, repr).join(', ') + ')';
-    if (typeof v === 'number') return Number.isInteger(v) && Math.abs(v) < 1e16 ? v.toFixed(1) : String(v);
+    if (typeof v === 'number') return floatRepr(v);
     if (v === null || v === undefined) return 'None';
     if (typeof v === 'boolean') return v ? 'True' : 'False';
     return String(v);
   }
-  OMR.py = { round: pyRound, int: pyInt, floorDiv: floorDiv, mod: mod, divmod: divmod, sorted: sorted, cmp: cmp, max: maxBy, min: minBy, max2: max2, min2: min2, range: range, contains: contains, repr: repr, error: pyError };
+  OMR.py = { round: pyRound, int: pyInt, floorDiv: floorDiv, mod: mod, divmod: divmod, sorted: sorted, cmp: cmp, max: maxBy, min: minBy, max2: max2, min2: min2, range: range, contains: contains, repr: repr, floatRepr: floatRepr, error: pyError };
 
   // ---- numpy reductions over plain arrays / typed arrays ----
   function toArr(a) { return Array.isArray(a) ? a : Array.prototype.slice.call(a); }

@@ -375,7 +375,7 @@
       }
       this.simplices = triangles;
     }
-    // homr: staff_dewarping.py:51
+    // homr: staff_dewarping.py:54
     // Find the index of a point in the points array (np.linalg.norm in float32, first minimum)
     _findPointIndex(point, points, tolerance) {
       tolerance = tolerance === undefined ? 1e-3 : tolerance;
@@ -389,7 +389,7 @@
       if (minD < fr(tolerance)) return minIdx;
       return null;
     }
-    // homr: staff_dewarping.py:61
+    // homr: staff_dewarping.py:64
     // Find which triangle contains each point -> Int32Array (-1 = none)
     findSimplex(points) {
       const pts = Array.isArray(points[0]) || ArrayBuffer.isView(points[0]) ? toF32Points(points) : toF32Points([points]);
@@ -407,7 +407,7 @@
       }
       return result;
     }
-    // homr: staff_dewarping.py:77
+    // homr: staff_dewarping.py:81
     // Check if point is inside triangle using barycentric coordinates (all float32 arithmetic)
     _pointInTriangle(point, triangle) {
       const x = point[0], y = point[1];
@@ -424,7 +424,7 @@
     }
   }
 
-  // homr: staff_dewarping.py:93
+  // homr: staff_dewarping.py:99
   // triangle: 3 float32 points, point: float64 (an np.float64 tuple): b[0] - a[0] is a float32
   // difference, point[1] - a[1] a float64 one
   function _isPointInTriangle(point, triangle) {
@@ -485,7 +485,7 @@
 
   function triangleOf(points, simplex) { return [points[simplex[0]], points[simplex[1]], points[simplex[2]]]; }
 
-  // homr: staff_dewarping.py:106
+  // homr: staff_dewarping.py:111
   // Piecewise affine transformation using triangulation
   class PiecewiseAffineTransform {
     constructor() {
@@ -494,7 +494,7 @@
       this.triangulation = null;
       this.affineMatrices = [];
     }
-    // homr: staff_dewarping.py:115
+    // homr: staff_dewarping.py:120
     // Estimate the piecewise affine transformation from source to destination points
     estimate(src, dst) {
       this.srcPoints = toF32Points(src);
@@ -519,7 +519,7 @@
         }
       }
     }
-    // homr: staff_dewarping.py:139
+    // homr: staff_dewarping.py:144
     // Transform a single point using the piecewise affine transformation
     transformPoint(point) {
       if (this.triangulation === null) return point;
@@ -529,7 +529,7 @@
       if (mat === null) return point;
       return applyMat(mat, point[0], point[1]);
     }
-    // homr: staff_dewarping.py:157
+    // homr: staff_dewarping.py:164
     // Maps a point of the warped image back to the source image. Uses the same
     // triangles as warp_image, only looked up by their destination corners.
     inverseTransformPoint(point) {
@@ -544,7 +544,7 @@
       }
       return point;
     }
-    // homr: staff_dewarping.py:175
+    // homr: staff_dewarping.py:185
     // Warp an image using the piecewise affine transformation
     warpImage(image, fillColor, order) {
       fillColor = fillColor === undefined ? 1 : fillColor;
@@ -609,7 +609,7 @@
       }
       return output;
     }
-    // homr: staff_dewarping.py:269
+    // homr: staff_dewarping.py:282
     // Check if triangle has near-zero area (float32 arithmetic like numpy)
     static _isDegenerateTriangle(triangle) {
       const v1 = [fr(triangle[1][0] - triangle[0][0]), fr(triangle[1][1] - triangle[0][1])];
@@ -617,7 +617,7 @@
       const area = fr(Math.abs(fr(fr(v1[0] * v2[1]) - fr(v1[1] * v2[0]))) / 2.0);
       return area < fr(1e-6);
     }
-    // homr: staff_dewarping.py:277
+    // homr: staff_dewarping.py:290
     // Calculate area of a triangle
     static _triangleArea(triangle) {
       const v1 = [fr(triangle[1][0] - triangle[0][0]), fr(triangle[1][1] - triangle[0][1])];
@@ -626,7 +626,7 @@
     }
   }
 
-  // homr: staff_dewarping.py:284
+  // homr: staff_dewarping.py:297
   class StaffDewarping {
     constructor(tform) { this.tform = tform; }
     dewarp(image, fillColor, order) {
@@ -643,7 +643,7 @@
     }
   }
 
-  // homr: staff_dewarping.py:304
+  // homr: staff_dewarping.py:317
   function isPointOnImage(pts, image) {
     const height = image.h, width = image.w;
     const margin = 10;
@@ -651,7 +651,7 @@
     return true;
   }
 
-  // homr: staff_dewarping.py:312
+  // homr: staff_dewarping.py:325
   // -> [spanPoints, optimalPoints]: lists of lines of [x, y] int points
   function calculateSpanAndOptimalPoints(staff, image) {
     const spanPoints = [];
@@ -690,7 +690,7 @@
     return [spanPoints, optimalPoints];
   }
 
-  // homr: staff_dewarping.py:347
+  // homr: staff_dewarping.py:360
   // source / destination: lists of lines of [x, y] (the lines are extended in place like Python's)
   function calculateDewarpTransformation(image, source, destination) {
     function addImageEdgesToLines(lines) {
@@ -716,7 +716,7 @@
     return new StaffDewarping(tform);
   }
 
-  // homr: staff_dewarping.py:377
+  // homr: staff_dewarping.py:392
   function dewarpStaffImage(image, staff, index, debug) {
     try {
       const so = calculateSpanAndOptimalPoints(staff, image);

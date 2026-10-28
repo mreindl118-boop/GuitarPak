@@ -302,6 +302,80 @@ if (!fs.existsSync(auditPath)) {
     good = cases.filter((c) => same(tryClean(c.voices), cleanWant(c))).length;
     H.ok(good === cases.length, 'audit: ' + kind + ' voices through _clean_up_voice ' + good + '/' + cases.length + ' exact incl. image coordinates');
   }
+
+  // second audit, the API boundary (dump_lang.py audit_boundary): what a JS caller may pass that
+  // homr's own calls never do. Values arrive tagged ({int}, {float}, {str}, {set}, {dict}, {list}).
+  const bd = au.boundary;
+  if (!bd) H.skip('audit boundary cases (12-lang-audit.json predates them: run tools/omr/dump_lang.py --audit)');
+  else {
+    const untag = (v) => {
+      if (v === null || typeof v === 'boolean') return v;
+      if ('int' in v) return Number(v.int);
+      if ('float' in v) return v.float === 'nan' ? NaN : v.float === 'inf' ? Infinity : v.float === '-inf' ? -Infinity : Number(v.float);
+      if ('str' in v) return v.str;
+      if ('set' in v) return new Set(v.set);
+      if ('dict' in v) return Object.fromEntries(v.dict.map((k) => [k, 0]));
+      if ('list' in v) return v.list.map(untag);
+      throw new Error('bad tag ' + JSON.stringify(v));
+    };
+    const TRY = (fn) => { try { return { ok: fn() }; } catch (e) { return { error: e.name, message: e.message }; } };
+    const firstBad = (list, fn) => { const bad = list.filter((c) => !fn(c)); return [list.length - bad.length, bad[0]]; };
+    const rep = (label, list, fn) => { const [n, bad] = firstBad(list, fn); H.ok(n === list.length, label + ' ' + n + '/' + list.length + (bad ? ' first bad ' + JSON.stringify(bad).slice(0, 400) : '')); };
+    // These two used to loop forever on Infinity (prior_power_of_two(inf), a 309+ digit kern):
+    // they run in a child process with a time limit, so a regression FAILs instead of hanging.
+    const child = (cases, body) => {
+      const lib = ['np.js', 'transformer_vocabulary.js'].map((f) => 'require(' + JSON.stringify(path.join(H.ROOT, 'js', 'omr', f)) + ');').join('');
+      const code = lib + 'const V = globalThis.OMR.transformer_vocabulary; const cases = ' + JSON.stringify(cases) + ';' +
+        'const out = cases.map((c) => { try { return { ok: (' + body + ')(c) }; } catch (e) { return { error: e.name, message: e.message }; } });' +
+        'process.stdout.write(JSON.stringify(out));';
+      const r = require('child_process').spawnSync(process.execPath, ['-e', code], { timeout: 20000, encoding: 'utf8' });
+      if (r.error || r.status !== 0) return cases.map(() => ({ error: r.error && r.error.code === 'ETIMEDOUT' ? 'HANG (killed after 20 s)' : 'child failed: ' + (r.stderr || '').slice(0, 200) }));
+      return JSON.parse(r.stdout);
+    };
+    // n.bit_length() is int-only: a float (also NaN / inf, where the loop never ended) raises AttributeError
+    const ppGot = child(bd.prior_power_of_two.map(([n]) => n), "(n) => { const v = n === null || typeof n === 'boolean' ? n : 'int' in n ? Number(n.int) : n.float === 'nan' ? NaN : n.float === 'inf' ? Infinity : n.float === '-inf' ? -Infinity : Number(n.float); return V.priorPowerOfTwo(v); }");
+    rep('audit2: prior_power_of_two of floats / NaN / infinities / big ints (no hang)', bd.prior_power_of_two.map((c, i) => c.concat([ppGot[i]])), ([, want, got]) =>
+      (want.error ? got.error === want.error && got.message === want.message : got.ok === untag(want.ok)));
+    // Python's int is exact; past 2^53 the port raises OverflowError (309+ digits used to hang the page)
+    const kGot = child(bd.kern_huge.map(([k]) => k), '(k) => { const d = V.kernToSymbolDuration(k); return { base_duration: String(d.baseDuration), dots: d.dots, actual_notes: d.actualNotes, normal_notes: d.normalNotes, fraction: String(d.fraction), kern: d.kern }; }');
+    rep('audit2: kern_to_symbol_duration past 2^53 raises OverflowError (no hang), below it is exact', bd.kern_huge.map((c, i) => c.concat([kGot[i]])), ([, want, fits, got]) => {
+      if (!fits) return got.error === 'OverflowError';
+      return same(got.ok, Object.assign({}, want.ok, { actual_notes: Number(want.ok.actual_notes), normal_notes: Number(want.ok.normal_notes), kern: Number(want.ok.kern) }));
+    });
+    // remove_tuplet of a digit string past 2^53: string in, string out, exact (BigInt)
+    rep('audit2: remove_tuplet / is_tuplet on duration digits past 2^53', bd.remove_tuplet_big, ([rh, out, isSame, isTuplet]) => {
+      const s = new ES(rh, 'C4', '_', '_', '_', 'upper');
+      const r = s.removeTuplet();
+      return r.rhythm === out && (r === s) === isSame && s.isTuplet() === isTuplet;
+    });
+    // list.extend(str / set / dict) and `x in str / set / dict` in the training-side helpers
+    const ex = sym('note_4 C4 _ staccato_tenuto slurStart upper');
+    rep('audit2: add_articulations / add_slurs extend any iterable, strip_* use Python\'s `in`', bd.extend_in, ([kind, a, w1, w2]) => {
+      const arg = untag(a);
+      const eq = (got, want) => (want.error ? got.error === want.error && got.message === want.message : same(got, want));
+      if (kind === 'add') return eq(TRY(() => String(ex.addArticulations(arg))), w1) && eq(TRY(() => String(ex.addSlurs(arg))), w2);
+      const strip = (m) => TRY(() => { const [st, r] = ex[m](arg); return [st, String(r)]; });
+      return eq(strip('stripArticulations'), w1) && eq(strip('stripSlurs'), w2);
+    });
+    // bool() of the flags: NaN, non-empty strings and lists are True in Python
+    const flagSeq = () => syms(['note_12 C4 _ _ _ lower', 'barline . . . . .', 'note_4 C4 _ _ _ lower', 'chord . . . . .', 'note_4 E4 _ _ _ lower', 'barline . . . . .']);
+    rep('audit2: cleanup_tuplets / keep_chord_symbol / remove_all flags are Python truthiness (NaN is true)', bd.flags, ([f, rds, stc, sa, ss]) => {
+      const flag = untag(f);
+      return same(SL(V.removeDuplicatedSymbols(flagSeq(), flag)), rds) && same(CH(V.sortTokenChords(flagSeq(), flag)), stc) &&
+        same(ex.stripArticulations(['tenuto'], flag)[0], sa) && same(ex.stripSlurs([], flag)[0], ss);
+    });
+    // str() of a symbol with a non-str field raises TypeError (str.join); hash() does not
+    rep('audit2: str(EncodedSymbol) with a None / int / float / bool field raises like str.join, hash does not', bd.str_fields, ([fields, want, hashOk]) => {
+      const s = new ES(...fields.map(untag));
+      const got = TRY(() => String(s));
+      return got.error === want.error && got.message === want.message && same(TRY(() => typeof s.hashKey() === 'string'), hashOk);
+    });
+    rep('audit2: _note_value of no indices / a rhythm without "_" raises like Python', bd.note_value, ([ix, want]) => {
+      const tbl = syms(['note_8 C4 _ _ _ upper', 'barline . . . . .']);
+      const got = TRY(() => T._noteValue(tbl, ix));
+      return want.error ? got.error === want.error && got.message === want.message : got.ok === want.ok;
+    });
+  }
 }
 // fixture-free: comparisons and sums whose products leave 2^53 stay exact (invariants only)
 {

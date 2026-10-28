@@ -33,6 +33,7 @@
     if (Number.isNaN(x)) return 'nan';
     if (x === Infinity) return 'inf';
     if (x === -Infinity) return '-inf';
+    if (Object.is(x, -0)) return '-0.0';  // no Python int is a negative zero
     if (Number.isInteger(x)) return BigInt(x).toString();
     return pyFloatRepr(x);
   }
@@ -120,7 +121,7 @@
     findtext(path, dflt) {
       const e = this.find(path);
       if (e === null) return dflt === undefined ? null : dflt;
-      return e.text || '';
+      return e.text === null || e.text === undefined ? '' : e.text;  // "" only for a None text
     }
     iter(tag) {  // depth first, the element itself first
       const out = [];
@@ -161,7 +162,11 @@
 
   function ProcessingInstruction(target, text) {
     const element = new Element(ProcessingInstruction);
-    element.text = pyTruthy(text) ? target + ' ' + text : target;
+    element.text = target;
+    if (pyTruthy(text)) {
+      if (typeof text !== 'string' || typeof target !== 'string') throw pyError('TypeError', 'can only concatenate str (not "' + V.pyTypeName(typeof target !== 'string' ? target : text) + '") to str');
+      element.text = target + ' ' + text;
+    }
     return element;
   }
 
@@ -659,10 +664,17 @@
     }
   }
 
-  function pyIntText(text) {  // int(el.text)
-    const s = String(text).trim();
-    if (!/^[+-]?[0-9]+$/.test(s)) throw pyError('ValueError', "invalid literal for int() with base 10: '" + text + "'");
-    return parseInt(s, 10);
+  // int(text) for the texts homr parses: the digit strings it wrote itself and a time
+  // signature's / multirest's number from a vocabulary token. (Python's int() also reads
+  // Unicode digits and 1_000; no such text reaches it.)
+  function pyIntText(text) {
+    if (typeof text === 'number') return py.int(text);
+    if (typeof text !== 'string') throw pyError('TypeError', "int() argument must be a string, a bytes-like object or a real number, not '" + V.pyTypeName(text) + "'");
+    const s = text.trim();
+    if (!/^[+-]?[0-9]+$/.test(s)) throw pyError('ValueError', 'invalid literal for int() with base 10: ' + pyReprStr(text));
+    const v = parseInt(s, 10);
+    if (!Number.isSafeInteger(v)) throw pyError('OverflowError', 'JS port: ' + s + ' does not fit a JS number (2^53)');
+    return v;
   }
 
   function rebalanceMeasureVoices(measure) {
@@ -834,7 +846,7 @@
 
   function buildClef(modelClef, attributes) {
     // homr: music_xml_generator.py:574
-    const signAndLine = secondField(modelClef.rhythm, '_');
+    const signAndLine = Array.from(secondField(modelClef.rhythm, '_'));  // str[i] indexes code points
     const clef = SubElement(attributes, 'clef', { number: String(getStaff(modelClef)) });
     if (signAndLine.length < 2) throw pyError('IndexError', 'string index out of range');
     SubElement(clef, 'sign').text = signAndLine[0];
@@ -990,9 +1002,10 @@
       SubElement(note, 'rest');
     } else {
       const pitch = SubElement(note, 'pitch');
-      if (modelPitch.length < 2) throw pyError('IndexError', 'string index out of range');
-      SubElement(pitch, 'step').text = modelPitch[0];
-      SubElement(pitch, 'octave').text = modelPitch[1];
+      const cp = Array.from(modelPitch);  // str[i] indexes code points
+      if (cp.length < 2) throw pyError('IndexError', 'string index out of range');
+      SubElement(pitch, 'step').text = cp[0];
+      SubElement(pitch, 'octave').text = cp[1];
       if (modelNote.lift === nonote) eprint('WARNING note with invalid lift', modelNote);
       else if (modelNote.lift !== empty) SubElement(pitch, 'alter').text = String(getItem(LIFT_TO_ALTER, modelNote.lift));
     }

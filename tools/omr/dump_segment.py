@@ -323,6 +323,17 @@ if 'edges' in ONLY:
     for fn, call in [('autocrop_with_offset', autocrop_with_offset), ('apply_clahe', color_adjust.apply_clahe)]:
         for shp in [(50, 40), (10, 0, 3), (0, 10, 3), (1, 1, 3), (3, 3, 3)]:
             ecases.append({'fn': fn, 'shape': list(shp), 'fill': 200, 'out': outcome(lambda: call(np.full(shp, 200, np.uint8)))})
+    # a BGRA page (alpha 255) of the synthetic photos, cut by `sub` rows / columns: homr wants BGR
+    # (cv2.imread); its crop path raises ValueError (reshape or broadcast, by the strip's size),
+    # the pages it does not crop come back as they are
+    for name in ['desk', 'desk-shadow', 'desk-blue', 'tiny-paper', 'blank']:
+        src = cv2.imread(os.path.join(FIX, '30-seg-%s-00-input.png' % name))
+        if src is None:
+            continue
+        for sub in [(0, 0), (0, 1), (1, 0), (2, 1)]:
+            bgra = np.ascontiguousarray(cv2.cvtColor(src[sub[0]:, sub[1]:], cv2.COLOR_BGR2BGRA))
+            ecases.append({'fn': 'autocrop_bgra', 'source': '30-seg-%s-00-input.png' % name, 'sub': list(sub),
+                           'shape': list(bgra.shape), 'out': outcome(lambda: autocrop_with_offset(bgra))})
     # inference(): the arguments' Python types decide where (and whether) it raises - a None step
     # before the Segnet is made, a float or None window or a float step in max() / range() /
     # np.full after it; batch sizes that never equal len(batch) run every tile in one batch (a

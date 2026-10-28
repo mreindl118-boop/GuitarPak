@@ -523,10 +523,201 @@ async function debugSuite() {
     'debug pictures have shapes (' + Array.from(kinds).join(', ') + ')');
 }
 
+// The adversarial audit (tools/omr/dump_staff_audit.py -> 15-staff-audit.json): cases the printed
+// fixture pages never reach - real segnet masks of photos (rotated, curved, a book with a strip of
+// the neighbour page, a spread, low-res, dark frame) and transformed fixture masks (rotated,
+// curved, one staff, cut staffs, flipped, scaled, noisy, thick lines, clefs / bar lines removed in
+// part, interrupted lines, shine-through duplicates, stacked pages) - each through the whole stage
+// + repair_systems + random regroupings, plus unit fuzz of check_bbox_size,
+// find_horizontal_lines / filter_line_peaks and break_wide_fragments.
+function errText(e) {
+  if (e && e.pyType) return e.pyType + ': ' + e.message;
+  return 'JS ' + (e && e.name) + ': ' + (e && e.message);
+}
+async function auditSuite() {
+  const file = path.join(H.FIX, '15-staff-audit.json');
+  if (!require('fs').existsSync(file)) { H.skip('audit: no 15-staff-audit.json (run tools/omr/dump_staff_audit.py)'); return; }
+  const audit = H.readJson(file);
+  for (const cse of audit.cases) {
+    const m = {};
+    for (const n of MASKS) m[n] = mask(path.join(H.FIX, cse.masks + '-' + n + '.png'));
+    OMR.cv2.resetRNG();
+    const debug = new OMR.debug.Debug(null, 'audit.png', false);
+    const rec = {};
+    let err = null, multi = null;
+    try { multi = detectStaffsInImage(predictionsOf(m), debug, rec)[0]; } catch (e) { err = errText(e); }
+    H.ok(err === cse.error, 'audit ' + cse.name + ': ' + (cse.error === null ? 'no exception' : 'throws ' + cse.error) + (err !== cse.error ? ' -- got ' + err : ''));
+    const got = {}, want = {};
+    if ('average_note_head_height' in cse) { got.average_note_head_height = rec.averageNoteHeadHeight; want.average_note_head_height = cse.average_note_head_height; }
+    if ('unit_size_from_clefs' in cse) { got.unit_size_from_clefs = F(rec.unitSizeFromClefs); want.unit_size_from_clefs = cse.unit_size_from_clefs; }
+    if ('staffs' in cse) { got.staffs = (rec.staffs || []).map(stf); want.staffs = cse.staffs; }
+    check('audit ' + cse.name + ' values', got, want, TOLX, true);
+    for (const key of Object.keys(cse.stage07)) check('audit ' + cse.name + ' 07 ' + key, camelRec(rec, key), cse.stage07[key], TOL4, false, cmpPy);
+    if (cse.error === null && multi) {
+      check('audit ' + cse.name + ' 08', SR.repairSystems(debug, multi), cse.repaired.multi_staffs, TOL4, false, cmpPy);
+      let bad = 0;
+      for (const r of cse.repair) {
+        if (r.build_error) continue;
+        const multiIn = build(rec.staffs, r.systems);
+        const g = { input: rows(multiIn), info: repairInfo(multiIn) };
+        try { g.repaired = rows(SR.repairSystems(debug, multiIn)); } catch (e) { g.error = errText(e); }
+        const w = { input: r.input, info: r.info };
+        if (r.repaired) w.repaired = r.repaired;
+        if (r.error) w.error = r.error;
+        if (!check('audit ' + cse.name + ' regrouping ' + JSON.stringify(r.systems), g, w, TOLX, true)) bad++;
+      }
+    }
+  }
+  // units
+  const u = audit.units, masks = {};
+  const pageMask = (page, n) => { const k = page + '/' + n; if (!masks[k]) masks[k] = mask(H.fix(page, '05-filtered-' + n + '.png')); return masks[k]; };
+  check('audit check_bbox_size fuzz (' + u.bbox.length + ' boxes)', u.bbox.map((b) => ND.checkBboxSize(b.bbox, pageMask(b.page, 'notehead'), b.unit)),
+    u.bbox.map((b) => b.out), 0);
+  check('audit find_horizontal_lines fuzz (' + u.lines.length + ' zones)', u.lines.map((l) =>
+    SD.findHorizontalLines(np.crop(pageMask(l.page, 'staff'), null, null, l.zone[0], l.zone[1]), l.unit)), u.lines.map((l) => l.lines), 0);
+  check('audit filter_line_peaks fuzz (' + u.peaks.length + ' cases)', u.peaks.map((p) => {
+    const r = SD.filterLinePeaks(p.peaks, Float64Array.from(p.norm), p.ratio);
+    return { valid: r[0], groups: r[1] };
+  }), u.peaks.map((p) => ({ valid: p.valid, groups: p.groups })), 0);
+  // find_staff_anchors on shifted candidates + begins_or_ends_on_one_staff_line; remove_duplicate_staffs /
+  // merge_staffs_in_same_row on raw staffs and their merges
+  const ancU = (a) => ({ symbol: bx(a.symbol.box), unit_sizes: a.unitSizes, avg: a.averageUnitSize, min_y: a.minY, max_y: a.maxY,
+    y_range: [a.yRange.start, a.yRange.stop], zone: [a.zone.start, a.zone.stop], lines: a.staffLines.map((l) => l.staffFragments.map((f) => bx(f.box))) });
+  const rawU = (s) => ({ box: bx(s.box), id: s.staffId, min_x: s.minX, max_x: s.maxX, min_y: s.minY, max_y: s.maxY,
+    contours_len: s.contours.length / 2, lines: s.lines.map((l) => l.staffFragments.map((f) => bx(f.box))), anchors: s.anchors.map((a) => bx(a.symbol.box)) });
+  const shifted = (boxes, fractions) => {
+    const out = [];
+    for (const b of boxes) {
+      const unit = b.size[1] / 4;
+      for (const k of fractions) out.push(new bbx.RotatedBoundingBox([[b.center[0], b.center[1] + k * unit], b.box[1], b.box[2]], b.contours, b.debugId));
+    }
+    return out;
+  };
+  const pageBoxes = {};
+  const boxesOf = (page) => {
+    if (!pageBoxes[page]) {
+      const frags = SD.breakWideFragments(bbx.createRotatedBoundingBoxes(pageMask(page, 'staff'), { skipMerging: true, minSize: [5, 1], maxSize: [10000, 100] }));
+      const bars = bbx.createRotatedBoundingBoxes(BL.prepareBarLineImage(pageMask(page, 'stems_rest')), { skipMerging: true, minSize: [1, 5] });
+      const clefs = bbx.createRotatedBoundingBoxes(pageMask(page, 'clefs_keys'), { minSize: [20, 40], maxSize: [1000, 1000] });
+      pageBoxes[page] = { frags, bars: bars.filter((b) => b.size[1] > 40).slice(0, 30), clefs };
+    }
+    return pageBoxes[page];
+  };
+  if (u.anchors) {
+    check('audit find_staff_anchors on shifted candidates + begins_or_ends_on_one_staff_line', u.anchors.map((a) => {
+      const p = boxesOf(a.page), sym = shifted(p.bars, a.fractions);
+      const barAnchors = SD.findStaffAnchors(p.frags, sym, false);
+      const clefAnchors = SD.findStaffAnchors(p.frags, shifted(p.clefs.slice(0, 12), [-2.0, 0.0, 1.3]), true);
+      const begins = [];
+      for (const c of clefAnchors.slice(0, 8)) for (const s of sym.slice(0, 120)) begins.push(SD.beginsOrEndsOnOneStaffLine(s, c.staffLines, c.averageUnitSize));
+      return { page: a.page, n_bars: p.bars.length, n_clefs: Math.min(p.clefs.length, 12), fractions: a.fractions, bar_anchors: barAnchors.map(ancU), clef_anchors: clefAnchors.map(ancU), begins };
+    }), u.anchors, TOLX, true);
+  }
+  if (u.dups) {
+    const rawsOf = {};
+    check('audit remove_duplicate_staffs / merge_staffs_in_same_row on merged raw staffs', u.dups.map((d) => {
+      if (!rawsOf[d.page]) { const p = boxesOf(d.page); rawsOf[d.page] = SD.findRawStaffsByConnectingLineFragments(SD.findStaffAnchors(p.frags, p.clefs, true), p.frags); }
+      const raws = rawsOf[d.page], r = raws.slice(0, 4);
+      const m01 = r[0].merge(r[1]), m12 = r[1].merge(r[2]);
+      const lists = { 'a-b-ab': [r[0], r[1], m01], 'ab-a-b': [m01, r[0], r[1]], 'a-ab': [r[0], m01], 'ab-a': [m01, r[0]],
+        'a-b-c-ab-bc': [r[0], r[1], r[2], m01, m12], 'ab-bc-b': [m01, m12, r[1]], all: raws.slice(), rev: raws.slice().reverse(), 'a-a': [r[0], r[0]] };
+      const dedup = SD.removeDuplicateStaffs(lists[d.name]);
+      return { page: d.page, name: d.name, dedup: dedup.map(rawU), rows: SD.mergeStaffsInSameRow(dedup).map(rawU) };
+    }), u.dups, TOLX, true);
+  }
+  if (u.raises) {
+    const calls = {
+      '_filter_for_tall_elements([], [])': () => BD._filterForTallElements([], []),
+      'find_braces_brackets_and_grand_staff_lines(debug, [], [])': () => BD.findBracesBracketsAndGrandStaffLines(new OMR.debug.Debug(null, 'x.png', false), [], [])
+    };
+    for (const r of u.raises) {
+      let got = null;
+      try { calls[r.call](); } catch (e) { got = errText(e); }
+      H.ok(got === r.error, 'audit ' + r.call + ' raises ' + r.error + (got !== r.error ? ' -- got ' + got : ''));
+    }
+  }
+  const fragsOf = {};
+  check('audit break_wide_fragments limits', u.break.map((b) => {
+    if (!fragsOf[b.page]) fragsOf[b.page] = bbx.createRotatedBoundingBoxes(pageMask(b.page, 'staff'), { skipMerging: true, minSize: [5, 1], maxSize: [10000, 100] });
+    const res = SD.breakWideFragments(fragsOf[b.page], b.limit);
+    return { n: res.length, boxes: res.map((f) => bx(f.box)), contours_len: res.map((f) => f.contours.length / 2) };
+  }), u.break.map((b) => ({ n: b.n, boxes: b.boxes, contours_len: b.contours_len })), TOLX, true);
+}
+
+// system_repair on synthetic pages (tools/omr/dump_staff_repair_fuzz.py -> 15-staff-repair-fuzz.json)
+async function repairFuzzSuite() {
+  const file = path.join(H.FIX, '15-staff-repair-fuzz.json');
+  if (!require('fs').existsSync(file)) { H.skip('repair fuzz: no 15-staff-repair-fuzz.json (run tools/omr/dump_staff_repair_fuzz.py)'); return; }
+  const fuzz = H.readJson(file);
+  const debug = new OMR.debug.Debug(null, 'fuzz.png', false);
+  let n = 0, bad = 0, first = '';
+  fuzz.pages.forEach((page, pi) => {
+    const staffs = page.staffs.map((grid) => new model.Staff(grid.map((p) => new model.StaffPoint(p[0], p[1].slice(), p[2]))));
+    page.cases.forEach((cse, ci) => {
+      n++;
+      let multiIn, g;
+      try { multiIn = build(staffs, cse.systems); } catch (e) { g = { build_error: e.pyType || 'JS ' + e.name + ': ' + e.message }; }
+      if (multiIn) {
+        g = { input: rows(multiIn), info: repairInfo(multiIn) };
+        try { g.repaired = rows(SR.repairSystems(debug, multiIn)); } catch (e) { g.error = errText(e); }
+      }
+      const c = new Cmp(TOLX, true), want = Object.assign({}, cse);
+      delete want.systems;
+      deep(g, want, 'page ' + pi + ' case ' + ci, c);
+      for (const k of Object.keys(g)) if (!(k in want)) c.fail('page ' + pi + ' case ' + ci + '.' + k, 'unexpected ' + JSON.stringify(g[k]).slice(0, 80));
+      if (!c.ok) { bad++; if (!first) first = c.first; }
+    });
+  });
+  H.ok(bad === 0, 'repair_systems fuzz: ' + (n - bad) + '/' + n + ' regroupings of ' + fuzz.pages.length + ' synthetic pages equal' + (first ? ' -- ' + first : ''));
+}
+
+// the worker runs page after page: no opencv.js object may outlive the stage
+// (the same accounting as omr-cv: every Mat / MatVector / PointVector made and deleted)
+function trackLeaks(cv) {
+  const st = { made: 0, gone: 0 };
+  for (const name of ['Mat', 'MatVector', 'PointVector', 'CLAHE']) {
+    const Real = cv[name];
+    const del = Real.prototype.delete;
+    Real.prototype.delete = function () { st.gone++; return del.call(this); };
+    cv[name] = new Proxy(Real, { construct(T, args) { st.made++; return new T(...args); } });
+  }
+  for (const f of ['getStructuringElement', 'getAffineTransform']) {
+    const g = cv[f];
+    const w = function () { st.made++; return g.apply(this, arguments); };
+    if (g.overloadTable) w.overloadTable = g.overloadTable;
+    cv[f] = w;
+  }
+  const probe = new cv.MatVector(), MV = Object.getPrototypeOf(probe);
+  probe.delete();
+  const get = MV.get;
+  MV.get = function (i) { st.made++; return get.call(this, i); };
+  return st;
+}
+async function leakSuite(cv) {
+  const page = H.pages().filter((p) => H.has(p, '05-filtered-staff.png'))[0];
+  if (!page) return;
+  const m = {};
+  for (const n of MASKS) m[n] = mask(H.fix(page, '05-filtered-' + n + '.png'));
+  const st = trackLeaks(cv);
+  OMR.cv2.resetRNG();
+  const debug = new OMR.debug.Debug(null, page + '.png', false);
+  const multi = detectStaffsInImage(predictionsOf(m), debug, {})[0];
+  SR.repairSystems(debug, multi);
+  new OMR.staff_regions.StaffRegions(multi);
+  SD.prepareStaffImage(m.staff);
+  SD.makeLinesStronger(m.staff, [1, 2]);
+  H.ok(st.made > 0 && st.made === st.gone, page + ': no opencv.js object outlives the stage (' + st.made + ' made, ' + st.gone + ' deleted)');
+}
+
 (async () => {
-  await H.cv();
-  await pagesSuite();
-  await edgeSuite();
-  await debugSuite();
+  const cv = await H.cv();
+  if (process.env.SL_OMR_STAFF_ONLY !== 'audit') {
+    await pagesSuite();
+    await edgeSuite();
+    await debugSuite();
+  }
+  await repairFuzzSuite();
+  await auditSuite();
+  await leakSuite(cv);
   H.done();
 })().catch((e) => { console.log('FAIL crashed: ' + (e && e.stack || e)); process.exit(1); });

@@ -26,7 +26,7 @@
     return { get: (k) => { if (!(k in arr)) throw pyError('KeyError', String(k)); return arr[k]; } };
   }
 
-  // homr: transformer/decoder_inference.py:12
+  // homr: transformer/decoder_inference.py:13
   class ScoreDecoder {
     // transformer: the decoder InferenceSession; ort: the onnxruntime module (Tensor);
     // opts.sessionOpts: what to ask OMR.runtime.session for on every generate (null = keep it)
@@ -62,7 +62,7 @@
       ];
     }
 
-    // homr: transformer/decoder_inference.py:50
+    // homr: transformer/decoder_inference.py:51
     // startTokens / nonoteTokens: [[id]] (or [id], 1-D like Python's num_dims == 1);
     // kwargs.context: {data: Float32Array, dims: [1, n, 512]}. -> Promise<EncodedSymbol[]>
     async generate(startTokens, nonoteTokens, kwargs) {
@@ -149,7 +149,7 @@
       return symbols;
     }
 
-    // homr: transformer/decoder_inference.py:154
+    // homr: transformer/decoder_inference.py:155
     // -> [cache tensors (zeros [1, heads, cacheLen, dim / heads]), input names, output names]
     initCache(cacheLen) {
       cacheLen = cacheLen || 0;
@@ -172,14 +172,14 @@
     return np.argmax(t.data.subarray(n - v, n));
   }
 
-  // homr: transformer/decoder_inference.py:182
+  // homr: transformer/decoder_inference.py:183
   function detokenize(tokens, vocab) {
     let toks = tokens.map((tok) => vocab.get(tok));
     toks = toks.filter((t) => t !== '[BOS]' && t !== '[EOS]' && t !== '[PAD]');
     return toks;
   }
 
-  // homr: transformer/decoder_inference.py:188
+  // homr: transformer/decoder_inference.py:189
   // Returns Tromr's Decoder -> Promise<ScoreDecoder>. Python opens the fp16 decoder with a GPU
   // and decoder_path otherwise; here OMR.runtime's 'decoder' (the int8 one, always WASM).
   // opts: {session (use this InferenceSession), onProgress, onRuntimeProgress}

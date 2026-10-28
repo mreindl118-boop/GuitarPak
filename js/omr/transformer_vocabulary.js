@@ -32,7 +32,7 @@
   function pyTypeName(x) {
     if (x === null || x === undefined) return 'NoneType';
     if (typeof x === 'boolean') return 'bool';
-    if (typeof x === 'number') return Number.isInteger(x) ? 'int' : 'float';
+    if (typeof x === 'number') return Number.isInteger(x) && !Object.is(x, -0) ? 'int' : 'float';
     if (typeof x === 'bigint') return 'int';
     if (typeof x === 'string') return 'str';
     if (Array.isArray(x)) return 'list';
@@ -396,11 +396,12 @@
       // Convert to a final Fraction duration (relative to whole note).
       let dur = this.baseDuration;
 
-      // Apply dots
-      let add = dur.div(2);
+      // Apply dots (Python halves `add` once more than it uses it; computing only the halves
+      // that are added keeps a duration near 2^53 from raising over a value nobody reads)
+      let add = null;
       for (let i = 0; i < this.dots; i++) {
+        add = add === null ? dur.div(2) : add.div(2);
         dur = dur.add(add);
-        add = add.div(2);
       }
 
       // Apply tuplet scaling

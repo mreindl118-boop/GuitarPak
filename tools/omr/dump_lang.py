@@ -40,7 +40,10 @@ the adversarial audit of the JS port (inputs the recordings above never reach: o
 exotic vocabulary tuplets whose sums leave 2^53 in intermediate products, imgpos rounding of
 NaN / infinite / huge coordinates, str.strip whitespace in build_dict, kern bases beyond 2^31,
 KeyError messages of string keys, exact Fraction arithmetic on such sums) plus a seeded sample
-of random and triplet-heavy voices through the clean-up and generate_xml.
+of random and triplet-heavy voices through the clean-up and generate_xml, and (key "boundary", the
+second audit) what a JS caller may pass at the API boundary: NaN / inf / huge / tiny / bool / str
+XmlGeneratorArguments, flags' truthiness, str / set / dict where a list is expected, non-str symbol
+fields and element texts, digit strings past 2^53, lcm products past 2^53, astral characters.
 Expected values come only from running homr; nothing is written by hand.
 """
 import argparse
@@ -1038,6 +1041,152 @@ def audit():
         case['kind'] = 'triplets'
         fuzz.append(case)
     out['fuzz'] = fuzz
+    out['boundary'] = audit_boundary()
+    return out
+
+
+# ---------------------------------------------------------------- second audit: the API boundary
+# What a JS caller can pass that the recordings never do: NaN / infinities / huge ints / tiny
+# floats / bools / strings where homr takes an int or a flag, str / set / dict where it takes a
+# list, non-str element texts, digit strings past 2^53, astral characters in tokens. Values go
+# through JSON tagged: {"int": "123"}, {"float": repr}, {"str": s}, {"set": [...]}, {"dict": [...]},
+# {"list": [...]}; None / bools stay plain.
+
+def TAG(v):
+    if v is None or isinstance(v, bool):
+        return v
+    if isinstance(v, int):
+        return {'int': str(v)}
+    if isinstance(v, float):
+        return {'float': repr(v)}
+    if isinstance(v, str):
+        return {'str': v}
+    if isinstance(v, (set, frozenset)):
+        return {'set': sorted(v)}
+    if isinstance(v, dict):
+        return {'dict': list(v)}
+    if isinstance(v, list):
+        return {'list': [TAG(x) for x in v]}
+    raise TypeError(v)
+
+
+def TRY(fn):
+    try:
+        return {'ok': fn()}
+    except Exception as e:  # noqa: BLE001
+        return ERR(e)
+
+
+def audit_boundary():
+    nan, inf = float('nan'), float('inf')
+    out = {}
+    voice = [V.EncodedSymbol('clef_G2', '_', '_', '_', '_', 'upper'), V.EncodedSymbol('note_4', 'C4', '_', '_', '_', 'upper'),
+             V.EncodedSymbol('chord'), V.EncodedSymbol('note_4', 'E4', '#', '_', '_', 'upper'), V.EncodedSymbol('barline')]
+    vals = [nan, inf, -inf, 10 ** 21, 1e-7, 1.5e-5, 120.5, 0.0001, 1 / 30000, 2.5e-300, 123456.789, -3.5, -0.0, 0, 0.0, 1, 7,
+            True, False, None, '', 'x', 96]
+    cases = []
+    for m in vals:
+        for a in [(False, m, None), (False, 120, m), (m, None, None)]:
+            # bool(x) and str(x) only: the generated part does not depend on the arguments
+            cases.append({'args': [TAG(x) for x in a],
+                          **TRY(lambda a=a: ET.tostring(MX.generate_xml(MX.XmlGeneratorArguments(*a), [voice], ''),
+                                                        encoding='unicode'))})
+    out['xml_args'] = cases
+    out['prior_power_of_two'] = [[TAG(n), TRY(lambda n=n: TAG(V.prior_power_of_two(n)))] for n in
+                                 [5.5, nan, inf, -inf, 0.5, 0, -3, 1, 3, 2 ** 52 + 1, 2 ** 60, 2 ** 60 + 2 ** 10]]
+    # kern bases past 2^53 (Python's int is exact; the JS port refuses them with OverflowError)
+    def fits(d):  # every int of the SymbolDuration within a JS number's exact range
+        f = [d.base_duration.numerator, d.base_duration.denominator, d.fraction.numerator, d.fraction.denominator,
+             d.actual_notes, d.normal_notes, d.kern]
+        return all(abs(x) <= 2 ** 53 - 1 for x in f)
+    out['kern_huge'] = [[k, TRY(lambda k=k: DUR(V.kern_to_symbol_duration(k))), fits(V.kern_to_symbol_duration(k))] for k in
+                        ['9' * 400, '9007199254740993', '18014398509481984', '4' * 30 + 'G', '12345678901234567890.',
+                         '9007199254740991', '4503599627370496']]
+    out['remove_tuplet_big'] = []
+    for rh in ['note_999999999999999999', 'note_' + '9' * 30 + '.', 'rest_123456789012345678', 'note_9007199254740993',
+               'note_' + '7' * 40 + 'G..', 'rest_' + '5' * 25, 'note_' + '1' * 17, 'note_000000000000000000021']:
+        s = V.EncodedSymbol(rh, 'C4', '_', '_', '_', 'upper')
+        r = s.remove_tuplet()
+        out['remove_tuplet_big'].append([rh, r.rhythm, r is s, s.is_tuplet()])
+    out['common_division'] = [[[F(Fraction(1, d)) for d in ds], MX.find_common_division([Fraction(1, d) for d in ds])] for ds in
+                              [[299999967, 699999923], [299999955, 499999925], [299999949, 499999915, 7, 9],
+                               [99999989, 99999971], [392071680, 512, 17], [3, 5, 7, 11, 13, 17, 512, 9]]]
+    # list.extend(iterable) and `x in container` of the training-side EncodedSymbol helpers
+    s = V.EncodedSymbol('note_4', 'C4', '_', 'staccato_tenuto', 'slurStart', 'upper')
+    ext = []
+    for arg in ['ab', {'accent', 'fermata'}, {'trill': 1, 'accent': 2}, ['tenuto', 'accent'], '', []]:
+        ext.append(['add', TAG(arg), TRY(lambda arg=arg: str(s.add_articulations(arg))), TRY(lambda arg=arg: str(s.add_slurs(arg)))])
+    for cont in ['staccatissimo', 'staccato_x', {'staccato'}, {'tenuto': 0}, ['tenuto'], 'slurStartX', '']:
+        ext.append(['strip', TAG(cont), TRY(lambda c=cont: [s.strip_articulations(c)[0], str(s.strip_articulations(c)[1])]),
+                    TRY(lambda c=cont: [s.strip_slurs(c)[0], str(s.strip_slurs(c)[1])])])
+    out['extend_in'] = ext
+    # bool() of the flags
+    seq = [V.EncodedSymbol('note_12', 'C4', '_', '_', '_', 'lower'), V.EncodedSymbol('barline'),
+           V.EncodedSymbol('note_4', 'C4', '_', '_', '_', 'lower'), V.EncodedSymbol('chord'),
+           V.EncodedSymbol('note_4', 'E4', '_', '_', '_', 'lower'), V.EncodedSymbol('barline')]
+    flags = []
+    for f in [nan, 0, 0.0, -0.0, 1, '', 'x', [], ['a'], None, True, False, inf]:
+        flags.append([TAG(f), SL(V.remove_duplicated_symbols(seq, f)),
+                      [SL(c) for c in V.sort_token_chords(seq, f)],
+                      s.strip_articulations(['tenuto'], f)[0], s.strip_slurs([], f)[0]])
+    out['flags'] = flags
+    # str() of a symbol with a non-str field raises (str.join); hash() does not
+    strs = []
+    for fields in [('note_4', None), ('note_4', 'C4', '_', 3), ('note_4', 'C4', '_', '_', 1.5), (None,),
+                   ('note_4', 'C4', '_', '_', '_', True)]:
+        sym = V.EncodedSymbol(*fields)
+        strs.append([[TAG(x) for x in fields], TRY(lambda sym=sym: str(sym)), TRY(lambda sym=sym: hash(sym) is not None)])
+    out['str_fields'] = strs
+    # the ElementTree serializer with non-str texts (NaN is truthy: refused, not skipped)
+    ser = []
+    for v in [nan, 5, 0, 1.5, True, False, None, -0.0, inf]:
+        rec = {'v': TAG(v)}
+        for where in ['text', 'tail', 'attrib', 'comment', 'pi', 'nulltag']:
+            def build(where=where, v=v):
+                if where == 'comment':
+                    return ET.tostring(ET.Comment(v), encoding='unicode')
+                if where == 'pi':
+                    return ET.tostring(ET.ProcessingInstruction('t', v), encoding='unicode')
+                e = ET.Element(None if where == 'nulltag' else 'a', **({'b': v} if where == 'attrib' else {}))
+                if where in ('text', 'nulltag'):
+                    e.text = v
+                if where == 'tail':
+                    e.tail = v
+                return ET.tostring(e, encoding='unicode')
+            rec[where] = TRY(build)
+        ser.append(rec)
+    out['serializer'] = ser
+    out['serializer_tag'] = TRY(lambda: ET.tostring(ET.Element(5), encoding='unicode'))
+    # int() of token texts: repr in the message; str[i] counts code points
+    texts = []
+    for rh in ["timeSignature/4'", 'timeSignature/4"', 'timeSignature/a\\b', 'timeSignature/ 8 ', 'timeSignature/-4']:
+        def ts(rh=rh):
+            attributes = ET.Element('attributes')
+            MX.build_time_signature(V.EncodedSymbol(rh), attributes, MX.ConversionState(16, Fraction(1)))
+            return ET.tostring(attributes, encoding='unicode')
+        texts.append([rh, TRY(ts)])
+    for rh in ["rest_4'm", 'rest_ 3 m', 'rest_xm']:
+        def mm(rh=rh):
+            attributes = ET.Element('attributes')
+            MX.build_multi_measure_rest(V.EncodedSymbol(rh), attributes)
+            return ET.tostring(attributes, encoding='unicode')
+        texts.append([rh, TRY(mm)])
+    out['int_texts'] = texts
+    astral = []
+    for rh, pitch in [('clef_\U0001D11E2', None), ('clef_G\U0001D7DA', None), ('note_4', '\U0001D11E4'), ('note_4', 'C\U0001D7DC')]:
+        if pitch is None:
+            def b(rh=rh):
+                attributes = ET.Element('attributes')
+                MX.build_clef(V.EncodedSymbol(rh, '_', '_', '_', '_', 'upper'), attributes)
+                return ET.tostring(attributes, encoding='unicode')
+        else:
+            def b(rh=rh, pitch=pitch):
+                return ET.tostring(MX.build_note_or_rest(V.EncodedSymbol(rh, pitch, '_', '_', '_', 'upper'), 0, False,
+                                                         MX.ConversionState(16, Fraction(1)), ''), encoding='unicode')
+        astral.append([rh, pitch, TRY(b)])
+    out['astral'] = astral
+    tbl = [V.EncodedSymbol('note_8', 'C4', '_', '_', '_', 'upper'), V.EncodedSymbol('barline')]
+    out['note_value'] = [[ix, TRY(lambda ix=ix: T._note_value(tbl, frozenset(ix)))] for ix in [[0], [], [1], [1, 0]]]
     return out
 
 

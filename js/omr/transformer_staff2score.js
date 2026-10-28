@@ -15,7 +15,7 @@
   }
   const perfCounter = () => (G.performance && G.performance.now ? G.performance.now() / 1000 : Date.now() / 1000);
 
-  // homr: transformer/staff2score.py:14
+  // homr: transformer/staff2score.py:15
   // Inference class for Tromr. Use predict() for prediction
   class Staff2Score {
     // Python's __init__ opens both sessions (asynchronous here): use Staff2Score.create().
@@ -36,7 +36,7 @@
       return new Staff2Score(config, encoder, decoder);
     }
 
-    // homr: transformer/staff2score.py:29
+    // homr: transformer/staff2score.py:30
     // Inference an image (an OMR.np gray image, 256 x 1280 uint8) using Tromr. -> Promise<EncodedSymbol[]>
     async predict(image) {
       const x = _transform.transform(image);
@@ -71,7 +71,7 @@
     }
   }
 
-  // homr: transformer/staff2score.py:64
+  // homr: transformer/staff2score.py:65
   // (img / 255 - mean) / std in float64, then .astype(float32), as numpy computes it
   class ConvertToArray {
     constructor() {

@@ -2,7 +2,7 @@
 // transformer_encoder_inference.js, transformer_decoder_inference.js, transformer_staff2score.js,
 // staff_parsing_tromr.js, staff_parsing.js) against the Python reference on every page.
 //
-// Fixtures (tools/omr/dump_read.py; dump_stages.py's 03 / 09 / 10 / 11):
+// Fixtures (tools/omr/dump_read.py, dump_read_delaunay.py; dump_stages.py's 03 / 09 / 10 / 11):
 //   40-read-staffs.json   the multi_staffs after repair_systems at full precision -> rebuilt into
 //                         model objects (tests/omr/rebuild.js); the image is 03-clahe.png
 //   40-read-prep.json     every prepare_staff_image step (region, crops, the dewarping's points,
@@ -12,23 +12,32 @@
 //                         attention, voices with image_coordinates, the MusicXML
 //                           ship    = the shipping int8 encoder + int8 decoder (what soundLAB runs)
 //                           fp32enc = the fp32 encoder + the int8 decoder
-//                           fp16    = what dump_stages ran (10-tokens.json / 11-score.musicxml)
+//                           fp16    = what dump_stages ran (== 10-tokens.json / 11-score.musicxml)
 //   41-read-ctx-<mode>-NN.bin  Python's encoder output of call NN (decoder-only checks)
-//   40-read-synthetic.json     Subdiv2D / Delaunay / piecewise affine / dewarp / canvas / black
-//                         contours / layouts / measure rests / parse_staffs with a stub transformer
+//   40-read-synthetic.json, 40-read-delaunay-fuzz.json  Subdiv2D / Delaunay / piecewise affine /
+//                         dewarp / canvas / black contours / layouts / measure rests / parse_staffs with
+//                         a stub transformer; 700 fuzz point sets
 //
-// Sections:
+// Sections (all exact unless said otherwise):
 //   synthetic   always (no models)
 //   prep        every staff: each step vs 40-read-prep.json, canvas == 09-staff-NN.png
 //   stub        parse_staffs with Python's own tokens + attention (a stub Staff2Score): voices
-//               (strings + image_coordinates) and MusicXML exact, for ship and fp16 (= 10 / 11)
-//   models      (SL_OMR_MODELS) the JS Staff2Score on every staff through OMR.runtime ('wasm'):
-//               encoder input sha1 exact, tokens vs ship / 10-tokens, the JS decoder fed with
-//               Python's encoder output (exact decoder parity), full parse_staffs -> voices + XML;
-//               timings per staff (encoder ms, decoder ms per token)
+//               (strings + image_coordinates) and MusicXML byte for byte, for ship and fp16 (= 10 / 11)
+//   models      (SL_OMR_MODELS) through OMR.runtime ('wasm'), the shipping int8 models:
+//               - the JS decoder fed with Python's encoder output: tokens and every head's argmax at
+//                 every step identical (logit / attention noise reported)
+//               - parse_staffs with the JS Staff2Score: encoder input sha1 exact; tokens vs Python
+//                 ship must be identical OR start to diverge at a model near tie (Python's top-2 logit
+//                 margin < NEAR_TIE): the int8 encoder's output in onnxruntime-web differs from
+//                 onnxruntime CPU by ~0.04 (DynamicQuantizeLinear amplifies kernel float noise; see
+//                 notes/read.md); pages with identical tokens: voices exact, MusicXML equal apart from
+//                 the imgpos comments (attention positions); token agreement vs 10-tokens.json,
+//                 encoder-output distance, imgpos statistics, MIDI impact and timings are INFO lines
+//               - staff_parsing_tromr's own Staff2Score creation path
 //   fp32        (SL_OMR_FP32_ENCODER=<encoder fp32 .onnx>) the same with the fp32 encoder vs
-//               40-read-fp32enc.json
-// Env: SL_OMR_READ_PAGES=a,b limits the pages; SL_OMR_READ_SKIP=decoder,full,stub,prep,synthetic
+//               40-read-fp32enc.json (the size-vs-fidelity comparison for the owner)
+// Run time (Node, 1 thread): ~40 s without models, ~10 min with, ~18 min with the fp32 comparison.
+// Env: SL_OMR_READ_PAGES=a,b limits the pages; SL_OMR_READ_SKIP=synthetic,prep,stub,decoder,full
 // skips sections.
 'use strict';
 const fs = require('fs');
@@ -38,6 +47,7 @@ const H = require('./omr/harness');
 const R = require('./omr/rebuild');
 const OMR = H.load('staff_parsing.js');
 require(path.join(H.ROOT, 'js', 'omr', 'runtime.js'));
+require(path.join(H.ROOT, 'js', 'omr', 'midi.js')); // impact of a token divergence on the MIDI (INFO only)
 const np = OMR.np, py = OMR.py;
 const DW = OMR.staff_dewarping, SP = OMR.staff_parsing, SPT = OMR.staff_parsing_tromr;
 const V = OMR.transformer_vocabulary, MX = OMR.music_xml_generator, PM = OMR.point_mapping;
@@ -560,15 +570,28 @@ const NEAR_TIE = 1.0;
 // a recording wrapper around a Staff2Score: per predict the image, input sha1, tokens, attention,
 // per-step argmax / margins (through the decoder's onStep) and timings
 class Recorder {
-  constructor(inner) { this.inner = inner; this.calls = []; }
+  // ctxFile(k): Python's encoder output of call k (41-read-ctx-*.bin) to measure the JS encoder against
+  constructor(inner, ctxFile) { this.inner = inner; this.calls = []; this.ctxFile = ctxFile; }
   async predict(image) {
     const x = S2S._transform.transform(image);
     const rec = { image, x: sha1(x.data), steps: [] };
+    const k = this.calls.length;
     this.calls.push(rec);
     const dec = this.inner.decoder, gen = dec.generate;
     dec.generate = function (a, b, kw) { return gen.call(this, a, b, Object.assign({}, kw, { onStep: (o) => rec.steps.push(stepInfo(o)) })); };
+    const enc = this.inner.encoder, egen = enc.generate, file = this.ctxFile && this.ctxFile(k);
+    enc.generate = async function (xx) {
+      const out = await egen.call(this, xx);
+      if (file && fs.existsSync(file)) {
+        const want = readCtx(file).data;
+        let maxd = 0, sum = 0, same = 0;
+        for (let i = 0; i < want.length; i++) { const d = Math.abs(out.data[i] - want[i]); if (d > maxd) maxd = d; sum += d; if (d === 0) same++; }
+        rec.ctx = { maxd, mean: sum / want.length, same: same / want.length };
+      }
+      return out;
+    };
     let out;
-    try { out = await this.inner.predict(image); } finally { delete dec.generate; }
+    try { out = await this.inner.predict(image); } finally { delete dec.generate; delete enc.generate; }
     rec.tokens = out.map(String);
     rec.coords = out.map((s) => s.coordinates === null ? null : Array.from(s.coordinates));
     rec.encMs = this.inner.lastEncoderSecs * 1000;
@@ -656,7 +679,7 @@ async function modelsSection(pagesList, pagesData, opts) {
     }
     if (SKIP.has('full')) continue;
     // ---- the whole stage: parse_staffs with the JS Staff2Score ----
-    const recd = new Recorder(s2s);
+    const recd = new Recorder(s2s, (k) => H.fix(page, '41-read-ctx-' + opts.mode + '-' + String(k).padStart(2, '0') + '.bin'));
     SPT._setInference(recd);
     let voices;
     const t0 = msNow();
@@ -695,6 +718,14 @@ async function modelsSection(pagesList, pagesData, opts) {
     T.tok10 += tok10; T.edits10 += edits10; T.staffs10Same += staffs10; T.pages++;
     H.ok(xOk === w.calls.length && recd.calls.length === w.calls.length, page + ' ' + tag + ' encoder input (ConvertToArray, float32) sha1 == Python\'s: ' + xOk + '/' + w.calls.length);
     console.log('INFO ' + page + ' ' + tag + ' per staff: ' + lines.join('; '));
+    const cs = recd.calls.filter((r) => r.ctx);
+    if (cs.length) {
+      const mx = Math.max(...cs.map((r) => r.ctx.maxd)), mean = cs.reduce((a, r) => a + r.ctx.mean, 0) / cs.length;
+      const eq = cs.reduce((a, r) => a + r.ctx.same, 0) / cs.length;
+      T.ctxMax = Math.max(T.ctxMax || 0, mx); (T.ctxMeans = T.ctxMeans || []).push(mean);
+      console.log('INFO ' + page + ' ' + tag + ' encoder output vs Python\'s (' + cs.length + ' staffs, 655360 floats each): max |diff| ' + mx.toExponential(2) +
+        ', mean |diff| ' + mean.toExponential(2) + ', bit-equal ' + (100 * eq).toFixed(1) + ' %');
+    }
     const allSame = staffsSame === recd.calls.length;
     H.ok(!confident, page + ' ' + tag + ' tokens vs Python ' + opts.mode + ' (onnxruntime CPU): ' + staffsSame + '/' + recd.calls.length + ' staffs identical, ' +
       (tok - edits) + '/' + tok + ' tokens (edit distance ' + edits + ')' + (allSame ? '' : '; every divergence starts at a near tie (Python top-2 margin < ' + NEAR_TIE + ')') +
@@ -724,8 +755,19 @@ async function modelsSection(pagesList, pagesData, opts) {
       H.ok(strip(xml) === strip(w.xml), page + ' ' + tag + ' MusicXML == Python ' + opts.mode + (xml === w.xml ? ' byte for byte' : ' apart from ' + nDiff + ' of ' + ib.length + ' imgpos comments (rounded attention positions)'));
     } else {
       let nd = 0;
-      voices.forEach((v, i) => v.forEach((s, j) => { if (!w.voices[i] || !w.voices[i][j] || String(s) !== w.voices[i][j][0]) nd++; }));
-      console.log('INFO ' + page + ' ' + tag + ' voices: ' + (strSame ? 'strings identical to Python ' + opts.mode : 'differ from Python ' + opts.mode + ' after the token divergence (' + nd + ' symbol positions differ)'));
+      voices.forEach((v, i) => { nd += tokenAgreement(v.map(String), (w.voices[i] || []).map((x) => x[0])).edits; });
+      // what the divergence changes downstream: the MusicXML (without the imgpos comments) and the
+      // MIDI the SheetLab engine writes from it (OMR.midi, tempo 112)
+      const xml = xmlOf(voices), strip = (x) => x.replace(/<!--[^>]*-->/g, '');
+      let midiNote = '';
+      if (OMR.midi && OMR.midi.fromMusicXml) {
+        try {
+          const ma = OMR.midi.fromMusicXml(xml, { tempo: 112 }), mb = OMR.midi.fromMusicXml(w.xml, { tempo: 112 });
+          midiNote = ', MIDI ' + (ma.length === mb.length && ma.every((v, i) => v === mb[i]) ? 'byte-identical' : 'differs');
+        } catch (e) { midiNote = ', MIDI: ' + e.message; }
+      }
+      console.log('INFO ' + page + ' ' + tag + ' voices: ' + (strSame ? 'strings identical to Python ' + opts.mode : 'differ from Python ' + opts.mode + ' after the token divergence (edit distance ' + nd + ')') +
+        '; MusicXML apart from imgpos comments ' + (strip(xml) === strip(w.xml) ? 'identical' : 'differs') + midiNote);
     }
   }
   return { totals: T, createMs, s2s };
@@ -763,6 +805,7 @@ function report(label, r) {
       d.js + ' vs ' + d.py + ' (Python margin ' + d.pyMargin.map((m) => m.toFixed(3)).join('/') + ', JS margin ' + d.jsMargin.map((m) => m.toFixed(3)).join('/') + ', ' +
       d.edits + ' edit(s) in ' + d.tokens + ' tokens)').join('; '));
   }
+  if (t.ctxMeans) console.log('INFO ' + label + ' encoder output vs Python onnxruntime CPU: max |diff| ' + t.ctxMax.toExponential(2) + ', mean |diff| per page ' + t.ctxMeans.map((m) => m.toExponential(1)).join(' / '));
   if (t.imgposN) console.log('INFO ' + label + ' imgpos comments (pages with identical tokens): ' + t.imgposDiff + '/' + t.imgposN + ' differ; image_coordinates distance in page px ' + quantiles(t.coordPx));
   console.log('INFO ' + label + ' timing (Node, onnxruntime-web wasm, 1 thread): encoder ' + Math.round(t.encMs / t.staffs) + ' ms/staff, decoder ' + (t.decMs / t.steps).toFixed(1) +
     ' ms/token (' + t.steps + ' steps incl. EOS), sessions ' + Math.round(r.createMs) + ' ms');

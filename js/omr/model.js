@@ -301,7 +301,8 @@
     constructor(pairIndex, score) { this.pairIndex = pairIndex; this.score = score; }
     getScore() { return this.score; }
     getIndex() { return this.pairIndex; }
-    toString() { return 'staff pair: ' + py.repr(this.pairIndex) + ' with score: ' + this.score + ')'; }
+    // f"staff pair: {self.pair_index} with score: {self.score})": a list of ints, a float
+    toString() { return 'staff pair: [' + this.pairIndex.join(', ') + '] with score: ' + py.floatRepr(this.score) + ')'; }
   }
 
   // homr: model.py:417

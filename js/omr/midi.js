@@ -28,11 +28,16 @@
      except leaves a 14-byte header-only (unreadable) file. Here the title is written as UTF-8.
    - Badly formed repeats make music21 raise ExpanderException and the engine report an error with
      no MIDI. Here (unless opts.strict) the MIDI is written without expanding repeats, and the
-     warning is reported (convert().warnings).
+     warning is reported (convert().warnings). The result is byte for byte what music21 writes
+     when the whole score is left unexpanded (tools/omr/midi_ref.py --audit2, _Lenient).
+   - A character XML 1.0 forbids (e.g. a control character of a PDF title that generate_xml copies
+     into <work-title>) makes music21's expat parse fail, so the engine writes no MIDI. Here
+     (unless opts.strict, which throws expat's ParseError message) the MIDI is made and the
+     warning names expat's error: the MusicXML itself is not well-formed for other readers.
    Everything else matches byte for byte, including the engine's quirks (a key of 8 sharps after
    transposing makes mido fail to read the file, so the engine keeps music21's raw, unpolished file).
 
-   OMR.xml  = { parse, serialize, find, findAll, text, childElements }
+   OMR.xml  = { parse, serialize, find, findAll, text, childElements, charError }
    OMR.midi = { fromMusicXml, convert, transposeMusicXml, summary, importScore, readSmf,
                 GM_INSTRUMENTS, TICKS_PER_QUARTER } */
 (function (G) {
@@ -55,6 +60,43 @@
       }
       return Object.prototype.hasOwnProperty.call(ENT, e) ? ENT[e] : m; // unknown entity: keep as written
     });
+  }
+  // XML 1.0 Char: #x9 | #xA | #xD | [#x20-#xD7FF] | [#xE000-#xFFFD] | [#x10000-#x10FFFF]
+  const xmlChar = (c) => c === 0x9 || c === 0xa || c === 0xd || (c >= 0x20 && c <= 0xd7ff) ||
+    (c >= 0xe000 && c <= 0xfffd) || (c >= 0x10000 && c <= 0x10ffff);
+  const CHAR_REF = /&#(?:x([0-9a-fA-F]+)|([0-9]+));/y;
+  // The error expat (music21's parser) stops at for the first character XML 1.0 forbids, or null:
+  // 'not well-formed (invalid token)' at the character, 'reference to invalid character number'
+  // at a &#...; reference to one (not inside comments, CDATA or <?...?>, where nothing is a
+  // reference). line is 1-based, column the 0-based code-point index in the line (\r\n, \r and \n
+  // end a line), as expat counts them. A lone surrogate is reported as a reference: ElementTree
+  // writes one as &#55296; (xmlcharrefreplace). This parser itself accepts such characters; the
+  // engine's music21 step fails on them (e.g. a control character in a PDF's metadata title,
+  // which generate_xml copies into <work-title>).
+  function charError(src) {
+    src = String(src);
+    let line = 1, col = 0, close = null;
+    for (let i = 0; i < src.length;) {
+      const c = src.codePointAt(i);
+      if (c === 0xa || c === 0xd) {
+        i += c === 0xd && src.charCodeAt(i + 1) === 0xa ? 2 : 1;
+        line++; col = 0;
+        continue;
+      }
+      const at = ': line ' + line + ', column ' + col;
+      if (c >= 0xd800 && c <= 0xdfff) return 'reference to invalid character number' + at;
+      if (!xmlChar(c)) return 'not well-formed (invalid token)' + at;
+      if (close) { if (src.startsWith(close, i)) close = null; }
+      else if (c === 0x3c) close = src.startsWith('<!--', i) ? '-->' : src.startsWith('<![CDATA[', i) ? ']]>' : src.startsWith('<?', i) ? '?>' : null;
+      else if (c === 0x26) {
+        CHAR_REF.lastIndex = i;
+        const m = CHAR_REF.exec(src);
+        if (m && !xmlChar(m[1] != null ? parseInt(m[1], 16) : parseInt(m[2], 10))) return 'reference to invalid character number' + at;
+      }
+      col++;
+      i += c > 0xffff ? 2 : 1;
+    }
+    return null;
   }
   function xmlParse(src) {
     src = String(src);
@@ -209,7 +251,7 @@
   }
   function stripped(el) { const t = elText(el); return t == null ? '' : t.trim(); }
 
-  OMR.xml = { parse: xmlParse, serialize: xmlSerialize, find: find, findAll: findAll, text: elText, childElements: childElements };
+  OMR.xml = { parse: xmlParse, serialize: xmlSerialize, find: find, findAll: findAll, text: elText, childElements: childElements, charError: charError };
 
   // ======================================================================================
   // Python numbers as music21 uses them. Offsets and durations are opFrac'd: a value whose
@@ -365,6 +407,8 @@
     if (Object.prototype.hasOwnProperty.call(DYN, v)) return DYN[v];
     let t = v;
     if (t.indexOf('s') >= 0) t = t.slice(1);     // "ignore leading s like in sf" (any s: drops char 0)
+    // thisDynamic[-1] of '' (a value 's', or an empty / blank <other-dynamic>): music21 raises
+    if (!t.length) throw pyError('IndexError', 'string index out of range');
     if (t[t.length - 1] === 'z') t = t.slice(0, -1);
     return Object.prototype.hasOwnProperty.call(DYN, t) ? DYN[t] : 0.5;
   }
@@ -758,7 +802,7 @@
           for (const dy of childElements(d)) {
             let txt = dy.name;
             if (txt === 'other-dynamic' && elText(dy)) txt = elText(dy).trim(); // (homr writes other-dynamics)
-            const e = el('dynamic', total, { value: txt, scalar: dynamicScalar(txt) });
+            const e = el('dynamic', total, { value: txt }); // volumeScalar: computed where music21 reads it
             addStaffRef(M, staff, e); M.items.push(e);
           }
         } else if (d.name === 'metronome') {
@@ -1316,7 +1360,7 @@
       }
       let val = 0.5;
       val += 0.20866;
-      if (dm) val = val * (dm.scalar * 2.0);
+      if (dm) val = val * (dynamicScalar(dm.value) * 2.0); // Dynamic.volumeScalar, only for a note in its span
       for (const a of x.e.arts) val += ART_SHIFT[a];
       if (val > 1) val = 1.0; else if (val < 0) val = 0.0;
       x.e.velocity = pyRound(val * 127);
@@ -1596,7 +1640,11 @@
     if (opts.program == null) opts.program = 0;
     if (opts.transpose == null) opts.transpose = 0;
     if (opts.title == null) opts.title = '';
-    if (typeof opts.program === 'string') { // GM_INSTRUMENTS.get(options.instrument_name, 0)
+    if (typeof opts.program === 'string' && /^\s*\d+\s*$/.test(opts.program)) {
+      // a program NUMBER as a string (e.g. a <select> value): no GM name is all digits, and
+      // GM_INSTRUMENTS.get('24', 0) would silently give the piano
+      opts.program = Number(opts.program);
+    } else if (typeof opts.program === 'string') { // GM_INSTRUMENTS.get(options.instrument_name, 0)
       if (opts.instrumentName == null) opts.instrumentName = opts.program;
       opts.program = Object.prototype.hasOwnProperty.call(GM_INSTRUMENTS, opts.program) ? GM_INSTRUMENTS[opts.program] : 0;
     }
@@ -1607,11 +1655,17 @@
     if (!Number.isInteger(Number(opts.transpose))) throw new RangeError('OMR.midi: transpose must be a whole number of semitones, not ' + opts.transpose);
     opts.transpose = Number(opts.transpose);
     opts.title = String(opts.title);
+    // step 4 starts with music21.converter.parse (expat): a character XML 1.0 forbids (in practice a
+    // control character of a PDF title in <work-title>) makes the engine fail with no MIDI at all.
+    // strict reproduces that error; otherwise the MIDI is made and the warning says the MusicXML
+    // is not well-formed (other readers will refuse it too).
+    const bad = typeof xml === 'string' ? charError(xml) : null;
+    if (bad && opts.strict) throw pyError('ParseError', bad);
     const score = engineScore(xml, opts);
     const counts = scoreCounts(score);
     const res = scoreToTracks(score.parts, { strict: opts.strict });
     const pol = polish(res.tracks, opts.tempo, opts.program, opts.title);
-    const warnings = res.warnings.slice();
+    const warnings = (bad ? ['MusicXML is not well-formed (' + bad + '): music21 cannot read it, so the engine writes no MIDI'] : []).concat(res.warnings);
     if (!pol.polished) warnings.push('MIDI left as music21 wrote it (' + pol.why + '), like the engine');
     if (pol.titleUtf8) warnings.push('title written as UTF-8 (latin-1 cannot encode it)');
     const sm = midiSummary(readSmf(pol.bytes), opts.tempo);
@@ -1629,7 +1683,8 @@
   // the engine's transposed .musicxml: homr's XML with music21's new spellings and keys
   // (music21 rewrites the whole document; this keeps homr's and only changes pitches and keys)
   function transposeMusicXml(xml, semitones) {
-    const n = semitones | 0;
+    const n = semitones == null ? 0 : Number(semitones);
+    if (!Number.isInteger(n)) throw new RangeError('OMR.midi: transpose must be a whole number of semitones, not ' + semitones);
     const doc = xmlParse(xml);
     if (!n) return xmlSerialize(doc);
     const visit = (node) => {

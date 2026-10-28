@@ -12,6 +12,8 @@
   var OMR = G.OMR = G.OMR || {};
   var np = OMR.np, cv2 = OMR.cv2;
   var f32 = Math.fround;
+  // a Python exception: e.name = its class, e.message = Python's text
+  function pyError(name, message) { var e = new Error(message); e.name = name; return e; }
 
   // homr: autocrop.py:7
   /**
@@ -33,29 +35,32 @@
 
   // homr: autocrop.py:23
   // Color without brightness: every channel divided by the sum of the channels.
-  // pixels: a flat uint8 array of BGR triples (numpy (N, 3) or (h, w, 3)) -> Float32Array
-  // of the same length (float32 like numpy: (v + 1) / sum, the sum taken left to right)
-  function _chromaticity(pixels) {
-    var n = pixels.length, out = new Float32Array(n);
-    for (var i = 0; i < n; i += 3) {
-      var b = pixels[i] + 1, g = pixels[i + 1] + 1, r = pixels[i + 2] + 1;
-      var s = b + g + r; // integers: exact in float32 as in numpy's float32 sum
-      out[i] = b / s; out[i + 1] = g / s; out[i + 2] = r / s; // Float32Array rounds = float32 division
+  // pixels: a flat uint8 array of BGR triples (numpy (N, 3) or (h, w, 3); `ch` values per pixel
+  // for another channel count, default 3) -> Float32Array of the same length (float32 like
+  // numpy: (v + 1) / sum, the sum taken left to right)
+  function _chromaticity(pixels, ch) {
+    ch = ch || 3;
+    var n = pixels.length, out = new Float32Array(n), k;
+    for (var i = 0; i < n; i += ch) {
+      var s = 0;
+      for (k = 0; k < ch; k++) s += pixels[i + k] + 1; // integers: exact in float32 as in numpy's float32 sum
+      for (k = 0; k < ch; k++) out[i + k] = (pixels[i + k] + 1) / s; // Float32Array rounds = float32 division
     }
     return out;
   }
 
-  // np.median(a, axis=0) of an (N, 3) array given flat: per channel, the middle value or
-  // the mean of the two middle values (float32 for float32 input, float64 for uint8)
-  function _medianAxis0(flat) {
-    var n = flat.length / 3, out = [0, 0, 0], single = flat instanceof Float32Array;
-    if (!n) return [NaN, NaN, NaN];
+  // np.median(a, axis=0) of an (N, 3) array given flat (N, ch with ch given): per channel, the
+  // middle value or the mean of the two middle values (float32 for float32 input, float64 for uint8)
+  function _medianAxis0(flat, nch) {
+    nch = nch || 3;
+    var n = flat.length / nch, out = [], single = flat instanceof Float32Array;
+    if (!n) { for (var e = 0; e < nch; e++) out.push(NaN); return out; }
     var col = single ? new Float32Array(n) : new Float64Array(n), h = n >> 1;
-    for (var ch = 0; ch < 3; ch++) {
-      for (var i = 0; i < n; i++) col[i] = flat[i * 3 + ch];
+    for (var ch = 0; ch < nch; ch++) {
+      for (var i = 0; i < n; i++) col[i] = flat[i * nch + ch];
       col.sort(); // typed-array sort is numeric
-      if (n % 2) out[ch] = col[h];
-      else out[ch] = single ? f32(f32(col[h - 1] + col[h]) / 2) : (col[h - 1] + col[h]) / 2;
+      if (n % 2) out.push(col[h]);
+      else out.push(single ? f32(f32(col[h - 1] + col[h]) / 2) : (col[h - 1] + col[h]) / 2);
     }
     return out;
   }
@@ -68,7 +73,14 @@
 
   // homr: autocrop.py:29
   function _isPaper(pixels, paperChromaticity) {
-    if (pixels.data.length === 0) return true;
+    var size = pixels.data.length;
+    if (size === 0) return true;
+    // pixels.reshape(-1, 3) and the (3,) - (k,) subtraction: a page that is not 3-channel
+    // (BGRA: homr gets BGR from cv2.imread) raises at one of them, like Python
+    if (size % 3) throw pyError('ValueError', 'cannot reshape array of size ' + size + ' into shape (3)');
+    if (paperChromaticity.length !== 3) {
+      throw pyError('ValueError', 'operands could not be broadcast together with shapes (3,) (' + paperChromaticity.length + ',) ');
+    }
     var chromaticity = _medianAxis0(_chromaticity(pixels.data));
     return _chromaDistance(chromaticity[0], chromaticity[1], chromaticity[2], paperChromaticity) <= MAX_CHROMA_F32;
   }
@@ -178,18 +190,19 @@
     if (isFullPageView) return [img, [0, 0]];
     // A sample of the paper is enough to know its color
     // img[y:y+h, x:x+w][thresh[y:y+h, x:x+w] > 0][::10]: the paper pixels row by row, every 10th
-    var paperList = [], seen = 0, yy, xx;
+    // (all img.c channels of each: homr's pages are BGR, a BGRA page raises in _isPaper)
+    var nch = img.c, paperList = [], seen = 0, yy, xx, k;
     for (yy = y; yy < y + h; yy++) {
       for (xx = x; xx < x + w; xx++) {
         if (thresh.data[yy * thresh.w + xx] > 0) {
-          if (seen % 10 === 0) { var s = (yy * img.w + xx) * 3; paperList.push(img.data[s], img.data[s + 1], img.data[s + 2]); }
+          if (seen % 10 === 0) { var s = (yy * img.w + xx) * nch; for (k = 0; k < nch; k++) paperList.push(img.data[s + k]); }
           seen++;
         }
       }
     }
     var paper = Uint8Array.from(paperList);
     if (paper.length === 0) return [img, [0, 0]];
-    var paperChromaticity = _medianAxis0(_chromaticity(paper));
+    var paperChromaticity = _medianAxis0(_chromaticity(paper, nch), nch);
     // The contour was eroded, keep a margin so that staffs at the edge of the paper stay
     var margin = Math.max(5, Math.floor(Math.max(pageWidth, pageHeight) / 100));
     var x0 = Math.max(0, x - margin), y0 = Math.max(0, y - margin);

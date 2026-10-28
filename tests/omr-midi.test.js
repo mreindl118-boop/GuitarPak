@@ -3,6 +3,9 @@
 //   SL_OMR_FIXTURES/<page>/13-midi-ref.json   the 7 pages x {fixture, engine-112, engine-80} inputs
 //                                             x tempo / GM program / transpose (+ title encodings)
 //   SL_OMR_FIXTURES/13-midi-synthetic.json     153 synthetic generate_xml scores (every element homr writes)
+//   SL_OMR_FIXTURES/13-midi-audit.json / 13-midi-audit2.json   the adversarial audits (midi_ref.py --audit / --audit2):
+//                                             exotic tuplets, option limits, random options, lenient repeats, forbidden
+//                                             XML characters, key/pitch transposition tables, expat's character errors
 // Checks per case: the .mid bytes are identical; when they are not, the first differing event;
 // the error cases fail the same way; the summary; music21's note spellings and key signatures of
 // the (transposed) score. Plus the XML parser, the SMF reader and the GM table.
@@ -101,6 +104,36 @@ function sameView(js, py) {
   H.ok(threw, 'xml: no root element throws');
 }
 
+// ---------------------------------------------------------------- fixture-free checks of the second audit
+// (the parity versions run on 13-midi-audit2.json; these guard the same behaviour without fixtures;
+// the expected messages are expat's / music21's own output for these exact strings)
+{
+  const score = (title, dyn) => '<?xml version="1.0" encoding="UTF-8"?>\n<score-partwise version="4.0"><work><work-title>' + title +
+    '</work-title></work><part-list><score-part id="P1"><part-name>Voice</part-name></score-part></part-list><part id="P1"><measure number="1">' +
+    '<attributes><divisions>1</divisions><key><fifths>0</fifths></key><time><beats>4</beats><beat-type>4</beat-type></time></attributes>' +
+    (dyn ? '<direction><direction-type><dynamics>' + dyn + '</dynamics></direction-type></direction>' : '') +
+    '<note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration><type>whole</type></note></measure></part></score-partwise>';
+  const x = score('T', null);
+  H.ok(Buffer.compare(Buffer.from(M.convert(x, { program: '24' }).midi), Buffer.from(M.convert(x, { program: 24 }).midi)) === 0 &&
+    Buffer.compare(Buffer.from(M.convert(x, { program: '24' }).midi), Buffer.from(M.convert(x, { program: 0 }).midi)) !== 0,
+  'convert: program "24" = 24 (a string of digits is a program number, not a GM name)');
+  let n = 0;
+  for (const t of [1.5, 'x', NaN, Infinity]) { try { M.transposeMusicXml(x, t); } catch (e) { if (e instanceof RangeError) n++; } }
+  H.ok(n === 4 && /<step>D<\/step>/.test(M.transposeMusicXml(x, '2')), 'transposeMusicXml: non-whole transposes refused like convert');
+  const ctl = score('Seite\u000c1', null);
+  let pe = null;
+  try { M.convert(ctl, { strict: true }); } catch (e) { pe = e; }
+  const lw = M.convert(ctl, {});
+  H.ok(pe && pe.name === 'ParseError' && pe.message === 'not well-formed (invalid token): line 2, column 53' && X.charError(x) === null &&
+    lw.warnings.some((w) => w.indexOf(pe.message) >= 0), 'convert: a control character in <work-title> = expat\'s ParseError (strict) / a warning');
+  H.ok(X.charError('<a>\n<!-- &#1; -->&#x41;\u{1F600}\u0001</a>') === 'not well-formed (invalid token): line 2, column 20' &&
+    X.charError('<a b="x&#xFFFE;"/>') === 'reference to invalid character number: line 1, column 7', 'charError: positions in code points, no references inside comments');
+  let ie = 0;
+  for (const st of [true, false]) { try { M.convert(score('T', '<s />'), { strict: st }); } catch (e) { if (e.name === 'IndexError') ie++; } }
+  H.ok(ie === 2 && M.convert(score('T', '<other-dynamic />'), {}).midi.length > 14,
+    'dynamics: <s/> raises IndexError like music21\'s volumeScalar; an empty <other-dynamic/> is 0.5');
+}
+
 // ---------------------------------------------------------------- GM table == the engine's
 {
   const eng = path.join(H.FIX, '..', 'tools', 'sheetlab_engine.py');
@@ -119,22 +152,32 @@ function runFile(file, label) {
   const st = { bytes: 0, cases: 0, errors: 0, errorsOk: 0, deviation: 0, deviationOk: 0, summary: 0, summaryOk: 0, reader: 0, readerOk: 0, fails: [] };
   // inputs round-trip through the parser/serializer unchanged (ElementTree's output style)
   let rt = 0;
+  let notWf = 0;
   for (const k of Object.keys(ref.inputs)) {
     const x = ref.inputs[k];
+    if (X.charError(x)) { notWf++; continue; } // not well-formed XML (a control character in the title): nothing to keep
     const body = x.replace(/^<\?xml[^>]*\?>\n?/, '');
     if (X.serialize(X.parse(x)).replace(/^<\?xml[^>]*\?>\n?/, '') === body) rt++;
   }
-  H.ok(rt === Object.keys(ref.inputs).length, label + ': ' + rt + '/' + Object.keys(ref.inputs).length + ' inputs parse + serialize back to the same text');
+  H.ok(rt + notWf === Object.keys(ref.inputs).length, label + ': ' + rt + '/' + (Object.keys(ref.inputs).length - notWf) + ' inputs parse + serialize back to the same text' + (notWf ? ' (' + notWf + ' not well-formed XML left out)' : ''));
   for (const c of ref.cases) {
-    if (c.error && c.error.stage !== 'midi') continue; // the engine stopped before MIDI (its music21 MusicXML export)
+    if (c.error && (c.error.stage === 'mxl' || c.error.stage === 'musicxml')) continue; // the engine stopped at its music21 MusicXML export
     st.cases++;
     const opts = { tempo: c.tempo, program: c.program, transpose: c.transpose, title: c.title };
-    const tag = c.input + ' t' + c.tempo + ' p' + c.program + ' tr' + c.transpose + (c.exports === false ? ' midi-only' : '');
+    const tag = c.input + ' t' + c.tempo + ' p' + c.program + ' tr' + c.transpose + (c.exports === false ? ' midi-only' : '') + (c.lenient ? ' lenient' : '');
+    if (c.lenient) opts.strict = false; // the reference = music21 translating the score unexpanded (midi_ref.py _Lenient)
     if (c.error) {
       st.errors++;
       let err = null;
       try { M.convert(ref.inputs[c.input], Object.assign({ strict: true }, opts)); } catch (e) { err = e; }
       const same = err && err.name === c.error.type && err.message === c.error.message;
+      if (c.error.type === 'ParseError') { // a character XML forbids: the engine's parse fails; the default still makes the MIDI and says why
+        let r2 = null;
+        try { r2 = M.convert(ref.inputs[c.input], opts); } catch (e) { /* r2 stays null */ }
+        if (same && r2 && r2.midi.length > 14 && r2.warnings.some((w) => w.indexOf(c.error.message) >= 0)) st.errorsOk++;
+        else st.fails.push(tag + ': ParseError ' + (err && err.name + ' ' + err.message) + ' vs ' + c.error.message);
+        continue;
+      }
       if (c.error.type !== 'ExpanderException') { // e.g. a tempo of 0: no MIDI in either mode
         let err2 = null;
         try { M.convert(ref.inputs[c.input], opts); } catch (e) { err2 = e; }
@@ -149,6 +192,13 @@ function runFile(file, label) {
       continue;
     }
     const r = M.convert(ref.inputs[c.input], opts);
+    if (c.lenient) { // repeatsExpanded says whether music21 could expand them (strict throws exactly when it cannot)
+      let ex = false;
+      try { M.convert(ref.inputs[c.input], Object.assign({}, opts, { strict: true })); } catch (e) { ex = e.name === 'ExpanderException'; }
+      st.lenient = (st.lenient || 0) + 1;
+      if (r.repeatsExpanded === !ex) st.lenientOk = (st.lenientOk || 0) + 1;
+      if (ex) st.unexpanded = (st.unexpanded || 0) + 1;
+    }
     if (c.midi && c.midi.unreadable && c.midi.bytes === 14) {
       // the engine's file is a 14-byte header (mido could not encode the title in latin-1); ours
       // is the same MIDI as with a latin-1 title, with the title as UTF-8
@@ -182,6 +232,7 @@ function runFile(file, label) {
   }
   H.ok(st.bytes === st.cases - st.errors - st.deviation, label + ': ' + st.bytes + '/' + (st.cases - st.errors - st.deviation) + ' MIDI files byte-identical to the engine\'s');
   if (st.errors) H.ok(st.errorsOk === st.errors, label + ': ' + st.errorsOk + '/' + st.errors + ' engine errors reproduced (badly formed repeats: strict throws like music21, the default plays them unexpanded)');
+  if (st.lenient) H.ok(st.lenientOk === st.lenient && st.unexpanded > 0, label + ': default mode on scores with repeats: ' + (st.lenientOk || 0) + '/' + st.lenient + ' report repeatsExpanded right (' + (st.unexpanded || 0) + ' badly formed, played unexpanded = music21 with expansion skipped, byte for byte)');
   if (st.raw) H.ok(st.rawOk === st.raw, label + ': ' + (st.rawOk || 0) + '/' + st.raw + ' files mido cannot read stay unpolished, like the engine\'s');
   if (st.deviation) H.ok(st.deviationOk === st.deviation, label + ': ' + st.deviationOk + '/' + st.deviation + ' non-latin-1 titles: UTF-8 title instead of the engine\'s truncated file');
   H.ok(st.readerOk === st.reader, label + ': readSmf reads ' + st.readerOk + '/' + st.reader + ' engine files like mido');
@@ -210,7 +261,7 @@ function runFile(file, label) {
 const pages = H.pages().filter((p) => H.has(p, '13-midi-ref.json'));
 if (!pages.length) H.skip('(no 13-midi-ref.json fixtures): run python -I tools/omr/midi_ref.py $SL_OMR_FIXTURES');
 for (const p of pages) runFile(H.fix(p, '13-midi-ref.json'), p);
-for (const [f, label] of [['13-midi-synthetic.json', 'synthetic'], ['13-midi-edge.json', 'edge'], ['13-midi-audit.json', 'audit']]) {
+for (const [f, label] of [['13-midi-synthetic.json', 'synthetic'], ['13-midi-edge.json', 'edge'], ['13-midi-audit.json', 'audit'], ['13-midi-audit2.json', 'audit2']]) {
   const file = path.join(H.FIX, f);
   if (fs.existsSync(file)) runFile(file, label);
   else H.skip('(no ' + f + ')');
@@ -263,6 +314,28 @@ for (const [f, label] of [['13-midi-synthetic.json', 'synthetic'], ['13-midi-edg
   } else H.skip('(no 13-midi-audit.json) music21 number checks');
 }
 
+// ---------------------------------------------------------------- second audit: tables (13-midi-audit2.json)
+// Stream.transpose(n) of all 15 key signatures for n = -24..24 and of spelled pitches (incl. double
+// accidentals, octaves 0-9, MIDI folding above 127), and expat's error for characters XML 1.0
+// forbids (a PDF title in <work-title> can carry them; the engine's music21 parse then fails)
+{
+  const file = path.join(H.FIX, '13-midi-audit2.json');
+  if (fs.existsSync(file)) {
+    const a2 = JSON.parse(fs.readFileSync(file, 'utf8'));
+    const I = M._internal;
+    let k1 = 0, k2 = 0, k3 = 0;
+    for (const [k, n, sharps] of a2.keys) if (I.transposeSharps(k, n) === sharps) k1++;
+    for (const [step, alt, oct, n, s2, a2_, o2, midi] of a2.pitches) {
+      const q = I.spellPs(I.pitchPs({ step: step, alter: alt, octave: oct }) + n);
+      if (q.step === s2 && (q.alter || 0) === (a2_ || 0) && (q.alter === null) === (a2_ === null || a2_ === 0) && q.octave === o2 && I.pitchMidi(q) === midi) k2++;
+    }
+    for (const [x, msg] of a2.chars) if (X.charError(x) === msg) k3++;
+    H.ok(k1 === a2.keys.length, 'audit2: key signatures transposed like Stream.transpose in ' + k1 + '/' + a2.keys.length + ' (15 keys x -24..24)');
+    H.ok(k2 === a2.pitches.length, 'audit2: pitches transposed (spelling, octave, MIDI number) like music21 in ' + k2 + '/' + a2.pitches.length);
+    H.ok(k3 === a2.chars.length, 'audit2: OMR.xml.charError = expat\'s error (or none) in ' + k3 + '/' + a2.chars.length + ' texts');
+  } else H.skip('(no 13-midi-audit2.json: python -I tools/omr/midi_ref.py --audit2 $SL_OMR_FIXTURES) second audit tables');
+}
+
 // ---------------------------------------------------------------- API
 if (pages.length) {
   const ref = JSON.parse(fs.readFileSync(H.fix(pages[0], '13-midi-ref.json'), 'utf8'));
@@ -287,6 +360,23 @@ if (pages.length) {
     try { M.convert(xml, o); } catch (e) { if (e instanceof RangeError || e instanceof TypeError) bad++; }
   }
   H.ok(bad === 6, 'convert: a program outside 0..127, a non-numeric tempo or a fractional transpose is refused (' + bad + '/6), never a corrupt file');
+  // a program number given as a string (a <select> value) used to be looked up as a GM NAME and
+  // silently become the piano
+  const c24 = ref.cases.find((x) => x.input === 'fixture' && x.tempo === 112 && x.program === 24 && x.transpose === 0 && x.title === c.title);
+  H.ok(b64(M.convert(xml, { title: c.title, program: '24' }).midi) === c24.mid && b64(M.convert(xml, { title: c.title, program: ' 24 ' }).midi) === c24.mid,
+    'convert: program "24" (a string of digits) is program 24, not an unknown name');
+  // transposeMusicXml follows convert's whole-number rule (it truncated 1.5 to 1 while convert refused it)
+  let txBad = 0;
+  for (const n of [1.5, 'x', NaN]) { try { M.transposeMusicXml(xml, n); } catch (e) { if (e instanceof RangeError) txBad++; } }
+  H.ok(txBad === 3 && M.transposeMusicXml(xml, '2') === M.transposeMusicXml(xml, 2) && M.transposeMusicXml(xml, null) === M.transposeMusicXml(xml, 0),
+    'transposeMusicXml: a fractional / non-numeric transpose is refused like convert; "2" = 2, null = 0');
+  // a forbidden character: strict = the engine's error, the default makes the MIDI and warns
+  const ctl = xml.replace(/<work-title>[^<]*<\/work-title>|<work-title \/>/, '<work-title>Seite\u000c1</work-title>');
+  let pe = null;
+  try { M.convert(ctl, { strict: true }); } catch (e) { pe = e; }
+  const lw = ctl === xml ? null : M.convert(ctl, {});
+  H.ok(ctl !== xml && pe && pe.name === 'ParseError' && /^not well-formed \(invalid token\): line \d+, column \d+$/.test(pe.message) &&
+    lw && lw.warnings.some((w) => w.indexOf(pe.message) >= 0) && lw.midi.length > 14, 'convert: a control character in the title: strict ParseError like music21, default MIDI + warning');
 }
 
 // ---------------------------------------------------------------- .mxl (js/omr/mxl.js)
