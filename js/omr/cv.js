@@ -38,12 +38,21 @@
   function CvError(msg) { this.name = 'cv2.error'; this.message = msg; this.stack = (new Error(msg)).stack; }
   CvError.prototype = Object.create(Error.prototype);
   CvError.prototype.constructor = CvError;
+  // str(cv2.error) is OpenCV's message with the wheel's source path (/io/opencv/...); opencv.js
+  // was built elsewhere: the path is rewritten so the text matches Python (the SheetLab engine
+  // shows str(exc) as a page's skip reason)
+  var CV_SRC = /OpenCV\(([^)]*)\) \S*?\/opencv\/modules\//;
+  function cvMessage(m) { return String(m).replace(CV_SRC, 'OpenCV($1) /io/opencv/modules/'); }
+  // the message cv2 gives for a CV_Assert / CV_Error raised in the C++ code at file:line
+  function cvAssertText(file, line, code, kind, what, fn) {
+    return 'OpenCV(5.0.0) /io/opencv/modules/' + file + ':' + line + ': error: (' + code + ':' + kind + ') ' + what + " in function '" + fn + "'\n";
+  }
   function wrapErr(e) {
     if (e instanceof CvError) return e;
     if (typeof e === 'number' && cv && cv.exceptionFromPtr) {
       var m = '';
       try { m = cv.exceptionFromPtr(e).msg; } catch (x) { m = 'OpenCV exception ' + e; }
-      return new CvError(m);
+      return new CvError(cvMessage(m));
     }
     return e;
   }
@@ -91,9 +100,39 @@
   // copy a Mat's pixels back into an image (in-place drawing)
   function writeBack(img, m) { img.data.set(view(m, m.depth())); return img; }
 
-  // flat x,y pairs -> CV_32SC2 / CV_32FC2 Mat (float64 is narrowed to float32: cv2's point
-  // functions only take int32 / float32 and homr casts with .astype(np.float32))
-  function ptsMat(p, dtype) {
+  // flat x,y pairs -> CV_32SC2 / CV_32FC2 Mat. cv2's point functions take int32 / float32
+  // arrays only (int64 is converted by the bindings, but there is no int64 typed array here): a
+  // typed array of another dtype raises cv2.error like the (-215) depth assertion in Python, e.g.
+  // a Float64Array = a float64 numpy array, which homr always casts with .astype(np.float32).
+  // Nested JS arrays are untyped: all-integer -> int32, else float32. `dtype` = the dtype the
+  // function requires (getAffineTransform: float32 only).
+  // where cv2 5.0.0 asserts the point dtype (file, line, condition, function), for its message
+  var PTS_ASSERT = {
+    minAreaRect: ['geometry/src/convhull.cpp', 147, 'total >= 0 && (depth == CV_32F || depth == CV_32S)', 'convexHull'],
+    convexHull: ['geometry/src/convhull.cpp', 147, 'total >= 0 && (depth == CV_32F || depth == CV_32S)', 'convexHull'],
+    boundingRect: ['geometry/src/geometry.cpp', 599, 'npoints >= 0 && (depth == CV_32F || depth == CV_32S)', 'pointSetBoundingRect'],
+    contourArea: ['geometry/src/geometry.cpp', 445, 'npoints >= 0 && (depth == CV_32F || depth == CV_32S)', 'contourArea'],
+    pointPolygonTest: ['geometry/src/geometry.cpp', 55, 'total >= 0 && (depth == CV_32S || depth == CV_32F)', 'pointPolygonTest'],
+    fitEllipseDirect: ['geometry/src/shapedescr.cpp', 620, 'n >= 0 && (depth == CV_32F || depth == CV_32S)', 'fitEllipseDirect'],
+    fitEllipse: ['geometry/src/shapedescr.cpp', 256, 'n >= 0 && (depth == CV_32F || depth == CV_32S)', 'fitEllipseNoDirect'],
+    intersectConvexConvex1: ['geometry/src/geometry.cpp', 917, 'p1.depth() == CV_32S || p1.depth() == CV_32F', 'intersectConvexConvex'],
+    intersectConvexConvex2: ['geometry/src/geometry.cpp', 918, 'p2.depth() == CV_32S || p2.depth() == CV_32F', 'intersectConvexConvex'],
+    getAffineTransform: ['geometry/src/geometry.cpp', 908, 'src.checkVector(2, CV_32F) == 3 && dst.checkVector(2, CV_32F) == 3', 'getAffineTransform'],
+    // the drawing functions take int32 points only
+    fillPoly: ['imgproc/src/drawing.cpp', 2121, 'p.checkVector(2, CV_32S) > 0', 'fillPoly'],
+    fillConvexPoly: ['imgproc/src/drawing.cpp', 2099, 'points.checkVector(2, CV_32S) >= 0', 'fillConvexPoly'],
+    drawContours: ['imgproc/src/drawing.cpp', 2242, 'npoints > 0', 'drawContours']
+  };
+  function checkPts(p, dtype, fn) {
+    if (!ArrayBuffer.isView(p)) return;
+    var dt = np.dtypeOf(p);
+    if (dtype ? dt !== dtype : dt !== 'int32' && dt !== 'float32') {
+      var a = PTS_ASSERT[fn] || ['geometry/src/geometry.cpp', 0, 'depth == CV_32F || depth == CV_32S', fn || 'points'];
+      throw new CvError(cvAssertText(a[0], a[1], -215, 'Assertion failed', a[2], a[3]));
+    }
+  }
+  function ptsMat(p, dtype, fn) {
+    checkPts(p, dtype, fn);
     var a = np.toPts(p, dtype), n = a.length >> 1, m;
     if (a instanceof Int32Array) { m = new cv.Mat(n, 1, cv.CV_32SC2); m.data32S.set(a); }
     else if (a instanceof Float32Array || a instanceof Float64Array) { m = new cv.Mat(n, 1, cv.CV_32FC2); m.data32F.set(a); }
@@ -153,9 +192,9 @@
   // cv2.minAreaRect(points) -> [[cx, cy], [w, h], angle]
   // An empty point set: cv2 returns defaults where opencv.js asserts (its empty Mat fails
   // checkVector), so the point-set wrappers answer those cases themselves.
-  function isEmptyPts(p) { return np.toPts(p).length < 2; }
+  function isEmptyPts(p, fn) { checkPts(p, null, fn); return np.toPts(p).length < 2; }
   function minAreaRect(points) {
-    if (isEmptyPts(points)) return [[0, 0], [0, 0], -90];
+    if (isEmptyPts(points, 'minAreaRect')) return [[0, 0], [0, 0], -90];
     return run(function (t) { return unrrect(cv.minAreaRect(t(ptsMat(points)))); });
   }
   // opencv.js's own fitEllipse, kept for comparison: it differs from cv2 on degenerate
@@ -681,6 +720,8 @@
 
   // the point set as float32 pairs, the way fitEllipse reads CV_32S / CV_32F input
   function ellipsePts(points) {
+    // 5 points go to fitEllipseDirect, which asserts the dtype at its own line
+    checkPts(points, null, ArrayBuffer.isView(points) && points.length === 10 ? 'fitEllipseDirect' : 'fitEllipse');
     var a = np.toPts(points), n = a.length >> 1, f = new Float32Array(2 * n);
     for (var i = 0; i < 2 * n; i++) f[i] = a[i]; // (float)int is exact for image coordinates
     return f;
@@ -689,7 +730,7 @@
   // fitEllipseDirect, more take fitEllipseNoDirect (OpenCV 5)
   function fitEllipse(points) {
     var p = ellipsePts(points), n = p.length >> 1;
-    if (n < 5) throw new CvError('There should be at least 5 points to fit the ellipse');
+    if (n < 5) throw new CvError(cvAssertText('geometry/src/shapedescr.cpp', 261, -201, 'Incorrect size of input array', 'There should be at least 5 points to fit the ellipse', 'fitEllipseNoDirect'));
     return n === 5 ? fitEllipseDirect(p, n) : fitEllipseNoDirect(p, n);
   }
   function fitEllipseNoDirect(pts, n) {
@@ -860,7 +901,7 @@
 
   // cv2.boundingRect(points or image) -> [x, y, w, h]
   function boundingRect(p) {
-    if (!np.isImage(p) && isEmptyPts(p)) return [0, 0, 0, 0];
+    if (!np.isImage(p) && isEmptyPts(p, 'boundingRect')) return [0, 0, 0, 0];
     return run(function (t) {
       var r = cv.boundingRect(t(np.isImage(p) ? toMat(p) : ptsMat(p)));
       return [r.x, r.y, r.width, r.height];
@@ -868,13 +909,13 @@
   }
   // cv2.contourArea(contour, oriented=False)
   function contourArea(c, oriented) {
-    if (isEmptyPts(c)) return 0;
+    if (isEmptyPts(c, 'contourArea')) return 0;
     return run(function (t) { return cv.contourArea(t(ptsMat(c)), !!oriented); });
   }
   // cv2.convexHull(points, clockwise=False, returnPoints=True) -> same dtype as the input
   // (indices Int32Array when returnPoints is false)
   function convexHull(p, clockwise, returnPoints) {
-    if (isEmptyPts(p)) return null;
+    if (isEmptyPts(p, 'convexHull')) return null;
     return run(function (t) {
       var src = t(ptsMat(p)), hull = t(new cv.Mat());
       cv.convexHull(src, hull, !!clockwise, returnPoints === undefined ? true : !!returnPoints);
@@ -883,11 +924,12 @@
   }
   // cv2.pointPolygonTest(contour, (x, y), measureDist)
   function pointPolygonTest(c, p, measureDist) {
-    if (isEmptyPts(c)) return measureDist ? -Number.MAX_VALUE : -1;
+    if (isEmptyPts(c, 'pointPolygonTest')) return measureDist ? -Number.MAX_VALUE : -1;
     return run(function (t) { return cv.pointPolygonTest(t(ptsMat(c)), new cv.Point(p[0], p[1]), !!measureDist); });
   }
   // cv2.intersectConvexConvex(p1, p2, handleNested=True) -> [area, Float32Array | null]
   function intersectConvexConvex(p1, p2, handleNested) {
+    checkPts(p1, null, 'intersectConvexConvex1'); checkPts(p2, null, 'intersectConvexConvex2');
     if (np.toPts(p1).length < 4 || np.toPts(p2).length < 4) return [0, null]; // n < 2 || m < 2
     return run(function (t) {
       var out = t(new cv.Mat());
@@ -930,7 +972,7 @@
   // cv2.findNonZero(img) is not in opencv.js: row-major scan like OpenCV's
   // -> Int32Array of x,y pairs (numpy (N,1,2)) or null when there is none
   function findNonZero(img) {
-    if (img.c !== 1) throw new CvError('findNonZero: single-channel image expected');
+    if (img.c !== 1) throw new CvError(cvAssertText('core/src/count_non_zero.dispatch.cpp', 156, -215, 'Assertion failed', 'src.channels() == 1 && src.dims == 2', 'findNonZero'));
     var d = img.data, w = img.w, n = 0, i;
     // != 0 like C++ (NaN counts; JS truthiness would drop it)
     for (i = 0; i < d.length; i++) if (d[i] !== 0) n++;
@@ -1061,8 +1103,9 @@
   // goes to opencv.js
   function warpAffine(img, M, dsize, o) {
     var flags = opt(o, 'flags', C2.INTER_LINEAR), border = opt(o, 'borderMode', C2.BORDER_CONSTANT);
-    // dst.create(dsize.empty() ? src.size() : dsize): a zero width or height means the source size
-    if (!dsize || !dsize[0] || !dsize[1]) dsize = [img.w, img.h];
+    // dst.create(dsize.empty() ? src.size() : dsize): Size::empty() is width <= 0 || height <= 0,
+    // so a zero or negative width or height means the source size
+    if (!dsize || !(dsize[0] > 0) || !(dsize[1] > 0)) dsize = [img.w, img.h];
     if (img.data instanceof Uint8Array && (flags & 7) === C2.INTER_LINEAR && border === C2.BORDER_CONSTANT && img.c <= 4) {
       return warpAffineLinear8u(img, M, dsize, flags, scalar(opt(o, 'borderValue', 0)));
     }
@@ -1130,7 +1173,9 @@
   }
   // cv2.getAffineTransform(src3, dst3) -> [[a, b, c], [d, e, f]] (float64)
   function getAffineTransform(src, dst) {
-    return run(function (t) { return un23(t(cv.getAffineTransform(t(ptsMat(src, 'float32')), t(ptsMat(dst, 'float32'))))); });
+    // cv2 asserts src.checkVector(2, CV_32F) == 3: a typed array must be float32 (an int32 or
+    // float64 numpy array raises); nested arrays are taken as float32
+    return run(function (t) { return un23(t(cv.getAffineTransform(t(ptsMat(src, 'float32', 'getAffineTransform')), t(ptsMat(dst, 'float32', 'getAffineTransform'))))); });
   }
   // cv2.invertAffineTransform(M) -> 2x3
   function invertAffineTransform(M) {
@@ -1175,7 +1220,8 @@
     var dtype = opt(o, 'dtype', -1);
     // cv2: "Sizes of input arguments do not match" unless both have the same size and channels
     if (np.isImage(a) && np.isImage(b) && (a.h !== b.h || a.w !== b.w || a.c !== b.c)) {
-      throw new CvError('addWeighted: the input arrays must have the same size and number of channels');
+      throw new CvError(cvAssertText('core/src/arithm.cpp', 688, -209, 'Sizes of input arguments do not match',
+        "The operation is neither 'array op array' (where arrays have the same size and the same number of channels), nor 'array op scalar', nor 'scalar op array'", 'arithm_op'));
     }
     if (a.data instanceof Uint8Array && b.data instanceof Uint8Array && (dtype === -1 || dtype === 0)) {
       var w1 = fr(alpha), w2 = fr(beta), dl = fr(gamma), n = a.data.length, out = new Uint8Array(n), i;
@@ -1242,16 +1288,16 @@
   }
 
   // ---- drawing (in place) ----
-  function polysVec(t, pts) {
+  function polysVec(t, pts, fn) {
     var mv = t(new cv.MatVector());
-    for (var i = 0; i < pts.length; i++) { var m = t(ptsMat(pts[i], 'int32')); mv.push_back(m); }
+    for (var i = 0; i < pts.length; i++) { var m = t(ptsMat(pts[i], 'int32', fn)); mv.push_back(m); }
     return mv;
   }
   // cv2.fillPoly(img, [pts, ...], color, lineType=LINE_8, shift=0, offset=(0,0))
   function fillPoly(img, pts, color, o) {
     return run(function (t) {
       var m = t(toMat(img)), off = opt(o, 'offset', [0, 0]);
-      cv.fillPoly(m, polysVec(t, pts), scalar(color), opt(o, 'lineType', C2.LINE_8), opt(o, 'shift', 0), new cv.Point(off[0], off[1]));
+      cv.fillPoly(m, polysVec(t, pts, 'fillPoly'), scalar(color), opt(o, 'lineType', C2.LINE_8), opt(o, 'shift', 0), new cv.Point(off[0], off[1]));
       return writeBack(img, m);
     });
   }
@@ -1259,7 +1305,7 @@
   function fillConvexPoly(img, p, color, o) {
     return run(function (t) {
       var m = t(toMat(img));
-      cv.fillConvexPoly(m, t(ptsMat(p, 'int32')), scalar(color), opt(o, 'lineType', C2.LINE_8), opt(o, 'shift', 0));
+      cv.fillConvexPoly(m, t(ptsMat(p, 'int32', 'fillConvexPoly')), scalar(color), opt(o, 'lineType', C2.LINE_8), opt(o, 'shift', 0));
       return writeBack(img, m);
     });
   }
@@ -1268,7 +1314,7 @@
     return run(function (t) {
       var m = t(toMat(img)), off = opt(o, 'offset', [0, 0]);
       var hier = o && o.hierarchy ? t(ptsMatHier(o.hierarchy)) : t(new cv.Mat());
-      cv.drawContours(m, polysVec(t, contours), idx, scalar(color), thickness === undefined ? 1 : thickness,
+      cv.drawContours(m, polysVec(t, contours, 'drawContours'), idx, scalar(color), thickness === undefined ? 1 : thickness,
         opt(o, 'lineType', C2.LINE_8), hier, opt(o, 'maxLevel', 2147483647), new cv.Point(off[0], off[1]));
       return writeBack(img, m);
     });

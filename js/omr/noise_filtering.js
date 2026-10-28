@@ -11,10 +11,19 @@
 
   var NOISE_KERNEL = [[1, -2, 1], [-2, 4, -2], [1, -2, 1]];
 
+  // a Python exception: e.name = its class, e.message = Python's text
+  function pyError(name, message) { var e = new Error(message); e.name = name; return e; }
+
+  // `h, w = img.shape`: Python refuses anything but a 2-D array there (a JS image with c 1 is one)
+  function shape2(img) {
+    if (img.c !== 1) throw pyError('ValueError', 'too many values to unpack (expected 2)');
+    return [img.h, img.w];
+  }
+
   // homr: noise_filtering.py:11
   // -> float64 (Python annotates int; the value is a float)
   function estimateNoise(gray) {
-    var H = gray.h, W = gray.w;
+    var hw = shape2(gray), H = hw[0], W = hw[1];
     var M = NOISE_KERNEL;
     var f = cv2.filter2D(gray, cv2.CV_64F, M).data;
     // integer-valued doubles: the sum is exact in any order (numpy's pairwise sum included)
@@ -27,26 +36,25 @@
   // homr: noise_filtering.py:18
   // -> mask (uint8 image, 255 = keep) or null
   function createNoiseGrid(gray, debug) {
-    var imgheight = gray.h, imgwidth = gray.w;
+    var hw = shape2(gray), imgheight = hw[0], imgwidth = hw[1];
     var M = Math.floor(imgheight / 20), N = Math.floor(imgwidth / 20);
 
-    // Python always draws the grid onto a colour copy for debug.write_image; the drawing has
-    // no effect on the result and costs a full-page cv.Mat per putText call through
-    // opencv.js, so it only happens when debugging
-    var debugImage = debug && debug.debug ? cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR) : null;
+    // Python always draws the grid onto a colour copy for debug.write_image. The copy is made
+    // here too (~20 ms a page): its cvtColor is what raises on an empty mask or one cv2 cannot
+    // convert. The drawing has no effect on the result and costs a full-page cv.Mat per putText
+    // call through opencv.js, so it only happens when debugging
+    var debugImage = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR);
+    var drawing = !!(debug && debug.debug);
     var mask = np.zeros([imgheight, imgwidth], 'uint8');
 
     var grid = createGrid(gray, M, N);
-    var r = applyNoiseFilter(grid, mask, debugImage, M, N);
+    var r = applyNoiseFilter(grid, mask, drawing ? debugImage : null, M, N);
     var filteredCells = r[0], totalCells = r[1];
 
-    if (debug && debug.debug) debug.writeImage('noise_crop', debugImage);
+    if (drawing) debug.writeImage('noise_crop', debugImage);
 
     return handleFilterResults(filteredCells, totalCells, mask);
   }
-
-  // a Python exception: e.name = its class, e.message = Python's text
-  function pyError(name, message) { var e = new Error(message); e.name = name; return e; }
 
   // range(0, n, step) like Python (a zero step raises)
   function steps(n, step) {
@@ -59,7 +67,7 @@
   // homr: noise_filtering.py:34
   // -> uint8 image of ceil(h / M) x ceil(w / N) noise values
   function createGrid(gray, M, N) {
-    var imgheight = gray.h, imgwidth = gray.w;
+    var hw = shape2(gray), imgheight = hw[0], imgwidth = hw[1];
     // np.zeros([int(np.ceil(imgheight / M)), ...]) comes first in Python: a mask lower or narrower
     // than 20 px (M or N == 0) raises ZeroDivisionError there, before range() could
     if (M === 0 || N === 0) throw pyError('ZeroDivisionError', 'division by zero');
@@ -84,7 +92,7 @@
   // homr: noise_filtering.py:48
   // mask is written in place; debugImage may be null (no drawing). -> [filteredCells, totalCells]
   function applyNoiseFilter(grid, mask, debugImage, M, N) {
-    var imgheight = mask.h, imgwidth = mask.w;
+    var hw = shape2(mask), imgheight = hw[0], imgwidth = hw[1];
     var filteredCells = 0, totalCells = 0;
     var limit = constants.imageNoiseLimit;
     var ys = steps(imgheight, M), xs = steps(imgwidth, N);

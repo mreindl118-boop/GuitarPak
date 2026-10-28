@@ -119,6 +119,14 @@
         const positionSample = lastArgmax(outputs.out_positions);
         const attention = Float32Array.from(outputs.attention.data);
 
+        // JS only: a per-step observer (tests, diagnostics): the six heads' argmax in symbol
+        // order (rhythm, pitch, lift, articulation, slur, position), the attention and the raw
+        // ORT outputs of the step
+        if (kwargs.onStep) {
+          kwargs.onStep({ step: step, arg: [rhythmSample, pitchSample, liftSample, articulationSample, slurSample, positionSample],
+            att: attention, outputs: outputs });
+        }
+
         const liftToken = detokenize([liftSample], this.invLiftVocab);
         const pitchToken = detokenize([pitchSample], this.invPitchVocab);
         const rhythmToken = detokenize([rhythmSample], this.invRhythmVocab);

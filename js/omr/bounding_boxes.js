@@ -160,7 +160,7 @@
       var center1 = this.box[0], axes1 = this.box[1], center2, axes2;
       if (other instanceof BoundingBox) { center2 = other.rotatedBox[0]; axes2 = other.rotatedBox[1]; }
       else if (other instanceof AngledBoundingBox) { center2 = other.box[0]; axes2 = other.box[1]; }
-      else throw new Error('Unknown type ' + (other && other.constructor && other.constructor.name));
+      else throw py.error('ValueError', 'Unknown type ' + (other && other.constructor && other.constructor.name));
       // max(axes): Python's max keeps the first of (w, nan)
       var majorAxis1 = py.max2(axes1[0], axes1[1]), majorAxis2 = py.max2(axes2[0], axes2[1]);
       // the distance between the centers

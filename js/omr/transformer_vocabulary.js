@@ -12,8 +12,55 @@
     const L = OMR.simple_logging;
     if (L && L.eprint) L.eprint.apply(null, arguments);
   }
-  function pyError(name, message) { const e = new Error(message); e.name = name; return e; }
+  function pyError(name, message) { const e = new Error(message); e.name = name; e.pyType = name; return e; }
   function startsWithAny(s, prefixes) { for (const p of prefixes) if (s.startsWith(p)) return true; return false; }
+
+  // bool(x) of the value a JS caller passes where Python takes a flag or a number: NaN is TRUE
+  // in Python (only 0 / -0 are false), empty strings / lists / dicts are false. JS `!x` would
+  // call NaN false.
+  function pyTruthy(x) {
+    if (x === null || x === undefined) return false;
+    if (typeof x === 'number') return x !== 0;  // NaN !== 0
+    if (typeof x === 'bigint') return x !== BigInt(0);
+    if (typeof x === 'string') return x.length > 0;
+    if (Array.isArray(x)) return x.length > 0;
+    if (x instanceof Set || x instanceof Map) return x.size > 0;
+    if (typeof x === 'object' && Object.getPrototypeOf(x) === Object.prototype) return Object.keys(x).length > 0;
+    return Boolean(x);
+  }
+  // Python's type name of a JS value, for TypeError / AttributeError messages
+  function pyTypeName(x) {
+    if (x === null || x === undefined) return 'NoneType';
+    if (typeof x === 'boolean') return 'bool';
+    if (typeof x === 'number') return Number.isInteger(x) ? 'int' : 'float';
+    if (typeof x === 'bigint') return 'int';
+    if (typeof x === 'string') return 'str';
+    if (Array.isArray(x)) return 'list';
+    if (x instanceof Set) return 'set';
+    if (x instanceof Map || (typeof x === 'object' && Object.getPrototypeOf(x) === Object.prototype)) return 'dict';
+    return typeof x;
+  }
+  // list.extend(iterable): a string gives its characters, a dict (Map / plain object) its keys
+  function pyList(iterable) {
+    if (typeof iterable === 'string' || Array.isArray(iterable) || iterable instanceof Set) return Array.from(iterable);
+    if (iterable instanceof Map) return Array.from(iterable.keys());
+    if (iterable !== null && typeof iterable === 'object' && Object.getPrototypeOf(iterable) === Object.prototype) return Object.keys(iterable);
+    if (iterable !== null && iterable !== undefined && typeof iterable[Symbol.iterator] === 'function') return Array.from(iterable);
+    throw pyError('TypeError', "'" + pyTypeName(iterable) + "' object is not iterable");
+  }
+  // `x in container`: a substring for a str, == for a list, membership for a set / dict
+  function pyIn(container, x) {
+    if (typeof container === 'string') {
+      if (typeof x !== 'string') throw pyError('TypeError', "'in <string>' requires string as left operand, not " + pyTypeName(x));
+      return container.includes(x);
+    }
+    if (Array.isArray(container)) return container.includes(x);
+    if (container instanceof Set || container instanceof Map) return container.has(x);
+    if (container !== null && typeof container === 'object' && Object.getPrototypeOf(container) === Object.prototype) {
+      return Object.prototype.hasOwnProperty.call(container, x);
+    }
+    throw pyError('TypeError', "argument of type '" + pyTypeName(container) + "' is not iterable");
+  }
 
   // ---- fractions.Fraction --------------------------------------------------------------
   // numerator / denominator are JS integers, reduced, denominator > 0. Python's Fraction is
@@ -370,7 +417,12 @@
       // This produces wrong rhythms, but at least it produces something
       return 1;
     }
-    let p = 1;  // 1 << (n.bit_length() - 1)
+    // n.bit_length() exists for ints only: Python raises for a float (also NaN and infinity,
+    // where the loop below would never end)
+    if (typeof n !== 'number' || !Number.isInteger(n)) {
+      throw pyError('AttributeError', "'" + pyTypeName(n) + "' object has no attribute 'bit_length'");
+    }
+    let p = 1;  // 1 << (n.bit_length() - 1); exact for any finite integer (powers of two are)
     while (p * 2 <= n) p *= 2;
     return p;
   }
@@ -396,6 +448,10 @@
     const rest = kern.slice(i);
 
     const base = baseStr ? parseInt(baseStr, 10) : 4;  // default quarter
+    // Python's int is exact for any number of digits; a JS number only up to 2^53 (and 309+
+    // digits parse to Infinity, which made prior_power_of_two loop forever). No vocabulary
+    // token comes near: refuse like the Fraction class does instead of computing with a guess.
+    if (!Number.isSafeInteger(base)) throw pyError('OverflowError', 'kern duration ' + baseStr + ' does not fit a JS number (2^53)');
     const dots = rest.split('.').length - 1;
 
     if (kern.includes('G')) {
@@ -472,14 +528,25 @@
       // homr: transformer/vocabulary.py:390
       const match = /^(note|rest)_([0-9]+)([^\n]*)/.exec(this.rhythm);
       if (!match) return this;
-      let duration = parseInt(match[2], 10);
-      if (duration % 3 === 0) duration = Math.floor(duration / 3) * 2;
-      else if (duration % 5 === 0) duration = Math.floor(duration / 5) * 4;
-      else if (duration % 7 === 0) duration = Math.floor(duration / 7) * 4;
-      else return this;
+      // int(match[2]) is exact in Python for any length: past 15 digits compute with BigInt
+      // (string in, string out), a JS number would round the digits
+      let duration;
+      if (match[2].length <= 15) {
+        duration = parseInt(match[2], 10);
+        if (duration % 3 === 0) duration = Math.floor(duration / 3) * 2;
+        else if (duration % 5 === 0) duration = Math.floor(duration / 5) * 4;
+        else if (duration % 7 === 0) duration = Math.floor(duration / 7) * 4;
+        else return this;
+      } else {
+        const big = BigInt(match[2]), zero = BigInt(0), B = (k) => BigInt(k);
+        if (big % B(3) === zero) duration = big / B(3) * B(2);
+        else if (big % B(5) === zero) duration = big / B(5) * B(4);
+        else if (big % B(7) === zero) duration = big / B(7) * B(4);
+        else return this;
+      }
 
       const result = this.copy();
-      result.rhythm = match[1] + '_' + duration + match[3];
+      result.rhythm = match[1] + '_' + String(duration) + match[3];
       result._duration = null;
       return result;
     }
@@ -503,27 +570,28 @@
       return isNote.every((item) => item === hasPosition);
     }
 
+    // all_articulations.extend(articulations): any iterable (a str adds its characters)
     addArticulations(articulations) {
-      const all = [].concat(articulations, _splitArticulations(this.articulation));
+      const all = pyList(articulations).concat(_splitArticulations(this.articulation));
       const result = this.copy();
       result.articulation = py.sorted(all).join('_');
       return result;
     }
 
     addSlurs(slurs) {
-      const all = [].concat(slurs, this.slur.split('_').filter((a) => a));
+      const all = pyList(slurs).concat(this.slur.split('_').filter((a) => a));
       const result = this.copy();
       result.slur = py.sorted(all).join('_');
       return result;
     }
 
-    // returns [stripped, result] (Python's tuple)
+    // returns [stripped, result] (Python's tuple); `x in to_be_removed` like Python's `in`
     stripArticulations(toBeRemoved, removeAll) {
       if (this.articulation === nonote && !hasRhythmSymbolAPosition(this.rhythm)) return [[], this.copy()];
       const stripped = [];
       const remaining = [];
       for (const articulation of _splitArticulations(this.articulation)) {
-        if (removeAll || toBeRemoved.includes(articulation)) stripped.push(articulation);
+        if (pyTruthy(removeAll) || pyIn(toBeRemoved, articulation)) stripped.push(articulation);
         else remaining.push(articulation);
       }
       const result = this.copy();
@@ -537,7 +605,7 @@
       const remaining = [];
       for (const slur of this.slur.split('_')) {
         if (!slur) continue;
-        if (removeAll || toBeRemoved.includes(slur)) stripped.push(slur);
+        if (pyTruthy(removeAll) || pyIn(toBeRemoved, slur)) stripped.push(slur);
         else remaining.push(slur);
       }
       const result = this.copy();
@@ -564,7 +632,12 @@
     }
 
     toString() {
-      return [this.rhythm, this.pitch, this.lift, this.articulation, this.slur, this.position].join(' ');
+      const fields = [this.rhythm, this.pitch, this.lift, this.articulation, this.slur, this.position];
+      // str.join refuses what is not a str (Array.join would print null as '' and 3 as '3')
+      for (let i = 0; i < 6; i++) {
+        if (typeof fields[i] !== 'string') throw pyError('TypeError', 'sequence item ' + i + ': expected str instance, ' + pyTypeName(fields[i]) + ' found');
+      }
+      return fields.join(' ');
     }
 
     // __eq__: the six token fields (not the coordinates)
@@ -575,7 +648,10 @@
     }
 
     // __hash__ as a string key: equal symbols have equal keys
-    hashKey() { return this.toString(); }
+    hashKey() {  // hash() of the 6-tuple works whatever the fields hold (str() would not)
+      const fields = [this.rhythm, this.pitch, this.lift, this.articulation, this.slur, this.position];
+      return fields.every((f) => typeof f === 'string') ? fields.join(' ') : JSON.stringify(fields.map((f) => [typeof f, String(f)]));
+    }
 
     // __lt__ is reversed on purpose in homr: sorted(chord) orders by str() DESCENDING
     lt(other) { return this.toString() > other.toString(); }
@@ -774,7 +850,7 @@
     // homr: transformer/vocabulary.py:695
     if (cleanupTuplets === undefined) cleanupTuplets = true;
     let chords = _groupIntoChords(symbols);
-    if (cleanupTuplets) {
+    if (pyTruthy(cleanupTuplets)) {
       chords = _fixOverEagerTuplets(chords);
       chords = _onlyKeepLowerStaffIfThereIsAClef(chords);
     }
@@ -791,7 +867,7 @@
       if (symbol.rhythm === 'chord') {
         isInChord = true;
       } else if (isInChord && chords.length > 0) {
-        if (keepChordSymbol) chords[chords.length - 1].push(new EncodedSymbol('chord'));
+        if (pyTruthy(keepChordSymbol)) chords[chords.length - 1].push(new EncodedSymbol('chord'));
         chords[chords.length - 1].push(symbol);
         isInChord = false;
       } else {
@@ -819,6 +895,7 @@
     _onlyKeepLowerStaffIfThereIsAClef: _onlyKeepLowerStaffIfThereIsAClef,
     removeDuplicatedSymbols: removeDuplicatedSymbols, sortTokenChords: sortTokenChords,
     // JS only
-    sortSymbols: sortSymbols, invert: invert, Fraction: Fraction
+    sortSymbols: sortSymbols, invert: invert, Fraction: Fraction,
+    pyTruthy: pyTruthy, pyTypeName: pyTypeName
   };
 })(typeof self !== 'undefined' ? self : globalThis);

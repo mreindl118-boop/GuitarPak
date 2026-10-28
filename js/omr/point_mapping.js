@@ -22,6 +22,8 @@
   // homr: point_mapping.py:30
   // Inverse of resizing an image, the shapes are numpy shapes (height, width, ...).
   function undoResize(shapeBefore, shapeAfter) {
+    // int / int in Python: a zero-sized shape raises ZeroDivisionError here
+    if (shapeBefore[1] === 0 || shapeBefore[0] === 0) throw OMR.py.error('ZeroDivisionError', 'division by zero');
     var scaleX = shapeAfter[1] / shapeBefore[1];
     var scaleY = shapeAfter[0] / shapeBefore[0];
     return function (point) { return [point[0] / scaleX, point[1] / scaleY]; };

@@ -147,7 +147,7 @@
   // homr: model.py:229
   class StaffPoint {
     constructor(x, y, angle) {
-      if (y.length % constants.numberOfLinesOnAStaff !== 0) throw new Error('A staff must consist of 5, 10, ... lines');
+      if (y.length % constants.numberOfLinesOnAStaff !== 0) throw py.error('Exception', 'A staff must consist of 5, 10, ... lines');
       this.x = x;
       this.y = y;
       this.angle = angle;
@@ -155,7 +155,7 @@
     }
     // homr: model.py:238
     merge(other) {
-      if (Math.abs(this.x - other.x) > 1e-3) throw new Error("Can't merge points at different positions");
+      if (Math.abs(this.x - other.x) > 1e-3) throw py.error('ValueError', "Can't merge points at different positions");
       var y = this.y.concat(other.y);
       var angle = (this.angle + other.angle) / 2;
       return new StaffPoint(this.x, py.sorted(y), angle);
@@ -186,6 +186,9 @@
   class Staff extends DebugDrawable {
     constructor(grid) {
       super();
+      // grid[0] of an empty list: Python's IndexError (Staff.merge of two staffs without a
+      // common x position ends here)
+      if (!grid.length) throw py.error('IndexError', 'list index out of range');
       this.grid = grid;
       this.minX = grid[0].x;
       this.maxX = grid[grid.length - 1].x;

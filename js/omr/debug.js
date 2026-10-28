@@ -6,16 +6,25 @@
   'use strict';
   var OMR = G.OMR = G.OMR || {};
 
+  // os.path.dirname / os.path.join (posixpath) for the debug file names
+  function dirname(p) {
+    var head = p.slice(0, p.lastIndexOf('/') + 1);
+    if (head && !/^\/+$/.test(head)) head = head.replace(/\/+$/, '');
+    return head;
+  }
+  function joinPath(a, b) {
+    if (b.charAt(0) === '/' || !a) return b;
+    return a.charAt(a.length - 1) === '/' ? a + b : a + '/' + b;
+  }
+
   // homr: debug.py:12
   class Debug {
     constructor(originalImage, filename, debug) {
       this.filename = filename;
       this.originalImage = originalImage;
       filename = String(filename || '').replace(/\\/g, '/');
-      var slash = filename.lastIndexOf('/');
-      this.dirName = slash >= 0 ? filename.slice(0, slash) : '';
-      var base = filename.split('/').pop().split('.')[0];
-      this.baseFilename = this.dirName ? this.dirName + '/' + base : base;
+      this.dirName = dirname(filename);
+      this.baseFilename = joinPath(this.dirName, filename.split('/').pop().split('.')[0]);
       this.debug = !!debug;
       // BGR like cv2 (green, red, blue, cyan, yellow, magenta, ...)
       this.colors = [
@@ -34,14 +43,29 @@
       return this.baseFilename + '_debug_' + this.debugOutputCounter + '_' + suffix + '.png';
     }
     _rememberFileName(filename) { this.writtenFiles.push(filename); }
+    // The writers below draw / write nothing in the browser, but with debug on they keep
+    // Python's bookkeeping: each numbered file advances the counter that later debug file
+    // names (and writeBoundingBoxesAlternatingColors' teasers) carry, and is remembered.
     // homr: debug.py:50
-    writeThresholdImage(suffix, image) {}
+    writeThresholdImage(suffix, image) {
+      if (!this.debug) return;
+      this._rememberFileName(this._debugFileName(suffix));
+    }
     // homr: debug.py:60
-    writeBoundingBoxes(suffix, boundingBoxes) {}
+    writeBoundingBoxes(suffix, boundingBoxes) {
+      if (!this.debug) return;
+      this._rememberFileName(this._debugFileName(suffix));
+    }
     // homr: debug.py:70
-    writeImage(suffix, image) {}
+    writeImage(suffix, image) {
+      if (!this.debug) return;
+      this._rememberFileName(this._debugFileName(suffix));
+    }
     // homr: debug.py:77
-    writeImageWithFixedSuffix(suffix, image) {}
+    writeImageWithFixedSuffix(suffix, image) {
+      if (!this.debug) return;
+      this._rememberFileName(this.baseFilename + suffix);
+    }
     // homr: debug.py:84
     writeAllBoundingBoxesAlternatingColors(suffix) {
       var all = [];
@@ -87,5 +111,5 @@
     return img;
   }
 
-  OMR.debug = { Debug: Debug, drawTeaser: drawTeaser };
+  OMR.debug = { Debug: Debug, drawTeaser: drawTeaser, _dirname: dirname, _joinPath: joinPath };
 })(typeof self !== 'undefined' ? self : globalThis);

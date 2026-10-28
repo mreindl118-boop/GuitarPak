@@ -126,9 +126,18 @@
     if (inW === xsize && inH === ysize && box[0] === 0 && box[1] === 0 && box[2] === inW && box[3] === inH) {
       return { h: inH, w: inW, c: c, data: img.data.slice() }; // self.copy()
     }
+    // _imaging.c _resize: "height and width must be > 0" (ValueError)
+    if (!(xsize >= 1 && ysize >= 1)) throw OMR.py.error('ValueError', 'height and width must be > 0');
+    var b0 = fr(box[0]), b1 = fr(box[1]), b2 = fr(box[2]), b3 = fr(box[3]); // float box[4]
+    if (b0 < 0 || b1 < 0) throw OMR.py.error('ValueError', "box offset can't be negative");
+    if (b2 > inW || b3 > inH) throw OMR.py.error('ValueError', "box can't exceed original image size");
+    if (fr(b2 - b0) < 0 || fr(b3 - b1) < 0) throw OMR.py.error('ValueError', "box can't be empty");
+    // an integer box of exactly the requested size is a plain crop (ImagingCrop)
+    if (b0 === Math.trunc(b0) && fr(b2 - b0) === xsize && b1 === Math.trunc(b1) && fr(b3 - b1) === ysize) {
+      return OMR.np.crop(img, b1, b1 + ysize, b0, b0 + xsize);
+    }
     var filter = FILTERS[resample];
     if (!filter) throw new Error('OMR.pil.resize: unsupported resampling filter ' + resample);
-    var b0 = fr(box[0]), b1 = fr(box[1]), b2 = fr(box[2]), b3 = fr(box[3]); // float box[4]
     // ImagingResampleInner
     var needH = xsize !== inW || b0 !== 0 || b2 !== xsize;
     var needV = ysize !== inH || b1 !== 0 || b3 !== ysize;

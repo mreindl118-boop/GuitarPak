@@ -233,8 +233,15 @@
     return g >= 0.5 ? x1 - d * (1 - g) : x0 + d * g;
   }
   // np.argmax / np.argmin: first occurrence; NaN wins like numpy
-  function argmax(a) { var bi = 0; if (a[0] !== a[0]) return 0; for (var i = 1; i < a.length; i++) { if (a[i] !== a[i]) return i; if (a[i] > a[bi]) bi = i; } return bi; }
-  function argmin(a) { var bi = 0; if (a[0] !== a[0]) return 0; for (var i = 1; i < a.length; i++) { if (a[i] !== a[i]) return i; if (a[i] < a[bi]) bi = i; } return bi; }
+  // (an empty input raises ValueError like numpy)
+  function argmax(a) {
+    if (!a.length) throw pyError('ValueError', 'attempt to get argmax of an empty sequence');
+    var bi = 0; if (a[0] !== a[0]) return 0; for (var i = 1; i < a.length; i++) { if (a[i] !== a[i]) return i; if (a[i] > a[bi]) bi = i; } return bi;
+  }
+  function argmin(a) {
+    if (!a.length) throw pyError('ValueError', 'attempt to get argmin of an empty sequence');
+    var bi = 0; if (a[0] !== a[0]) return 0; for (var i = 1; i < a.length; i++) { if (a[i] !== a[i]) return i; if (a[i] < a[bi]) bi = i; } return bi;
+  }
   function diff(a) { var out = []; for (var i = 1; i < a.length; i++) out.push(a[i] - a[i - 1]); return out; }
   function argsort(a) { return range(a.length).sort(function (i, j) { return a[i] - a[j] || i - j; }); }
   function clip(x, lo, hi) { return x < lo ? lo : x > hi ? hi : x; }
@@ -601,10 +608,10 @@
   // np.zeros(shape, dtype) / np.ones / np.full
   function zeros(shp, dtype) { var d = dims(shp); return image(d.h, d.w, d.c, dtype || 'float64'); }
   function ones(shp, dtype) { return full(shp, 1, dtype || 'float64'); }
-  function full(shp, value, dtype) { var im = zeros(shp, dtype); im.data.fill(value); return im; }
+  function full(shp, value, dtype) { var im = zeros(shp, dtype); im.data.fill(fillValue(im.data, value)); return im; }
   // np.zeros_like / np.full_like (dtype defaults to the source's)
   function zerosLike(img, dtype) { return image(img.h, img.w, img.c, dtype || dtypeOf(img)); }
-  function fullLike(img, value, dtype) { var im = zerosLike(img, dtype); im.data.fill(value); return im; }
+  function fullLike(img, value, dtype) { var im = zerosLike(img, dtype); im.data.fill(fillValue(im.data, value)); return im; }
   // img.copy()
   function clone(img) { return { h: img.h, w: img.w, c: img.c, data: img.data.slice() }; }
   // numpy's float -> int casts as the x86-64 wheel runs them (astype and setitem alike): to
@@ -631,6 +638,32 @@
     else if (out instanceof Uint32Array) out[i] = castInt64Low32(v);
     else out[i] = castInt32(v);
   }
+  // integer dtypes' ranges, for Python's bounds check of a Python int
+  var INT_RANGE = { uint8: [0, 255], int8: [-128, 127], uint16: [0, 65535], int16: [-32768, 32767],
+    int32: [-2147483648, 2147483647], uint32: [0, 4294967295] };
+  function checkBounds(t, dt) {
+    var r = INT_RANGE[dt];
+    if (r && (t < r[0] || t > r[1])) throw pyError('OverflowError', 'Python integer ' + t + ' out of bounds for ' + dt);
+    return t;
+  }
+  // arr[...] = x for a Python number x (setitem): an integer array takes int(x), so NaN raises
+  // ValueError, an infinity or a value outside the dtype OverflowError (numpy 2: "Python integer
+  // 300 out of bounds for uint8"); float arrays take x as it is
+  function scalarItem(d, v) {
+    if (d instanceof Float32Array || d instanceof Float64Array || typeof v !== 'number') return v;
+    checkFinite(v);
+    return checkBounds(Math.trunc(v), dtypeOf(d));
+  }
+  // np.full(shape, x, dtype): a Python int must fit the dtype (OverflowError), a Python float is
+  // cast like astype (NaN -> INT_MIN wrapped, 300.0 -> 44 for uint8). A JS number with an integer
+  // value is taken as a Python int.
+  function fillValue(d, v) {
+    if (d instanceof Float32Array || d instanceof Float64Array || typeof v !== 'number') return v;
+    if (Number.isInteger(v)) return checkBounds(v, dtypeOf(d));
+    var tmp = new d.constructor(1);
+    castInto(tmp, 0, v, true);
+    return tmp[0];
+  }
   // .astype(dtype): numpy's C casts (above). Float64 -> float32 rounds to nearest.
   function astype(img, dtype) {
     var C = ctorOf(dtype), out = new C(img.data.length), src = img.data, fs = isFloatData(src);
@@ -640,6 +673,10 @@
   }
   // numpy slice bounds: None -> default, negatives count from the end, then clamp
   function sliceBounds(a, b, n) {
+    // numpy takes integers or None only: a float bound (even 2.0) raises TypeError
+    if ((a !== undefined && a !== null && !Number.isInteger(a)) || (b !== undefined && b !== null && !Number.isInteger(b))) {
+      throw pyError('TypeError', 'slice indices must be integers or None or have an __index__ method');
+    }
     a = a === undefined || a === null ? 0 : a;
     b = b === undefined || b === null ? n : b;
     if (a < 0) a += n;
@@ -679,7 +716,7 @@
     var vals = Array.isArray(src) || ArrayBuffer.isView(src) ? src : null;
     for (var yy = 0; yy < h; yy++) {
       var tt = ((ys[0] + yy) * img.w + xs[0]) * c;
-      if (!vals) { d.fill(src, tt, tt + w * c); continue; }
+      if (!vals) { d.fill(scalarItem(d, src), tt, tt + w * c); continue; }
       for (var x = 0; x < w; x++) for (var k = 0; k < c; k++) d[tt + x * c + k] = vals[k];
     }
     return img;
@@ -752,8 +789,17 @@
     for (i = 0; i < h; i++) for (j = 0; j < w; j++) { tmp = out[j] + d[i * w + j]; out[j] = single ? f32(tmp) : tmp; }
     return out;
   }
-  function maxOf(a) { if (a && a.data && a.h !== undefined) a = a.data; var m = a[0]; for (var i = 1; i < a.length; i++) if (a[i] > m || a[i] !== a[i]) { m = a[i]; if (m !== m) break; } return m; }
-  function minOf(a) { if (a && a.data && a.h !== undefined) a = a.data; var m = a[0]; for (var i = 1; i < a.length; i++) if (a[i] < m || a[i] !== a[i]) { m = a[i]; if (m !== m) break; } return m; }
+  // np.max / np.min: NaN wins; an empty input raises ValueError like numpy (no identity)
+  function maxOf(a) {
+    if (a && a.data && a.h !== undefined) a = a.data;
+    if (!a.length) throw pyError('ValueError', 'zero-size array to reduction operation maximum which has no identity');
+    var m = a[0]; for (var i = 1; i < a.length; i++) if (a[i] > m || a[i] !== a[i]) { m = a[i]; if (m !== m) break; } return m;
+  }
+  function minOf(a) {
+    if (a && a.data && a.h !== undefined) a = a.data;
+    if (!a.length) throw pyError('ValueError', 'zero-size array to reduction operation minimum which has no identity');
+    var m = a[0]; for (var i = 1; i < a.length; i++) if (a[i] < m || a[i] !== a[i]) { m = a[i]; if (m !== m) break; } return m;
+  }
 
   // ---- point lists (cv2 contours) ----
   // a contour is a flat typed array of x,y pairs = numpy (N, 1, 2) / (N, 2) flattened
@@ -772,7 +818,9 @@
   // flat pairs -> [[x, y], ...]
   function pairs(p) { var out = []; for (var i = 0; i + 1 < p.length; i += 2) out.push([p[i], p[i + 1]]); return out; }
   // np.concatenate(list of contours)
+  // (like numpy, an empty list raises ValueError)
   function concat(list) {
+    if (!list.length) throw pyError('ValueError', 'need at least one array to concatenate');
     var n = 0, i;
     for (i = 0; i < list.length; i++) n += list[i].length;
     var out = new (list.length ? list[0].constructor : Int32Array)(n), o = 0;

@@ -18,8 +18,49 @@
     const L = OMR.simple_logging;
     if (L && L.eprint) L.eprint.apply(null, arguments);
   }
-  function pyError(name, message) { const e = new Error(message); e.name = name; return e; }
+  function pyError(name, message) { const e = new Error(message); e.name = name; e.pyType = name; return e; }
   function startsWithNoteOrRest(r) { return r.startsWith('note') || r.startsWith('rest'); }
+  const pyTruthy = V.pyTruthy;  // bool(x): NaN is true in Python
+  // str(x) of what a JS caller passes where homr takes an int (XmlGeneratorArguments): an
+  // integral number is an int (every digit, String(1e21) would say '1e+21'), any other number
+  // a float (repr: 'nan', 'inf', '1e-07', '120.5'), true/false/null 'True'/'False'/'None'.
+  // A Python float like 120.0 ('120.0') has no JS twin: pass integers, as homr's callers do.
+  function pyStr(x) {
+    if (x === null || x === undefined) return 'None';
+    if (typeof x === 'boolean') return x ? 'True' : 'False';
+    if (typeof x === 'bigint') return x.toString();
+    if (typeof x !== 'number') return String(x);
+    if (Number.isNaN(x)) return 'nan';
+    if (x === Infinity) return 'inf';
+    if (x === -Infinity) return '-inf';
+    if (Number.isInteger(x)) return BigInt(x).toString();
+    return pyFloatRepr(x);
+  }
+  // repr(float) of a finite non-integral x: the shortest digits that round-trip (JS's and
+  // Python's algorithms agree on them), laid out by Python's 'r' rule: exponent form when the
+  // decimal point is <= -4 or > 16 places from the first digit ('1e-05', '3.5e-07')
+  function pyFloatRepr(x) {
+    const parts = String(Math.abs(x)).split('e');
+    const mant = parts[0], exp = parts.length > 1 ? parseInt(parts[1], 10) : 0;
+    const dot = mant.indexOf('.');
+    const intPart = dot < 0 ? mant : mant.slice(0, dot), all = mant.replace('.', '');
+    let lead = 0;
+    while (lead < all.length - 1 && all[lead] === '0') lead++;
+    const digits = all.slice(lead).replace(/0+$/, '') || '0';
+    const decpt = intPart.length + exp - lead;  // |x| = 0.<digits> * 10^decpt
+    let s;
+    if (decpt <= -4 || decpt > 16) {
+      const e = decpt - 1;
+      s = digits[0] + (digits.length > 1 ? '.' + digits.slice(1) : '') + 'e' + (e < 0 ? '-' : '+') + String(Math.abs(e)).padStart(2, '0');
+    } else if (decpt <= 0) {
+      s = '0.' + '0'.repeat(-decpt) + digits;
+    } else if (decpt >= digits.length) {
+      s = digits + '0'.repeat(decpt - digits.length) + '.0';
+    } else {
+      s = digits.slice(0, decpt) + '.' + digits.slice(decpt);
+    }
+    return (x < 0 ? '-' : '') + s;
+  }
   function getItem(dict, key) {  // dict[key]: KeyError when missing; str(KeyError(k)) = repr(k)
     if (!Object.prototype.hasOwnProperty.call(dict, key)) throw pyError('KeyError', typeof key === 'string' ? pyReprStr(key) : String(key));
     return dict[key];
@@ -487,7 +528,7 @@
   function buildDefaults(args) {
     // homr: music_xml_generator.py:291
     const defaults = new Element('defaults');
-    if (args.largePage) {
+    if (pyTruthy(args.largePage)) {
       const pageLayout = SubElement(defaults, 'page-layout');
       SubElement(pageLayout, 'page-height').text = '300';
       SubElement(pageLayout, 'page-width').text = '110';
@@ -1092,14 +1133,14 @@
 
   function buildAddTimeDirection(args) {
     // homr: music_xml_generator.py:878
-    if (!args.metronome) return null;
+    if (!pyTruthy(args.metronome)) return null;
     const direction = new Element('direction');
     const directionType = SubElement(direction, 'direction-type');
     const metronome = SubElement(directionType, 'metronome');
     SubElement(metronome, 'beat-unit').text = 'quarter';
-    SubElement(metronome, 'per-minute').text = String(args.metronome);
-    const tempo = args.tempo ? args.tempo : args.metronome;
-    SubElement(direction, 'sound', { tempo: String(tempo) });
+    SubElement(metronome, 'per-minute').text = pyStr(args.metronome);
+    const tempo = pyTruthy(args.tempo) ? args.tempo : args.metronome;
+    SubElement(direction, 'sound', { tempo: pyStr(tempo) });
     return direction;
   }
 
@@ -1108,7 +1149,14 @@
     // Find the smallest division (denominator) so that all durations
     // can be expressed as integer multiples.
     function gcd(a, b) { a = Math.abs(a); b = Math.abs(b); while (b) { const t = a % b; a = b; b = t; } return a; }
-    function lcm(a, b) { return Math.abs(a * b) / gcd(a, b); }
+    // abs(a * b) // gcd(a, b), without the product: a * b may pass 2^53 (and round) even when
+    // the lcm does not. An lcm past 2^53 (never with vocabulary durations: <= 2^9*3^2*5*7*11*13*17)
+    // raises instead of rounding, like the Fraction class.
+    function lcm(a, b) {
+      const r = Math.abs(a / gcd(a, b) * b);
+      if (!Number.isSafeInteger(r)) throw pyError('OverflowError', 'common division lcm(' + a + ', ' + b + ') does not fit a JS number (2^53)');
+      return r;
+    }
 
     const denominators = durations.filter((d) => d.gt(0)).map((d) => d.denominator);
     if (!denominators.length) return 1;

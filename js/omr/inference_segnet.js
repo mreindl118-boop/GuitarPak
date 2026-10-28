@@ -23,6 +23,38 @@
   // a Python exception: e.name = its class, e.message = Python's text
   function pyError(name, message) { var e = new Error(message); e.name = name; return e; }
 
+  // Python's type name of a JS value standing in for an argument (null / undefined = None; an
+  // integral number counts as int: JS cannot tell 32.0 from 32)
+  function pyType(v) {
+    if (v === null || v === undefined) return 'NoneType';
+    if (typeof v === 'boolean') return 'bool';
+    if (typeof v === 'string') return 'str';
+    if (typeof v === 'number') return Number.isInteger(v) ? 'int' : 'float';
+    return typeof v;
+  }
+  // Python's int-like values: numbers and bools (bool is an int subclass)
+  function isPyNumber(v) { return typeof v === 'number' || typeof v === 'boolean'; }
+  // the checks of range(0, stop, step) on its arguments: TypeError for anything that is not an
+  // int (a float, None, a str: a loop over them would never end or index fractional pixels),
+  // ValueError for a zero step. -> the step as a number (a bool is 0 / 1)
+  function checkRange(stop, step) {
+    [stop, step].forEach(function (v) {
+      if (typeof v !== 'boolean' && !Number.isInteger(v)) throw pyError('TypeError', '\'' + pyType(v) + '\' object cannot be interpreted as an integer');
+    });
+    step = +step;
+    if (step === 0) throw pyError('ValueError', 'range() arg 3 must not be zero');
+    return step;
+  }
+  // list(range(0, stop, step)) after checkRange: empty for a negative step and a positive stop
+  // (a negative window gives one), where a JS `v < stop; v += step` loop would never end
+  function rangeList(stop, step) {
+    stop = +stop;
+    var out = [], v;
+    if (step > 0) for (v = 0; v < stop; v += step) out.push(v);
+    else for (v = 0; v > stop; v += step) out.push(v);
+    return out;
+  }
+
   // homr: segmentation/config.py
   var modelName = 'segnet_308-3296ccd40960f90ca6ab9c035cca945675d30a0f';
   var segnetPathOnnx = modelName + '.onnx';
@@ -135,16 +167,23 @@
     var weight = new Float32Array(H * W);
 
     var idx = 0, iy, ix, yy, xx;
-    for (iy = 0; iy < H; iy += stepSize) {
+    stepSize = checkRange(H, stepSize);
+    var ys = rangeList(H, stepSize);
+    for (var i = 0; i < ys.length; i++) {
+      iy = ys[i];
       var y = Math.min(iy, H - winSize);
       var y0 = Math.max(y, 0);
       var y1 = Math.min(y + winSize, H);
 
-      for (ix = 0; ix < W; ix += stepSize) {
+      checkRange(W, stepSize);
+      var xs = rangeList(W, stepSize);
+      for (var j = 0; j < xs.length; j++) {
+        ix = xs[j];
         var x = Math.min(ix, W - winSize);
         var x0 = Math.max(x, 0);
         var x1 = Math.min(x + winSize, W);
 
+        if (idx >= patches.length) throw pyError('IndexError', 'list index out of range');
         var patch = patches[idx];
         var ph = y1 - y0;
         var pw = x1 - x0;
@@ -159,11 +198,13 @@
     }
 
     // Avoid division by zero
+    // (reconstructed.astype(patches[0].dtype): an empty patch list raises there)
+    if (!patches.length) throw pyError('IndexError', 'list index out of range');
     var n = H * W, out = new patches[0].constructor(n);
-    for (var i = 0; i < n; i++) {
-      if (weight[i] === 0) weight[i] = 1;
-      reconstructed[i] /= weight[i]; // float32 division (stored rounded, like numpy's in-place /=)
-      out[i] = Math.trunc(reconstructed[i]);
+    for (var k = 0; k < n; k++) {
+      if (weight[k] === 0) weight[k] = 1;
+      reconstructed[k] /= weight[k]; // float32 division (stored rounded, like numpy's in-place /=)
+      out[k] = Math.trunc(reconstructed[k]);
     }
     return { h: H, w: W, c: 1, data: out };
   }
@@ -215,7 +256,14 @@
     var useGpuInference = opts.useGpuInference, batchSize = opts.batchSize, stepSize = opts.stepSize, winSize = opts.winSize;
     eprint('Starting Inference.');
     var t0 = now();
-    if (stepSize < 0) stepSize = Math.floor(winSize / 2);
+    // Python's arguments are checked where Python's operators check them: `step_size < 0` (a None
+    // step raises before the Segnet is made), `win_size // 2`, then max() and range() in the loops
+    if (!isPyNumber(stepSize)) throw pyError('TypeError', '\'<\' not supported between instances of \'' + pyType(stepSize) + '\' and \'int\'');
+    if (stepSize < 0) {
+      if (!isPyNumber(winSize)) throw pyError('TypeError', 'unsupported operand type(s) for //: \'' + pyType(winSize) + '\' and \'int\'');
+      // a float window gives a float step (NaN stands for it: range() refuses any float alike)
+      stepSize = Number.isInteger(+winSize) ? Math.floor(+winSize / 2) : NaN;
+    }
 
     if (_segnetInference === null) {
       _segnetInference = Segnet.create(useGpuInference, { onProgress: opts.onModelProgress });
@@ -227,19 +275,32 @@
     var c = imageOrg.c, h = imageOrg.h, w = imageOrg.w;
     var data = [];
 
-    // the tile positions in Python's loop order (the total feeds onProgress); a zero step raises
-    // where Python's range() does: after the Segnet was made and cvtColor checked the page
-    if (stepSize === 0) throw pyError('ValueError', 'range() arg 3 must not be zero');
-    var tiles = [], yLoop, xLoop;
-    for (yLoop = 0; yLoop < Math.max(h, winSize); yLoop += stepSize) {
-      var y = Math.min(yLoop, h - winSize);
-      for (xLoop = 0; xLoop < Math.max(w, winSize); xLoop += stepSize) {
-        tiles.push([y, Math.min(xLoop, w - winSize)]);
-      }
+    // the tile positions in Python's loop order (the total feeds onProgress). Bad arguments raise
+    // where Python's loops do, after the Segnet was made and cvtColor checked the page:
+    // max(h, win_size) compares win_size > h, range() takes ints and a non-zero step only, and
+    // extract_patch's np.full((c, win_size, win_size)) refuses a float or bool window
+    if (!isPyNumber(winSize)) throw pyError('TypeError', '\'>\' not supported between instances of \'' + pyType(winSize) + '\' and \'int\'');
+    stepSize = checkRange(winSize > h ? winSize : h, stepSize);
+    // (a negative step, from a negative window, makes both loops empty: no tile, and
+    // merge_patches raises IndexError on the empty list)
+    if (stepSize > 0) {
+      checkRange(winSize > w ? winSize : w, stepSize);
+      if (typeof winSize === 'boolean') throw pyError('TypeError', 'an integer is required');
+      checkRange(winSize, 1);
+      if (winSize < 0) throw pyError('ValueError', 'negative dimensions are not allowed');
+    }
+    var tiles = [], ys = rangeList(Math.max(h, winSize), stepSize);
+    for (var i = 0; i < ys.length; i++) {
+      var y = Math.min(ys[i], h - winSize);
+      var xs = rangeList(Math.max(w, winSize), stepSize);
+      for (var j = 0; j < xs.length; j++) tiles.push([y, Math.min(xs[j], w - winSize)]);
     }
     var total = tiles.length, plane = winSize * winSize, tileSize = c * plane;
-    // (a batch_size < 1 never fills, so Python runs every tile in the final batch)
-    var buf = new Float32Array((batchSize >= 1 ? Math.min(batchSize, total) : total) * tileSize), inBatch = 0;
+    // `len(batch) == batch_size`: a bool is 0 / 1; anything that is not a whole number >= 1
+    // (0, a negative or fractional size, None, a str) never fills, so Python runs every tile in
+    // the final batch
+    var batchN = typeof batchSize === 'boolean' ? +batchSize : typeof batchSize === 'number' ? batchSize : NaN;
+    var buf = new Float32Array((Number.isInteger(batchN) && batchN >= 1 ? Math.min(batchN, total) : total) * tileSize), inBatch = 0;
     if (opts.onProgress) opts.onProgress(0, total);
 
     async function runBatch() {
@@ -255,7 +316,7 @@
     for (var t = 0; t < total; t++) {
       extractPatch(imageOrg, tiles[t][0], tiles[t][1], winSize, buf, inBatch * tileSize);
       inBatch += 1;
-      if (inBatch === batchSize) await runBatch();
+      if (inBatch === batchN) await runBatch();
     }
     if (inBatch) await runBatch();
 

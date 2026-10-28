@@ -18,6 +18,8 @@
 
     if (width === targetWidth) return [width, height];
 
+    // Python's int division raises where JS gives Infinity (an image 0 px wide)
+    if (width === 0) throw pyError('ZeroDivisionError', 'division by zero');
     var ratio = targetWidth / width;
     var tarW = targetWidth;
     var tarH = py.round(height * ratio);

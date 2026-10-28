@@ -27,9 +27,12 @@ other suites):
     FakeSegnet): tile order, batch sizes per run (partial / never-full batches), padding of
     tiles beyond the image, argmax ties and the averaging merge of overlapping steps.
   34-seg-edges.json: what homr does with degenerate inputs (the exception class + message, or
-    the result's shape + sha1): resize_image to a zero height, the noise grid of a mask lower or
-    narrower than 20 px, a 2-D gray page into autocrop / apply_clahe, a 3-channel page or a
-    zero step into inference() (stand-in model).
+    the result's shape + sha1): resize_image to a zero height or from a zero width, the noise
+    grid of a mask lower or narrower than 20 px, empty, 3-D or float64, a 2-D gray or an empty
+    page into autocrop / apply_clahe, a 3-channel page into inference() (stand-in model), and
+    inference()'s arguments by Python type (None / float / str / bool / negative step, window and
+    batch size: where it raises, whether the Segnet was made, the batch size of every run), and
+    merge_patches with a bad step or too few patches.
 --only pages,synthetic,noise,tiling,edges rewrites just those sections (e.g. --only tiling needs no
 model and keeps the segnet results already in 30-segment.json).
 The shipping segnet on page shapes the fixtures lack (A4, short, strip): dump_segment_shapes.py.
@@ -299,22 +302,63 @@ def outcome(fn):
 
 
 if 'edges' in ONLY:
-    from homr.noise_filtering import create_noise_grid  # noqa: E402
+    from homr.noise_filtering import create_noise_grid, estimate_noise  # noqa: E402
+    from homr.segmentation.inference_segnet import merge_patches  # noqa: E402
     ecases = []
-    for shp in [(1, 3841, 3), (1, 4000, 3), (1, 3839, 3), (3, 7681, 3)]:
+    # (audit 2) + an image 0 px wide (ZeroDivisionError in calc_target_image_size), 0 px high,
+    # 1 x 1 and 2 x 1 pixels
+    for shp in [(1, 3841, 3), (1, 4000, 3), (1, 3839, 3), (3, 7681, 3), (10, 0, 3), (0, 10, 3), (0, 0, 3),
+                (10, 0), (1, 1, 3), (2, 1, 3), (1, 2, 3)]:
         ecases.append({'fn': 'resize_image', 'shape': list(shp), 'fill': 200,
                        'out': outcome(lambda: resize_image(np.full(shp, 200, np.uint8)))})
-    for shp in [(15, 100), (100, 15), (19, 19), (20, 20), (21, 400)]:
-        ecases.append({'fn': 'create_noise_grid', 'shape': list(shp), 'fill': 0,
-                       'out': outcome(lambda: create_noise_grid(np.zeros(shp, np.uint8), Debug(None, 'edges', False)))})
+    # (audit 2) + an empty mask (cvtColor raises before the grid divides by zero), a 3-D one
+    # (`h, w = gray.shape`), a float64 one (cvtColor's depth check)
+    for shp, dt in [((15, 100), 'uint8'), ((100, 15), 'uint8'), ((19, 19), 'uint8'), ((20, 20), 'uint8'),
+                    ((21, 400), 'uint8'), ((0, 100), 'uint8'), ((100, 0), 'uint8'), ((40, 40, 3), 'uint8'),
+                    ((40, 40), 'float64')]:
+        ecases.append({'fn': 'create_noise_grid', 'shape': list(shp), 'fill': 0, 'dtype': dt,
+                       'out': outcome(lambda: create_noise_grid(np.zeros(shp, dt), Debug(None, 'edges', False)))})
+    ecases.append({'fn': 'estimate_noise', 'shape': [5, 5, 3], 'fill': 0,
+                   'out': outcome(lambda: estimate_noise(np.zeros((5, 5, 3), np.uint8)))})
     for fn, call in [('autocrop_with_offset', autocrop_with_offset), ('apply_clahe', color_adjust.apply_clahe)]:
-        ecases.append({'fn': fn, 'shape': [50, 40], 'fill': 200, 'out': outcome(lambda: call(np.full((50, 40), 200, np.uint8)))})
-    saved = S._segnet_inference
-    for shp, step in [((40, 40, 3), 16), ((40, 40, 3), 0), ((40, 40), 0)]:
-        S._segnet_inference = FakeSegnet()
-        ecases.append({'fn': 'inference', 'shape': list(shp), 'fill': 0, 'step': step, 'win': 32, 'batch': 8,
-                       'out': outcome(lambda: S.inference(np.zeros(shp, np.uint8), False, 8, step, 32))})
-    S._segnet_inference = saved
+        for shp in [(50, 40), (10, 0, 3), (0, 10, 3), (1, 1, 3), (3, 3, 3)]:
+            ecases.append({'fn': fn, 'shape': list(shp), 'fill': 200, 'out': outcome(lambda: call(np.full(shp, 200, np.uint8)))})
+    # inference(): the arguments' Python types decide where (and whether) it raises - a None step
+    # before the Segnet is made, a float or None window or a float step in max() / range() /
+    # np.full after it; batch sizes that never equal len(batch) run every tile in one batch (a
+    # bool is 0 / 1); a negative window makes both loops empty (IndexError in merge_patches).
+    # JSON null = None, true = True; JS cannot tell 32.0 from 32, so floats are fractional.
+    saved, saved_cls = S._segnet_inference, S.Segnet
+    INF = [((40, 40, 3), 8, 16, 32), ((40, 40, 3), 8, 0, 32), ((40, 40), 8, 0, 32),
+           ((40, 70), 8, None, 32), ((40, 70, 3), 8, None, 32), ((40, 70), 8, 16.5, 32), ((40, 70, 3), 8, 16.5, 32),
+           ((40, 70), 8, -1, None), ((40, 70), 8, 16, None), ((40, 70), 8, -1, 33.5), ((40, 70), 8, 16, 33.5),
+           ((40, 70), 8, 16, 50.5), ((40, 70), 8, 16, 100.5), ((40, 70), 8, 0, 33.5), ((40, 70), 8, 0, 50.5),
+           ((40, 70), 8, '16', 32), ((40, 70), 8, 16, '32'), ((40, 70), 8, -1, '32'), ((40, 70), 8, False, 32),
+           ((40, 70), 8, 16, True), ((40, 70), 8, -1, True), ((40, 70), 8, 16, -32), ((40, 70), 8, -1, -32),
+           ((40, 70), 8, -5, -31), ((40, 70), 8, 16, 0), ((40, 70), 8, -1, 0), ((40, 70), 8, -1, 1),
+           ((40, 70), 2.5, 16, 32), ((40, 70), None, 16, 32), ((40, 70), True, 16, 32), ((40, 70), False, 16, 32),
+           ((40, 70), 0, 16, 32), ((40, 70), -3, 16, 32), ((40, 70), '8', 16, 32), ((12, 9), 8, True, 4)]
+    for shp, batch, step, win in INF:
+        made = []
+
+        def factory(use_gpu, made=made):
+            made.append(1)
+            return FakeSegnet()
+        S._segnet_inference, S.Segnet = None, factory
+        img = (np.arange(int(np.prod(shp))) % 251).astype(np.uint8).reshape(shp)
+        rec = {'fn': 'inference', 'shape': list(shp), 'fill': 'arange', 'step': step, 'win': win, 'batch': batch,
+               'out': outcome(lambda: S.inference(img, False, batch, step, win))}
+        rec['segnet_made'] = bool(made)
+        rec['calls'] = S._segnet_inference.calls if S._segnet_inference is not None else []
+        ecases.append(rec)
+    S._segnet_inference, S.Segnet = saved, saved_cls
+    # merge_patches on its own: range() of a bad step, too few / no patches (uint8 patches, so
+    # the result keeps the dtype the JS port gives)
+    for n, shape, step in [(1, (40, 40), 0), (1, (40, 40), None), (9, (40, 40), 16.5), (1, (40, 40), 16), (0, (40, 40), 16),
+                           (0, (0, 40), 16), (1, (40, 40), -16), (4, (40, 40), 16)]:
+        pats = [(np.arange(32 * 32) % 6).astype(np.uint8).reshape(32, 32) for _ in range(n)]
+        ecases.append({'fn': 'merge_patches', 'patches': n, 'image_shape': list(shape), 'step': step, 'win': 32,
+                       'out': outcome(lambda: merge_patches(pats, shape, 32, step))})
     with open(os.path.join(FIX, '34-seg-edges.json'), 'w') as f:
         json.dump({'cases': ecases}, f, indent=1)
-    print('edge cases', [(c['fn'], c['shape'], c['out'].get('raises') or c['out'].get('shape')) for c in ecases], file=sys.stderr)
+    print('edge cases', [(c['fn'], c.get('shape', c.get('image_shape')), c['out'].get('raises') or c['out'].get('shape')) for c in ecases], file=sys.stderr)

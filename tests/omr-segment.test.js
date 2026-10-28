@@ -232,19 +232,39 @@ function checkFilter(label, preds, rep, debug) {
   // ---- degenerate inputs: homr's exceptions (and the order they come in) are behaviour too ----
   if (fs.existsSync(path.join(H.FIX, '34-seg-edges.json'))) {
     const doc = H.readJson(path.join(H.FIX, '34-seg-edges.json'));
+    const arg = (v) => typeof v === 'string' ? '\'' + v + '\'' : String(v === null ? 'None' : v === true ? 'True' : v === false ? 'False' : v);
     for (const c of doc.cases) {
-      const input = np.full(c.shape, c.fill, 'uint8');
-      let got;
+      let input = null;
+      if (c.shape) {
+        input = np.full(c.shape, c.fill === 'arange' ? 0 : c.fill, c.dtype || 'uint8');
+        if (c.fill === 'arange') for (let i = 0; i < input.data.length; i++) input.data[i] = i % 251;
+      }
+      let got, extra = '', extraOk = true;
       if (c.fn === 'resize_image') got = await outcome(() => watch('resize_image', () => OMR.resize.resizeImage(input)));
       else if (c.fn === 'create_noise_grid') got = await outcome(() => watch('create_noise_grid', () => OMR.noise_filtering.createNoiseGrid(input, new OMR.debug.Debug(null, 'edges', false))));
+      else if (c.fn === 'estimate_noise') got = await outcome(() => watch('estimate_noise', () => OMR.np.full([1], OMR.noise_filtering.estimateNoise(input))));
       else if (c.fn === 'autocrop_with_offset') got = await outcome(() => watch('autocrop', () => OMR.autocrop.autocropWithOffset(input)));
       else if (c.fn === 'apply_clahe') got = await outcome(() => watch('apply_clahe', () => OMR.color_adjust.applyClahe(input)));
       else if (c.fn === 'inference') {
-        seg._inject(fakeSegnet([]));
-        got = await outcome(() => watchAsync('inference', () => seg.inference(input, { useGpuInference: false, batchSize: c.batch, stepSize: c.step, winSize: c.win })));
+        // a stand-in Segnet.create: was the Segnet made (homr raises for a None step before)?
+        const calls = [], realCreate = seg.Segnet.create;
+        let made = false;
         seg._reset();
+        seg.Segnet.create = async () => { made = true; return fakeSegnet(calls); };
+        try {
+          got = await outcome(() => watchAsync('inference', () => seg.inference(input, { useGpuInference: false, batchSize: c.batch, stepSize: c.step, winSize: c.win })));
+        } finally { seg.Segnet.create = realCreate; seg._reset(); }
+        extraOk = made === c.segnet_made && calls.join() === c.calls.join();
+        extra = ', batch ' + arg(c.batch) + ', step ' + arg(c.step) + ', win ' + arg(c.win);
+        if (!extraOk) extra += ' -- JS Segnet made ' + made + ' (homr ' + c.segnet_made + '), runs ' + calls + ' (homr ' + c.calls + ')';
+      } else if (c.fn === 'merge_patches') {
+        const pats = [];
+        for (let k = 0; k < c.patches; k++) { const p = new Uint8Array(32 * 32); for (let i = 0; i < p.length; i++) p[i] = i % 6; pats.push(p); }
+        got = await outcome(() => seg.mergePatches(pats, c.image_shape, c.win, c.step));
+        extra = ' ' + c.patches + ' patches, step ' + arg(c.step);
       }
-      H.ok(got && sameOutcome(c.out, got), 'edge ' + c.fn + '(' + c.shape.join('x') + (c.fn === 'inference' ? ', step ' + c.step : '') + ') -> ' +
+      const shape = c.shape || c.image_shape;
+      H.ok(got && sameOutcome(c.out, got) && extraOk, 'edge ' + c.fn + '(' + shape.join('x') + (c.dtype && c.dtype !== 'uint8' ? ' ' + c.dtype : '') + extra + ') -> ' +
         showOutcome(c.out) + ' like homr' + (got && !sameOutcome(c.out, got) ? ' -- JS: ' + showOutcome(got) : ''));
     }
   } else H.skip('no 34-seg-edges.json (run tools/omr/dump_segment.py --only edges)');
