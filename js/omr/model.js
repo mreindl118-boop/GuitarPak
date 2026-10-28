@@ -352,15 +352,16 @@
       // min of both mins makes the match fragile to whichever staff is noisy; requiring
       // closeness to at least one is robust to either staff being the noisy one.
       var symbolMinX = symbol.center[0];
-      var xDistance = Math.min(Math.abs(upperStaff.minX - symbolMinX), Math.abs(lowerStaff.minX - symbolMinX));
-      var yOverlap = Math.min(symbolMaxY, lowerStaff.maxY) - Math.max(symbolMinY, upperStaff.minY);
+      // Python's min / max (first argument wins over a NaN)
+      var xDistance = py.min2(Math.abs(upperStaff.minX - symbolMinX), Math.abs(lowerStaff.minX - symbolMinX));
+      var yOverlap = py.min2(symbolMaxY, lowerStaff.maxY) - py.max2(symbolMinY, upperStaff.minY);
       if (!(xDistance < xDistanceThreshold && yOverlap > yOverlapThreshold && yOverlap > xDistance)) return 0;
       // Score by intersection-over-union of the symbol with this staff pair's own span, rather
       // than by raw overlap in pixels. A brace_dot blob that also touches a third, unrelated
       // staff (e.g. it merged with that staff's clef ink during preprocessing) spans much more
       // than the true pair and would otherwise win purely because its absolute overlap is
       // larger, even when it fits some other pair's span far more tightly.
-      var union = Math.max(symbolMaxY, lowerStaff.maxY) - Math.min(symbolMinY, upperStaff.minY);
+      var union = py.max2(symbolMaxY, lowerStaff.maxY) - py.min2(symbolMinY, upperStaff.minY);
       var iou = union > 0 ? yOverlap / union : 0.0;
       return iou - xDistance / xDistanceThreshold;
     }

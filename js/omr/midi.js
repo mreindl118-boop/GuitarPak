@@ -15,9 +15,13 @@
      midi/translate.py streamToMidiFile   scoreToTracks()  expandRepeats, conductor track, volumes,
                                                            stripTies, packets, channels
      mido MidiFile read + polish + save   polish() + writeMido()  (running status like mido)
-   Python semantics that matter here: offsets and durations are exact fractions (music21 opFrac),
-   ticks = int(round(quarterLength * 10080)) with round half to even, velocities
-   int(round(realized * 127)) on the same doubles, stable sorts on music21's sort keys.
+   Python semantics that matter here: offsets and durations are Python numbers as music21 keeps
+   them (opFrac: floats when the denominator is a power of two, else Fractions; float + Fraction is
+   a rounded float; opFrac of a float is limit_denominator(65535)), computed with the same
+   operations in the same places, so offsets that need a denominator above 65535 (exotic tuplets)
+   come out approximated exactly like music21's; ticks = int(round(quarterLength * 10080)) with
+   round half to even, velocities int(round(realized * 127)) on the same doubles, stable sorts on
+   music21's sort keys.
 
    Deliberate deviations (see notes/runtime-midi.md):
    - A title that latin-1 cannot encode makes mido's save raise inside _polish_midi_file, whose bare
@@ -208,43 +212,128 @@
   OMR.xml = { parse: xmlParse, serialize: xmlSerialize, find: find, findAll: findAll, text: elText, childElements: childElements };
 
   // ======================================================================================
-  // exact fractions (music21 offsets/durations; values stay far below 2^53)
+  // Python numbers as music21 uses them. Offsets and durations are opFrac'd: a value whose
+  // denominator is a power of two is a float, anything else a Fraction. Arithmetic follows
+  // Python: Fraction + Fraction is exact (BigInt parts: sums of exotic tuplets outgrow 2^53),
+  // anything with a float is a ROUNDED float, and opFrac of a float whose ratio needs a
+  // denominator above 65535 is limit_denominator(65535) (common.numberTools). music21 adds
+  // 0.0 or a float in many places (flatten, getOffsetInHierarchy, the voice wrapper, backups,
+  // directions, measure offsets), so offsets whose exact denominator exceeds 65535 come out
+  // approximated; the port must make the same approximations to give the same ticks, the same
+  // order and the same dynamics.
   // ======================================================================================
-  function gcd(a, b) { a = Math.abs(a); b = Math.abs(b); while (b) { const t = a % b; a = b; b = t; } return a; }
+  const babs = (x) => (x < 0n ? -x : x);
+  function bgcd(a, b) { a = babs(a); b = babs(b); while (b) { const t = a % b; a = b; b = t; } return a; }
+  // Fraction(n, d): BigInt parts, reduced, positive denominator
   function Q(n, d) {
-    if (d === undefined) d = 1;
-    if (!Number.isInteger(n) || !Number.isInteger(d) || d === 0) throw new Error('OMR.midi: bad fraction ' + n + '/' + d);
-    if (d < 0) { n = -n; d = -d; }
-    const g = gcd(n, d) || 1;
-    return { n: n / g, d: d / g };
+    n = BigInt(n);
+    d = d === undefined ? 1n : BigInt(d);
+    if (d === 0n) throw new Error('OMR.midi: zero denominator');
+    if (d < 0n) { n = -n; d = -d; }
+    const g = bgcd(n, d);
+    return g > 1n ? { n: n / g, d: d / g } : { n: n, d: d };
   }
   const Q0 = Q(0);
   const qadd = (a, b) => Q(a.n * b.d + b.n * a.d, a.d * b.d);
   const qsub = (a, b) => Q(a.n * b.d - b.n * a.d, a.d * b.d);
   const qmul = (a, b) => Q(a.n * b.n, a.d * b.d);
   const qdiv = (a, b) => Q(a.n * b.d, a.d * b.n);
-  const qcmp = (a, b) => a.n * b.d - b.n * a.d;
-  const qnum = (a) => a.n / a.d;
+  const qcmp = (a, b) => { const l = a.n * b.d, r = b.n * a.d; return l < r ? -1 : l > r ? 1 : 0; };
   const qmax = (a, b) => (qcmp(a, b) >= 0 ? a : b);
-  // a decimal string ("12", "1.5", "2e1") as an exact fraction; null when it is not a number
-  function qDec(s) {
-    s = String(s).trim();
-    const m = /^([+-]?)(\d*)(?:\.(\d*))?(?:[eE]([+-]?\d+))?$/.exec(s);
-    if (!m || (!m[2] && !m[3])) return null;
-    let num = parseInt((m[2] || '0') + (m[3] || ''), 10);
-    let den = Math.pow(10, (m[3] || '').length);
-    const e = m[4] ? parseInt(m[4], 10) : 0;
-    if (e > 0) num *= Math.pow(10, e); else if (e < 0) den *= Math.pow(10, -e);
-    return Q(m[1] === '-' ? -num : num, den);
+  const isPow2 = (d) => (d & (d - 1n)) === 0n;
+  const isDyadic = (q) => isPow2(q.d);
+  const floorDivBig = (a, b) => { const q = a / b; return (a % b !== 0n && ((a < 0n) !== (b < 0n))) ? q - 1n : q; };
+  const bitLen = (x) => x.toString(2).length;
+  // float(Fraction): n / d correctly rounded (Python's int true division), round half to even
+  const TWO53 = 9007199254740992n;
+  function qnum(q) {
+    const n = q.n, d = q.d;
+    if (babs(n) <= TWO53 && d <= TWO53) return Number(n) / Number(d); // both exact: IEEE division rounds once
+    if (n === 0n) return 0;
+    const neg = n < 0n, a = babs(n);
+    const e = bitLen(a) - bitLen(d) - 55;      // a / (d * 2^e) has 54..56 bits
+    const num = e < 0 ? a << BigInt(-e) : a, den = e > 0 ? d << BigInt(e) : d;
+    let m = num / den;
+    const sticky = num % den !== 0n;
+    const extra = bitLen(m) - 53;
+    const low = m & ((1n << BigInt(extra)) - 1n), half = 1n << BigInt(extra - 1);
+    m >>= BigInt(extra);
+    if (low > half || (low === half && (sticky || (m & 1n)))) m += 1n;
+    const v = Number(m) * Math.pow(2, e + extra);
+    return neg ? -v : v;
   }
+  // float.as_integer_ratio(): the exact value of a double
+  function doubleRatio(x) {
+    if (!Number.isFinite(x)) throw new Error('OMR.midi: cannot convert ' + x + ' to a fraction');
+    const dv = new DataView(new ArrayBuffer(8));
+    dv.setFloat64(0, x);
+    const hi = dv.getUint32(0), lo = dv.getUint32(4);
+    const neg = (hi >>> 31) === 1, ex = (hi >>> 20) & 0x7ff;
+    let mant = (BigInt(hi & 0xfffff) << 32n) | BigInt(lo);
+    let e;
+    if (ex === 0) e = -1074; else { mant |= 1n << 52n; e = ex - 1075; }
+    if (mant === 0n) return Q0;
+    while ((mant & 1n) === 0n && e < 0) { mant >>= 1n; e++; }
+    const num = neg ? -mant : mant;
+    return e >= 0 ? { n: num << BigInt(e), d: 1n } : { n: num, d: 1n << BigInt(-e) };
+  }
+  // music21 common.numberTools._preFracLimitDenominator (= Fraction.limit_denominator(65535))
+  const DENOM_LIMIT = 65535n;
+  function limitDenominator(n, d) {
+    if (d <= DENOM_LIMIT) return [n, d];
+    const nOrg = n, dOrg = d;
+    let p0 = 0n, q0 = 1n, p1 = 1n, q1 = 0n;
+    for (;;) {
+      const a = floorDivBig(n, d);
+      const q2 = q0 + a * q1;
+      if (q2 > DENOM_LIMIT) break;
+      [p0, q0, p1, q1] = [p1, q1, p0 + a * p1, q2];
+      [n, d] = [d, n - a * d];
+    }
+    const k = floorDivBig(DENOM_LIMIT - q0, q1);
+    const b1n = p0 + k * p1, b1d = q0 + k * q1, b2n = p1, b2d = q1;
+    const d1n = babs(b1n * dOrg - nOrg * b1d), d1d = dOrg * b1d;
+    const d2n = babs(b2n * dOrg - nOrg * b2d), d2d = dOrg * b2d;
+    return (d1n * d2d - d2n * d1d >= 0n) ? [b2n, b2d] : [b1n, b1d];
+  }
+  // common.opFrac(float)
+  function opFracF(x) {
+    const r = doubleRatio(x);
+    if (r.d <= DENOM_LIMIT) return r;
+    const [n, d] = limitDenominator(r.n, r.d);
+    if (isPow2(d)) return doubleRatio(Number(n) / Number(d)); // f_out._numerator / (d + 0.0)
+    return Q(n, d);
+  }
+  // common.opFrac(Fraction): power-of-two denominators become floats
+  const opFracQ = (q) => (isPow2(q.d) ? doubleRatio(Number(q.n) / Number(q.d)) : q);
+  // A Python value is {f: double} (a float) or {q: Fraction} (a Fraction or an int: int + float
+  // is a float and int + Fraction a Fraction, like a Fraction). pv() gives a stored (opFrac'd)
+  // value its Python type.
+  const F0 = { f: 0 };                                   // 0.0, e.g. a Voice's offset, a clef's duration
+  const pv = (q) => (isDyadic(q) ? { f: qnum(q) } : { q: q });
+  const fval = (a) => (a.q ? qnum(a.q) : a.f);
+  const pyAdd = (a, b) => (a.q && b.q ? { q: qadd(a.q, b.q) } : { f: fval(a) + fval(b) });
+  const pySub = (a, b) => (a.q && b.q ? { q: qsub(a.q, b.q) } : { f: fval(a) - fval(b) });
+  const exact = (a) => (a.q ? a.q : doubleRatio(a.f));
+  const pyCmp = (a, b) => qcmp(exact(a), exact(b));      // Python compares float and Fraction exactly
+  const opFrac = (a) => (a.q ? opFracQ(a.q) : opFracF(a.f));
+  // Python float(str) for MusicXML numbers (ValueError like Python's for anything else)
+  function pyFloat(s) {
+    const t = String(s).trim();
+    if (!/^[+-]?(\d(_?\d)*(\.(\d(_?\d)*)?)?|\.\d(_?\d)*)([eE][+-]?\d(_?\d)*)?$/.test(t)) {
+      if (/^[+-]?(inf|infinity|nan)$/i.test(t)) return Number(t.replace(/inf(inity)?/i, 'Infinity').replace(/nan/i, 'NaN'));
+      throw new ImportException('could not convert string to float: ' + pyRepr(String(s)));
+    }
+    return Number(t.replace(/_/g, ''));
+  }
+  function pyRepr(s) { return "'" + s.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'"; }
   // Python round() of an exact fraction: half to even
   function qRound(a) {
-    const f = Math.floor(a.n / a.d);
-    const r = qsub(a, Q(f));
-    const c = qcmp(r, Q(1, 2));
-    if (c < 0) return f;
-    if (c > 0) return f + 1;
-    return f % 2 === 0 ? f : f + 1;
+    const f = floorDivBig(a.n, a.d);
+    const twice = 2n * (a.n - f * a.d);          // 2 * remainder vs the denominator
+    if (twice < a.d) return f;
+    if (twice > a.d) return f + 1n;
+    return f % 2n === 0n ? f : f + 1n;
   }
   // Python round() of a double: half to even
   function pyRound(x) {
@@ -252,7 +341,9 @@
     return (Math.abs(x % 1) === 0.5 && r % 2 !== 0) ? r - 1 : r;
   }
   const TPQ = 10080; // music21 defaults.ticksPerQuarter
-  const ticks = (q) => qRound(qmul(q, Q(TPQ)));
+  // midi.translate.offsetToMidiTicks / durationToMidiTicks: int(round(o * 10080)). A float o is
+  // dyadic, so o * 10080 is exact in a double here and rounding the exact product is the same.
+  const ticks = (q) => Number(qRound(qmul(q, Q(TPQ))));
 
   // ======================================================================================
   // music21 constants
@@ -291,6 +382,8 @@
   };
 
   class ExpanderException extends Error { constructor(m) { super(m); this.name = 'ExpanderException'; } }
+  // an Error named like the Python exception the engine would report ("<name>: <message>")
+  function pyError(name, message) { const e = new Error(message); e.name = name; return e; }
   class ImportException extends Error { constructor(m) { super(m); this.name = 'MusicXMLImportException'; } }
 
   // ======================================================================================
@@ -359,7 +452,8 @@
     const inst = defaultInstrument(mxScorePart, partName);
     inst.offset = Q0;
     const P = {
-      lastDivisions: 10080, lastTimeSignature: null, lastMeasureOffset: Q0,
+      // lastMeasureOffset is a raw Python float: 0.0, then += each measure's shift (never opFrac'd)
+      lastDivisions: Q(10080), lastTimeSignature: null, lastMeasureOffset: 0,
       maxStaves: 1, measures: [], staffRefs: [], bundle: bundle || { open: null, list: [] }
     };
     for (const mxMeasure of childElements(mxPart, 'measure')) parseMeasure(mxMeasure, P);
@@ -401,20 +495,25 @@
       const c = kids[i];
       switch (c.name) {
         case 'note': xmlToNote(c, kids[i + 1], M); break;
-        case 'backup': {
-          const d = qDec(stripped(find(c, 'duration')));
-          if (d) { M.pos = qsub(M.pos, qdiv(d, M.divisions)); if (qcmp(M.pos, Q0) < 0) M.pos = Q0; }
+        case 'backup': { // MeasureParser.xmlBackup
+          const t = stripped(find(c, 'duration'));
+          if (t) {
+            // opFrac(offsetMeasureNote - float(duration) / divisions): float arithmetic
+            M.pos = opFracF(fval(pv(M.pos)) - pyDivF(pyFloat(t), M.divisions));
+            // "negative offsets produced by musicxml durations with float rounding issues"
+            if (qcmp(M.pos, Q0) < 0) M.pos = Q0;
+          }
           break;
         }
-        case 'forward': {
-          const d = qDec(stripped(find(c, 'duration')));
-          if (d) {
-            const change = qdiv(d, M.divisions);
+        case 'forward': { // MeasureParser.xmlForward
+          const t = stripped(find(c, 'duration'));
+          if (t) {
+            const change = opFracF(pyDivF(pyFloat(t), M.divisions));
             // MusicXMLImporter.applyFinaleWorkarounds: a hidden rest fills the gap
             const r = el('rest', M.pos, { ql: change, hidden: true, fullMeasure: false, typeName: null, dots: 0, tuplets: false });
             addStaffRef(M, staffOf(c), r);
             insertInMeasureOrVoice(M, c, r);
-            M.pos = qadd(M.pos, change);
+            M.pos = opFrac(pyAdd(pv(M.pos), pv(change)));
           }
           break;
         }
@@ -442,7 +541,7 @@
       }
     }
     m.number = M.number;
-    m.offset = P.lastMeasureOffset;
+    m.offset = opFracF(P.lastMeasureOffset); // stream.insert(self.lastMeasureOffset, m)
     P.measures.push(m);
     adjustTimeAttributes(m, P);
   }
@@ -461,11 +560,19 @@
     }
     return null;
   }
+  // Stream.highestTime: opFrac(max(elementOffset + duration.quarterLength)) in Python arithmetic,
+  // from highestTimeSoFar = 0.0. Clefs, keys, dynamics ... last 0.0 (a float), and a Voice is an
+  // element at 0.0 lasting its own highestTime, so both turn a Fraction offset into a float.
+  const ZERO_LENGTH = { clef: 1, key: 1, time: 1, dynamic: 1, metronome: 1, instrument: 1 };
+  const qlOf = (e) => (ZERO_LENGTH[e.kind] || !e.ql ? F0 : pv(e.ql));
+  function highestTime(entries, voices) { // entries: [{offset, e}]
+    let best = F0;
+    for (const x of entries) { const c = pyAdd(pv(x.offset), qlOf(x.e)); if (pyCmp(c, best) > 0) best = c; }
+    if (voices) for (const v of voices) { const c = pyAdd(F0, pv(measureHighestTime({ items: v.items }))); if (pyCmp(c, best) > 0) best = c; }
+    return opFrac(best);
+  }
   function measureHighestTime(m) {
-    let h = Q0;
-    for (const e of m.items) h = qmax(h, qadd(e.offset, e.ql));
-    for (const v of m.voices) for (const e of v.items) h = qmax(h, qadd(e.offset, e.ql));
-    return h;
+    return highestTime(m.items.map((e) => ({ offset: e.offset, e: e })), m.voices);
   }
   function hasNotesOrRests(m) {
     for (const e of m.items) if (e.kind === 'note' || e.kind === 'chord' || e.kind === 'rest') return true;
@@ -481,15 +588,26 @@
     let shift = h;
     const c = qcmp(h, tsQl);
     if (c > 0) {
-      const diff = qsub(h, tsQl);
-      // diff > 0.5, or a multiple of 1/16 or of 1/12 (nearestMultiple(...)[1] < 1e-6)
-      const mult = (k) => qmul(diff, Q(k)).d === 1;
-      if (!(qcmp(diff, Q(1, 2)) > 0 || mult(16) || mult(12))) shift = tsQl; // "assuming ... is correct"
+      const diff = pySub(pv(h), pv(tsQl));
+      // "If the measure is overfull by a 'round' amount, assume that it was intended":
+      // diff > 0.5, or nearestMultiple(diff, 0.0625)[1] < 1e-6, or the same for 1 / 12
+      if (!(pyCmp(diff, { f: 0.5 }) > 0 || nearestMultipleClose(diff, 0.0625) || nearestMultipleClose(diff, 1 / 12))) shift = tsQl;
     } else if (c < 0 && qcmp(h, Q0) === 0 && !hasNotesOrRests(m)) {
       m.items.push(el('rest', Q0, { ql: tsQl, fullMeasure: false, typeName: null, dots: 0, tuplets: false }));
       shift = tsQl;
     }
-    P.lastMeasureOffset = qadd(P.lastMeasureOffset, shift);
+    P.lastMeasureOffset = P.lastMeasureOffset + fval(pv(shift)); // a float += float or Fraction
+  }
+  // common.numberTools.nearestMultiple(n, unit)[1] < 1e-6, in its float arithmetic: the error is
+  // round(n - matchLow, 7) or round(matchHigh - n, 7), which is below 1e-6 exactly when the
+  // unrounded double is below 9.5e-7 (a decimal tie cannot be a double)
+  const NM_TOL = Q(95, 100000000);
+  function nearestMultipleClose(n, unit) {
+    const mult = Math.floor(fval(n) / unit);
+    const matchLow = unit * mult, matchHigh = unit * (mult + 1), half = unit / 2.0;
+    const err = (pyCmp(n, { f: matchLow }) >= 0 && pyCmp(n, { f: matchLow + half }) <= 0)
+      ? fval(n) - matchLow : matchHigh - fval(n);
+    return qcmp(doubleRatio(err), NM_TOL) < 0;
   }
 
   function staffOf(mx) { // getStaffNumber for note/forward/direction/harmony
@@ -514,11 +632,28 @@
     if (v) v.items.push(e); else M.items.push(e); // "putting outside of voices"
   }
 
+  // MeasureParser.xmlToDuration: qLen = opFrac(float(duration) / divisions). (Its "cooked" value
+  // from <type>, dots and tuplets replaces qLen only when the two are within 1e-7 but unequal,
+  // which a single note's exact duration never is.)
   function noteDuration(mxNote, M) {
     const d = find(mxNote, 'duration');
-    let ql = Q0;
-    if (d) { const v = qDec(elText(d) || ''); if (v) ql = qdiv(v, M.divisions); }
-    return ql;
+    if (!d) return Q0;
+    return opFracF(pyDivF(pyFloat(elText(d) == null ? '' : elText(d)), M.divisions));
+  }
+  // float(x) / divisions, where divisions is the opFrac'd float (or Fraction) of <divisions>
+  function pyDivF(x, div) {
+    const y = fval(pv(div));
+    if (y === 0) throw pyError('ZeroDivisionError', 'float division by zero');
+    return x / y;
+  }
+  // MeasureParser.xmlToOffset: float(<offset>) / divisions, 0.0 without a valid <offset>
+  function xmlToOffset(mx, M) {
+    const o = find(mx, 'offset');
+    const t = o ? elText(o) : null;
+    if (t == null) return 0;
+    let v;
+    try { v = pyFloat(t); } catch (e) { return 0; }
+    return pyDivF(v, M.divisions);
   }
   function readPitch(mxNote) {
     const mp = find(mxNote, 'pitch');
@@ -566,7 +701,7 @@
       const v = find(mxNote, 'voice');
       if (v) { const t = elText(v); if (t != null) M.lastVoice = t.trim(); }
     }
-    let incr = Q0;
+    let incr = F0; // offsetIncrement = 0.0: a chord's notes before its last turn the offset into a float
     if (isChord) {
       M.noteList.push(mxNote);
     } else if (!isRest) {
@@ -575,7 +710,7 @@
       const n = el('note', M.pos, { ql: s.ql, grace: s.grace, pitches: [s.pitch], ties: [s.tie], arts: s.arts });
       addStaffRef(M, staffOf(mxNote), n);
       insertInMeasureOrVoice(M, mxNote, n);
-      incr = n.ql;
+      incr = pv(n.ql);
     } else {
       M.restCount++;
       const grace = !!find(mxNote, 'grace');
@@ -590,7 +725,7 @@
       }
       addStaffRef(M, staffOf(mxNote), r);
       insertInMeasureOrVoice(M, mxNote, r);
-      incr = r.ql;
+      incr = pv(r.ql);
     }
     if (M.noteList.length && !nextIsChord) {
       const notes = M.noteList.map((x) => simpleNote(x, M));
@@ -607,15 +742,14 @@
       for (const x of M.noteList) if (find(x, 'voice')) { target = x; break; }
       insertInMeasureOrVoice(M, target, c);
       M.noteList = [];
-      incr = c.ql;
+      incr = pv(c.ql);
     }
-    M.pos = qadd(M.pos, incr);
+    M.pos = opFrac(pyAdd(pv(M.pos), incr)); // offsetMeasureNote = opFrac(offsetMeasureNote + offsetIncrement)
   }
 
   function xmlDirection(mx, M) {
-    const off = find(mx, 'offset');
-    let total = M.pos;
-    if (off) { const v = qDec(elText(off) || ''); if (v) total = qadd(total, qdiv(v, M.divisions)); }
+    // totalOffset = float(offsetDirection + offsetMeasureNote), inserted with opFrac
+    const total = opFracF(xmlToOffset(mx, M) + fval(pv(M.pos)));
     const staff = staffOf(mx);
     let metronomeAdded = false;
     for (const dt of childElements(mx, 'direction-type')) {
@@ -648,21 +782,19 @@
   }
   function soundTempo(mxSound, total, M, staff) {
     if (!('tempo' in mxSound.attrs)) return;
-    if (total == null) {
-      total = M.pos;
-      const off = find(mxSound, 'offset');
-      if (off) { const v = qDec(elText(off) || ''); if (v) total = qadd(total, qdiv(v, M.divisions)); }
+    if (total == null) { // xmlSound: totalOffset = offsetDirection + offsetMeasureNote (a float)
+      total = opFracF(xmlToOffset(mxSound, M) + fval(pv(M.pos)));
       staff = NO_STAFF;
     }
-    const qpm = parseFloat(mxSound.attrs.tempo);
-    if (!qpm) return;
+    const qpm = pyFloat(mxSound.attrs.tempo);
+    if (qpm === 0) return; // "0 qpm tempo tag found, skipping."
     const e = el('metronome', total, { number: null, sounding: qpm, referent: 1 });
     addStaffRef(M, staff, e); M.items.push(e);
   }
 
   function parseAttributes(mx, M, P) {
     for (const c of childElements(mx)) {
-      if (c.name === 'divisions') { const v = qDec(elText(c) || ''); if (v) M.divisions = v; }
+      if (c.name === 'divisions') M.divisions = opFracF(pyFloat(elText(c) == null ? '' : elText(c))); // opFrac(float(text))
       else if (c.name === 'staves') { const v = parseInt(stripped(c), 10); if (v) M.staves = v; }
       else if (c.name === 'time') {
         if (find(c, 'senza-misura')) continue;
@@ -791,11 +923,17 @@
     return out;
   }
   // Measure.flattenUnnecessaryVoices(force=False): a single voice with content joins the measure
+  // (empty voices are removed; a lone voice's elements go to coreInsert(shiftOffset + offset),
+  // shiftOffset being the voice's 0.0, so a Fraction offset passes through a float)
   function flattenUnnecessaryVoices(m) {
     if (!m.voices.length) return;
     const used = m.voices.filter((v) => v.items.length);
-    if (used.length > 1) return;
-    for (const v of used) for (const e of v.items) m.items.push(e);
+    m.voices = used;
+    if (used.length !== 1) return;
+    for (const e of used[0].items) {
+      const off = opFrac(pyAdd(F0, pv(e.offset)));
+      m.items.push(qcmp(off, e.offset) === 0 ? e : Object.assign({}, e, { offset: off }));
+    }
     m.voices = [];
   }
 
@@ -1063,11 +1201,13 @@
       ms = processInnermostRepeatsAndBrackets(ms, part.brackets, memo);
       if (!hasRepeat(ms)) break;
     }
-    // Stream.append: each measure goes to the highest time so far (its own highestTime long)
+    // Stream.append: each measure goes to the stream's highestTime so far, which then becomes
+    // opFrac(highestTime + the measure's duration) (a measure lasts its own highestTime)
     let off = Q0;
     for (const m of ms) {
       m.offset = off;
-      off = qadd(off, measureHighestTime(m));
+      const ql = measureHighestTime(m);
+      if (qcmp(ql, Q0) !== 0) off = opFrac(pyAdd(pv(off), pv(ql)));
     }
     return ms;
   }
@@ -1075,18 +1215,31 @@
   // ======================================================================================
   // midi/translate.py: streamToMidiFile
   // ======================================================================================
-  // Stream.flatten(): every element with its offset in the part, sorted by music21's sort key
+  // Stream.flatten(): every element with its offset in the part, sorted by music21's sort key.
+  // The RecursiveIterator starts at 0.0 and adds each container's offset (a float sum), and the
+  // element goes in at opFrac(start + offset): flatOffset(m.offset, e.offset).
+  const flatOffset = (mOff, eOff) => opFracF(fval(pv(mOff)) + fval(pv(eOff)));
   function flattenPart(part, kinds) {
     const all = [];
     const add = (e, off) => { if (!e.removed && (!kinds || kinds[e.kind])) all.push({ e: e, offset: off, kind: e.kind, grace: e.grace }); };
-    for (const e of part.instruments) add(e, e.offset || Q0);
-    for (const e of part.extra) add(e, e.offset || Q0);
+    for (const e of part.instruments) add(e, flatOffset(Q0, e.offset || Q0));
+    for (const e of part.extra) add(e, flatOffset(Q0, e.offset || Q0));
     for (const m of part.measures) {
-      for (const e of m.items) add(e, qadd(m.offset, e.offset));
-      for (const v of m.voices) for (const e of v.items) add(e, qadd(m.offset, e.offset));
+      for (const e of m.items) add(e, flatOffset(m.offset, e.offset));
+      for (const v of m.voices) for (const e of v.items) add(e, flatOffset(m.offset, e.offset)); // + the voice's 0.0
     }
     // stable sort = (offset, classSortOrder, isNotGrace, insertion order)
     return all.map((x, i) => (x.i = i, x)).sort((a, b) => sortKeyCmp(a, b) || a.i - b.i);
+  }
+  // Music21Object.getOffsetInHierarchy(score) through contextSites: opFrac(offsetInSite +
+  // offsetAppend) at each level, from the element (offsetAppend 0.0) up through its voice (at
+  // 0.0), measure and part (at 0.0)
+  const up = (siteOff, acc) => opFrac(pyAdd(siteOff, pv(acc)));
+  function hierarchyOffset(mOff, eOff, inVoice) {
+    let o = up(pv(eOff), Q0);            // in its measure or voice: opFrac(offset + 0.0)
+    if (inVoice) o = up(F0, o);          // the voice in the measure
+    if (mOff) o = up(pv(mOff), o);       // the measure in the part
+    return up(F0, o);                    // the part in the score
   }
   // the sorted recursion of Stream.recurse() for one class: part-level elements and measures merge
   // by (offset, classSortOrder) with Measure = -20; inside a measure, its own sorted elements
@@ -1098,14 +1251,14 @@
     top.forEach((x, i) => { x.i = i; });
     top.sort((a, b) => qcmp(a.offset, b.offset) || a.cso - b.cso || a.i - b.i);
     for (const x of top) {
-      if (x.e) { if (x.e.kind === kind && !x.e.removed) out.push({ e: x.e, offset: x.offset }); continue; }
+      if (x.e) { if (x.e.kind === kind && !x.e.removed) out.push({ e: x.e, offset: hierarchyOffset(null, x.offset, false) }); continue; }
       const items = x.m.items.map((e, i) => ({ e: e, offset: e.offset, kind: e.kind, grace: e.grace, i: i }))
         .sort((a, b) => sortKeyCmp(a, b) || a.i - b.i);
-      for (const it of items) if (it.kind === kind && !it.e.removed) out.push({ e: it.e, offset: qadd(x.m.offset, it.offset) });
+      for (const it of items) if (it.kind === kind && !it.e.removed) out.push({ e: it.e, offset: hierarchyOffset(x.m.offset, it.offset, false) });
       for (const v of x.m.voices) {
         const vi = v.items.map((e, i) => ({ e: e, offset: e.offset, kind: e.kind, grace: e.grace, i: i }))
           .sort((a, b) => sortKeyCmp(a, b) || a.i - b.i);
-        for (const it of vi) if (it.kind === kind && !it.e.removed) out.push({ e: it.e, offset: qadd(x.m.offset, it.offset) });
+        for (const it of vi) if (it.kind === kind && !it.e.removed) out.push({ e: it.e, offset: hierarchyOffset(x.m.offset, it.offset, true) });
       }
     }
     return out;
@@ -1131,82 +1284,34 @@
     if (!cond.some((x) => x.e.kind === 'time')) cond.push({ e: { kind: 'time', num: 4, den: 4 }, offset: Q0 });
     return cond.map((x, i) => ({ e: x.e, offset: x.offset, kind: x.e.kind, i: i })).sort((a, b) => sortKeyCmp(a, b) || a.i - b.i);
   }
-  // ---- Python float vs Fraction: music21 keeps binary-expressible values as floats and the rest
-  // as Fractions (opFrac); float + Fraction is a ROUNDED float. Elsewhere opFrac turns such sums
-  // back into the exact fraction, but realizeVolume's boundary ends stay raw, so a dynamic that
-  // starts on a float offset and lasts a Fraction may end a hair after the next one starts.
-  const isDyadic = (q) => (q.d & (q.d - 1)) === 0;
-  // exact value of a double as BigInts [num, den] (float.as_integer_ratio)
-  function doubleRatio(x) {
-    const dv = new DataView(new ArrayBuffer(8));
-    dv.setFloat64(0, x);
-    const hi = dv.getUint32(0), lo = dv.getUint32(4);
-    const neg = (hi >>> 31) === 1, ex = (hi >>> 20) & 0x7ff;
-    let mant = (BigInt(hi & 0xfffff) << 32n) | BigInt(lo);
-    let e;
-    if (ex === 0) e = -1074; else { mant |= 1n << 52n; e = ex - 1075; }
-    if (mant === 0n) return [0n, 1n];
-    while ((mant & 1n) === 0n && e < 0) { mant >>= 1n; e++; }
-    const num = neg ? -mant : mant;
-    return e >= 0 ? [num << BigInt(e), 1n] : [num, 1n << BigInt(-e)];
-  }
-  // a Python sum/difference of two opFrac'd values: [num, den] BigInts of the exact result
-  function pyArith(a, b, sign) {
-    if (isDyadic(a) === isDyadic(b)) { const q = sign > 0 ? qadd(a, b) : qsub(a, b); return [BigInt(q.n), BigInt(q.d)]; }
-    return doubleRatio(sign > 0 ? a.n / a.d + b.n / b.d : a.n / a.d - b.n / b.d);
-  }
-  const bigCmp = (x, y) => { const l = x[0] * y[1], r = y[0] * x[1]; return l < r ? -1 : l > r ? 1 : 0; };
-  const big = (q) => [BigInt(q.n), BigInt(q.d)];
-  const floorDivBig = (a, b) => { const q = a / b; return (a % b !== 0n && ((a < 0n) !== (b < 0n))) ? q - 1n : q; };
-  // common.opFrac of a raw value: denominators above 65535 go through _preFracLimitDenominator
-  function opFracBig(r) {
-    let [n, d] = r;
-    const LIMIT = 65535n;
-    if (d <= LIMIT) return Q(Number(n), Number(d));
-    const nOrg = n, dOrg = d;
-    let p0 = 0n, q0 = 1n, p1 = 1n, q1 = 0n;
-    for (;;) {
-      const a = floorDivBig(n, d);
-      const q2 = q0 + a * q1;
-      if (q2 > LIMIT) break;
-      [p0, q0, p1, q1] = [p1, q1, p0 + a * p1, q2];
-      [n, d] = [d, n - a * d];
-    }
-    const k = floorDivBig(LIMIT - q0, q1);
-    const b1n = p0 + k * p1, b1d = q0 + k * q1, b2n = p1, b2d = q1;
-    const abs = (v) => (v < 0n ? -v : v);
-    const d1n = abs(b1n * dOrg - nOrg * b1d), d1d = dOrg * b1d;
-    const d2n = abs(b2n * dOrg - nOrg * b2d), d2d = dOrg * b2d;
-    return (d1n * d2d - d2n * d1d >= 0n) ? Q(Number(b2n), Number(b2d)) : Q(Number(b1n), Number(b1d));
-  }
-
   // volume.realizeVolume: dynamics hold until the next one (extendDuration); velocity scalar
   // 0.5 + 0.20866, times 2 * dynamic, plus each articulation's volumeShift, clipped to [0, 1]
   function realizeVolume(part) {
     const flat = flattenPart(part);
     const dyns = flat.filter((x) => x.kind === 'dynamic');
+    // boundaries[(start, end)] = dynamic: a later dynamic with the same key replaces the earlier
+    // one in its place (Python dict). The end is NOT opFrac'd: a dynamic on a float offset lasting
+    // a Fraction can end a rounding error after the next one starts.
     const bounds = new Map();
     if (dyns.length) {
-      let total = Q0; // the flat stream's duration (highestTime) before the dynamics are stretched
-      for (const x of flat) total = qmax(total, qadd(x.offset, x.e.ql || Q0));
+      const total = highestTime(flat, null); // the flat stream's duration before the dynamics are stretched
       dyns.forEach((x, k) => {
         const next = k + 1 < dyns.length ? dyns[k + 1].offset : total;
-        const span = opFracBig(pyArith(next, x.offset, -1));   // extendDuration: opFrac(next - this)
-        const end = pyArith(x.offset, span, 1);                 // start + duration.quarterLength (raw)
-        const start = big(x.offset);
-        const key = start.join('/') + '|' + end.join('/');
-        if (bounds.has(key)) bounds.get(key).dyn = x.e; else bounds.set(key, { start: start, end: end, dyn: x.e });
+        const span = opFrac(pySub(pv(next), pv(x.offset)));   // extendDuration: opFrac(next - this)
+        const end = exact(pyAdd(pv(x.offset), pv(span)));      // start + duration.quarterLength
+        const key = x.offset.n + '/' + x.offset.d + '|' + end.n + '/' + end.d;
+        if (bounds.has(key)) bounds.get(key).dyn = x.e; else bounds.set(key, { start: x.offset, end: end, dyn: x.e });
       });
     }
-    const keys = Array.from(bounds.values()).sort((a, b) => bigCmp(a.start, b.start) || bigCmp(a.end, b.end));
+    const keys = Array.from(bounds.values()).sort((a, b) => qcmp(a.start, b.start) || qcmp(a.end, b.end));
     let lastIdx = 0;
     for (const x of flat) {
       if (x.kind !== 'note' && x.kind !== 'chord') continue;
       let dm = null;
       if (keys.length) {
-        const st = big(x.offset);
+        const st = x.offset;
         for (let k = lastIdx; k < keys.length; k++) {
-          if (bigCmp(keys[k].end, st) > 0 && bigCmp(st, keys[k].start) >= 0) { lastIdx = k; dm = keys[k].dyn; break; }
+          if (qcmp(keys[k].end, st) > 0 && qcmp(st, keys[k].start) >= 0) { lastIdx = k; dm = keys[k].dyn; break; }
         }
       }
       let val = 0.5;
@@ -1256,11 +1361,11 @@
       if (em) {
         pos.push(i);
         if (pos.length < 2) { pos = []; continue; }
-        let sum = Q0;
-        for (const q of pos.slice(1)) { sum = qadd(sum, nr[q].ql); del.push(q); }
-        if (qcmp(sum, Q0) === 0) throw new Error('aggregated ties have a zero duration sum');
+        let sum = { q: Q0 }; // durSum = 0 (an int), += quarterLength
+        for (const q of pos.slice(1)) { sum = pyAdd(sum, pv(nr[q].ql)); del.push(q); }
+        if (pyCmp(sum, { q: Q0 }) === 0) throw pyError('StreamException', 'aggregated ties have a zero duration sum');
         const first = nr[pos[0]];
-        first.ql = qadd(first.ql, sum);
+        first.ql = opFrac(pyAdd(pv(first.ql), sum)); // opFrac(qLen + durSum)
         if (first.ties) first.ties = first.ties.map(() => null);
         pos = [];
       }
@@ -1325,11 +1430,14 @@
     const tracks = [];
     const t0 = [];
     for (const x of cond) {
-      const tk = ticks(x.offset), e = x.e;
+      const tk = ticks(flatOffset(Q0, x.offset)), e = x.e; // the conductor Part flattened: opFrac(0.0 + offset)
       if (e.kind === 'metronome') {
         const num = e.sounding != null ? e.sounding : e.number;
         if (num == null) continue;
         const bpm = num * e.referent;
+        // tempoToMidiEvents: int(round(60_000_000 / bpm)); a mark of 0 fails music21's MIDI writer
+        // (the engine then reports the error and writes no MIDI)
+        if (bpm === 0) throw pyError('ZeroDivisionError', 'division by zero');
         t0.push({ tick: tk, so: 0, type: 'set_tempo', tempo: pyRound(60000000 / bpm) });
       } else if (e.kind === 'key') t0.push({ tick: tk, so: 0, type: 'key_signature', sharps: e.sharps, minor: !!e.minor });
       else if (e.kind === 'time') { if (e.num <= 255) t0.push({ tick: tk, so: 0, type: 'time_signature', num: e.num, den: e.den }); }
@@ -1442,12 +1550,16 @@
     // mido cannot read a key signature beyond 7 sharps/flats (KeySignatureError): the engine's bare
     // except then keeps music21's file as it is
     for (const t of tracks) for (const e of t) if (e.type === 'key_signature' && (e.sharps > 7 || e.sharps < -7)) return { bytes: writeMusic21(tracks), polished: false, why: 'key signature of ' + e.sharps + ' sharps' };
+    // mido.bpm2tempo(tempo): a set_tempo outside 0..0xFFFFFF (under ~3.58 bpm) makes mido raise
+    // before anything is saved: again the bare except keeps music21's file
+    const tempoUs = pyRound(60 * 1e6 / tempo);
+    if (!(tempoUs >= 0 && tempoUs <= 0xffffff)) return { bytes: writeMusic21(tracks), polished: false, why: 'a tempo of ' + tempo + ' bpm does not fit a MIDI set_tempo' };
     const out = tracks.map((t) => t.map((e) => Object.assign({}, e)));
     let titleBytes = null, titleUtf8 = false;
     if (title) { titleBytes = latin1(title); if (!titleBytes) { titleBytes = utf8(title); titleUtf8 = true; } }
     out.forEach((t, idx) => {
       if (idx === 0) {
-        t.unshift({ tick: 0, type: 'set_tempo', tempo: pyRound(60 * 1e6 / tempo) }); // mido.bpm2tempo
+        t.unshift({ tick: 0, type: 'set_tempo', tempo: tempoUs });
         if (titleBytes) t.unshift({ tick: 0, type: 'track_name', name: titleBytes });
       }
       let has = false;
@@ -1467,7 +1579,9 @@
     const program = opts.program == null ? 0 : opts.program;
     const tempo = opts.tempo == null ? 112 : opts.tempo;
     for (const p of score.parts) {
-      // part.insert(0, instrumentFromMidiProgram(gm)); part.insert(0, MetronomeMark(number=tempo))
+      // part.insert(0, instrumentFromMidiProgram(gm)); inst.instrumentName = options.instrument_name;
+      // part.insert(0, MetronomeMark(number=tempo)). (The part's own instrument stays first, so the
+      // track name never comes from this one.)
       p.extra.push({ kind: 'instrument', offset: Q0, program: program, channel: null, partName: null, instrumentName: opts.instrumentName || null });
       p.extra.push({ kind: 'metronome', offset: Q0, number: tempo, sounding: null, referent: 1 });
     }
@@ -1475,8 +1589,24 @@
   }
   // -> {midi: Uint8Array, warnings, repeatsExpanded, polished, summary}
   function convert(xml, opts) {
-    opts = Object.assign({ tempo: 112, program: 0, transpose: 0, title: '' }, opts || {});
-    if (typeof opts.program === 'string') opts.program = GM_INSTRUMENTS[opts.program] || 0;
+    opts = Object.assign({}, opts || {});
+    // TranslationOptions' defaults; an option given as undefined/null takes its default too (an
+    // undefined tempo used to give a set_tempo of 0 and a NaN length)
+    if (opts.tempo == null) opts.tempo = 112;
+    if (opts.program == null) opts.program = 0;
+    if (opts.transpose == null) opts.transpose = 0;
+    if (opts.title == null) opts.title = '';
+    if (typeof opts.program === 'string') { // GM_INSTRUMENTS.get(options.instrument_name, 0)
+      if (opts.instrumentName == null) opts.instrumentName = opts.program;
+      opts.program = Object.prototype.hasOwnProperty.call(GM_INSTRUMENTS, opts.program) ? GM_INSTRUMENTS[opts.program] : 0;
+    }
+    // the engine only takes a menu name; a number outside the GM range would corrupt the file
+    if (!Number.isInteger(opts.program) || opts.program < 0 || opts.program > 127) throw new RangeError('OMR.midi: program must be 0..127 or a GM_INSTRUMENTS name, not ' + opts.program);
+    opts.tempo = Number(opts.tempo);
+    if (!Number.isFinite(opts.tempo)) throw new TypeError('OMR.midi: tempo must be a number of beats per minute');
+    if (!Number.isInteger(Number(opts.transpose))) throw new RangeError('OMR.midi: transpose must be a whole number of semitones, not ' + opts.transpose);
+    opts.transpose = Number(opts.transpose);
+    opts.title = String(opts.title);
     const score = engineScore(xml, opts);
     const counts = scoreCounts(score);
     const res = scoreToTracks(score.parts, { strict: opts.strict });
@@ -1631,7 +1761,9 @@
     importScore: importScore, transposeScore: transposeScore, readSmf: readSmf,
     GM_INSTRUMENTS: GM_INSTRUMENTS, TICKS_PER_QUARTER: TPQ,
     _internal: {
-      Q: Q, qcmp: qcmp, qnum: qnum, qDec: qDec, qRound: qRound, pyRound: pyRound, ticks: ticks, pitchPs: pitchPs,
+      Q: Q, qcmp: qcmp, qnum: qnum, pyFloat: pyFloat, opFracF: opFracF, opFracQ: opFracQ, opFrac: opFrac, pv: pv, pyAdd: pyAdd,
+      pySub: pySub, doubleRatio: doubleRatio, limitDenominator: limitDenominator, nearestMultipleClose: nearestMultipleClose,
+      highestTime: highestTime, flatOffset: flatOffset, hierarchyOffset: hierarchyOffset, qRound: qRound, pyRound: pyRound, ticks: ticks, pitchPs: pitchPs,
       pitchMidi: pitchMidi, spellPs: spellPs, transposeSharps: transposeSharps, engineScore: engineScore,
       scoreToTracks: scoreToTracks, polish: polish, writeMido: writeMido, writeMusic21: writeMusic21,
       expandRepeats: expandRepeats, flattenPart: flattenPart, dynamicScalar: dynamicScalar, scoreCounts: scoreCounts,

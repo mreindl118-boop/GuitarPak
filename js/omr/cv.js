@@ -151,7 +151,11 @@
     });
   }
   // cv2.minAreaRect(points) -> [[cx, cy], [w, h], angle]
+  // An empty point set: cv2 returns defaults where opencv.js asserts (its empty Mat fails
+  // checkVector), so the point-set wrappers answer those cases themselves.
+  function isEmptyPts(p) { return np.toPts(p).length < 2; }
   function minAreaRect(points) {
+    if (isEmptyPts(points)) return [[0, 0], [0, 0], -90];
     return run(function (t) { return unrrect(cv.minAreaRect(t(ptsMat(points)))); });
   }
   // opencv.js's own fitEllipse, kept for comparison: it differs from cv2 on degenerate
@@ -856,6 +860,7 @@
 
   // cv2.boundingRect(points or image) -> [x, y, w, h]
   function boundingRect(p) {
+    if (!np.isImage(p) && isEmptyPts(p)) return [0, 0, 0, 0];
     return run(function (t) {
       var r = cv.boundingRect(t(np.isImage(p) ? toMat(p) : ptsMat(p)));
       return [r.x, r.y, r.width, r.height];
@@ -863,11 +868,13 @@
   }
   // cv2.contourArea(contour, oriented=False)
   function contourArea(c, oriented) {
+    if (isEmptyPts(c)) return 0;
     return run(function (t) { return cv.contourArea(t(ptsMat(c)), !!oriented); });
   }
   // cv2.convexHull(points, clockwise=False, returnPoints=True) -> same dtype as the input
   // (indices Int32Array when returnPoints is false)
   function convexHull(p, clockwise, returnPoints) {
+    if (isEmptyPts(p)) return null;
     return run(function (t) {
       var src = t(ptsMat(p)), hull = t(new cv.Mat());
       cv.convexHull(src, hull, !!clockwise, returnPoints === undefined ? true : !!returnPoints);
@@ -876,10 +883,12 @@
   }
   // cv2.pointPolygonTest(contour, (x, y), measureDist)
   function pointPolygonTest(c, p, measureDist) {
+    if (isEmptyPts(c)) return measureDist ? -Number.MAX_VALUE : -1;
     return run(function (t) { return cv.pointPolygonTest(t(ptsMat(c)), new cv.Point(p[0], p[1]), !!measureDist); });
   }
   // cv2.intersectConvexConvex(p1, p2, handleNested=True) -> [area, Float32Array | null]
   function intersectConvexConvex(p1, p2, handleNested) {
+    if (np.toPts(p1).length < 4 || np.toPts(p2).length < 4) return [0, null]; // n < 2 || m < 2
     return run(function (t) {
       var out = t(new cv.Mat());
       var area = cv.intersectConvexConvex(t(ptsMat(p1)), t(ptsMat(p2)), out, handleNested === undefined ? true : !!handleNested);
@@ -923,10 +932,11 @@
   function findNonZero(img) {
     if (img.c !== 1) throw new CvError('findNonZero: single-channel image expected');
     var d = img.data, w = img.w, n = 0, i;
-    for (i = 0; i < d.length; i++) if (d[i]) n++;
+    // != 0 like C++ (NaN counts; JS truthiness would drop it)
+    for (i = 0; i < d.length; i++) if (d[i] !== 0) n++;
     if (!n) return null;
     var out = new Int32Array(2 * n), k = 0;
-    for (i = 0; i < d.length; i++) if (d[i]) { out[k++] = i % w; out[k++] = (i / w) | 0; }
+    for (i = 0; i < d.length; i++) if (d[i] !== 0) { out[k++] = i % w; out[k++] = (i / w) | 0; }
     return out;
   }
 
@@ -1051,6 +1061,8 @@
   // goes to opencv.js
   function warpAffine(img, M, dsize, o) {
     var flags = opt(o, 'flags', C2.INTER_LINEAR), border = opt(o, 'borderMode', C2.BORDER_CONSTANT);
+    // dst.create(dsize.empty() ? src.size() : dsize): a zero width or height means the source size
+    if (!dsize || !dsize[0] || !dsize[1]) dsize = [img.w, img.h];
     if (img.data instanceof Uint8Array && (flags & 7) === C2.INTER_LINEAR && border === C2.BORDER_CONSTANT && img.c <= 4) {
       return warpAffineLinear8u(img, M, dsize, flags, scalar(opt(o, 'borderValue', 0)));
     }
@@ -1062,8 +1074,12 @@
   }
   // OpenCV 5.0.0 warpAffine (imgproc/src/imgwarp.cpp) -> warpAffineLinearInvoker_8UC1/3/4
   // (warp_kernels.simd.hpp), as dispatched on x86 with AVX2: the source position and the
-  // bilinear blend are float32 FMAs over chunks of 16 output pixels; the remaining pixels of
-  // a row take the scalar code (plain float math, OpenCV builds without FP contraction).
+  // bilinear blend are float32 FMAs over chunks of 16 output pixels (row constant
+  // y*M1 + M2 rounded twice); the remaining pixels of a row take the scalar code
+  // `sx = x*M[0] + y*M[1] + M[2]`, `v0 = p00 + sx*(p01 - p00)`, `v0 += sy*(v1 - v0)`, which GCC
+  // contracts (C++ default -ffp-contract=fast, -mfma in that unit) to fma(x, M0, y*M1) + M2 and
+  // FMA blends; y*M1 is shared with the row constant, so that one stays a plain product.
+  // Checked on 1900 random warps and constructed rounding cases against cv2.
   // opencv.js runs other code paths whose float rounding differs in rare pixels.
   var WARP_INVERSE_MAP = 16, WARP_UF = 16;
   function warpAffineLinear8u(img, M, dsize, flags, bvalue) {
@@ -1088,22 +1104,17 @@
       for (var x = 0; x < w; x++) {
         var o0 = (y * w + x) * cn, vec = x < vecEnd, sx, sy;
         if (vec) { sx = fmaF(M0, x, Mx); sy = fmaF(M3, x, My); }
-        else { sx = fr(fr(fr(x * M0) + fr(y * M1)) + M2); sy = fr(fr(fr(x * M3) + fr(y * M4)) + M5); }
+        else { sx = fr(fmaF(x, M0, fr(y * M1)) + M2); sy = fr(fmaF(x, M3, fr(y * M4)) + M5); }
         var ix = Math.floor(sx), iy = Math.floor(sy), fx = fr(sx - ix), fy = fr(sy - iy);
         if ((ix + 1 >>> 0) >= sc + 1 || (iy + 1 >>> 0) >= sr + 1) {
           for (k = 0; k < cn; k++) out[o0 + k] = bval[k]; // the whole 2x2 block is outside
           continue;
         }
         for (k = 0; k < cn; k++) {
-          var p00 = tap(ix, iy, k), p01 = tap(ix + 1, iy, k), p10 = tap(ix, iy + 1, k), p11 = tap(ix + 1, iy + 1, k), v;
-          if (vec) {
-            var v0 = fmaF(fx, p01 - p00, p00), v1 = fmaF(fx, p11 - p10, p10);
-            v = fmaF(fy, fr(v1 - v0), v0);
-          } else {
-            var s0 = fr(p00 + fr(fx * (p01 - p00))), s1 = fr(p10 + fr(fx * (p11 - p10)));
-            v = fr(s0 + fr(fy * fr(s1 - s0)));
-          }
-          out[o0 + k] = rintSat8(v);
+          var p00 = tap(ix, iy, k), p01 = tap(ix + 1, iy, k), p10 = tap(ix, iy + 1, k), p11 = tap(ix + 1, iy + 1, k);
+          // the same fused blend in the vector and the (contracted) scalar code
+          var v0 = fmaF(fx, p01 - p00, p00), v1 = fmaF(fx, p11 - p10, p10);
+          out[o0 + k] = rintSat8(fmaF(fy, fr(v1 - v0), v0));
         }
       }
     }
@@ -1156,15 +1167,21 @@
   }
   // cv2.addWeighted(a, alpha, b, beta, gamma, dtype=-1). Two uint8 images run OpenCV 5's
   // addWeighted8u (core/src/arithm.simd.hpp) as dispatched with AVX2: per value
-  // fma(a, alpha, fma(b, beta, gamma)) in float32, rounded half to even; fewer than 16 values
-  // take the scalar a*alpha + b*beta + gamma. Other types go to opencv.js.
+  // fma(a, alpha, fma(b, beta, gamma)) in float32, rounded half to even (the vector loop
+  // covers a tail by re-running the last 16 values); fewer than 16 values take the scalar
+  // a*alpha + b*beta + gamma, which GCC compiles (C++ default -ffp-contract=fast, FMA in that
+  // translation unit) as fma(a, alpha, b*beta) + gamma. Other types go to opencv.js.
   function addWeighted(a, alpha, b, beta, gamma, o) {
     var dtype = opt(o, 'dtype', -1);
-    if (a.data instanceof Uint8Array && b.data instanceof Uint8Array && (dtype === -1 || dtype === 0) && a.data.length === b.data.length) {
+    // cv2: "Sizes of input arguments do not match" unless both have the same size and channels
+    if (np.isImage(a) && np.isImage(b) && (a.h !== b.h || a.w !== b.w || a.c !== b.c)) {
+      throw new CvError('addWeighted: the input arrays must have the same size and number of channels');
+    }
+    if (a.data instanceof Uint8Array && b.data instanceof Uint8Array && (dtype === -1 || dtype === 0)) {
       var w1 = fr(alpha), w2 = fr(beta), dl = fr(gamma), n = a.data.length, out = new Uint8Array(n), i;
       for (i = 0; i < n; i++) {
         var f1 = a.data[i], f2 = b.data[i];
-        out[i] = rintSat8(n >= 16 ? fmaF(f1, w1, fmaF(f2, w2, dl)) : fr(fr(fr(f1 * w1) + fr(f2 * w2)) + dl));
+        out[i] = rintSat8(n >= 16 ? fmaF(f1, w1, fmaF(f2, w2, dl)) : fr(fmaF(f1, w1, fr(f2 * w2)) + dl));
       }
       return { h: a.h, w: a.w, c: a.c, data: out };
     }

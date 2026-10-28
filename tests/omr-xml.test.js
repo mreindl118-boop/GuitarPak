@@ -142,6 +142,72 @@ if (!fs.existsSync(synPath)) {
   H.ok(etGood === hx.et.length, 'ElementTree serializer (escaping, empty elements, comments, PI, tail, UTF-8, lone surrogate) ' + etGood + '/' + hx.et.length + etFirst);
 }
 
+// ---- audit regressions (tools/omr/dump_lang.py --audit): inputs the page recordings never reach
+// a voice of the audit fixture: [str, image_coordinates] pairs, or {s, ic} / {alias: i} (the same object again)
+function auditVoice(entries) {
+  const out = [];
+  for (const e of entries) {
+    if (!Array.isArray(e) && 'alias' in e) { out.push(out[e.alias]); continue; }
+    const [s, ic] = Array.isArray(e) ? e : [e.s, e.ic];
+    const x = sym(s);
+    if (ic !== null) x.imageCoordinates = ic.slice();
+    out.push(x);
+  }
+  return out;
+}
+const T = OMR.triplet_restoration;
+const errOf = (fn) => { try { fn(); return null; } catch (e) { return { error: e.name, message: e.message }; } };
+const auditPath = path.join(H.FIX, '12-lang-audit.json');
+if (!fs.existsSync(auditPath)) {
+  H.skip('audit regressions (no ' + auditPath + ': run tools/omr/dump_lang.py --audit)');
+} else {
+  const au = H.readJson(auditPath);
+  // _clean_up_voice per voice, then generate_xml: ET.tostring (toXmlString is the declaration + it)
+  function pipeline(c) {
+    let cleaned;
+    try { cleaned = c.voices.map((v) => T.restoreUnmarkedTriplets(V.removeDuplicatedSymbols(auditVoice(v)))); } catch (e) { return { clean: e.name }; }
+    const r = generate(args(c.args), cleaned, c.title);
+    return r.error ? { error: r.error, message: r.message } : MX.xmlToString(r.root);
+  }
+  const want = (c) => (c.clean.error ? { clean: c.clean.error } : c.tostring.error ? { error: c.tostring.error, message: c.tostring.message } : c.tostring);
+  function report(label, cases) {
+    let good = 0, first = '';
+    for (const c of cases) {
+      const got = pipeline(c), w = want(c);
+      if (JSON.stringify(got) === JSON.stringify(w)) good++;
+      else if (!first) first = typeof got === 'string' && typeof w === 'string' ? diffAt(got, w) : ' got ' + JSON.stringify(got).slice(0, 300) + ' want ' + JSON.stringify(w).slice(0, 300);
+    }
+    H.ok(good === cases.length, label + ' ' + good + '/' + cases.length + ' exact' + first);
+  }
+  report('audit: exotic tuplets (sums past 2^53 in comparisons) -> generate_xml', au.tuplets);
+  report('audit: random voices (any vocabulary symbol, aliased objects, image coordinates) -> generate_xml', au.fuzz.filter((c) => c.kind === 'random'));
+  report('audit: triplet-heavy voices -> generate_xml', au.fuzz.filter((c) => c.kind === 'triplets'));
+  const fr = (s) => { const [n, d] = s.split('/'); return new Fraction(+n, d === undefined ? 1 : +d); };
+  H.ok(errOf(() => { if (!au.fraction_ops.every(([a, b, , , , med]) => String(MX.medianFraction([fr(a), fr(b)])) === med)) throw new Error('differs'); }) === null, 'audit: medianFraction = np.median on big sums');
+  // imgpos comments: round() raises on NaN / infinities, prints every digit of a huge value; x, y unpack two values
+  const num = (r) => (r === 'nan' ? NaN : r === 'inf' ? Infinity : r === '-inf' ? -Infinity : Number(r));
+  let bad = null, good = 0;
+  for (const c of au.imgpos) {
+    const s = sym('note_4 C4 _ _ _ upper');
+    s.imageCoordinates = c.in.map(num);
+    const e = new MX.Element('note');
+    const err = errOf(() => MX.buildImagePosition(e, s));
+    const ok = c.error ? err && err.error === c.error && err.message === c.message : !err && MX.xmlToString(e) === c.xml;
+    if (ok) good++; else if (!bad) bad = { want: c, got: err || MX.xmlToString(e) };
+  }
+  H.ok(good === au.imgpos.length, 'audit: build_image_position (NaN, infinities, huge, half-way, unpacking) ' + good + '/' + au.imgpos.length + (bad ? ' first bad ' + JSON.stringify(bad) : ''));
+  // KeyError messages: str(KeyError(k)) = repr(k)
+  const keyBad = au.keyerrors.filter(([s, w]) => JSON.stringify((() => { const e = errOf(() => MX.buildNoteOrRest(sym(s), 0, false, new MX.ConversionState(16, new Fraction(1)), '')); return e && [e.error, e.message]; })()) !== JSON.stringify(w));
+  H.ok(keyBad.length === 0, 'audit: KeyError messages (repr of a string key) ' + (au.keyerrors.length - keyBad.length) + '/' + au.keyerrors.length + (keyBad.length ? ' first bad ' + JSON.stringify(keyBad[0]) : ''));
+}
+// fixture-free invariants: an imgpos comment never says NaN / Infinity / 1e+21
+{
+  const s = sym('note_4 C4 _ _ _ upper');
+  const comment = (ic) => { s.imageCoordinates = ic; const e = new MX.Element('n'); const err = errOf(() => MX.buildImagePosition(e, s)); return err ? err.error : MX.xmlToString(e); };
+  const outs = [[NaN, 1], [1, Infinity], [1e21, 2], [-1e22, 3]].map(comment);
+  H.ok(outs.every((o) => !/NaN|Infinity|e\+/.test(o)), 'imgpos comments never print NaN / Infinity / exponent notation: ' + outs.join(' | '));
+}
+
 // ---- the element API homr uses
 const e = new MX.Element('note');
 const d = MX.SubElement(e, 'duration'); d.text = '4';

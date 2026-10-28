@@ -50,11 +50,11 @@
         // the lowest contour line around the peak: look left for the minimum until we hit a
         // higher peak or the boundary, then the same to the right
         var leftMin = x[peak];
-        for (k = peak - 1; k >= 0; k--) { if (x[k] > x[peak]) break; leftMin = Math.min(leftMin, x[k]); }
+        for (k = peak - 1; k >= 0; k--) { if (x[k] > x[peak]) break; leftMin = OMR.py.min2(leftMin, x[k]); }
         var rightMin = x[peak];
-        for (k = peak + 1; k < n; k++) { if (x[k] > x[peak]) break; rightMin = Math.min(rightMin, x[k]); }
+        for (k = peak + 1; k < n; k++) { if (x[k] > x[peak]) break; rightMin = OMR.py.min2(rightMin, x[k]); }
         // prominence is the height above the higher of the two minima
-        if (x[peak] - Math.max(leftMin, rightMin) >= prominence) valid.push(peak);
+        if (x[peak] - OMR.py.max2(leftMin, rightMin) >= prominence) valid.push(peak);
       }
       peaks = valid;
     }

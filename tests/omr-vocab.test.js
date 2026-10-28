@@ -248,6 +248,76 @@ if (!fs.existsSync(synPath)) {
   });
 }
 
+// ---- audit regressions (tools/omr/dump_lang.py --audit): inputs the recordings above never reach
+// a voice of the audit fixture: [str, image_coordinates] pairs, or {s, ic} / {alias: i} (the same
+// object again: restore_unmarked_triplets maps symbols to indices by identity)
+function auditVoice(entries) {
+  const out = [];
+  for (const e of entries) {
+    if (!Array.isArray(e) && 'alias' in e) { out.push(out[e.alias]); continue; }
+    const [s, ic] = Array.isArray(e) ? e : [e.s, e.ic];
+    const x = sym(s);
+    if (ic !== null) x.imageCoordinates = ic.slice();
+    out.push(x);
+  }
+  return out;
+}
+const SIC = (l) => l.map((s) => [String(s), s.imageCoordinates]);
+const cleanUp = (v) => T.restoreUnmarkedTriplets(V.removeDuplicatedSymbols(v));
+const auditPath = path.join(H.FIX, '12-lang-audit.json');
+if (!fs.existsSync(auditPath)) {
+  H.skip('audit regressions (no ' + auditPath + ': run tools/omr/dump_lang.py --audit)');
+} else {
+  const au = H.readJson(auditPath);
+  const tryClean = (voices) => { try { return voices.map((v) => SIC(cleanUp(auditVoice(v)))); } catch (e) { return { error: e.name, message: e.message }; } };
+  const cleanWant = (c) => (c.clean.error ? { error: c.clean.error, message: c.clean.message } : c.clean);
+  // one measure of exotic vocabulary tuplets: its sums compare past 2^53 (JS used to throw OverflowError)
+  let good = au.tuplets.filter((c) => same(tryClean(c.voices), cleanWant(c))).length;
+  H.ok(good === au.tuplets.length, 'audit: exotic tuplets (sums past 2^53 in comparisons) through _clean_up_voice ' + good + '/' + au.tuplets.length + ' exact');
+  // the Fraction arithmetic homr does on such sums: + - cmp, (a + b) / 2 (= np.median([a, b]); omr-xml
+  // checks medianFraction itself), int(a * 1000), a * int, a / int
+  const opsBad = au.fraction_ops.filter(([a, b, sum, diff, c, med, i1000, muls, divs]) => {
+    const x = frac(a), y = frac(b);
+    let got;
+    try {
+      got = [String(x.add(y)), String(x.sub(y)), x.cmp(y), String(x.add(y).div(2)), x.mul(1000).int(),
+        au.fraction_muls.map((k) => String(x.mul(k))), au.fraction_divs.map((k) => String(x.div(k)))];
+    } catch (e) { got = e.name + ': ' + e.message; }
+    return !same(got, [sum, diff, c, med, i1000, muls, divs]);
+  });
+  H.ok(opsBad.length === 0, 'audit: Fraction + - * / cmp median int on big sums ' + (au.fraction_ops.length - opsBad.length) + '/' + au.fraction_ops.length + ' exact' + (opsBad.length ? ' first bad ' + JSON.stringify(opsBad[0]) : ''));
+  // build_dict: str.strip's whitespace (\x1c-\x1f, \x85; not ﻿)
+  const dictBad = au.build_dict.filter(([t, items, err]) => {
+    let got;
+    try { got = [t, Object.entries(V.buildDict([t])), null]; } catch (e) { got = [t, null, [e.name, e.message]]; }
+    return !same(got, [t, items, err]);
+  });
+  H.ok(dictBad.length === 0, 'audit: build_dict whitespace = str.strip ' + (au.build_dict.length - dictBad.length) + '/' + au.build_dict.length + (dictBad.length ? ' first bad ' + JSON.stringify(dictBad[0]) : ''));
+  // kern bases beyond 32 bits: the power-of-two test is not JS's 32-bit &
+  const kernBad = au.kern_big.filter(([k, d]) => !same(DUR(V.kernToSymbolDuration(k)), d));
+  H.ok(kernBad.length === 0, 'audit: kern_to_symbol_duration with bases beyond 2^31 ' + (au.kern_big.length - kernBad.length) + '/' + au.kern_big.length + (kernBad.length ? ' first bad ' + JSON.stringify(kernBad[0]) : ''));
+  // a seeded sample of the audit's differential fuzz (random voices incl. aliased objects, triplet-heavy voices)
+  for (const kind of ['random', 'triplets']) {
+    const cases = au.fuzz.filter((c) => c.kind === kind);
+    good = cases.filter((c) => same(tryClean(c.voices), cleanWant(c))).length;
+    H.ok(good === cases.length, 'audit: ' + kind + ' voices through _clean_up_voice ' + good + '/' + cases.length + ' exact incl. image coordinates');
+  }
+}
+// fixture-free: comparisons and sums whose products leave 2^53 stay exact (invariants only)
+{
+  const tuplets = ['note_7..', 'note_11..', 'note_13..', 'note_34..', 'note_96..', 'note_128..', 'note_36', 'note_40', 'note_7'];
+  let a = new Fraction(0);
+  for (const t of tuplets) a = a.add(V.kernToSymbolDuration(t.split('_')[1]).fraction);
+  const tiny = new Fraction(1, 392071680);
+  const exact = errOf(() => {
+    const b = a.add(tiny);
+    if (!(a.denominator > 1e8 && a.lt(b) && b.gt(a) && b.sub(a).eq(tiny) && a.mul(4).div(4).eq(a) && Fraction.max([a, b]) === b)) throw new Error('not exact');
+  });
+  H.ok(exact === null, 'Fraction: comparisons / sums of one measure of exotic tuplets stay exact (products past 2^53)' + (exact ? ': ' + exact.error + ' ' + exact.message : ''));
+  const voice = [sym('clef_G2 . . . . upper')].concat(tuplets.map((t) => sym(t + ' C4 _ _ _ upper')));
+  H.ok(errOf(() => cleanUp(voice)) === null, 'one measure of exotic tuplets goes through _clean_up_voice without an OverflowError');
+}
+
 // ---- str() <-> EncodedSymbol.fromString on every symbol string of the fixtures
 let rtGood = 0, rtBad = null;
 for (const s of roundTrip) { if (String(ES.fromString(s)) === s) rtGood++; else if (!rtBad) rtBad = s; }

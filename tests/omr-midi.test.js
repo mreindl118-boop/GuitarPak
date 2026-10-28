@@ -46,8 +46,8 @@ function firstDiff(mine, ref) {
 }
 // music21's view of a score (midi_ref.py score_view): per part the notes in recurse() order
 // [measure, offset in measure, [[step, alter, octave]...], isGrace] and the key signatures
-function offStr(q) {
-  if ((q.d & (q.d - 1)) === 0) { const v = q.n / q.d; return Number.isInteger(v) ? v.toFixed(1) : String(v); }
+function offStr(q) { // q: an exact fraction with BigInt parts (js/omr/midi.js Q)
+  if ((q.d & (q.d - 1n)) === 0n) { const v = Number(q.n) / Number(q.d); return Number.isInteger(v) ? v.toFixed(1) : String(v); }
   return q.n + '/' + q.d;
 }
 const CSO = { clef: 0, key: 2, time: 4, voice: 5, metronome: 1, dynamic: 10, note: 20, chord: 20, rest: 20 };
@@ -134,8 +134,16 @@ function runFile(file, label) {
       st.errors++;
       let err = null;
       try { M.convert(ref.inputs[c.input], Object.assign({ strict: true }, opts)); } catch (e) { err = e; }
+      const same = err && err.name === c.error.type && err.message === c.error.message;
+      if (c.error.type !== 'ExpanderException') { // e.g. a tempo of 0: no MIDI in either mode
+        let err2 = null;
+        try { M.convert(ref.inputs[c.input], opts); } catch (e) { err2 = e; }
+        if (same && err2 && err2.name === err.name && err2.message === err.message) st.errorsOk++;
+        else st.fails.push(tag + ': error ' + (err && err.name + ' ' + err.message) + ' vs ' + c.error.type + ' ' + c.error.message);
+        continue;
+      }
       const lenient = M.convert(ref.inputs[c.input], opts);
-      if (err && err.name === c.error.type && err.message === c.error.message && !lenient.repeatsExpanded &&
+      if (same && !lenient.repeatsExpanded &&
         lenient.warnings[0] === 'repeats not expanded: ' + c.error.message && M.readSmf(lenient.midi).tracks.length > 1) st.errorsOk++;
       else st.fails.push(tag + ': error ' + (err && err.name + ' ' + err.message) + ' vs ' + c.error.type);
       continue;
@@ -173,7 +181,7 @@ function runFile(file, label) {
     }
   }
   H.ok(st.bytes === st.cases - st.errors - st.deviation, label + ': ' + st.bytes + '/' + (st.cases - st.errors - st.deviation) + ' MIDI files byte-identical to the engine\'s');
-  if (st.errors) H.ok(st.errorsOk === st.errors, label + ': ' + st.errorsOk + '/' + st.errors + ' badly formed repeats fail like music21 (strict) / play unexpanded (default)');
+  if (st.errors) H.ok(st.errorsOk === st.errors, label + ': ' + st.errorsOk + '/' + st.errors + ' engine errors reproduced (badly formed repeats: strict throws like music21, the default plays them unexpanded)');
   if (st.raw) H.ok(st.rawOk === st.raw, label + ': ' + (st.rawOk || 0) + '/' + st.raw + ' files mido cannot read stay unpolished, like the engine\'s');
   if (st.deviation) H.ok(st.deviationOk === st.deviation, label + ': ' + st.deviationOk + '/' + st.deviation + ' non-latin-1 titles: UTF-8 title instead of the engine\'s truncated file');
   H.ok(st.readerOk === st.reader, label + ': readSmf reads ' + st.readerOk + '/' + st.reader + ' engine files like mido');
@@ -202,7 +210,7 @@ function runFile(file, label) {
 const pages = H.pages().filter((p) => H.has(p, '13-midi-ref.json'));
 if (!pages.length) H.skip('(no 13-midi-ref.json fixtures): run python -I tools/omr/midi_ref.py $SL_OMR_FIXTURES');
 for (const p of pages) runFile(H.fix(p, '13-midi-ref.json'), p);
-for (const [f, label] of [['13-midi-synthetic.json', 'synthetic'], ['13-midi-edge.json', 'edge']]) {
+for (const [f, label] of [['13-midi-synthetic.json', 'synthetic'], ['13-midi-edge.json', 'edge'], ['13-midi-audit.json', 'audit']]) {
   const file = path.join(H.FIX, f);
   if (fs.existsSync(file)) runFile(file, label);
   else H.skip('(no ' + f + ')');
@@ -232,6 +240,29 @@ for (const [f, label] of [['13-midi-synthetic.json', 'synthetic'], ['13-midi-edg
   } else H.skip('(no sheetlab-ref next to the fixtures) end-to-end engine outputs');
 }
 
+// ---------------------------------------------------------------- music21's numbers (audit)
+// float(Fraction) of huge fractions, common.opFrac(float) = limit_denominator(65535) and
+// nearestMultiple(n, unit)[1] < 1e-6, against music21 itself (13-midi-audit.json "numeric")
+{
+  const file = path.join(H.FIX, '13-midi-audit.json');
+  if (fs.existsSync(file)) {
+    const num = JSON.parse(fs.readFileSync(file, 'utf8')).numeric;
+    const I = M._internal;
+    const hex = (h) => { // float.hex() -> double
+      const m = /^(-?)0x([01])\.([0-9a-f]*)p([+-]\d+)$/.exec(h);
+      if (!m) return h === '0x0.0p+0' ? 0 : NaN;
+      return (m[1] ? -1 : 1) * (parseInt(m[2] + m[3], 16) / Math.pow(16, m[3].length)) * Math.pow(2, +m[4]);
+    };
+    let ok1 = 0, ok2 = 0, ok3 = 0;
+    for (const [n, d, f] of num.fractions) if (Object.is(I.qnum(I.Q(BigInt(n), BigInt(d))), hex(f))) ok1++;
+    for (const [x, n, d] of num.floats) { const q = I.opFracF(hex(x)); if (q.n === BigInt(n) && q.d === BigInt(d)) ok2++; }
+    for (const [n, d, u, close] of num.nearest_multiple) if (I.nearestMultipleClose(I.pv(I.Q(BigInt(n), BigInt(d))), hex(u)) === close) ok3++;
+    H.ok(ok1 === num.fractions.length, 'numbers: float(Fraction) correctly rounded like Python in ' + ok1 + '/' + num.fractions.length);
+    H.ok(ok2 === num.floats.length, 'numbers: common.opFrac(float) like music21 in ' + ok2 + '/' + num.floats.length);
+    H.ok(ok3 === num.nearest_multiple.length, 'numbers: nearestMultiple(n, 1/16 | 1/12)[1] < 1e-6 like music21 in ' + ok3 + '/' + num.nearest_multiple.length);
+  } else H.skip('(no 13-midi-audit.json) music21 number checks');
+}
+
 // ---------------------------------------------------------------- API
 if (pages.length) {
   const ref = JSON.parse(fs.readFileSync(H.fix(pages[0], '13-midi-ref.json'), 'utf8'));
@@ -245,6 +276,17 @@ if (pages.length) {
   H.ok(b64(d.midi) === c0.mid && d.polished && d.repeatsExpanded, 'convert defaults = the engine\'s TranslationOptions (112 bpm, piano, no transpose)');
   const s = M.summary(xml, { tempo: 80 });
   H.ok(s.noteEvents.length > 0 && s.noteEvents.every((e) => e.durationBeats >= 0 && e.pitchName && e.partIndex >= 0), 'summary: note events (pitch, start/duration in beats, part)');
+  // options given as undefined / null take the engine's defaults (an undefined tempo used to write
+  // a set_tempo of 0 and give a NaN length); GM_INSTRUMENTS.get(name, 0) never reads inherited keys
+  const u = M.convert(xml, { title: c.title, tempo: undefined, program: null, transpose: undefined });
+  H.ok(b64(u.midi) === c0.mid && Number.isFinite(u.summary.durationSeconds), 'convert: undefined / null options = the defaults');
+  const proto = M.convert(xml, { title: c.title, program: 'constructor' });
+  H.ok(b64(proto.midi) === c0.mid, 'convert: an unknown instrument name (even "constructor") is program 0, like dict.get');
+  let bad = 0;
+  for (const o of [{ program: 128 }, { program: -1 }, { program: 2.5 }, { tempo: NaN }, { tempo: 'fast' }, { transpose: 1.5 }]) {
+    try { M.convert(xml, o); } catch (e) { if (e instanceof RangeError || e instanceof TypeError) bad++; }
+  }
+  H.ok(bad === 6, 'convert: a program outside 0..127, a non-numeric tempo or a fractional transpose is refused (' + bad + '/6), never a corrupt file');
 }
 
 // ---------------------------------------------------------------- .mxl (js/omr/mxl.js)
@@ -259,6 +301,10 @@ if (pages.length) {
   const dv = new DataView(a.buffer, a.byteOffset);
   H.ok(ra.xml === xml && ra.rootfile === 'Für Elise.musicxml' && Object.keys(ra.files).join() === 'Für Elise.musicxml,META-INF/container.xml' &&
     dv.getUint16(8, true) === 8 && (xml.length < 10000 || a.length < xml.length / 4), 'mxl: deflated zip, score first then META-INF/container.xml, reads back (' + a.length + ' bytes)');
+  // container.xml escapes the name; read() must unescape it (it used to look the score up as
+  // "A &amp; B ..." and return no XML)
+  const amp = await Z.read(await Z.write(xml, 'A & B "x" <y>.musicxml', { date: date }));
+  H.ok(amp.rootfile === 'A & B "x" <y>.musicxml' && amp.xml === xml, 'mxl: a name with & " < reads back (escaped in container.xml)');
   const b = Z.writeStored(xml, 'score.musicxml', { date: date });
   const rb = await Z.read(b);
   H.ok(rb.xml === xml && new DataView(b.buffer).getUint16(8, true) === 0, 'mxl: stored zip (sync)');

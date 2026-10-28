@@ -14,6 +14,81 @@ function sha1(ta) { return crypto.createHash('sha1').update(Buffer.from(ta.buffe
 function num(x) { return x !== x ? 'nan' : x === Infinity ? 'inf' : x === -Infinity ? '-inf' : x; }
 function ND(data, shape) { return { __nd: shape, data: data }; }
 
+// ---- audit: cv2 behaviour the page cases never reach (tools/omr/dump_audit.py ->
+// FIXTURES/<page>/23-audit.json, key "cv"): empty point sets (cv2 answers with defaults where
+// opencv.js asserts), NaN in findNonZero, warpAffine with a zero dsize (= the source size),
+// addWeighted / fillPoly refusing bad input ----
+function auditCv(cv2) {
+  const pages = H.pages().filter((p) => H.has(p, '23-audit.json'));
+  if (!pages.length) { H.skip('audit: no 23-audit.json fixtures (run tools/omr/dump_audit.py)'); return; }
+  const dec = (v) => (v === 'nan' ? NaN : v === 'inf' ? Infinity : v === '-inf' ? -Infinity : Array.isArray(v) ? v.map(dec) : v);
+  const res = (f) => { try { return f(); } catch (e) { return { raises: e && e.name === 'cv2.error' ? 'error' : (e && e.name) || String(e) }; } };
+  const eqv = (a, b) => {
+    if (ArrayBuffer.isView(a)) a = Array.from(a);
+    if (Array.isArray(a) || Array.isArray(b)) return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((x, i) => eqv(x, b[i]));
+    if (a && typeof a === 'object' && b && typeof b === 'object') return a.raises === b.raises;
+    return (a !== a && b !== b) || a === b;
+  };
+  const show = (v) => JSON.stringify(v, (k, x) => (ArrayBuffer.isView(x) ? Array.from(x) : typeof x === 'number' && !isFinite(x) ? String(x) : x)).slice(0, 90);
+  // Python's nested results -> the wrappers' flat point lists
+  const flatPts = (v) => (v === null || (v && v.raises) ? v : v.flat(Infinity));
+  for (const page of pages) {
+    const d = H.readJson(H.fix(page, '23-audit.json')).cv;
+    let n = 0, fails = 0;
+    const bad = [];
+    const check = (cond, what) => { n++; if (!cond) { fails++; if (bad.length < 4) bad.push(what); } };
+    for (const dt of ['int32', 'float32']) {
+      const z = dt === 'int32' ? new Int32Array(0) : new Float32Array(0), w = d[dt];
+      const sq = Float32Array.from([0, 0, 4, 0, 4, 4, 0, 4]);
+      const got = {
+        minAreaRect: res(() => cv2.minAreaRect(z)),
+        boundingRect: res(() => cv2.boundingRect(z)),
+        contourArea: res(() => cv2.contourArea(z)),
+        convexHull: res(() => cv2.convexHull(z)),
+        convexHullIdx: res(() => cv2.convexHull(z, false, false)),
+        pointPolygonTest: res(() => cv2.pointPolygonTest(z, [1, 2], false)),
+        pointPolygonTestDist: res(() => cv2.pointPolygonTest(z, [1, 2], true)),
+        intersectConvexConvex: res(() => cv2.intersectConvexConvex(z, sq)),
+        intersectConvexConvex1: res(() => cv2.intersectConvexConvex(Float32Array.from([1, 1]), sq)),
+        drawContours: res(() => np.sum(cv2.drawContours(np.zeros([5, 5], 'uint8'), [new Int32Array(0)], -1, 255, 1).data)),
+        fillPoly: res(() => np.sum(cv2.fillPoly(np.zeros([5, 5], 'uint8'), [new Int32Array(0)], 255).data))
+      };
+      for (const k of Object.keys(got)) {
+        let want = dec(w[k]);
+        if (k.startsWith('intersect') && Array.isArray(want)) want = [want[0], flatPts(want[1])];
+        check(eqv(got[k], want), dt + ' ' + k + ' ' + show(got[k]) + ' vs ' + show(w[k]));
+      }
+    }
+    const fnz = res(() => cv2.findNonZero(np.image(2, 2, 1, Float32Array.from([NaN, 0, 0, 1]))));
+    check(eqv(fnz, flatPts(d.findNonZero_nan)), 'findNonZero with NaN ' + show(fnz) + ' vs ' + show(d.findNonZero_nan));
+    const wa = d.warpAffine, src = np.image(wa.h, wa.w, 3, Uint8Array.from(wa.src));
+    for (const c of wa.cases) {
+      const r = cv2.warpAffine(src, wa.M, c.dsize);
+      check(eqv(np.shape(r), c.shape) && sha1(r.data) === c.sha1, 'warpAffine dsize ' + c.dsize + ' -> ' + np.shape(r) + ' vs ' + c.shape);
+    }
+    // the FMA-contracted scalar code of the AVX2 kernels (see warpAffineLinear8u / addWeighted)
+    for (const t of d.warpAffine_tails || []) {
+      const r = cv2.warpAffine(np.image(t.h, t.w, t.c, Uint8Array.from(t.src)), t.M, t.dsize);
+      check(sha1(r.data) === t.sha1, 'warpAffine scalar tail ' + t.h + 'x' + t.w + 'x' + t.c + ' -> ' + t.dsize);
+    }
+    for (const b of d.warpAffine_blends || []) {
+      const src = np.zeros([6, 6], 'uint8');
+      src.data[2 * 6 + 2] = b.p00; src.data[2 * 6 + 3] = b.p01;
+      const r = cv2.warpAffine(src, [[1, 0, 2 + b.fx], [0, 1, 2]], [3, 3], { flags: cv2.INTER_LINEAR | 16 }); // WARP_INVERSE_MAP
+      check(eqv(r.data, b.out.flat()), 'warpAffine fused blend p=' + b.p00 + ',' + b.p01 + ' fx=' + b.fx + ': ' + r.data[0] + ' vs ' + b.out[0][0]);
+    }
+    for (const a of d.addWeighted_scalar || []) {
+      const r = cv2.addWeighted(np.full([1, a.n], a.a, 'uint8'), a.alpha, np.full([1, a.n], a.b, 'uint8'), a.beta, a.gamma);
+      const r40 = cv2.addWeighted(np.full([1, 40], a.a, 'uint8'), a.alpha, np.full([1, 40], a.b, 'uint8'), a.beta, a.gamma);
+      check(eqv(r.data, a.out.flat()) && eqv(r40.data, a.out40.flat()), 'addWeighted ' + a.n + ' values (scalar) ' + r.data[0] + ' vs ' + a.out[0][0] + ', 40 values ' + r40.data[0] + ' vs ' + a.out40[0][0]);
+    }
+    const m1 = res(() => cv2.addWeighted(np.zeros([2, 6], 'uint8'), 0.5, np.zeros([3, 4], 'uint8'), 0.5, 0));
+    const m2 = res(() => cv2.addWeighted(np.zeros([2, 6], 'uint8'), 0.5, np.zeros([2, 2, 3], 'uint8'), 0.5, 0));
+    check(eqv(m1, d.addWeighted_mismatch) && eqv(m2, d.addWeighted_channels), 'addWeighted with mismatched inputs ' + show([m1, m2]) + ' vs ' + show([d.addWeighted_mismatch, d.addWeighted_channels]));
+    H.ok(!fails, page + ' audit cv edge cases: ' + (n - fails) + '/' + n + ' as cv2' + (fails ? ' -- ' + bad.join(' | ') : ''));
+  }
+}
+
 // ---- the spec language of dump_cv.py ----
 function makeEval(page, R) {
   const pngCache = {};
@@ -258,9 +333,11 @@ function trackLeaks(cv) {
   // synthetic API behaviour not covered by the dump
   const e = cv2.findContours(np.zeros([5, 5], 'uint8'), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE);
   H.ok(e[0].length === 0 && e[1] === null, 'findContours on an empty mask -> [[], null] like ((), None)');
+  // (cv2.fillPoly raises on an empty polygon too; an empty minAreaRect does not, see the audit)
   let threw = null;
-  try { cv2.minAreaRect(new Int32Array(0)); } catch (err) { threw = err; }
+  try { cv2.fillPoly(np.zeros([5, 5], 'uint8'), [new Int32Array(0)], 255); } catch (err) { threw = err; }
   H.ok(threw instanceof cv2.error, 'opencv.js exceptions surface as OMR.cv2.error (' + (threw && threw.message.split('\n')[0].slice(0, 60)) + ')');
+  auditCv(cv2);
   const img = np.zeros([10, 10, 3], 'uint8');
   const same = cv2.circle(img, [5, 5], 3, [1, 2, 3], -1);
   H.ok(same === img && img.data[(5 * 10 + 5) * 3 + 2] === 3, 'drawing mutates the image in place and returns it');

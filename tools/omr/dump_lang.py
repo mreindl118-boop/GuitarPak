@@ -4,6 +4,7 @@ triplet_restoration.js and music_xml_generator.js (tests/omr-vocab.test.js, test
 
 usage: python -I tools/omr/dump_lang.py [--seg P] [--enc P] [--dec P] [--ship] [--no-pages]
                                         FIXTURES [page ...]
+       python -I tools/omr/dump_lang.py --audit FIXTURES
 
 Per fixture page (FIXTURES/<page>/00-input.png) homr runs the way tools/ref.py and
 dump_stages.py run it (detect_staffs_in_image -> repair_systems -> parse_staffs(Config())
@@ -34,6 +35,12 @@ EncodedSymbol methods on generated symbols, seeded random token sequences throug
 remove_duplicated_symbols / sort_token_chords / restore_unmarked_triplets / circle_of_fifths /
 generate_xml (exceptions recorded by class name), triplet-heavy measures, a SheetLab-style
 merge of all pages' voices, and the calls recorded while computing them.
+--audit (no models, no pages) writes only FIXTURES/12-lang-audit.json: the regression cases of
+the adversarial audit of the JS port (inputs the recordings above never reach: one measure of
+exotic vocabulary tuplets whose sums leave 2^53 in intermediate products, imgpos rounding of
+NaN / infinite / huge coordinates, str.strip whitespace in build_dict, kern bases beyond 2^31,
+KeyError messages of string keys, exact Fraction arithmetic on such sums) plus a seeded sample
+of random and triplet-heavy voices through the clean-up and generate_xml.
 Expected values come only from running homr; nothing is written by hand.
 """
 import argparse
@@ -41,9 +48,12 @@ import copy
 import json
 import os
 import random
+import re
 import sys
 import xml.etree.ElementTree as ET
 from fractions import Fraction
+
+import numpy as np
 
 ap = argparse.ArgumentParser()
 ap.add_argument('--seg')
@@ -52,6 +62,7 @@ ap.add_argument('--dec')
 ap.add_argument('--ship', action='store_true', help='really run the swapped encoder/decoder')
 ap.add_argument('--no-pages', action='store_true',
                 help='only write 12-lang-synthetic.json (its merged-pages case reads existing 12-lang-voices.json)')
+ap.add_argument('--audit', action='store_true', help='only write 12-lang-audit.json (audit regression cases)')
 ap.add_argument('fixtures')
 ap.add_argument('pages', nargs='*')
 A = ap.parse_args()
@@ -778,6 +789,261 @@ def et_case(d):
         case['write_bytes'] = list(f.read())
     os.remove(path)
     return case
+
+
+# ---------------------------------------------------------------- audit (12-lang-audit.json)
+# Regression cases of the adversarial audit of the JS port, each pinned to what homr does.
+
+AUDIT_TUPLETS = ['note_7..', 'note_11..', 'note_13..', 'note_34..', 'note_96..', 'note_128..', 'note_36', 'note_40',
+                 'note_7', 'rest_26.', 'note_22..', 'note_56.']
+
+
+AUDIT_MULS = [2, 3, 4, 16, 1000, 392071680, 784143360]
+AUDIT_DIVS = [2, 3, 7]
+
+
+def audit_tuplet_voice(n, barline_every=0, chords=False):
+    """One clef, then n notes of the vocabulary's most exotic durations; a measure of them sums to a
+    denominator near 4e8, so comparing two sums multiplies past 2^53."""
+    v = [V.EncodedSymbol('clef_G2', '.', '.', '.', '.', 'upper')]
+    for i in range(n):
+        rhythm = AUDIT_TUPLETS[i % len(AUDIT_TUPLETS)]
+        pitch = '_' if rhythm.startswith('rest') else 'C4'
+        if chords and i % 3 == 1:
+            v.append(V.EncodedSymbol('chord'))
+            v.append(V.EncodedSymbol(rhythm, pitch, '_', '_', '_', 'lower'))
+        else:
+            v.append(V.EncodedSymbol(rhythm, pitch, '_', '_', '_', 'upper'))
+        if barline_every and (i + 1) % barline_every == 0:
+            v.append(V.EncodedSymbol('barline'))
+    return v
+
+
+def audit_pipeline(voices, args=(False, None, None), title=''):
+    """[str(symbol), image_coordinates] of every _clean_up_voice and what generate_xml writes."""
+    out = {'voices': [SIC(v) for v in voices]}
+    cleaned = []
+    try:
+        for v in voices:
+            cleaned.append(T.restore_unmarked_triplets(V.remove_duplicated_symbols(v)))
+        out['clean'] = [SIC(c) for c in cleaned]
+    except Exception as e:  # noqa: BLE001
+        out['clean'] = ERR(e)
+        return out
+    out['args'], out['title'] = list(args), title
+    try:
+        out['tostring'] = ET.tostring(MX.generate_xml(MX.XmlGeneratorArguments(*args), cleaned, title), encoding='unicode')
+    except Exception as e:  # noqa: BLE001
+        out['tostring'] = ERR(e)
+    return out
+
+
+def audit_random_voice(r, vocab, maxlen):
+    """Any vocabulary symbol (grace notes of a non power-of-two value rarely: they raise KeyError),
+    chord markers, the same symbol object twice now and then, image coordinates incl. .5 values."""
+    def bad_grace(k):
+        m = re.match(r'(note|rest)_(\d+)G', k)
+        return m is not None and int(m[2]) not in (0, 1, 2, 4, 8, 16, 32, 64, 128)
+    rh = [k for k in vocab.rhythm if k not in ('PAD', 'BOS', 'EOS')] + ['newline', 'measureRest', 'chord']
+    notes = [k for k in vocab.rhythm if k.startswith(('note', 'rest'))]
+    plain = ['note_4', 'note_8', 'note_16', 'note_8', 'rest_8', 'note_2', 'note_4.', 'note_12', 'note_24', 'note_6']
+    pitches = [k for k in vocab.pitch if k not in ('.', '_')]
+    arts = ['_', '_', '_', 'accent', 'staccato', 'tenuto', 'fermata', 'accent_staccato', 'trill', 'tremolo',
+            'breathMark', 'turn', 'mordent', 'arpeggiate', 'accentStrong', 'dynamic_piu', '.']
+    slurs = ['_', '_', '_', 'slurStart', 'slurStop', 'slurStart_slurStop', '.']
+    positions = ['upper', 'upper', 'upper', 'lower', 'lower', 'upper2', 'lower2']
+    out = []
+    for i in range(r.randint(0, maxlen)):
+        if out and r.random() < 0.05:
+            out.append(out[r.randrange(len(out))])  # the same object again (identity matters)
+            continue
+        x = r.random()
+        rhythm = (r.choice(plain) if r.random() < 0.6 else r.choice(notes)) if x < 0.55 else 'barline' if x < 0.62 else r.choice(rh)
+        while bad_grace(rhythm) and r.random() < 0.995:
+            rhythm = r.choice(notes)
+        if rhythm.startswith(('note', 'rest', 'clef', 'dynamic')):
+            if rhythm.startswith('rest'):
+                pitch = '_' if r.random() < 0.9 else r.choice(pitches)
+            elif rhythm.startswith('note'):
+                pitch = r.choice(pitches) if r.random() < 0.95 else r.choice(['_', '.'])
+            else:
+                pitch = '_'
+            lift = r.choice(['_', '_', '#', 'b', 'N', '##', 'bb', '.']) if rhythm.startswith('note') else '_'
+            art = r.choice(arts) if rhythm.startswith(('note', 'rest')) else r.choice(['_', 'dynamic_poco'])
+            slur = r.choice(slurs) if rhythm.startswith('note') else '_'
+            s = V.EncodedSymbol(rhythm, pitch, lift, art, slur, r.choice(positions))
+        elif rhythm == 'measureRest':
+            s = V.EncodedSymbol(rhythm, position=r.choice(positions))
+        else:
+            s = V.EncodedSymbol(rhythm)
+        k = r.random()
+        if k < 0.6:
+            s.image_coordinates = (r.uniform(-5, 2500), r.uniform(-5, 2500)) if k < 0.5 else \
+                (r.randint(0, 2500) + 0.5, r.randint(0, 2500) - 0.5)
+        out.append(s)
+        if rhythm.startswith(('note', 'rest')) and r.random() < 0.35:
+            out.append(V.EncodedSymbol('chord'))
+    return out
+
+
+def audit_triplet_voice(r):
+    """Measures where unmarked triplet eighths (read as plain note_8) run against a steady lower voice."""
+    def figure():
+        k = r.random()
+        if k < 0.35:
+            return [('note_8', Fraction(1, 12))] * 3
+        if k < 0.45:
+            return [('note_12', Fraction(1, 12))] * 3
+        if k < 0.6:
+            return [('note_8', Fraction(1, 8))] * 2
+        if k < 0.7:
+            return [('note_16', Fraction(1, 24))] * 6 if r.random() < 0.5 else [('note_16', Fraction(1, 16))] * 4
+        if k < 0.8:
+            return [('note_8.', Fraction(3, 16)), ('note_16', Fraction(1, 16))]
+        return [('note_4', Fraction(1, 4))] if k < 0.9 else [('rest_4', Fraction(1, 4))]
+    beats = r.choice([2, 3, 4])
+    seq = [V.EncodedSymbol('clef_G2', '.', '.', '.', '.', 'upper'), V.EncodedSymbol('clef_F4', '.', '.', '.', '.', 'lower'),
+           V.EncodedSymbol('keySignature_%d' % r.randint(-3, 3)), V.EncodedSymbol('timeSignature/4')]
+    for _ in range(r.randint(1, 10)):
+        up, t = [], Fraction(0)
+        for _ in range(beats):
+            for rhythm, d in figure():
+                up.append((t, rhythm))
+                t += d
+        low = [(Fraction(b, 4), 'note_4') for b in range(beats)]
+        for onset in sorted({t for t, _ in up} | {t for t, _ in low}):
+            chord = [V.EncodedSymbol(rhythm, '_' if rhythm.startswith('rest') else r.choice(['C5', 'E5', 'G5', 'A4']),
+                                     '_', '_', '_', 'upper') for t, rhythm in up if t == onset]
+            chord += [V.EncodedSymbol(rhythm, r.choice(['C3', 'G2', 'E3']), '_', '_', '_', 'lower')
+                      for t, rhythm in low if t == onset and r.random() < 0.97]
+            if chord and r.random() < 0.05:
+                chord.pop()  # a lost note
+            r.shuffle(chord)
+            for i, s in enumerate(chord):
+                if i:
+                    seq.append(V.EncodedSymbol('chord'))
+                if r.random() < 0.5:
+                    s.image_coordinates = (r.uniform(0, 2000), r.uniform(0, 2000))
+                seq.append(s)
+        seq.append(V.EncodedSymbol(r.choice(['barline'] * 8 + ['repeatEnd', 'doublebarline'])))
+        if r.random() < 0.15:
+            seq.append(V.EncodedSymbol('newline'))
+    return seq
+
+
+def audit_seq_json(symbols):
+    """A voice as JSON keeping object identity: a repeated object is {"alias": its first index}."""
+    first, out = {}, []
+    for i, s in enumerate(symbols):
+        if id(s) in first:
+            out.append({'alias': first[id(s)]})
+        else:
+            first[id(s)] = i
+            out.append({'s': str(s), 'ic': IC(s)})
+    return out
+
+
+def audit():
+    r = random.Random(20261029)
+    vocab = V.Vocabulary()
+    out = {}
+
+    # one measure (and longer stretches) of exotic tuplets: exact Fractions past 2^53 in between
+    tuplets = []
+    for n, every, chords in [(9, 0, False), (12, 0, True), (50, 0, False), (60, 12, True), (300, 0, True), (240, 9, False)]:
+        case = audit_pipeline([audit_tuplet_voice(n, every, chords)])
+        case['n'], case['barline_every'], case['chords'] = n, every, chords
+        tuplets.append(case)
+    out['tuplets'] = tuplets
+    # the Fraction arithmetic homr does on such sums: [a, b, a+b, a-b, cmp, np.median([a, b]),
+    # int(a * 1000), [a * k for k in MULS], [a / k for k in DIVS]]. homr multiplies and divides
+    # durations only by ints (division, 4, a time signature's denominator, 2/3, a median's /2),
+    # never one sum by another (whose reduced product could pass 2^53, which the JS port refuses)
+    sums = []
+    for n in (5, 9, 12, 40):
+        acc = Fraction(0)
+        for i in range(n):
+            acc += V.kern_to_symbol_duration(AUDIT_TUPLETS[i % len(AUDIT_TUPLETS)].split('_')[1]).fraction
+        sums.append(acc)
+    sums += [Fraction(1, 392071680), Fraction(392071679, 392071680), Fraction(7, 512) * 3 / 13]
+    ops = []
+    for a in sums:
+        for b in sums:
+            ops.append([F(a), F(b), F(a + b), F(a - b), (a > b) - (a < b), F(np.median([a, b])), int(a * 1000),
+                        [F(a * k) for k in AUDIT_MULS], [F(a / k) for k in AUDIT_DIVS]])
+    out['fraction_ops'] = ops
+    out['fraction_muls'], out['fraction_divs'] = AUDIT_MULS, AUDIT_DIVS
+
+    # build_image_position: NaN / infinities raise like round(), huge values print every digit
+    imgpos = []
+    for x, y in [('nan', '1.0'), ('1.0', 'nan'), ('inf', '1.0'), ('1.0', '-inf'), ('1e+21', '2.5'), ('-1e+22', '3.5'),
+                 ('9007199254740994.0', '-0.5'), ('1.2345678901234569e+23', '0.49999999999999994'), ('-2.5', '-0.4'),
+                 ('4503599627370494.5', '1234.5')]:
+        s = V.EncodedSymbol('note_4', 'C4', '_', '_', '_', 'upper')
+        s.image_coordinates = (np.float64(float(x)), np.float64(float(y)))
+        e = ET.Element('note')
+        try:
+            MX.build_image_position(e, s)
+            imgpos.append({'in': [x, y], 'xml': ET.tostring(e, encoding='unicode')})
+        except Exception as ex:  # noqa: BLE001
+            imgpos.append({'in': [x, y], **ERR(ex)})
+    for ic in [(1.0,), (1.0, 2.0, 3.0)]:  # x, y = image_coordinates unpacks exactly two
+        s = V.EncodedSymbol('note_4', 'C4', '_', '_', '_', 'upper')
+        s.image_coordinates = ic
+        try:
+            MX.build_image_position(ET.Element('note'), s)
+            imgpos.append({'in': [repr(v) for v in ic], 'xml': None})
+        except Exception as ex:  # noqa: BLE001
+            imgpos.append({'in': [repr(v) for v in ic], **ERR(ex)})
+    out['imgpos'] = imgpos
+
+    # build_dict: str.strip's whitespace is not String.trim's (\x1c-\x1f, \x85 vs ﻿)
+    dicts = []
+    for t in ['\x1c', 'a\x1d', '\x1e', 'b\x1f', '\x85', 'c\x85', '﻿', '﻿a', 'a᠎', '​', ' a', '\xa0', '　x', 'ok', '']:
+        try:
+            dicts.append([t, list(V.build_dict([t]).items()), None])
+        except Exception as e:  # noqa: BLE001
+            dicts.append([t, None, [type(e).__name__, str(e)]])
+    out['build_dict'] = dicts
+
+    # kern_to_symbol_duration with bases beyond 32 bits (JS's & is 32-bit)
+    out['kern_big'] = [[k, DUR(V.kern_to_symbol_duration(k))] for k in
+                       ['2147483648', '6442450944', '3221225472', '4294967296', '12884901888', '1099511627776',
+                        '1099511627777', '2147483647', '4294967295.', '6442450945']]
+
+    # KeyError messages: str(KeyError(k)) is repr(k) for a string key
+    keyerrors = []
+    for sym in ['note_4 C4 x _ _ upper', "note_4 C4 it's _ _ upper", 'note_4 C4 a"b _ _ upper', 'note_4 C4 q\'" _ _ upper',
+                'note_4 C4 a\\b _ _ upper', 'note_4 C4 \x85 　 _ _ upper', 'note_3G C4 _ _ _ upper', 'note_6G. C4 _ _ _ upper']:
+        try:
+            MX.build_note_or_rest(V.EncodedSymbol(*sym.split(' ')), 0, False, MX.ConversionState(16, Fraction(1)), '')
+            keyerrors.append([sym, None])
+        except Exception as e:  # noqa: BLE001
+            keyerrors.append([sym, [type(e).__name__, str(e)]])
+    out['keyerrors'] = keyerrors
+
+    # a seeded sample of the audit's differential fuzz
+    fuzz = []
+    for i in range(160):
+        voices = [audit_random_voice(r, vocab, 70) for _ in range(r.choice([1, 1, 1, 2, 3]))]
+        case = audit_pipeline(voices, (r.choice([None, False, True]), r.choice([None, 0, 96, 120]), r.choice([None, 0, 60])),
+                              r.choice(['', 'T', 'A & B <c>']))
+        case['voices'] = [audit_seq_json(v) for v in voices]
+        case['kind'] = 'random'
+        fuzz.append(case)
+    for i in range(60):
+        voices = [audit_triplet_voice(r) for _ in range(r.choice([1, 1, 2]))]
+        case = audit_pipeline(voices, (False, r.choice([None, 100]), None), '')
+        case['voices'] = [audit_seq_json(v) for v in voices]
+        case['kind'] = 'triplets'
+        fuzz.append(case)
+    out['fuzz'] = fuzz
+    return out
+
+
+if A.audit:
+    wjson(os.path.join(FIX, '12-lang-audit.json'), audit())
+    sys.exit(0)
 
 
 install()

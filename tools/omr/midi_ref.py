@@ -42,6 +42,15 @@ MIDI event tick / ticks_per_beat * 60 / tempo, from the polished MIDI.
 And FIXTURES/13-midi-edge.json: inputs made from the pages by small programmatic edits, for paths the
 pages miss: generate_xml's own metronome (120; 96 with sound tempo 132) against the engine's tempo,
 a key that transposes to 8 sharps, minor-mode keys, a bare <sound tempo>, a dotted-quarter beat unit.
+--audit writes only FIXTURES/13-midi-audit.json, the regression cases of the adversarial audit of
+js/omr/midi.js, for paths the pages and the synthetic scores never reach:
+  numeric   music21's own numbers: float(Fraction) of huge fractions, common.opFrac of floats
+            (limit_denominator(65535)), nearestMultiple(n, 1/16 | 1/12)[1] < 1e-6
+  inputs/cases/scores  (the 13-midi-ref.json layout) seeded generate_xml scores full of exotic
+            tuplets (divisions per quarter above 65535, where music21's float offsets are
+            approximated), plus engine options at their limits on belle-p1: tempo 0 (music21
+            raises ZeroDivisionError), under ~3.58 bpm (mido cannot store the set_tempo and the
+            engine keeps music21's unpolished file), 112.5, 99999.
 Nothing here is written by hand: every expectation is music21 / mido output.
 """
 import argparse
@@ -62,6 +71,7 @@ ap.add_argument('--jobs', type=int, default=3)
 ap.add_argument('--no-pages', action='store_true')
 ap.add_argument('--no-synthetic', action='store_true')
 ap.add_argument('--no-edge', action='store_true')
+ap.add_argument('--audit', action='store_true', help='only write FIXTURES/13-midi-audit.json (adversarial audit cases)')
 ap.add_argument('fixtures')
 ap.add_argument('pages', nargs='*')
 A = ap.parse_args()
@@ -387,7 +397,117 @@ def run_edge(pool):
     print('edge', len(cases), 'cases', sum(1 for c in cases if 'error' in c), 'errors', file=sys.stderr)
 
 
+# ---------------------------------------------------------------- --audit
+
+def audit_numeric():
+    import random
+    from fractions import Fraction
+    from music21.common.numberTools import opFrac, nearestMultiple
+    r = random.Random(20261028)
+    fractions, floats, multiples = [], [], []
+    for _ in range(400):
+        n = r.randint(-10 ** r.randint(1, 40), 10 ** r.randint(1, 40))
+        d = r.randint(1, 10 ** r.randint(1, 40))
+        fractions.append([str(n), str(d), float(Fraction(n, d)).hex()])
+    for _ in range(400):
+        k = r.random()
+        if k < 0.3:
+            x = r.random() * 10 ** r.randint(-3, 6)
+        elif k < 0.7:
+            x = r.randint(0, 10 ** 6) / r.choice([3, 7, 11, 13, 17, 65536, 65537, 1000003, 2 ** 20, 3 * 2 ** 18])
+        else:
+            x = r.randint(0, 10 ** 9) / r.randint(1, 10 ** 9)
+        o = Fraction(opFrac(x))
+        floats.append([x.hex(), str(o.numerator), str(o.denominator)])
+    for _ in range(300):
+        if r.random() < 0.5:
+            n = Fraction(r.randint(0, 10 ** 8), r.randint(1, 10 ** 7))
+        else:
+            n = abs(Fraction(r.randint(0, 64), 16) + Fraction(r.choice([0, 1, -1]),
+                                                              r.choice([10 ** 6, 10 ** 7, 2 * 10 ** 6, 1052632, 1052631])))
+        for unit in (0.0625, 1 / 12):
+            multiples.append([str(n.numerator), str(n.denominator), unit.hex(), nearestMultiple(n, unit)[1] < 1e-6])
+    return {'fractions': fractions, 'floats': floats, 'nearest_multiple': multiples}
+
+
+def audit_sequence(r, V):
+    """A homr voice with many exotic tuplets (11-, 13-, 17-tuplets ...), the way a misread page
+    can come out: measures whose lengths and offsets need huge denominators."""
+    E = V.EncodedSymbol
+    seq = [E('clef_G2', '_', '_', '_', '_', 'upper')]
+    two = r.random() < 0.5
+    if two:
+        seq += [E('chord'), E('clef_F4', '_', '_', '_', '_', 'lower')]
+    seq += [E('keySignature_%d' % r.randint(-7, 7)), E('timeSignature/4')]
+    pitches = ['C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4', 'C5', 'D5', 'E5', 'G5', 'C6']
+    tuplets = ['12', '6', '10', '20', '7', '14', '28', '9', '18', '11', '22', '13', '26', '34', '5', '3', '56', '96']
+    for _m in range(r.randint(3, 12)):
+        if r.random() < 0.25:
+            seq.append(E('dynamic_' + r.choice(['p', 'mf', 'f', 'ff', 'sfz', 'pp', 'fp']), '_', '_', '_', '_', 'upper'))
+        for _b in range(r.randint(2, 6)):
+            if r.random() < 0.6:
+                tv = r.choice(tuplets)
+                for _k in range(r.randint(1, 4)):
+                    seq.append(E('note_' + tv, r.choice(pitches), r.choice(['_'] * 5 + ['#', 'b']), '_',
+                                 r.choice(['_'] * 4 + ['slurStart', 'slurStop']), 'upper'))
+                    if r.random() < 0.2:
+                        seq += [E('chord'), E('note_' + r.choice(tuplets), r.choice(pitches), '_', '_', '_', 'upper2')]
+            else:
+                seq.append(E('note_' + r.choice(['4', '8', '16', '2', '4.']), r.choice(pitches), '_', '_', '_', 'upper'))
+            if two and r.random() < 0.5:
+                seq += [E('chord'), E('note_' + r.choice(['4', '2', '12', '10']), r.choice(['C3', 'G3', 'E3']), '_', '_', '_', 'lower')]
+        seq.append(E(r.choice(['barline'] * 6 + ['repeatEnd', 'repeatStart'])))
+    return seq
+
+
+def run_audit(pool):
+    import random
+    import re
+    from homr.music_xml_generator import XmlGeneratorArguments, generate_xml
+    from homr.transformer import vocabulary as V
+    r = random.Random(1028)
+    inputs, jobs = {}, []
+    with open(os.path.join(FIX, 'belle-p1', '11-score.musicxml'), encoding='utf-8', newline='') as f:
+        inputs['belle'] = f.read()
+    for tempo in (0, 1, 3, 4, 112.5, 99999):
+        jobs.append((inputs['belle'], 'belle', tempo, 0, 0, 'Belle'))
+    k = 0
+    while k < 40:
+        voices = [audit_sequence(r, V)] + ([audit_sequence(r, V)] if r.random() < 0.3 else [])
+        tempo = r.choice([60, 80, 112, 132])
+        try:
+            root = generate_xml(XmlGeneratorArguments(large_page=False, metronome=tempo, tempo=tempo),
+                                [V.remove_duplicated_symbols(v) for v in voices], 'Audit')
+        except Exception:  # noqa: BLE001 - random voices homr cannot write
+            continue
+        fd, path = tempfile.mkstemp(suffix='.musicxml')
+        os.close(fd)
+        ET.ElementTree(root).write(path, encoding='unicode', xml_declaration=True)
+        with open(path, encoding='utf-8', newline='') as f:
+            text = f.read()
+        os.remove(path)
+        divs = [int(x) for x in re.findall(r'<divisions>(\d+)</divisions>', text)]
+        if k < 30 and not any(d > 65535 for d in divs):
+            continue  # most cases: huge denominators; the rest: whatever comes
+        name = 'tuplets-%02d' % k
+        inputs[name] = text
+        for tr in (0, r.choice([2, -3, 7])):
+            jobs.append((text, name, tempo, r.choice([0, 24, 40]), tr, 'Audit', False))
+        k += 1
+    cases = pool.map(run_case, jobs)
+    sjobs = [(inputs[n], n + '|' + str(tr), tr) for n in inputs if n != 'belle' for tr in (0, 2)][:20]
+    scores = dict(pool.map(run_score, sjobs))
+    out = {'numeric': audit_numeric(), 'inputs': inputs, 'cases': cases, 'scores': scores}
+    with open(os.path.join(FIX, '13-midi-audit.json'), 'w', encoding='utf-8') as f:
+        json.dump(out, f)
+    print('audit', len(cases), 'cases', sum(1 for c in cases if 'error' in c), 'errors', file=sys.stderr)
+
+
 if __name__ == '__main__':
+    if A.audit:
+        with Pool(A.jobs) as pool:
+            run_audit(pool)
+        sys.exit(0)
     with Pool(A.jobs) as pool:
         if not A.no_pages:
             run_pages(pool)

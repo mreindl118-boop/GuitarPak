@@ -15,18 +15,66 @@
   var OMR = G.OMR = G.OMR || {};
 
   // ---- Python builtins ----
-  // round(): half to even ("banker's"), like Python 3 and np.round
-  function pyRound(x, nd) {
-    if (nd) { var f = Math.pow(10, nd); return pyRound(x * f) / f; }
+  // Python's exceptions, so `except ValueError` style handling (and the engine's per-page
+  // skip on any exception) sees what Python would raise
+  function pyError(type, msg) { var e = new Error(msg); e.name = type; e.pyType = type; return e; }
+  // int(float) / round(float) refuse NaN and infinities
+  function checkFinite(x) {
+    if (x !== x) throw pyError('ValueError', 'cannot convert float NaN to integer');
+    if (x === Infinity || x === -Infinity) throw pyError('OverflowError', 'cannot convert float infinity to integer');
+  }
+  // half to even, no checks (also numpy's rint)
+  function rint(x) {
     var r = Math.round(x);
     if (Math.abs(x % 1) === 0.5 && r % 2 !== 0) r -= 1;
     return r;
   }
-  // int(): truncate toward zero (also numpy astype(int))
-  function pyInt(x) { return Math.trunc(x); }
-  // a // b floors; a % b takes the divisor's sign
-  function floorDiv(a, b) { return Math.floor(a / b); }
-  function mod(a, b) { var m = a % b; return (m !== 0 && (m < 0) !== (b < 0)) ? m + b : m; }
+  // round(x): half to even ("banker's") -> int, like Python 3 (also for numpy floats, whose
+  // __round__ gives an int too). NaN raises ValueError, infinities OverflowError.
+  // round(x, nd): Python's float.__round__, correctly rounded from the exact binary value
+  // (round(2.675, 2) == 2.67); numpy's np.round(x, nd) multiplies, rints and divides instead
+  // (2.68): that is OMR.np.round.
+  function pyRound(x, nd) {
+    if (nd === undefined || nd === null) { checkFinite(x); return rint(x); }
+    if (x !== x || x === Infinity || x === -Infinity || x === 0) return x;
+    if (nd > 323) return x;
+    if (nd < -308) return 0 * x;
+    // x = m * 2^e exactly; x * 10^nd = N / D; round N / D half to even, then parse q * 10^-nd
+    var neg = x < 0, ax = Math.abs(x), e = 0, m;
+    while (!Number.isInteger(ax)) { ax *= 2; e--; } // exact: doubling never rounds
+    m = BigInt(ax);
+    var N = m * (nd > 0 ? 10n ** BigInt(nd) : 1n), D = (e < 0 ? 2n ** BigInt(-e) : 1n) * (nd < 0 ? 10n ** BigInt(-nd) : 1n);
+    var q = N / D, r2 = (N - q * D) * 2n;
+    if (r2 > D || (r2 === D && q % 2n === 1n)) q += 1n;
+    var v = Number(q.toString() + 'e' + (-nd));
+    return neg ? -v : v;
+  }
+  // int(): truncate toward zero; NaN raises ValueError, infinities OverflowError like Python.
+  // numpy's astype(int) does not raise: use OMR.np.astype / OMR.np.castInt32 for that.
+  function pyInt(x) { checkFinite(x); return Math.trunc(x); }
+  // a // b and a % b (CPython's float_divmod; exact for ints too): // floors, % takes the
+  // divisor's sign. Math.floor(a / b) is not the same for fractional divisors:
+  // 1 // 0.1 == 9.0 in Python (a / b rounds up to 10). Division by zero raises.
+  function divmod(a, b) {
+    if (b === 0) throw pyError('ZeroDivisionError', 'float divmod()');
+    var m = a % b, div = (a - m) / b, fl;
+    if (m) {
+      if ((b < 0) !== (m < 0)) { m += b; div -= 1.0; }
+    } else m = b < 0 ? -0 : 0; // copysign(0.0, b)
+    if (div) {
+      fl = Math.floor(div);
+      if (div - fl > 0.5) fl += 1.0;
+    } else fl = (a / b < 0 || Object.is(a / b, -0)) ? -0 : 0; // copysign(0.0, a / b)
+    return [fl, m];
+  }
+  function floorDiv(a, b) {
+    if (b === 0) throw pyError('ZeroDivisionError', 'float floor division by zero');
+    return divmod(a, b)[0];
+  }
+  function mod(a, b) {
+    if (b === 0) throw pyError('ZeroDivisionError', 'float modulo');
+    return divmod(a, b)[1];
+  }
   // sorted(arr, key=, reverse=): stable; reverse=True keeps the ORIGINAL order of ties
   // (Python sorts by key descending while preserving input order among equals)
   function sorted(arr, key, reverse) {
@@ -53,15 +101,19 @@
   function maxBy(arr, key) {
     var best = null, bk;
     for (var i = 0; i < arr.length; i++) { var k = key ? key(arr[i]) : arr[i]; if (i === 0 || cmp(k, bk) > 0) { best = arr[i]; bk = k; } }
-    if (!arr.length) throw new Error('max() arg is an empty sequence');
+    if (!arr.length) throw pyError('ValueError', 'max() arg is an empty sequence');
     return best;
   }
   function minBy(arr, key) {
     var best = null, bk;
     for (var i = 0; i < arr.length; i++) { var k = key ? key(arr[i]) : arr[i]; if (i === 0 || cmp(k, bk) < 0) { best = arr[i]; bk = k; } }
-    if (!arr.length) throw new Error('min() arg is an empty sequence');
+    if (!arr.length) throw pyError('ValueError', 'min() arg is an empty sequence');
     return best;
   }
+  // max(a, b) / min(a, b) with two arguments: the first wins unless the second compares
+  // greater / smaller, so a NaN second argument loses (Math.max / Math.min return NaN)
+  function max2(a, b) { return b > a ? b : a; }
+  function min2(a, b) { return b < a ? b : a; }
   function range(a, b, s) {
     if (b === undefined) { b = a; a = 0; }
     s = s || 1;
@@ -87,7 +139,7 @@
     if (typeof v === 'boolean') return v ? 'True' : 'False';
     return String(v);
   }
-  OMR.py = { round: pyRound, int: pyInt, floorDiv: floorDiv, mod: mod, sorted: sorted, cmp: cmp, max: maxBy, min: minBy, range: range, contains: contains, repr: repr };
+  OMR.py = { round: pyRound, int: pyInt, floorDiv: floorDiv, mod: mod, divmod: divmod, sorted: sorted, cmp: cmp, max: maxBy, min: minBy, max2: max2, min2: min2, range: range, contains: contains, repr: repr, error: pyError };
 
   // ---- numpy reductions over plain arrays / typed arrays ----
   function toArr(a) { return Array.isArray(a) ? a : Array.prototype.slice.call(a); }
@@ -140,11 +192,15 @@
     if (!a.length) return NaN;
     return isF32(a) ? f32(sum(a) / a.length) : sum(a) / a.length;
   }
-  // np.median: mean of the two middle values for an even count
+  function hasNaN(a) { for (var i = 0; i < a.length; i++) if (a[i] !== a[i]) return true; return false; }
+  // np.median: the middle value, or np.mean of the two middle values for an even count
+  // (a Float32Array gives numpy's float32 mean: (a + b) rounded to float32, then / 2);
+  // any NaN gives NaN, an empty input NaN (numpy warns)
   function median(a) {
-    if (!a.length) return NaN;
+    if (!a.length || hasNaN(a)) return NaN;
     var s = toArr(a).slice().sort(function (x, y) { return x - y; }), n = s.length, h = n >> 1;
-    return n % 2 ? s[h] : (s[h - 1] + s[h]) / 2;
+    if (n % 2) return s[h];
+    return isF32(a) ? f32(f32(s[h - 1] + s[h]) / 2) : (s[h - 1] + s[h]) / 2;
   }
   // np.std: population standard deviation (ddof=0), sqrt(sum(|x - mean|^2) / n) like numpy's
   // _var (pairwise sums; a Float32Array stays in float32 throughout)
@@ -153,15 +209,27 @@
     for (var i = 0; i < a.length; i++) { var x = single ? f32(a[i] - m) : a[i] - m; d[i] = x * x; }
     return single ? f32(Math.sqrt(f32(sum(d) / a.length))) : Math.sqrt(sum(d) / a.length);
   }
-  // np.percentile, default 'linear' method: virtual index (n - 1) * (q / 100), numpy's _lerp
-  // (which interpolates from the upper neighbour when the weight is >= 0.5)
+  // np.percentile(a, q), default 'linear' method: virtual index (n - 1) * (q / 100) and numpy's
+  // _lerp (which interpolates from the upper neighbour when the weight is >= 0.5). q is a
+  // Python number (numpy's weak_q path): the index and the weight gamma are float64, then gamma
+  // becomes a Python float, so for a Float32Array the lerp runs in float32 with float32(gamma)
+  // and float32(1 - gamma) (numpy 2.4 _quantile / _lerp). Any NaN gives NaN; q outside
+  // [0, 100] raises ValueError and an empty input IndexError, like numpy.
   function percentile(a, q) {
-    var s = toArr(a).slice().sort(function (x, y) { return x - y; }), n = s.length;
-    if (!n) return NaN;
+    var n = a.length;
+    if (!(q >= 0 && q <= 100)) throw pyError('ValueError', 'Percentiles must be in the range [0, 100]');
+    if (!n) throw pyError('IndexError', 'index -1 is out of bounds for axis 0 with size 0');
+    if (hasNaN(a)) return NaN;
+    var s = toArr(a).slice().sort(function (x, y) { return x - y; });
     var v = (n - 1) * (q / 100);
     if (v >= n - 1) return s[n - 1];
     if (v < 0) return s[0];
-    var lo = Math.floor(v), g = v - lo, x0 = s[lo], x1 = s[lo + 1], d = x1 - x0;
+    var lo = Math.floor(v), g = v - lo, x0 = s[lo], x1 = s[lo + 1];
+    if (isF32(a)) {
+      var d32 = f32(x1 - x0);
+      return g >= 0.5 ? f32(x1 - f32(d32 * f32(1 - g))) : f32(x0 + f32(d32 * f32(g)));
+    }
+    var d = x1 - x0;
     return g >= 0.5 ? x1 - d * (1 - g) : x0 + d * g;
   }
   // np.argmax / np.argmin: first occurrence; NaN wins like numpy
@@ -170,7 +238,73 @@
   function diff(a) { var out = []; for (var i = 1; i < a.length; i++) out.push(a[i] - a[i - 1]); return out; }
   function argsort(a) { return range(a.length).sort(function (i, j) { return a[i] - a[j] || i - j; }); }
   function clip(x, lo, hi) { return x < lo ? lo : x > hi ? hi : x; }
-  function linspace(a, b, n) { var out = []; for (var i = 0; i < n; i++) out.push(n === 1 ? a : a + (b - a) * i / (n - 1)); return out; }
+  // np.linspace(start, stop, num): i * step + start with step = (stop - start) / (num - 1),
+  // the last value set to stop exactly (numpy's formula; (stop - start) * i / (num - 1)
+  // rounds differently). A zero step uses i / div * delta like numpy.
+  function linspace(a, b, n) {
+    var out = [], div = n - 1, delta = b - a, step = div > 0 ? delta / div : NaN, i;
+    for (i = 0; i < n; i++) {
+      if (div > 0 && step === 0) out.push(i / div * delta + a);
+      else out.push(div > 0 ? i * step + a : i * delta + a); // num == 1: [start] (step is delta)
+    }
+    if (n > 1) out[n - 1] = b;
+    return out;
+  }
+  // ---- tan(x), correctly rounded ----
+  // homr calls np.tan (numpy 2.4 on AVX-512 runs Intel SVML) and math.tan (glibc). V8's Math.tan
+  // is 1 ulp off the correctly rounded value for ~3% of homr's box angles, SVML for ~0.4% and
+  // glibc for ~0.2% (measured against an exact decimal tan), so a correctly rounded tan is the
+  // closest stand-in for both: sin and cos as double-double Taylor series, one rounding at the
+  // end. |x| <= 1.6 (angles within +-91 degrees; homr's boxes are within +-45) - beyond that
+  // Math.tan.
+  function twoSum(a, b) { var s = a + b, bb = s - a; return [s, (a - (s - bb)) + (b - bb)]; }
+  function quickTwoSum(a, b) { var s = a + b; return [s, b - (s - a)]; }
+  function splitD(a) { var c = 134217729 * a, hi = c - (c - a); return [hi, a - hi]; }
+  function twoProd(a, b) {
+    var p = a * b, A = splitD(a), B = splitD(b);
+    return [p, ((A[0] * B[0] - p) + A[0] * B[1] + A[1] * B[0]) + A[1] * B[1]];
+  }
+  function ddAdd(a, b) {
+    var s = twoSum(a[0], b[0]), t = twoSum(a[1], b[1]), r = quickTwoSum(s[0], s[1] + t[0]);
+    return quickTwoSum(r[0], t[1] + r[1]);
+  }
+  function ddMul(a, b) { var p = twoProd(a[0], b[0]); return quickTwoSum(p[0], p[1] + (a[0] * b[1] + a[1] * b[0])); }
+  function ddDivD(a, d) {
+    var q1 = a[0] / d, p = twoProd(q1, d), s = twoSum(a[0], -p[0]);
+    return quickTwoSum(q1, ((s[0] + ((s[1] - p[1]) + a[1]))) / d);
+  }
+  function ddDiv(a, b) {
+    var q1 = a[0] / b[0], r = ddAdd(a, ddMul([-q1, 0], b));
+    var q2 = r[0] / b[0];
+    r = ddAdd(r, ddMul([-q2, 0], b));
+    return ddAdd(quickTwoSum(q1, q2), [r[0] / b[0], 0]);
+  }
+  var tanMemo = [NaN, NaN]; // staff detection extrapolates one fragment angle at many x
+  function crTan(x) {
+    if (x === tanMemo[0]) return tanMemo[1];
+    if (!(Math.abs(x) <= 1.6) || x === 0) return Math.tan(x);
+    var x2 = twoProd(x, x), s = [x, 0], c = [1, 0], ts = [x, 0], tc = [1, 0];
+    for (var n = 1; n < 40; n++) {
+      ts = ddDivD(ddMul(ts, x2), -(2 * n) * (2 * n + 1));
+      tc = ddDivD(ddMul(tc, x2), -(2 * n - 1) * (2 * n));
+      s = ddAdd(s, ts);
+      c = ddAdd(c, tc);
+      if (Math.abs(ts[0]) < 1e-36 && Math.abs(tc[0]) < 1e-36) break;
+    }
+    var t = ddDiv(s, c), r = t[0] + t[1];
+    tanMemo[0] = x; tanMemo[1] = r;
+    return r;
+  }
+
+  // np.round(x, decimals=0) on a float: x * 10^d, rint, / 10^d (decimals < 0: / 10^-d, rint,
+  // * 10^-d). Not Python's correctly rounded round(x, nd) (OMR.py.round).
+  function npRound(x, d) {
+    d = d || 0;
+    if (d === 0) return rint(x);
+    if (d > 0) { var f = Math.pow(10, d); return rint(x * f) / f; }
+    var g = Math.pow(10, -d);
+    return rint(x / g) * g;
+  }
 
   // ---- np.argsort's default (kind='quicksort') as numpy 2.4 runs it on x86-64 with AVX-512 ----
   // numpy hands 32/64-bit argsorts to Intel's x86-simd-sort (BSD-3-Clause): bitonic sorting
@@ -286,11 +420,112 @@
     reduceMm(mm, st);
     return lStore;
   }
+  // ---- std::sort as libstdc++ (GCC, numpy's wheels) implements it: introsort with a
+  // median-of-3 pivot and an unguarded partition, heapsort past 2*lg(n) levels, then one
+  // insertion sort pass over runs of <= 16. Not stable: the order of equal keys comes out of
+  // these exact moves. x86-simd-sort's std_argsort / std_argsort_withnan call it on the index
+  // array with less(i, j) = arr[i] < arr[j] (NaN-aware for the latter). ----
+  var S_THRESHOLD = 16;
+  function stdSort(a, first, last, less) {
+    if (first === last) return;
+    introsortLoop(a, first, last, 2 * Math.floor(Math.log2(last - first)), less);
+    finalInsertionSort(a, first, last, less);
+  }
+  function introsortLoop(a, first, last, depthLimit, less) {
+    while (last - first > S_THRESHOLD) {
+      if (depthLimit === 0) { heapSort(a, first, last, less); return; } // __partial_sort(first, last, last)
+      --depthLimit;
+      var cut = unguardedPartitionPivot(a, first, last, less);
+      introsortLoop(a, cut, last, depthLimit, less);
+      last = cut;
+    }
+  }
+  function swap(a, i, j) { var t = a[i]; a[i] = a[j]; a[j] = t; }
+  function moveMedianToFirst(a, result, x, y, z, less) {
+    if (less(a[x], a[y])) {
+      if (less(a[y], a[z])) swap(a, result, y);
+      else if (less(a[x], a[z])) swap(a, result, z);
+      else swap(a, result, x);
+    } else if (less(a[x], a[z])) swap(a, result, x);
+    else if (less(a[y], a[z])) swap(a, result, z);
+    else swap(a, result, y);
+  }
+  function unguardedPartitionPivot(a, first, last, less) {
+    var mid = first + ((last - first) >> 1);
+    moveMedianToFirst(a, first, first + 1, mid, last - 1, less);
+    // __unguarded_partition(first + 1, last, pivot = first)
+    var lo = first + 1, hi = last, pv = a[first];
+    for (;;) {
+      while (less(a[lo], pv)) ++lo;
+      --hi;
+      while (less(pv, a[hi])) --hi;
+      if (!(lo < hi)) return lo;
+      swap(a, lo, hi);
+      ++lo;
+    }
+  }
+  function finalInsertionSort(a, first, last, less) {
+    if (last - first > S_THRESHOLD) {
+      insertionSort(a, first, first + S_THRESHOLD, less);
+      for (var i = first + S_THRESHOLD; i < last; i++) unguardedLinearInsert(a, i, less);
+    } else insertionSort(a, first, last, less);
+  }
+  function insertionSort(a, first, last, less) {
+    if (first === last) return;
+    for (var i = first + 1; i < last; i++) {
+      if (less(a[i], a[first])) {
+        var v = a[i];
+        for (var k = i; k > first; k--) a[k] = a[k - 1]; // move_backward
+        a[first] = v;
+      } else unguardedLinearInsert(a, i, less);
+    }
+  }
+  function unguardedLinearInsert(a, last, less) {
+    var v = a[last], next = last - 1;
+    while (less(v, a[next])) { a[last] = a[next]; last = next; --next; }
+    a[last] = v;
+  }
+  // __make_heap + __sort_heap (std::__adjust_heap / __push_heap)
+  function adjustHeap(a, first, hole, len, value, less) {
+    var top = hole, child = hole;
+    while (child < ((len - 1) >> 1)) {
+      child = 2 * (child + 1);
+      if (less(a[first + child], a[first + child - 1])) child--;
+      a[first + hole] = a[first + child];
+      hole = child;
+    }
+    if ((len & 1) === 0 && child === ((len - 2) >> 1)) {
+      child = 2 * (child + 1);
+      a[first + hole] = a[first + child - 1];
+      hole = child - 1;
+    }
+    var parent = (hole - 1) / 2 | 0;
+    while (hole > top && less(a[first + parent], value)) {
+      a[first + hole] = a[first + parent];
+      hole = parent;
+      parent = (hole - 1) / 2 | 0;
+    }
+    a[first + hole] = value;
+  }
+  function heapSort(a, first, last, less) {
+    var len = last - first, parent;
+    if (len >= 2) {
+      for (parent = (len - 2) >> 1; ; parent--) {
+        adjustHeap(a, first, parent, len, a[first + parent], less);
+        if (parent === 0) break;
+      }
+    }
+    while (last - first > 1) {
+      --last;
+      var v = a[last];
+      a[last] = a[first];
+      adjustHeap(a, first, 0, last - first, v, less);
+    }
+  }
   function argsortRec(arr, arg, left, right, maxIters) {
     if (maxIters <= 0) {
-      // std::sort fallback (introsort) is not ported: a stable sort of the slice instead
-      var part = arg.slice(left, right + 1).sort(function (a, b) { return arr[a] - arr[b] || 0; });
-      for (var q = 0; q < part.length; q++) arg[left + q] = part[q];
+      // quicksort is not making progress (e.g. many equal keys): std_argsort = std::sort
+      stdSort(arg, left, right + 1, function (i, j) { return arr[i] < arr[j]; });
       return;
     }
     if (right + 1 - left <= 256) { argsortN(arr, arg, left, right + 1 - left); return; }
@@ -306,7 +541,17 @@
   function argsortQuick(values) {
     var n = values.length, arg = range(n), i;
     if (n <= 1) return arg;
-    for (i = 0; i < n; i++) if (values[i] !== values[i]) return argsort(values); // NaN: numpy takes std::sort (not ported)
+    // NaN anywhere: std_argsort_withnan = std::sort with NaN after every number
+    for (i = 0; i < n; i++) {
+      if (values[i] !== values[i]) {
+        stdSort(arg, 0, n, function (p, q) {
+          var x = values[p], y = values[q];
+          if (x === x && y === y) return x < y;
+          return x === x; // (isnan(x) ? false : true)
+        });
+        return arg;
+      }
+    }
     // early exit for already sorted arrays
     var isSorted = true;
     for (i = 1; i < n; i++) if (values[i] < values[i - 1]) { isSorted = false; break; }
@@ -362,13 +607,35 @@
   function fullLike(img, value, dtype) { var im = zerosLike(img, dtype); im.data.fill(value); return im; }
   // img.copy()
   function clone(img) { return { h: img.h, w: img.w, c: img.c, data: img.data.slice() }; }
-  // .astype(dtype): numpy's C casts. Float -> int truncates toward zero and integers wrap
-  // modulo 2^bits, which is exactly what typed-array assignment does (also for
-  // np.uint8(-1.5) = 255). Float64 -> float32 rounds to nearest.
+  // numpy's float -> int casts as the x86-64 wheel runs them (astype and setitem alike): to
+  // int8/uint8/int16/uint16/int32 the value is truncated to int32 first (cvttsd2si), where NaN,
+  // +-inf and anything outside int32 become INT_MIN, then wraps to the width; so
+  // np.uint8(-1.5) = 255, np.int32(nan) = -2147483648, np.uint8(1e10 + 5) = 0 (a typed array
+  // would give 0, 0 and 5). uint32 goes through int64 (what numpy's scalar loop does; its
+  // vectorised loop disagrees for values outside [0, 2^32), which homr never casts).
+  // Integer sources are always inside int32 here and just wrap, like typed arrays do.
+  var INT_MIN = -2147483648;
+  function castInt32(v) {
+    if (v !== v) return INT_MIN;
+    var t = Math.trunc(v);
+    return t < -2147483648 || t > 2147483647 ? INT_MIN : t;
+  }
+  function castInt64Low32(v) {
+    if (v !== v) return 0;
+    var t = Math.trunc(v);
+    return t < -9223372036854775808 || t >= 9223372036854775808 ? 0 : t; // INT64_MIN: low 32 bits 0
+  }
+  function isFloatData(d) { return Array.isArray(d) || d instanceof Float32Array || d instanceof Float64Array; }
+  function castInto(out, i, v, floatSrc) {
+    if (!floatSrc) out[i] = v;
+    else if (out instanceof Uint32Array) out[i] = castInt64Low32(v);
+    else out[i] = castInt32(v);
+  }
+  // .astype(dtype): numpy's C casts (above). Float64 -> float32 rounds to nearest.
   function astype(img, dtype) {
-    var C = ctorOf(dtype), out = new C(img.data.length), src = img.data;
+    var C = ctorOf(dtype), out = new C(img.data.length), src = img.data, fs = isFloatData(src);
     if (C === Float32Array || C === Float64Array) out.set(src);
-    else for (var i = 0; i < src.length; i++) { var v = src[i]; out[i] = v !== v ? 0 : v; }
+    else for (var i = 0; i < src.length; i++) castInto(out, i, src[i], fs);
     return { h: img.h, w: img.w, c: img.c, data: out };
   }
   // numpy slice bounds: None -> default, negatives count from the end, then clamp
@@ -401,10 +668,11 @@
       if (src.h !== h || src.w !== w || src.c !== c) {
         throw new Error('OMR.np.assign: could not broadcast ' + shape(src) + ' into ' + [h, w, c]);
       }
+      var toInt = !(d instanceof Float32Array || d instanceof Float64Array), fs = isFloatData(src.data);
       for (var y = 0; y < h; y++) {
         var s = y * w * c, t = ((ys[0] + y) * img.w + xs[0]) * c;
-        if (src.data.constructor === d.constructor) d.set(src.data.subarray(s, s + w * c), t);
-        else for (var i = 0; i < w * c; i++) { var v = src.data[s + i]; d[t + i] = v !== v ? 0 : v; }
+        if (src.data.constructor === d.constructor || !toInt) d.set(src.data.subarray(s, s + w * c), t);
+        else for (var i = 0; i < w * c; i++) castInto(d, t + i, src.data[s + i], fs);
       }
       return img;
     }
@@ -453,20 +721,22 @@
   function ge(img, v) { return map(img, function (x) { return x >= v ? 1 : 0; }, 'uint8'); }
   function lt(img, v) { return map(img, function (x) { return x < v ? 1 : 0; }, 'uint8'); }
   function eq(img, v) { return map(img, function (x) { return x === v ? 1 : 0; }, 'uint8'); }
-  function and(a, b) { return map2(a, b, function (x, y) { return x && y ? 1 : 0; }, 'uint8'); }
-  function or(a, b) { return map2(a, b, function (x, y) { return x || y ? 1 : 0; }, 'uint8'); }
+  // truthiness like numpy's bool(): any non-zero value is True, NaN included (JS treats NaN as
+  // falsy, so these compare with 0 instead)
+  function and(a, b) { return map2(a, b, function (x, y) { return x !== 0 && y !== 0 ? 1 : 0; }, 'uint8'); }
+  function or(a, b) { return map2(a, b, function (x, y) { return x !== 0 || y !== 0 ? 1 : 0; }, 'uint8'); }
   // np.where(mask, a, b) with images or scalars for a / b
   function where(mask, a, b, dtype) {
     var C = ctorOf(dtype || (isImage(a) ? dtypeOf(a) : isImage(b) ? dtypeOf(b) : 'float64'));
     var n = mask.data.length, out = new C(n);
-    for (var i = 0; i < n; i++) out[i] = mask.data[i] ? (isImage(a) ? a.data[i] : a) : (isImage(b) ? b.data[i] : b);
+    for (var i = 0; i < n; i++) out[i] = mask.data[i] !== 0 ? (isImage(a) ? a.data[i] : a) : (isImage(b) ? b.data[i] : b);
     return { h: mask.h, w: mask.w, c: mask.c, data: out };
   }
-  function countNonZero(img) { var n = 0, d = img.data; for (var i = 0; i < d.length; i++) if (d[i]) n++; return n; }
+  function countNonZero(img) { var n = 0, d = img.data; for (var i = 0; i < d.length; i++) if (d[i] !== 0) n++; return n; }
   // np.nonzero / np.where(cond) for a 2-D image: [ys, xs] in row-major order
   function nonzero(img) {
     var ys = [], xs = [], d = img.data, w = img.w;
-    for (var i = 0; i < d.length; i++) if (d[i]) { ys.push((i / w) | 0); xs.push(i % w); }
+    for (var i = 0; i < d.length; i++) if (d[i] !== 0) { ys.push((i / w) | 0); xs.push(i % w); }
     return [Int32Array.from(ys), Int32Array.from(xs)];
   }
   // sum over one axis of a single-channel image: axis 0 = per column, 1 = per row
@@ -512,7 +782,8 @@
 
   OMR.np = {
     sum: sum, mean: mean, median: median, std: std, percentile: percentile, argmax: argmax, argmin: argmin,
-    diff: diff, argsort: argsort, argsortQuick: argsortQuick, clip: clip, linspace: linspace, pairwiseSum: function (a) { return sum(a); },
+    diff: diff, argsort: argsort, argsortQuick: argsortQuick, clip: clip, linspace: linspace, round: npRound, rint: rint, tan: crTan, pairwiseSum: function (a) { return sum(a); },
+    castInt32: castInt32,
     // image type
     CTORS: CTORS, dtypeOf: dtypeOf, ctorOf: ctorOf, image: image, isImage: isImage, shape: shape, ndim: ndim, size: size,
     zeros: zeros, ones: ones, full: full, zerosLike: zerosLike, fullLike: fullLike, clone: clone, astype: astype,

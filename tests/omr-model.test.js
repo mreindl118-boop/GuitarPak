@@ -39,10 +39,123 @@ function fromState(s) {
   return new bbx.RotatedBoundingBox([[r[0][0], r[0][1]], [r[1][0], r[1][1]], r[2]], new Int32Array(0), s.debug_id);
 }
 
+// ---- audit: edge cases the page fixtures never reach, each one a divergence the port once
+// had (tools/omr/dump_audit.py -> FIXTURES/<page>/23-audit.json: Python's results, NaN / inf as
+// strings, a call that raised as {raises: type}) ----
+function dec(v) {
+  if (v === 'nan') return NaN;
+  if (v === 'inf') return Infinity;
+  if (v === '-inf') return -Infinity;
+  if (Array.isArray(v)) return v.map(dec);
+  if (v && typeof v === 'object' && !('raises' in v)) { const o = {}; for (const k of Object.keys(v)) o[k] = dec(v[k]); return o; }
+  return v;
+}
+// run a call like dump_audit.py's call(): its value, or {raises: Python type name}
+function res(f) {
+  try { return f(); } catch (e) { return { raises: e && e.name === 'cv2.error' ? 'error' : (e && e.name) || String(e) }; }
+}
+// deep equality with NaN == NaN (typed arrays compare as arrays)
+function eqv(a, b) {
+  if (ArrayBuffer.isView(a)) a = Array.from(a);
+  if (ArrayBuffer.isView(b)) b = Array.from(b);
+  if (Array.isArray(a) || Array.isArray(b)) return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((x, i) => eqv(x, b[i]));
+  if (a && typeof a === 'object' && b && typeof b === 'object') return Object.keys(b).every((k) => eqv(a[k], b[k])) && Object.keys(a).length === Object.keys(b).length;
+  return (a !== a && b !== b) || a === b;
+}
+function audit() {
+  const pages = H.pages().filter((p) => H.has(p, '23-audit.json'));
+  if (!pages.length) { H.skip('audit: no 23-audit.json fixtures (run tools/omr/dump_audit.py)'); return; }
+  const show = (v) => JSON.stringify(v, (k, x) => (typeof x === 'number' && !isFinite(x) ? String(x) : x)).slice(0, 100);
+  let tanN = 0, tanNp = 0, tanMath = 0, v8Np = 0;
+  for (const page of pages) {
+    const d = H.readJson(H.fix(page, '23-audit.json'));
+    const tally = {};
+    const check = (group, cond, what) => {
+      const t = tally[group] = tally[group] || { n: 0, bad: 0, why: [] };
+      t.n++;
+      if (!cond) { t.bad++; if (t.why.length < 3) t.why.push(what); }
+    };
+    // np.argsort tie order: numpy 2.4's x86-simd-sort incl. its std::sort fallback and NaN path
+    for (const c of d.argsort) {
+      const a = dec(c.a), got = np.argsortQuick(a);
+      check('argsort', eqv(got, c.order), 'n=' + a.length + ' differs at ' + got.findIndex((v, i) => v !== c.order[i]));
+    }
+    for (const c of d.find_peaks) {
+      const got = OMR.find_peaks.findPeaks(Float64Array.from(c.x), { height: c.height, distance: c.distance, prominence: c.prominence })[0];
+      check('find_peaks', eqv(got, c.peaks), got.length + ' peaks vs ' + c.peaks.length);
+    }
+    // Python builtins: round / int raise on NaN and inf; round(x, nd); // and % on floats
+    for (const [v, want] of d.round) check('py', eqv(res(() => py.round(dec(v))), dec(want)), 'round(' + v + ') ' + show(res(() => py.round(dec(v)))) + ' vs ' + show(want));
+    for (const [v, want] of d.int) check('py', eqv(res(() => py.int(dec(v))), dec(want)), 'int(' + v + ') ' + show(res(() => py.int(dec(v)))) + ' vs ' + show(want));
+    for (const [x, nd, pyr, npr] of d.round_nd) {
+      check('py', py.round(x, nd) === pyr, 'round(' + x + ', ' + nd + ') ' + py.round(x, nd) + ' vs ' + pyr);
+      check('np', np.round(x, nd) === npr, 'np.round(' + x + ', ' + nd + ') ' + np.round(x, nd) + ' vs ' + npr);
+    }
+    for (const [a, b, fd, md] of d.floordiv) {
+      const g1 = res(() => py.floorDiv(a, b)), g2 = res(() => py.mod(a, b));
+      check('py', eqv(g1, dec(fd)) && eqv(g2, dec(md)), a + ' // ' + b + ' = ' + show(g1) + ', % = ' + show(g2) + ' vs ' + show(fd) + ', ' + show(md));
+    }
+    // numpy: median / percentile (float32 stays float32, NaN, empty), linspace, casts, NaN masks
+    for (const c of d.median) {
+      const v = dec(c.v), a64 = Float64Array.from(v), a32 = Float32Array.from(v);
+      const got = { median64: res(() => np.median(a64)), median32: res(() => np.median(a32)), pct64: res(() => np.percentile(a64, c.q)), pct32: res(() => np.percentile(a32, c.q)) };
+      for (const k of Object.keys(got)) check('np', eqv(got[k], dec(c[k])), k + ' n=' + v.length + ' q=' + c.q + ' ' + show(got[k]) + ' vs ' + show(c[k]));
+    }
+    for (const [a, b, n, want] of d.linspace) check('np', eqv(np.linspace(a, b, n), want), 'linspace(' + [a, b, n] + ')');
+    const vals = dec(d.casts.vals);
+    for (const key of Object.keys(d.casts)) {
+      if (key === 'vals') continue;
+      const [dt, rest] = key.split('<'), src = rest.split(' ')[0], C = src === 'float32' ? Float32Array : Float64Array;
+      const im = np.image(1, vals.length, 1, C.from(vals));
+      const got = rest.endsWith('setitem') ? np.assign(np.zeros([1, vals.length], dt), 0, 1, 0, vals.length, im).data : np.astype(im, dt).data;
+      const bad = Array.from(got).findIndex((v, i) => v !== d.casts[key][i]);
+      check('np casts', bad < 0, key + ' at ' + vals[bad] + ': ' + got[bad] + ' vs ' + d.casts[key][bad]);
+    }
+    const mk = d.masks, ma = np.image(2, 4, 1, Float64Array.from(dec(mk.a).flat())), mb = np.image(2, 4, 1, Float64Array.from(dec(mk.b).flat()));
+    check('np masks', np.countNonZero(ma) === mk.count_nonzero, 'count_nonzero ' + np.countNonZero(ma));
+    check('np masks', eqv(np.nonzero(ma), mk.nonzero), 'nonzero ' + show(np.nonzero(ma).map((x) => Array.from(x))));
+    check('np masks', eqv(np.and(ma, mb).data, mk.and.flat()) && eqv(np.or(ma, mb).data, mk.or.flat()), 'logical_and / logical_or');
+    check('np masks', eqv(np.where(ma, 7, -1).data, mk.where.flat()), 'where');
+    // tan: OMR.np.tan is correctly rounded; numpy (SVML) and glibc are not always
+    for (const [ang, npT, crN, mT, crM] of d.tan) {
+      const tn = np.tan(ang / 180 * Math.PI), tm = np.tan(ang * Math.PI / 180.0);
+      check('tan', tn === crN && tm === crM, 'tan(' + ang + ' deg) ' + tn + ' vs correctly rounded ' + crN);
+      tanN++; if (tn === npT) tanNp++; if (tm === mT) tanMath++; if (Math.tan(ang / 180 * Math.PI) === npT) v8Np++;
+    }
+    // homr functions on NaN / zero sizes: Python's min / max, int() / round() raising
+    const img = np.image(10, 10, 1, Uint8Array.from({ length: 100 }, (_, i) => i));
+    for (const [c, want] of d.crop) {
+      const got = res(() => np.shape(OMR.image_utils.cropImage(img, ...dec(c))));
+      check('homr NaN', eqv(got, want), 'crop_image(' + show(c) + ') ' + show(got) + ' vs ' + show(want));
+    }
+    const e = new Int32Array(0), boxes = dec(d.touch.boxes);
+    for (const [i, j, want] of d.touch.pairs) {
+      const got = res(() => new bbx.RotatedBoundingBox(boxes[i], e)._canShapesPossiblyTouch(new bbx.RotatedBoundingBox(boxes[j], e)));
+      check('homr NaN', eqv(got, want), '_can_shapes_possibly_touch ' + i + '/' + j + ' ' + show(got) + ' vs ' + show(want));
+    }
+    for (const [w, h, want] of d.ensure_min_dimension) {
+      const got = res(() => new bbx.RotatedBoundingBox(boxes[0], e).ensureMinDimension(dec(w), dec(h)).box[1]);
+      check('homr NaN', eqv(got, dec(want)), 'ensure_min_dimension(' + w + ', ' + h + ') ' + show(got) + ' vs ' + show(want));
+    }
+    const sp = new M.StaffPoint(10, [10, 10, 10, 10, 10], 0);
+    const pos = [[10, 12], [10, 10]].map((c) => res(() => sp.findPositionInUnitSizes(new bbx.RotatedBoundingBox([c, [4, 4], 0], e))));
+    check('homr NaN', eqv(pos, d.position_zero_unit), 'find_position_in_unit_sizes with unit size 0: ' + show(pos) + ' vs ' + show(d.position_zero_unit));
+    const sOk = new M.Staff([0, 10].map((x) => new M.StaffPoint(x, [10, 20, 30, 40, 50], 0)));
+    const sNan = new M.Staff([NaN, 10].map((x) => new M.StaffPoint(x, [110, 120, 130, 140, 150], 0)));
+    const mg = res(() => sOk.merge(sNan).grid.length);
+    check('homr NaN', eqv(mg, d.staff_merge_nan), 'Staff.merge with a NaN x: ' + show(mg) + ' vs ' + show(d.staff_merge_nan));
+    for (const [g, t] of Object.entries(tally)) H.ok(!t.bad, page + ' audit ' + g + ': ' + (t.n - t.bad) + '/' + t.n + ' as Python' + (t.bad ? ' -- ' + t.why.join(' | ') : ''));
+  }
+  // not a parity check (numpy runs SVML, Python's math glibc; neither is always correctly
+  // rounded): how often the correctly rounded tan meets them bit for bit, vs V8's Math.tan
+  console.log('INFO tan bit-exact: OMR.np.tan == np.tan ' + tanNp + '/' + tanN + ', == math.tan ' + tanMath + '/' + tanN + ' (Math.tan == np.tan ' + v8Np + '/' + tanN + ')');
+  H.ok(tanNp >= 0.99 * tanN && tanMath >= 0.99 * tanN, 'audit: OMR.np.tan meets numpy / glibc bit for bit on >= 99% of angles');
+}
+
 (async () => {
   await H.cv();
   const pages = H.pages().filter((p) => H.has(p, '22-model.json'));
-  if (!pages.length) { H.skip('model parity: no 22-model.json fixtures (run tools/omr/dump_model.py)'); H.done(); return; }
+  if (!pages.length) { H.skip('model parity: no 22-model.json fixtures (run tools/omr/dump_model.py)'); audit(); H.done(); return; }
   for (const page of pages) {
     const doc = H.readJson(H.fix(page, '22-model.json'));
     const tally = {};
@@ -215,5 +328,6 @@ function fromState(s) {
 
     for (const [g, t] of Object.entries(tally)) H.ok(!t.bad, page + ' ' + g + ': ' + (t.n - t.bad) + '/' + t.n + ' exact' + (t.bad ? ' -- ' + t.why.join(' | ') : ''));
   }
+  audit();
   H.done();
 })().catch((e) => { console.log('FAIL crashed: ' + (e && e.stack || e)); process.exit(1); });

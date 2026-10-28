@@ -112,6 +112,16 @@
     return zip(entries, opts && opts.date);
   }
 
+  const XML_ENT = { lt: '<', gt: '>', amp: '&', quot: '"', apos: "'" };
+  function unescapeXml(s) {
+    return s.replace(/&(#x[0-9a-fA-F]+|#[0-9]+|[A-Za-z]+);/g, (m, e) => {
+      if (e[0] === '#') {
+        const cp = e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
+        return cp <= 0x10ffff ? String.fromCodePoint(cp) : m;
+      }
+      return Object.prototype.hasOwnProperty.call(XML_ENT, e) ? XML_ENT[e] : m;
+    });
+  }
   async function read(bytes) {
     const b = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
     const dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
@@ -139,7 +149,10 @@
     }
     let rootfile = null;
     const cont = files['META-INF/container.xml'];
-    if (cont) { const m = /full-path\s*=\s*"([^"]*)"/.exec(new TextDecoder().decode(cont)); if (m) rootfile = m[1]; }
+    if (cont) { // the attribute value is XML-escaped (containerXml escapes & " <)
+      const m = /full-path\s*=\s*(?:"([^"]*)"|'([^']*)')/.exec(new TextDecoder().decode(cont));
+      if (m) rootfile = unescapeXml(m[1] != null ? m[1] : m[2]);
+    }
     if (!rootfile) rootfile = Object.keys(files).find((k) => !k.startsWith('META-INF/') && /\.(musicxml|xml)$/i.test(k)) || null;
     return { files: files, rootfile: rootfile, xml: rootfile && files[rootfile] ? new TextDecoder().decode(files[rootfile]) : null };
   }

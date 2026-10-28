@@ -20,9 +20,27 @@
   }
   function pyError(name, message) { const e = new Error(message); e.name = name; return e; }
   function startsWithNoteOrRest(r) { return r.startsWith('note') || r.startsWith('rest'); }
-  function getItem(dict, key) {  // dict[key]: KeyError when missing
-    if (!Object.prototype.hasOwnProperty.call(dict, key)) throw pyError('KeyError', String(key));
+  function getItem(dict, key) {  // dict[key]: KeyError when missing; str(KeyError(k)) = repr(k)
+    if (!Object.prototype.hasOwnProperty.call(dict, key)) throw pyError('KeyError', typeof key === 'string' ? pyReprStr(key) : String(key));
     return dict[key];
+  }
+  // repr(str): single quotes unless the text has ' and no ", backslash escapes for the quote,
+  // \\, \n \r \t and the characters str.isprintable() rejects
+  const NOT_PRINTABLE = /[\p{Cc}\p{Cf}\p{Cs}\p{Co}\p{Cn}\p{Zl}\p{Zp}\p{Zs}]/u;
+  function pyReprStr(s) {
+    const q = s.includes("'") && !s.includes('"') ? '"' : "'";
+    let out = q;
+    for (const ch of s) {
+      const c = ch.codePointAt(0);
+      if (ch === '\\' || ch === q) out += '\\' + ch;
+      else if (ch === '\n') out += '\\n';
+      else if (ch === '\r') out += '\\r';
+      else if (ch === '\t') out += '\\t';
+      else if (ch !== ' ' && NOT_PRINTABLE.test(ch)) {
+        out += c < 0x100 ? '\\x' + c.toString(16).padStart(2, '0') : c < 0x10000 ? '\\u' + c.toString(16).padStart(4, '0') : '\\U' + c.toString(16).padStart(8, '0');
+      } else out += ch;
+    }
+    return out + q;
   }
 
   // ======================================================================================

@@ -104,10 +104,10 @@
     // homr: bounding_boxes.py:103
     increaseSizeInEachDimension(increase, imageSize) {
       return new BoundingBox([
-        Math.max(this.box[0] - increase, 0),
-        Math.max(this.box[1] - increase, 0),
-        Math.min(this.box[2] + increase, imageSize[1]),
-        Math.min(this.box[3] + increase, imageSize[0])
+        py.max2(this.box[0] - increase, 0),
+        py.max2(this.box[1] - increase, 0),
+        py.min2(this.box[2] + increase, imageSize[1]),
+        py.min2(this.box[3] + increase, imageSize[0])
       ], this.contours, this.debugId);
     }
   }
@@ -161,7 +161,8 @@
       if (other instanceof BoundingBox) { center2 = other.rotatedBox[0]; axes2 = other.rotatedBox[1]; }
       else if (other instanceof AngledBoundingBox) { center2 = other.box[0]; axes2 = other.box[1]; }
       else throw new Error('Unknown type ' + (other && other.constructor && other.constructor.name));
-      var majorAxis1 = Math.max(axes1[0], axes1[1]), majorAxis2 = Math.max(axes2[0], axes2[1]);
+      // max(axes): Python's max keeps the first of (w, nan)
+      var majorAxis1 = py.max2(axes1[0], axes1[1]), majorAxis2 = py.max2(axes2[0], axes2[1]);
       // the distance between the centers
       var dx = center1[0] - center2[0], dy = center1[1] - center2[1];
       var distance = Math.sqrt(dx * dx + dy * dy);
@@ -201,7 +202,7 @@
     }
     // homr: bounding_boxes.py:226
     ensureMinDimension(minWidth, minHeight) {
-      return new RotatedBoundingBox([[this.box[0][0], this.box[0][1]], [Math.max(this.box[1][0], minWidth), Math.max(this.box[1][1], minHeight)], this.box[2]], this.contours, this.debugId);
+      return new RotatedBoundingBox([[this.box[0][0], this.box[0][1]], [py.max2(this.box[1][0], minWidth), py.max2(this.box[1][1], minHeight)], this.box[2]], this.contours, this.debugId);
     }
     // homr: bounding_boxes.py:237
     makeBoxThicker(thickness) {
@@ -226,7 +227,8 @@
     }
     // homr: bounding_boxes.py:282
     getCenterExtrapolated(x) {
-      return (x - this.box[0][0]) * Math.tan(this.box[2] / 180 * Math.PI) + this.box[0][1];
+      // np.tan: correctly rounded (OMR.np.tan), closer to numpy than Math.tan
+      return (x - this.box[0][0]) * np.tan(this.box[2] / 180 * Math.PI) + this.box[0][1];
     }
     // homr: bounding_boxes.py:285
     isOverlappingExtrapolated(other, unitSize) {
@@ -239,8 +241,9 @@
       if (centerX - left.center[0] - py.floorDiv(left.size[0], 2) > maxGap ||
           right.center[0] - centerX - py.floorDiv(right.size[0], 2) > maxGap) return false;
       // extrapolated y-values, same as getCenterExtrapolated but inlined
-      var leftAngle = Math.tan(left.box[2] * Math.PI / 180.0);
-      var rightAngle = Math.tan(right.box[2] * Math.PI / 180.0);
+      // math.tan (glibc): correctly rounded OMR.np.tan is the closest stand-in
+      var leftAngle = np.tan(left.box[2] * Math.PI / 180.0);
+      var rightAngle = np.tan(right.box[2] * Math.PI / 180.0);
       var leftY = (centerX - left.box[0][0]) * leftAngle + left.box[0][1];
       var rightY = (centerX - right.box[0][0]) * rightAngle + right.box[0][1];
       return Math.abs(leftY - rightY) <= tolerance;

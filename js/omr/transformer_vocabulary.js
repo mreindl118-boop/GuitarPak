@@ -35,9 +35,11 @@
     return x;
   }
   const isSafe = Number.isSafeInteger;
+  // (no BigInt literals: the file still parses where BigInt is missing; only this rare path needs it)
   function bigGcd(a, b) {
-    if (a < 0n) a = -a;
-    if (b < 0n) b = -b;
+    const zero = BigInt(0);
+    if (a < zero) a = -a;
+    if (b < zero) b = -b;
     while (b) { const t = a % b; a = b; b = t; }
     return a;
   }
@@ -48,9 +50,9 @@
   }
   // the exact n/d of two BigInts, reduced, as a Fraction of JS numbers
   function fromBig(n, d) {
-    const g = bigGcd(n, d) || 1n;
+    const g = bigGcd(n, d) || BigInt(1);
     n /= g; d /= g;
-    if (d < 0n) { n = -n; d = -d; }
+    if (d < BigInt(0)) { n = -n; d = -d; }
     return new Fraction(bigToSafe(n), bigToSafe(d));
   }
   class Fraction {
