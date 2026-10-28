@@ -172,18 +172,23 @@
   }
 
   // ---- render ----
+  function connPanel() { // the Deck's connection panel (js/synthtab.js), painted after each render
+    var el = root && root.querySelector('#st-lvconn'); if (el && window.SLSynthTab && SLSynthTab.conn) SLSynthTab.conn.paint(el);
+  }
   function render() {
     if (!root) return;
+    renderBody(); connPanel();
+  }
+  function renderBody() {
     var d = data(), s = active(d), page = pageOf(d);
     root.classList.toggle('st-islive', live);
     if (!s) {
-      root.innerHTML = '<div class="st-lvprof muted small"><span>Profile</span><select id="st-lvprofile" aria-label="Profile">' + (profiles().length ? profiles().map(function (x) { return '<option value="' + esc(x.id) + '"' + (x.id === profileId() ? ' selected' : '') + '>' + esc(x.name) + '</option>'; }).join('') : '<option value="">(no profile — your current setup)</option>') + '</select><button type="button" class="btn sm" id="st-lvpnew">+ New</button><button type="button" class="btn sm" id="st-lvpdup">Duplicate</button>' + (profiles().length ? '<button type="button" class="btn sm" id="st-lvprename">Rename</button><button type="button" class="btn sm" id="st-lvpdel">Delete</button>' : '') + '<button type="button" class="btn sm" id="st-lvpexport">Export</button><label class="btn sm">Import<input type="file" id="st-lvpimport" accept=".json,application/json" hidden></label></div>' +
+      root.innerHTML = '<div class="card st-conn" id="st-lvconn" role="status" aria-live="polite" hidden></div><div class="st-lvprof muted small"><span>Profile</span><select id="st-lvprofile" aria-label="Profile">' + (profiles().length ? profiles().map(function (x) { return '<option value="' + esc(x.id) + '"' + (x.id === profileId() ? ' selected' : '') + '>' + esc(x.name) + '</option>'; }).join('') : '<option value="">(no profile — your current setup)</option>') + '</select><button type="button" class="btn sm" id="st-lvpnew">+ New</button><button type="button" class="btn sm" id="st-lvpdup">Duplicate</button>' + (profiles().length ? '<button type="button" class="btn sm" id="st-lvprename">Rename</button><button type="button" class="btn sm" id="st-lvpdel">Delete</button>' : '') + '<button type="button" class="btn sm" id="st-lvpexport">Export</button><label class="btn sm">Import<input type="file" id="st-lvpimport" accept=".json,application/json" hidden></label></div>' +
         '<div class="card st-lvempty"><h2>Live sets</h2><p class="muted">Pages of 16 presets, like the synth’s own Live Sets. Save presets on the Deck, then put them on slots here; step through them with a foot switch on stage.</p><button type="button" class="btn primary st-big" id="st-lvnew">New set</button></div>';
       return;
     }
     var fs = g('fsCC', null);
-    root.innerHTML =
-      '<div id="st-lvconn" role="status" hidden></div>' + // the deck's connection bar: why a slot would reach nothing + the fix
+    root.innerHTML = '<div class="card st-conn" id="st-lvconn" role="status" aria-live="polite" hidden></div>' +
       (live ? '' :
       '<div class="st-lvtop">' +
         '<label class="field st-lvsel">Set<select id="st-lvset">' + d.sets.map(function (x) { return '<option value="' + esc(x.id) + '"' + (x.id === s.id ? ' selected' : '') + '>' + esc(x.name) + '</option>'; }).join('') + '</select></label>' +
@@ -216,7 +221,6 @@
         '<p class="muted small st-lvhint">Screen stays on. ' + (locked ? 'Locked: hold a slot to load it.' : 'Lock to make slots press-and-hold.') + '</p>' : '') +
       '<div class="st-lvpick" id="st-lvpick" hidden></div>';
     ['lvset', 'lvgrid', 'lvpick', 'lvconn'].forEach(function (id) { els[id] = q('#st-' + id); });
-    var p = P(); if (p && p.connBar) p.connBar(els.lvconn);
   }
   function nextName(d) {
     var s = active(d); if (!s) return '—';
@@ -340,7 +344,12 @@
       });
       // ports come and go, a refused tap: repaint (the connection bar) and nudge it
       App.on('midi:state', function () { if (App.active === 'liveset' && picking == null) render(); });
-      App.on('synth:conn', function (d) { if (App.active !== 'liveset' || picking != null) return; render(); var p = P(); if (d && d.refused && p && p.nudgeBar) p.nudgeBar(els.lvconn); });
+      App.on('synth:conn', function (d) { // a refused send: repaint the connect panel and nudge it (its .st-nudge from synthtab.js)
+        if (App.active !== 'liveset' || picking != null) return;
+        render();
+        var el = els.lvconn; if (!d || !d.refused || !el || el.hidden) return;
+        el.classList.remove('st-nudge'); void el.offsetWidth; el.classList.add('st-nudge');
+      });
       // a LUMI's octave buttons (option): down = previous, up = next
       App.on('midi:range', function (r) {
         if (!r || !r.lumi || r.prev == null || !g('octStep', false)) return;
@@ -351,9 +360,8 @@
     },
     onShow: function () {
       if (App.midi && App.midi.mute) App.midi.mute('synthlive', App.store.get('midihub.hear', false) !== true);
-      var m = App.midi; // MIDI was on last time: reconnect quietly (as the Deck does)
-      if (m && m.supported && !m.ready && App.store.get('midi.wanted', false)) m.enable().then(render).catch(function () { });
       render();
+      if (window.SLSynthTab && SLSynthTab.conn) SLSynthTab.conn.autoConnect(); // the Synth tab's connect panel (1.3.1)
     },
     onHide: function () { if (live) setLive(false); closePicker(); setLearnFs(false); if (App.midi && App.midi.mute) App.midi.mute('synthlive', false); },
     onBack: function () { if (picking != null) { closePicker(); return true; } if (live) { setLive(false); return true; } if (editing) { editing = false; render(); return true; } return false; },

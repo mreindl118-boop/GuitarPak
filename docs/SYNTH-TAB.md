@@ -38,24 +38,35 @@ the design boards Matt chose from: the "Synth Deck design options" artifact (opt
   `turn()`), so the LUMI guard, Rules-on-app-controls and the musical ledger apply. Nothing is sent
   on show, on a tab switch or on a profile switch.
 
-## Connection bar (1.3.1)
+### Connecting (1.3.1)
 
-A tap that cannot reach the synth is never silent. `connState()` in `js/synthdeck.js` names the one
-thing in the way, and `perform.connBar(el)` paints it at the top of the Deck face (`#st-conn`) and the
-Live page (`#st-lvconn`), hidden while all is well:
+The Deck and Live pages show a panel until the synth is reachable, and dim their controls:
 
-- **No MIDI in this browser** (Safari on an iPad): where it works instead.
-- **MIDI is off** (never connected in this browser): *Connect MIDI* (`App.midi.enable()`).
-- **Synth out is the LUMI / none chosen**: one button per port that is not a LUMI or Windows' GS
-  Wavetable; a tap sets the Hub's Synth out (`SLMidiHub.api.setOut`, the same store as its select).
-  On **Android / iOS** the app has ONE output shared with the key lights, so the tap moves that output
-  (`App.midi.setOutput`, as Settings › MIDI does) and, if key lights would paint a non-LUMI output, sets
-  the LED mode off — lights are note-ons and would play on the synth.
-- **Only the LUMI is connected**: connect the synth's cable.
+| State | What it says | What it offers |
+|---|---|---|
+| No Web MIDI | This browser can’t reach MIDI devices; on iPad/iPhone it names MIDIWeb Browser and Web MIDI Browser | nothing to press |
+| Never connected | Connect your synth | **Connect** (the one browser prompt) |
+| Waiting | Allow MIDI devices in the browser’s prompt | — |
+| Blocked | MIDI is blocked for this site; allow it in the site settings | **Try again** |
+| No output | Plug the synth in by USB; or choose where to send | an output picker when ports exist |
+| LUMI as output | The LUMI never gets synth messages | an output picker |
 
-A refused tap (`txCheck`) toasts where the player is — `App.toast` (the app-wide `#app-toast`) on the
-Deck / Live pages, the Hub's own `#mh-toast` on the Hub page — emits `synth:conn {refused}` and nudges
-the bar. A Live slot is marked loaded only when its program could go out (`perform.check()`).
+On show the page reconnects without a prompt when MIDI was switched on before or the browser
+already allows it. A tap on a dimmed control shakes the panel instead of silently doing nothing.
+
+The chips, Scenes and slots update in place and the page repaints only for controllers, program
+changes and SysEx replies. A MODX with MIDI clock out sends about 36 clock ticks a second; until
+1.3.1 each one rebuilt the buttons, so a finger often lifted off a different element and the tap was
+lost (found on the MODX8+ on 2026-10-26).
+
+On the **Android / iOS** app MIDI has ONE output, shared with the key lights: picking the synth in the
+panel moves that output (`App.midi.setOutput`, as Settings › MIDI does) and, if the key lights would
+paint a non-LUMI output, sets the LED mode off — lights are note-ons and would play on the synth.
+
+A refused send (the deck's funnel, `txCheck`) toasts where the player is — `App.toast` on the Deck /
+Live pages, the Hub's own `#mh-toast` on the Hub page — with the reason (`connState()` in
+`js/synthdeck.js`), emits `synth:conn {refused}` and nudges the panel. A Live slot is marked loaded only
+when its program could go out (`perform.check()`).
 
 ## Presets (the builder)
 
@@ -114,6 +125,4 @@ statechange path), offline (PWA + localStorage; export as the backup), readable 
 and slot badges; splits (rule + port, chip, bytes per zone, pedal copy, presets, the LUMI thru guard);
 Live sets (slots, MODX slot bytes, stepping, foot switch, Go live / lock / panic / exit, the Deck
 grid); profiles; the phone and iPad layouts. The LUMI bucket must stay empty throughout.
-`tests/synthconn.test.js`: the connection bar in every cut-off state (MIDI off, Synth out on the
-LUMI, only a LUMI + GS Wavetable, no Web MIDI, the Android bridge on the LUMI), the refusal toasts,
-the Live slot that stays put, and the same tap sending after the one-tap fix.
+`tests/synthconn.test.js`: refusals out loud next to the 1.3.1 panel (`tests/synthconnect.test.js`): the toast on the Deck / Live (the Hub keeps its own), the nudge, a refused strip drag speaking once, the Live slot that stays put, the Android one-output pick with the key lights off, and the same press sending after the fix.
