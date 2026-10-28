@@ -125,17 +125,23 @@
   function debounced(dir) { var now = Date.now(); if (now - lastStep < 150) return false; lastStep = now; return step(dir); }
 
   // ---- render ----
+  function connPanel() { // the Deck's connection panel (js/synthtab.js), painted after each render
+    var el = root && root.querySelector('#st-lvconn'); if (el && window.SLSynthTab && SLSynthTab.conn) SLSynthTab.conn.paint(el);
+  }
   function render() {
     if (!root) return;
+    renderBody(); connPanel();
+  }
+  function renderBody() {
     var d = data(), s = active(d), page = pageOf(d);
     root.classList.toggle('st-islive', live);
     if (!s) {
-      root.innerHTML = '<div class="st-lvprof muted small"><span>Profile</span><select id="st-lvprofile" aria-label="Profile">' + (profiles().length ? profiles().map(function (x) { return '<option value="' + esc(x.id) + '"' + (x.id === profileId() ? ' selected' : '') + '>' + esc(x.name) + '</option>'; }).join('') : '<option value="">(no profile — your current setup)</option>') + '</select><button type="button" class="btn sm" id="st-lvpnew">+ New</button><button type="button" class="btn sm" id="st-lvpdup">Duplicate</button>' + (profiles().length ? '<button type="button" class="btn sm" id="st-lvprename">Rename</button><button type="button" class="btn sm" id="st-lvpdel">Delete</button>' : '') + '<button type="button" class="btn sm" id="st-lvpexport">Export</button><label class="btn sm">Import<input type="file" id="st-lvpimport" accept=".json,application/json" hidden></label></div>' +
+      root.innerHTML = '<div class="card st-conn" id="st-lvconn" role="status" aria-live="polite" hidden></div><div class="st-lvprof muted small"><span>Profile</span><select id="st-lvprofile" aria-label="Profile">' + (profiles().length ? profiles().map(function (x) { return '<option value="' + esc(x.id) + '"' + (x.id === profileId() ? ' selected' : '') + '>' + esc(x.name) + '</option>'; }).join('') : '<option value="">(no profile — your current setup)</option>') + '</select><button type="button" class="btn sm" id="st-lvpnew">+ New</button><button type="button" class="btn sm" id="st-lvpdup">Duplicate</button>' + (profiles().length ? '<button type="button" class="btn sm" id="st-lvprename">Rename</button><button type="button" class="btn sm" id="st-lvpdel">Delete</button>' : '') + '<button type="button" class="btn sm" id="st-lvpexport">Export</button><label class="btn sm">Import<input type="file" id="st-lvpimport" accept=".json,application/json" hidden></label></div>' +
         '<div class="card st-lvempty"><h2>Live sets</h2><p class="muted">Pages of 16 presets, like the synth’s own Live Sets. Save presets on the Deck, then put them on slots here; step through them with a foot switch on stage.</p><button type="button" class="btn primary st-big" id="st-lvnew">New set</button></div>';
       return;
     }
     var fs = g('fsCC', null);
-    root.innerHTML =
+    root.innerHTML = '<div class="card st-conn" id="st-lvconn" role="status" aria-live="polite" hidden></div>' +
       (live ? '' :
       '<div class="st-lvtop">' +
         '<label class="field st-lvsel">Set<select id="st-lvset">' + d.sets.map(function (x) { return '<option value="' + esc(x.id) + '"' + (x.id === s.id ? ' selected' : '') + '>' + esc(x.name) + '</option>'; }).join('') + '</select></label>' +
@@ -297,7 +303,7 @@
       });
       render();
     },
-    onShow: function () { if (App.midi && App.midi.mute) App.midi.mute('synthlive', App.store.get('midihub.hear', false) !== true); render(); },
+    onShow: function () { if (App.midi && App.midi.mute) App.midi.mute('synthlive', App.store.get('midihub.hear', false) !== true); render(); if (window.SLSynthTab && SLSynthTab.conn) SLSynthTab.conn.autoConnect(); },
     onHide: function () { if (live) setLive(false); closePicker(); learnFs = false; if (App.midi && App.midi.mute) App.midi.mute('synthlive', false); },
     onBack: function () { if (picking != null) { closePicker(); return true; } if (live) { setLive(false); return true; } if (editing) { editing = false; render(); return true; } return false; }
   });

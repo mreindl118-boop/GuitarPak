@@ -1,6 +1,6 @@
 {
   "version": "0.75.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/soundLAB-alpha.apk",
-  "web": "1.3.0",
-  "notes": "soundLAB 1.3.0: the Synth tab. Your synth gets its own tab with three pills: Deck (a play face with faders instead of knobs, a knob-row picker like the MODX, Assign knobs named after what they control, Scenes, chips and an Explain mode that teaches what each control does), Live (Live sets in pages of 16, foot switch and octave-button stepping, Go live with Lock and Panic, whole-setup profiles you can export and import) and Hub (the MIDI Hub, now with key splits and port-aware rules). Presets save a full snapshot: sound, fader values, colour, the app key and scale, a split. One Open on the Play tab opens a MIDI file, a MusicXML score or a text tab and sends it to the synth, the Woodshed or tab view. The Practice tab is now Train, the clef is a header icon like its neighbours, and long page notes moved into tours and tips."
+  "web": "1.3.1",
+  "notes": "soundLAB 1.3.1: the Synth tab's buttons work with the MODX. The Arpeggiator, Motion sequencer, Scene and preset buttons now take every tap while the synth sends its MIDI clock (they used to be redrawn under your finger many times a second). The Deck and Live pages connect by themselves: a Connect button the first time, a quiet reconnect after that, and a clear note when the browser blocks MIDI, no synth is plugged in, the LUMI is chosen as the output, or the browser has no MIDI at all (Safari on iPad: use a Web MIDI browser app)."
 }

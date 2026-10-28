@@ -484,6 +484,18 @@ js/synthtab.js    SYNTH TAB (1.3, docs/SYNTH-TAB.md): pages 'deck' (the play fac
                   Control view, the preset builder sheet = full snapshot
                   {colour, app key/scale, fav strips, split}) - everything
                   through App.synthDeck.perform.* so the deck's funnel holds.
+                  1.3.1 CONNECT PANEL (#st-conn, #st-lvconn on Live; SLSynthTab.
+                  conn): the Synth tab asks for MIDI itself - unsupported (iPad
+                  Safari/Chrome: names the Web MIDI browser apps) / off (Connect
+                  button; never prompts by itself) / busy / denied / noout /
+                  lumi (output picker); on show it reconnects silently when
+                  midi.wanted or permissions.query says granted; controls dim
+                  (.st-offline) and a tap nudges the panel. IN-PLACE PAINT:
+                  chips, Scenes and slots go through morph() (same nodes, only
+                  attributes/text change) and midi:raw repaints only on CC /
+                  Program Change / SysEx - the MODX's MIDI clock (~36/s) used
+                  to rebuild the buttons under a finger and eat taps. Suite
+                  tests/synthconnect.test.js.
 js/synthlive.js   page 'liveset': Live sets in pages of 16 (presets or MODX
                   Live Set slots MSB 62), stepping (Next/Prev, foot switch CC
                   synthtab.fsCC, LUMI octave buttons option), GO LIVE (bars
