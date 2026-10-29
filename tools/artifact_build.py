@@ -13,6 +13,11 @@ The page is adapted to the artifact viewer's contract:
   - <title> becomes the plain app name (the viewer's gallery name)
   - no service worker (the viewer refuses them), no web manifest/PWA links
   - window.SL_ARTIFACT = true, which turns off the GitHub update checker
+    (and makes Scan say it needs the full site, see below)
+
+models/ is NOT staged: Scan's recognition models (models/omr, 8 parts + the
+manifest, 77 MB) are over one publish's size limit, so in the artifact Scan
+(js/sheetlab.js) offers no engine download and points to the full site.
 """
 import os, re, shutil, sys
 

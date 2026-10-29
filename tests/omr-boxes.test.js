@@ -55,7 +55,7 @@ function cmpBox(js, py) {
 }
 
 (async () => {
-  await H.cv();
+  await H.needCv();
   const pages = H.pages().filter((p) => H.has(p, '06-symbols.json'));
   if (!pages.length) { H.skip('boxes parity: no 06-symbols.json fixtures'); H.done(); return; }
   if (pages.length < 7) H.skip('only ' + pages.length + ' pages: degenerate noteheads of later pages may differ (theRNG carries over from the missing pages)');

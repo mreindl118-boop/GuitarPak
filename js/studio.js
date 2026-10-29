@@ -122,7 +122,7 @@
   }
 
   // My library (js/library.js): with "Save what I play" on, every captured idea is kept
-  // there as a MIDI file too; the idea's "Save to library" button does it on demand
+  // there as a MIDI file too; the idea's "Save to my library" button does it on demand
   function toLibrary(idea, auto) {
     var lib = window.App && App.library;
     if (!lib || !idea || (auto && !lib.savePlayedOn)) return;
@@ -296,7 +296,7 @@
           '<span class="row tight">' +
             '<button type="button" class="btn sm" data-itrk="' + it.id + '" title="Turn this idea into a synth track in the loop">To track</button>' +
             '<button type="button" class="btn sm" data-ikey="' + it.id + '" title="Set the app key/scale to this idea’s">Use key</button>' +
-            '<button type="button" class="btn sm" data-ilib="' + it.id + '" title="Keep this idea in My library as a MIDI file">Save to library</button>' +
+            '<button type="button" class="btn sm" data-ilib="' + it.id + '" title="Keep this idea in My library as a MIDI file">Save to my library</button>' +
             '<button type="button" class="btn sm" data-idel="' + it.id + '" aria-label="Delete idea">' + App.icon('close', 13) + '</button>' +
           '</span>' +
         '</div>' +

@@ -190,6 +190,7 @@ async function swChecks(OMRFILES) {
 }
 
 // ------------------------------------------------------------------------------- the browser
+const fs_png = () => fs.readFileSync(PNG);
 async function browserChecks(ref, OMR) {
   const { chromium } = require('playwright');
   const base = new URL(env.URL);
@@ -450,13 +451,32 @@ async function browserChecks(ref, OMR) {
   console.log('# Open as tab / Practice / Play on synth / Save to my library (' + secs() + ')');
   const a1 = await page.evaluate(async () => { document.getElementById('sl-tab').click(); await __wait(500); const c = App.songs.current; return { active: App.active, name: c && c.name, from: c && c.from, steps: c && c.steps.length }; });
   ok(a1.active === 'songs' && a1.name === 'Menuetto K. 487 & co' && a1.from === 'Scan' && a1.steps > 0, 'Open as tab: the Songs page with it (' + a1.steps + ' steps)');
-  const a2 = await page.evaluate(async () => { App.switchTo('sheetlab'); await __wait(150); document.getElementById('sl-practice').click(); await __wait(600); return { active: App.active }; });
+  const a2 = await page.evaluate(async () => {
+    App.switchTo('sheetlab'); await __wait(150); document.getElementById('sl-practice').click(); await __wait(600);
+    const toast = document.getElementById('app-toast').textContent;
+    App.switchTo('sheetlab'); await __wait(150); document.getElementById('sl-practice').click(); await __wait(600);
+    // (the Woodshed names an imported score without what follows its last dot: "Menuetto K")
+    const rows = [...document.querySelectorAll('#ws-lib [data-wsid]')].filter((r) => /Menuetto K/.test(r.textContent));
+    const b = rows[0] && rows[0].getBoundingClientRect();
+    return { active: App.active, toast, n: (App.store.get('ws.lib') || []).filter((sc) => /^Menuetto K/.test(sc.title)).length, inView: !!b && b.top >= 0 && b.bottom <= innerHeight };
+  });
   ok(a2.active === 'shed', 'Practice: in the Woodshed');
+  ok(a2.n === 1 && a2.inView && /In the Woodshed: Menuetto K\. 487 & co/.test(a2.toast), 'Practice says so, and a second tap shows the same score (scrolled into view) instead of a second copy: ' + JSON.stringify(a2));
   const a3 = await page.evaluate(async () => { App.switchTo('sheetlab'); await __wait(150); document.getElementById('sl-play').click(); await __wait(800); const s = SLMidiHub.player.state; return { active: App.active, view: App.store.get('midihub.view'), dur: s && s.duration, notes: s && s.notes }; });
   ok(a3.active === 'midihub' && a3.view === 'player' && a3.dur > 0, 'Play on synth: the Hub Player has it (' + (a3.dur || 0).toFixed(1) + ' s)');
-  const a4 = await page.evaluate(async () => { App.switchTo('sheetlab'); await __wait(150); document.getElementById('sl-save').click(); for (let i = 0; i < 60 && !/Saved|already|device/.test(document.getElementById('sl-libmsg').textContent); i++) await __wait(100); return document.getElementById('sl-libmsg').textContent; });
+  const a4 = await page.evaluate(async () => { App.switchTo('sheetlab'); await __wait(150); document.getElementById('sl-libmsg').textContent = ''; document.getElementById('sl-save').click(); for (let i = 0; i < 60 && !/Saved|already|device/.test(document.getElementById('sl-libmsg').textContent); i++) await __wait(100); return document.getElementById('sl-libmsg').textContent; });
   const lib2 = await page.evaluate(() => App.library.list().then((l) => l.filter((i) => i.kind === 'scan').map((i) => i.title)));
   ok(/Saved|already/.test(a4) && lib2.indexOf('Menuetto K. 487 & co') >= 0, 'Save to my library with the new title: ' + a4);
+  ok(lib2.indexOf('Mozart Menuetto') < 0 && lib2.filter((t) => t === 'Menuetto K. 487 & co').length === 1 && /already/.test(a4),
+    'the edited title renamed the auto-saved entry (one entry, no "Mozart Menuetto" left behind); Save then finds it there: ' + lib2.join(' | '));
+
+  console.log('# after a conversion, Take a photo starts the next piece (' + secs() + ')');
+  await page.evaluate(() => App.switchTo('sheetlab'));
+  const ph0 = await page.evaluate(() => document.getElementById('sl-photolbl').textContent);
+  await page.setInputFiles('#sl-cam', { name: 'IMG_0100.png', mimeType: 'image/png', buffer: fs_png() });
+  const ph1 = await page.evaluate(() => ({ files: App.sheetlab.state.files.map((f) => f.name), lbl: document.getElementById('sl-photolbl').textContent }));
+  ok(ph0 === 'Take a photo' && ph1.files.join() === 'IMG_0100.png' && ph1.lbl === 'Add a page (photo)',
+    'the photo replaces the converted picture (it used to become page 2 of the old scan): ' + ph0 + ' -> ' + ph1.files.join());
 
   console.log('# Stop mid-run (' + secs() + ')');
   const before = engineReqs().length;
@@ -510,7 +530,9 @@ async function browserChecks(ref, OMR) {
   ok(/notes\.txt” is not a PDF or a picture/.test(txt.message) && txt.files.length === 1 && txt.files[0].name === 'broken.png', 'a file that is not sheet music is refused and the selection kept: ' + txt.message);
 
   console.log('# a PDF (cover + music, metadata title) at 200 dpi through the worker pool (' + secs() + ')');
-  await page.evaluate(() => { App.store.set('sheetlab.pool', 2); App.switchTo('songs'); });
+  // a library key on this device: GitHub (the default repository is public) answers 503 here
+  await ctx.route('https://api.github.com/**', (route) => route.fulfill({ status: 503, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"message":"test"}' }));
+  await page.evaluate(() => { App.library.setKey('github_pat_TEST_sheetlab_0123456789abcdef'); App.store.set('library.publicAck', false); App.store.set('sheetlab.pool', 2); App.switchTo('songs'); });
   await page.setInputFiles('#sg-openfile', { name: 'menuetto.pdf', mimeType: 'application/pdf', buffer: fs.readFileSync(PDF) });
   await until(() => page.evaluate(() => App.active === 'sheetlab' && App.sheetlab.state.files[0] && App.sheetlab.state.files[0].name === 'menuetto.pdf'), 5000, 'PDF routed');
   const before2 = engineReqs().length;
@@ -529,6 +551,16 @@ async function browserChecks(ref, OMR) {
   }, 300000, 'PDF conversion');
   const s3 = await st();
   ok(s3.phase === 'done' && s3.result.title === 'Menuetto from 12 Duets' && s3.result.pagesInFile === 2, 'the PDF converts with the title from its metadata: ' + s3.result.title);
+  const pub = await page.evaluate(async () => ({ label: document.getElementById('sl-autosave-txt').textContent, msg: document.getElementById('sl-libmsg').textContent,
+    lib: (await App.library.list()).filter((i) => i.title === 'Menuetto from 12 Duets').length }));
+  ok(/GitHub/.test(pub.label) && /public/.test(pub.label), 'with a key the checkbox says where a save goes: ' + pub.label);
+  ok(pub.lib === 0 && /Not saved yet/.test(pub.msg) && /anyone can download/.test(pub.msg), 'the first scan upload is not automatic: it says where it would go and waits for the tap: ' + pub.msg);
+  await page.click('#sl-save');
+  await until(() => page.evaluate(() => /on this device|Saved|GitHub/.test(document.getElementById('sl-libmsg').textContent) && !/Not saved yet|Saving/.test(document.getElementById('sl-libmsg').textContent)), 15000, 'the tapped save');
+  const pub2 = await page.evaluate(async () => ({ ack: App.store.get('library.publicAck', false), lib: (await App.library.list()).filter((i) => i.title === 'Menuetto from 12 Duets').length, msg: document.getElementById('sl-libmsg').textContent }));
+  ok(pub2.ack === true && pub2.lib === 1, 'the tap saves it (asked once): ' + pub2.msg);
+  await page.evaluate(() => App.library.setKey(''));
+  await ctx.unroute('https://api.github.com/**');
   ok(s3.result.pages.length === 2 && s3.result.pages[0].skipped && /cover/i.test(s3.result.pages[0].skipped) && !s3.result.pages[1].skipped && s3.result.pages[1].staffCount >= 1,
     'page 1 (the cover) is skipped with its reason, page 2 is read: ' + s3.result.summary.pageSummaries.join(' / '));
   const pcap = await page.evaluate(() => [...document.querySelectorAll('#sl-pages figcaption')].map((f) => f.textContent));
@@ -579,8 +611,62 @@ async function browserChecks(ref, OMR) {
     });
     if (!canPick) ok(an.shown && /Android app cannot open files yet/.test(an.text) && /in Chrome/.test(an.text) && /cannot open files/.test(an.toast),
       'in the Android app (no file chooser) Scan says so and where it works: ' + an.text);
+    const aeng = await ap.evaluate(async () => { await new Promise((r) => setTimeout(r, 300)); const s = App.sheetlab.state; return { engine: s.engine, worker: s.workerAlive, dl: !!document.getElementById('sl-dl'), text: document.getElementById('sl-engine').textContent }; });
+    if (!canPick) ok(aeng.engine === 'unavailable' && !aeng.dl && !aeng.worker && /cannot open files/.test(aeng.text),
+      'and offers no engine download there (107 MB nothing could use), no worker starts: ' + JSON.stringify(aeng));
     else ok(!an.shown && !/cannot open files/.test(an.toast), 'an app that can pick files (canPickFiles) gets no note');
     await actx.close();
+  }
+
+  console.log('# the claude.ai artifact: no models there, Scan says so (' + secs() + ')');
+  {
+    const xctx = await browser.newContext({ viewport: { width: 1200, height: 900 }, serviceWorkers: 'block' });
+    await xctx.route((url) => url.origin !== origin, (route) => route.abort());
+    await xctx.addInitScript(() => { ['help.seen', 'help.done', 'qz.landed'].forEach((k) => localStorage.setItem('guitarlab.' + k, 'true')); window.SL_ARTIFACT = true; });
+    const xp = await xctx.newPage();
+    xp.on('pageerror', (e) => errs.push('artifact: ' + e.message));
+    await xp.goto(env.URL);
+    await xp.waitForFunction(() => window.App && App.sheetlab);
+    await xp.evaluate(() => App.switchTo('sheetlab'));
+    const xa = await xp.evaluate(async () => { await new Promise((r) => setTimeout(r, 300)); const s = App.sheetlab.state;
+      return { engine: s.engine, worker: s.workerAlive, dl: !!document.getElementById('sl-dl'), text: document.getElementById('sl-engine').textContent, pick: document.getElementById('sl-choose').getAttribute('aria-disabled') }; });
+    ok(xa.engine === 'unavailable' && !xa.dl && !xa.worker && /full site/.test(xa.text) && xa.pick === 'true',
+      'in the artifact (no models/omr) Scan points to the full site and offers neither Download nor a picker: ' + xa.text);
+    await xctx.close();
+  }
+
+  console.log('# a worker that cannot start (offline before the files were cached): Try again (' + secs() + ')');
+  {
+    const rctx = await browser.newContext({ viewport: { width: 1200, height: 900 }, serviceWorkers: 'block' });
+    await rctx.route((url) => url.origin !== origin, (route) => route.abort());
+    await rctx.addInitScript(() => {
+      ['help.seen', 'help.done', 'qz.landed'].forEach((k) => localStorage.setItem('guitarlab.' + k, 'true'));
+      const Real = window.Worker; window.__failWorker = true;
+      window.Worker = function (url, o) {
+        if (!window.__failWorker) return new Real(url, o);
+        const self = this; this.postMessage = function () {}; this.terminate = function () {};
+        setTimeout(() => { if (self.onerror) self.onerror({ message: "Uncaught NetworkError: Failed to execute 'importScripts' on 'WorkerGlobalScope'", preventDefault() {} }); }, 30);
+      };
+    });
+    const rp = await rctx.newPage();
+    rp.on('pageerror', (e) => errs.push('retry: ' + e.message));
+    await rp.goto(env.URL);
+    await rp.waitForFunction(() => window.App && App.sheetlab);
+    await rp.evaluate(() => App.switchTo('sheetlab'));
+    await rp.waitForFunction(() => App.sheetlab.state.engine === 'unknown' && !!document.getElementById('sl-retry'), null, { timeout: 8000 }).catch(() => {});
+    await rp.setInputFiles('#sl-file', { name: 'mozart-menuetto.png', mimeType: 'image/png', buffer: fs_png() });
+    await rp.click('#sl-go');
+    await rp.waitForTimeout(400);
+    const r1 = await rp.evaluate(() => ({ engine: App.sheetlab.state.engine, text: document.getElementById('sl-engine').textContent, msg: App.sheetlab.state.message,
+      retry: !!document.getElementById('sl-retry'), go: !document.getElementById('sl-go').disabled }));
+    ok(r1.engine === 'unknown' && r1.retry && /Could not start the recognition engine/.test(r1.text) && !/importScripts/.test(r1.text) && r1.go,
+      'a worker that fails to start is not "cannot run here" for good: a plain note and Try again (the raw error stays in the console): ' + r1.text);
+    ok(/Could not start/.test(r1.msg) && !/Download/.test(r1.msg), 'Convert says the same, not "tap Download above" (there is no Download): ' + r1.msg);
+    await rp.evaluate(() => { window.__failWorker = false; document.getElementById('sl-retry').click(); });
+    await rp.waitForFunction(() => App.sheetlab.state.engine === 'needed', null, { timeout: 20000 }).catch(() => {});
+    const r2 = await rp.evaluate(() => ({ engine: App.sheetlab.state.engine, dl: !!document.getElementById('sl-dl') }));
+    ok(r2.engine === 'needed' && r2.dl, 'Try again works once the worker can start (the engine is offered for download): ' + JSON.stringify(r2));
+    await rctx.close();
   }
 
   console.log('# a touch phone: Take a photo, each photo one more page (' + secs() + ')');
@@ -602,6 +688,14 @@ async function browserChecks(ref, OMR) {
   ok(m1.photo && m1.lbl === 'Take a photo' && /take a photo/i.test(m1.t), 'on a touch screen Take a photo shows (the camera input)');
   ok(m2 === 'Add a page (photo)' && m3.files.join() === 'IMG_0007.png,IMG_0008.png' && /2 pictures = 2 pages/.test(m3.sel), 'each photo adds a page in the order taken: ' + m3.sel);
   ok(m3.sw <= m3.iw, 'no sideways scroll on the phone (' + m3.sw + ' / ' + m3.iw + ')');
+  const dpiH = await mp.evaluate(() => { const b = document.querySelector('#sl-dpi button'); return b ? Math.round(b.getBoundingClientRect().height) : 0; });
+  ok(dpiH >= 44, 'PDF quality buttons are as tall as the other Scan controls on a touch screen (' + dpiH + ' px)');
+  await mp.setInputFiles('#sl-file', { name: 'IMG_4023.HEIC', mimeType: 'image/heic', buffer: Buffer.from('ftypheic not decodable here') });
+  await mp.click('#sl-go');
+  await mp.waitForFunction(() => /cannot open \.heic/.test(App.sheetlab.state.message), null, { timeout: 10000 }).catch(() => {});
+  const heic = await mp.evaluate(() => ({ msg: App.sheetlab.state.message, pending: App.sheetlab.state.pending, engine: App.sheetlab.state.engine }));
+  ok(/This browser cannot open \.heic pictures/.test(heic.msg) && !heic.pending && heic.engine !== 'downloading',
+    'a .heic this browser cannot open is refused at Convert, before the engine download is asked for: ' + heic.msg);
   await mctx.close();
 
   console.log('# an engine update on the server: asked for, never fetched by a run (' + secs() + ')');

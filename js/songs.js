@@ -550,7 +550,7 @@
           '<button type="button" class="btn sm" id="sg-midibtn">Import MIDI&hellip;</button>' +
           '<input type="file" id="sg-file" accept=".mid,.midi,audio/midi">' +
           '<input type="text" id="sg-name" placeholder="Song name" style="width:180px">' +
-          '<button type="button" class="btn sm" id="sg-save" disabled>Save to library</button>' +
+          '<button type="button" class="btn sm" id="sg-save" disabled title="Keep this tab in the Songs list below (not My library)">Save tab</button>' +
           '<button type="button" class="btn sm" id="sg-exporttab" disabled title="Download this tab as a text file">Export tab</button>' +
           '<span class="muted small" id="sg-addmsg"></span>' +
         '</div>' +

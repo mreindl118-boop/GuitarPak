@@ -25,7 +25,8 @@ jobs:
   test:
     runs-on: ubuntu-latest
     # A cold hosted install took 9 minutes; retain time for all UI contexts and the
-    # SheetLab engine suites (they run the real recognition models).
+    # SheetLab suites (omr-e2e's ci page and sheetlab run the real recognition models;
+    # the Python-parity suites skip without SL_OMR_FIXTURES / SL_OMR_MODELS).
     timeout-minutes: 45
     outputs:
       source_sha: ${{ steps.source.outputs.sha }}

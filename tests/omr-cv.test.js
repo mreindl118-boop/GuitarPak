@@ -252,7 +252,7 @@ function trackLeaks(cv) {
 }
 
 (async () => {
-  const cv = await H.cv();
+  const cv = await H.needCv();
   const leaks = trackLeaks(cv);
   const pages = H.pages().filter((p) => H.has(p, '20-cv.json'));
   if (!pages.length) { H.skip('cv parity: no 20-cv.json fixtures (run tools/omr/dump_cv.py)'); H.done(); return; }

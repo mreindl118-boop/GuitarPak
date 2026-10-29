@@ -105,7 +105,9 @@ function sameOutcome(w, g) {
   return !g.raises && JSON.stringify(g.shape) === JSON.stringify(w.shape) && g.dtype === w.dtype && g.sha1 === w.sha1;
 }
 function leakCheck() {
-  H.ok(!leaks.ops.size && leaks.inMade === leaks.inGone, 'no opencv.js object outlives autocrop / resize_image / apply_clahe / inference / ' +
+  // nothing ran (no fixtures / models here): 0 made = 0 deleted would pass without checking anything
+  if (!leaks.inMade) { H.skip('leak check: nothing ran'); return; }
+  H.ok(!leaks.ops.size && leaks.inMade > 0 && leaks.inMade === leaks.inGone, 'no opencv.js object outlives autocrop / resize_image / apply_clahe / inference / ' +
     'extract / filter_predictions (' + leaks.inMade + ' made, ' + leaks.inGone + ' deleted' + (leaks.ops.size ? '; leaking: ' + [...leaks.ops].join(', ') : '') + ')');
 }
 const showOutcome = (o) => o.raises ? o.raises + ': ' + (o.raises === 'error' ? cvCode(o.message) : o.message) : 'value' in o ? String(o.value) : o.shape.join('x') + ' ' + o.dtype;
@@ -201,7 +203,7 @@ function checkFilter(label, preds, rep, debug) {
 }
 
 (async () => {
-  trackLeaks(await H.cv());
+  trackLeaks(await H.needCv());
   const timings = [];
 
   // ---- inference(): tiling, batches, padding, argmax ties and merge with a stand-in model ----

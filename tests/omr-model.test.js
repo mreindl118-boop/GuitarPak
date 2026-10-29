@@ -363,7 +363,7 @@ function fuzz() {
 }
 
 (async () => {
-  await H.cv();
+  await H.needCv();
   const pages = H.pages().filter((p) => H.has(p, '22-model.json'));
   if (!pages.length) { H.skip('model parity: no 22-model.json fixtures (run tools/omr/dump_model.py)'); audit(); fuzz(); H.done(); return; }
   for (const page of pages) {

@@ -48,6 +48,19 @@ function cv() {
   return cvPromise;
 }
 
+// cv() for the suites that cannot run without opencv.js: a missing package prints SKIP and ends the
+// suite (exit 0, or 1 if a check already failed), like tests/run.sh promises. cv() itself still
+// rejects, for callers that handle it (omr-e2e, sheetlab --make-fixture).
+async function needCv() {
+  try { return await cv(); } catch (e) {
+    if (e && e.code === 'MODULE_NOT_FOUND' && /@techstark\/opencv-js/.test(String(e.message))) {
+      skip('opencv.js (@techstark/opencv-js) not on NODE_PATH: npm i @techstark/opencv-js@5.0.0-release.1 onnxruntime-web@1.31.1 pdfjs-dist@4.10.38');
+      done();
+    }
+    throw e;
+  }
+}
+
 function ort() {
   const o = require('onnxruntime-web');
   o.env.wasm.numThreads = 1;
@@ -127,4 +140,4 @@ function cmpImg(a, b) {
   return { same: d === 0, diff: d, total: a.data.length };
 }
 
-module.exports = { ROOT, FIX, MODELS, ok, skip, done, load, cv, ort, readPng, readJson, pages, fix, has, camel, near, cmpImg };
+module.exports = { ROOT, FIX, MODELS, ok, skip, done, load, cv, needCv, ort, readPng, readJson, pages, fix, has, camel, near, cmpImg };

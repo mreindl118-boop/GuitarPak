@@ -936,7 +936,7 @@ function report(label, r) {
 
 // =============================================================================================
 async function main() {
-  const cv = await H.cv();
+  const cv = await H.needCv();
   trackLeaks(cv);
   OMR.simple_logging.sink = null;
   let synDoc = null;
@@ -998,7 +998,9 @@ async function main() {
 }
 
 function finish() {
-  H.ok(!leaks.ops.size && leaks.inMade === leaks.inGone, 'no opencv.js object outlives the reading stage\'s calls (' + leaks.inMade + ' made, ' + leaks.inGone + ' deleted' +
+  // nothing ran (no fixtures / models here): 0 made = 0 deleted would pass without checking anything
+  if (!leaks.inMade) { H.skip('leak check: nothing ran'); H.done(); return; }
+  H.ok(!leaks.ops.size && leaks.inMade > 0 && leaks.inMade === leaks.inGone, 'no opencv.js object outlives the reading stage\'s calls (' + leaks.inMade + ' made, ' + leaks.inGone + ' deleted' +
     (leaks.ops.size ? '; leaking: ' + [...leaks.ops].join(', ') : '') + ')');
   H.done();
 }

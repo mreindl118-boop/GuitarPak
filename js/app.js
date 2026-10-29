@@ -1716,6 +1716,54 @@ window.App = (function () {
     toastT = setTimeout(function () { el.hidden = true; toastT = null; }, ms || 3200);
   }
 
+  // ONE way to hand the owner a file (Scan's exports, My library's downloads): a title -> a file name
+  // ('Menuetto in G: Mozart' -> 'Menuetto in G- Mozart.mid'), and the file to the device: a download;
+  // the share sheet in the iOS home-screen app and the Android app when they can share files; the
+  // Android app's WebView has no downloads (no DownloadListener, shells up to 0.75.0), so it says what
+  // works instead of a tap that silently does nothing. Returns 'blocked' | 'shared' | 'unsupported' |
+  // 'downloaded'.
+  function fileName(title, ext) {
+    var b = String(title || '').replace(/[\\/:*?"<>|\u0000-\u001f]+/g, '-').replace(/\s+/g, ' ').trim().replace(/^\.+/, '').slice(0, 100);
+    return (b || 'score') + '.' + ext;
+  }
+  function isAppleTouch() {
+    var ua = navigator.userAgent || '';
+    return /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  }
+  function standaloneApp() {
+    try { return navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches); } catch (e) { return false; }
+  }
+  function saveFile(name, data, type, opts) {
+    opts = opts || {};
+    if (window.SL_ARTIFACT) { toast('Downloads are blocked here.', 3600); return 'blocked'; }
+    var blob = new Blob([data], { type: type });
+    var host = window.GuitarLabHost;
+    if ((host || (isAppleTouch() && standaloneApp())) && navigator.share && navigator.canShare && typeof File === 'function') {
+      try {
+        var file = new File([blob], name, { type: type });
+        if (navigator.canShare({ files: [file] })) {
+          navigator.share({ files: [file], title: name }).catch(function (e) {
+            if (e && e.name !== 'AbortError') toast('Could not share ' + name + ': ' + (e && e.message ? e.message : e), 4200);
+          });
+          return 'shared';
+        }
+      } catch (e) { /* fall through */ }
+    }
+    if (host) {
+      toast(opts.apkNote || 'The Android app cannot save files yet: open soundLAB in Chrome to download.', 6400);
+      return 'unsupported';
+    }
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 15000);
+    return 'downloaded';
+  }
+
   return {
     register: register,
     icon: icon,
@@ -1730,6 +1778,8 @@ window.App = (function () {
     emit: emit,
     injectCSS: injectCSS,
     toast: toast,
+    saveFile: saveFile,
+    fileName: fileName,
     remoteAction: remoteAction,
     remoteKeyPage: remoteKeyPage,
     showBar: showBar,

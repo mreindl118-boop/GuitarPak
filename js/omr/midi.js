@@ -4,6 +4,8 @@
    homr (github.com/liebharc/homr) is AGPL-3.0; the behaviour reproduced here is music21 10.5.2
    (BSD) and mido 1.3.3 (MIT), ported for the subset of MusicXML homr's generate_xml writes and
    checked against them on the 7 fixture pages and 153 synthetic scores (tests/omr-midi.test.js).
+   Contains code ported from music21 10.5.2 and mido 1.3.3; their copyright and licences are in
+   THIRD-PARTY-NOTICES.md.
 
    The engine: score = music21.converter.parse(musicxml); score.transpose(n) when n != 0; per part
    insert instrumentFromMidiProgram(gm) and MetronomeMark(tempo) at offset 0; score.write('midi');

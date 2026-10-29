@@ -1,5 +1,6 @@
 /* soundLAB OMR: Python and numpy semantics the homr port relies on
-   (homr, github.com/liebharc/homr, AGPL-3.0). OMR.py = builtins, OMR.np = numpy,
+   (homr, github.com/liebharc/homr, AGPL-3.0). Contains code ported from x86-simd-sort (as bundled
+   in numpy 2.4.6; its copyright and licence are in THIRD-PARTY-NOTICES.md). OMR.py = builtins, OMR.np = numpy,
    including the image type every module passes around:
 
      image = { h, w, c, data }   HWC row-major, exactly numpy's memory layout.

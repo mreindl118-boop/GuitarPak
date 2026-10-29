@@ -101,7 +101,11 @@
   function setKey(k) {
     k = cleanKey(k);
     if (k && !keyOk(k)) return false;
+    var was = getKey();
     try { if (k) localStorage.setItem(KEY_STORE, k); else localStorage.removeItem(KEY_STORE); } catch (e) { return false; }
+    // a new key: the next visit to the Library page lists and uploads what waits at once (it used
+    // to wait up to LIST_TTL, saying "1 change waiting to upload" with nothing sent)
+    if (k !== was) state.lastList = 0;
     changed();
     return true;
   }
@@ -372,10 +376,12 @@
   }
   function offline() {
     var off = typeof navigator !== 'undefined' && navigator.onLine === false;
-    return fail('offline', (off ? 'Offline' : 'GitHub cannot be reached right now') + ': everything stays on this device and uploads the next time you sync.');
+    return fail('offline', (off ? 'Offline' : 'GitHub cannot be reached right now') + ': ' + staysText());
   }
   function needKey(what) { return fail('nokey', (what || 'Saving to GitHub') + ' needs the access key: Settings › Library sync.'); }
-  function slow() { return fail('offline', 'GitHub did not answer in time: everything stays on this device and uploads the next time you sync.'); }
+  function slow() { return fail('offline', 'GitHub did not answer in time: ' + staysText()); }
+  // without a key nothing would ever upload "the next time you sync"
+  function staysText() { return getKey() ? 'everything stays on this device and uploads the next time you sync.' : 'everything stays on this device.'; }
   // p (a fetch and the reading of its answer) or a "did not answer" after ms; the abort lets
   // the browser drop the hung connection
   function timed(p, ms, ac) {
@@ -694,12 +700,37 @@
   }
 
   function applyMeta(it, meta) {
-    if (!meta || typeof meta !== 'object') return;
+    meta = cleanMeta(meta);
+    if (!meta) return;
     it.meta = meta;
     if (meta.title) it.title = cleanTitle(meta.title) || it.title;
-    var t = Date.parse(meta.created);
+    var t = meta.created ? Date.parse(meta.created) : 0;
     if (t > 0) it.created = t;
-    if (meta.ideaId) it.ideaId = String(meta.ideaId);
+    if (meta.ideaId) it.ideaId = meta.ideaId;
+  }
+  // the fields soundLAB shows, each of its own type: a value of another type in a meta.json (a hand
+  // edit, another app, {"toString": 1}) is dropped instead of breaking every list paint and search.
+  // Fields soundLAB does not know are kept as they are: they are only ever written back (as JSON
+  // by a rename), never shown.
+  var META_STR = ['kind', 'title', 'source', 'created', 'app', 'key', 'scale', 'ideaId'], META_NUM = ['pages', 'bpm', 'root', 'notes', 'seconds'];
+  function plain(v) { return !!v && typeof v === 'object' && !Array.isArray(v); }
+  function cleanMeta(m) {
+    if (!plain(m)) return null;
+    var str = function (v) { return typeof v === 'string' ? v.slice(0, 300) : null; };
+    var num = function (v) { return typeof v === 'number' && isFinite(v) ? v : null; };
+    var out = {};
+    Object.keys(m).forEach(function (k) { if (k !== '__proto__' && k !== 'constructor' && k !== 'prototype') out[k] = m[k]; });
+    META_STR.forEach(function (k) { var v = str(m[k]); if (v != null) out[k] = v; else delete out[k]; });
+    META_NUM.forEach(function (k) { var v = num(m[k]); if (v != null) out[k] = v; else delete out[k]; });
+    if ('options' in out) {
+      if (plain(m.options)) out.options = { tempo: num(m.options.tempo), program: num(m.options.program) != null ? num(m.options.program) : str(m.options.program), transpose: num(m.options.transpose) || 0 };
+      else delete out.options;
+    }
+    if ('summary' in out) {
+      if (plain(m.summary)) out.summary = { measures: num(m.summary.measures), notes: num(m.summary.notes), chords: num(m.summary.chords), seconds: num(m.summary.seconds) };
+      else delete out.summary;
+    }
+    return out;
   }
 
   function metaOf(it) {
@@ -829,7 +860,7 @@
       return getItem(id).then(function (cur) {
         if (op === 'delete') {
           return { id: id, title: it.title, uploaded: !cur, pending: !!cur,
-            message: !cur ? what + ' (GitHub too).' : '“' + it.title + '” is deleted from GitHub at the next sync. ' + (st.error || '') };
+            message: !cur ? what + ' here and from the library branch on GitHub (earlier versions stay in its history).' : '“' + it.title + '” is deleted from GitHub at the next sync. ' + (st.error || '') };
         }
         var up = !!(cur && !cur.pending && cur.remote);
         return { id: id, title: it.title, uploaded: up, pending: !up,
@@ -851,7 +882,7 @@
     var now = Date.now(), op = o.options || {}, sm = o.summary || {};
     var num = function (v) { v = +v; return isFinite(v) ? v : null; };
     var meta = {
-      kind: 'scan', title: title, source: String(o.source || ''), pages: num(o.pages), created: new Date(now).toISOString(),
+      kind: 'scan', title: title, source: sourceKind(o.source), pages: num(o.pages), created: new Date(now).toISOString(),
       options: { tempo: num(op.tempo), program: op.program == null ? null : op.program, transpose: num(op.transpose) || 0 },
       summary: { measures: num(sm.measures), notes: num(sm.notes), chords: num(sm.chords), seconds: num(sm.seconds != null ? sm.seconds : sm.durationSeconds) },
       app: 'soundLAB ' + App.version
@@ -875,6 +906,9 @@
     return step.then(function (r) { return r.it ? settle(r.it, 'Saved “' + title + '”', 'add') : r; });
   }
   var scanQ = Promise.resolve();
+  // 'fur-elise.pdf' -> 'PDF': the original file's name can say more than the owner meant to keep on
+  // GitHub (the title, which they see and can edit, already says what it is)
+  function sourceKind(s) { var m = /\.([A-Za-z0-9]{1,5})$/.exec(String(s == null ? '' : s)); return m ? m[1].toUpperCase() : ''; }
   function sameBytes(a, b) {
     if (!a || !b || a.length !== b.length) return false;
     for (var i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
@@ -899,7 +933,7 @@
   }
 
   // the "is it in already?" check and the insert run one save at a time: the auto-save of a new
-  // idea and a tap on its Save to library (or two quick taps) must not both find it missing
+  // idea and a tap on its Save to my library (or two quick taps) must not both find it missing
   var playedQ = Promise.resolve();
   function savePlayed(idea, opts) {
     opts = opts || {};
@@ -994,7 +1028,15 @@
     return fileOf(id, 'mid').then(function (r) {
       var hub = window.SLMidiHub && SLMidiHub.player;
       if (!hub) throw new Error('The MIDI Hub is not loaded.');
-      return hub.loadFile(slugify(r.it.title) + '.mid', bufOf(r.data)).then(function () { hub.show(); return r.it.title; });
+      return hub.loadFile(slugify(r.it.title) + '.mid', bufOf(r.data)).then(function () {
+        hub.show();
+        // iPad Safari / Chrome have no Web MIDI: the Player opens, but nothing reaches a synth here
+        if (App.midi && App.midi.supported === false) {
+          App.toast('No MIDI in this browser: open soundLAB in a Web MIDI browser app (iPad) or Chrome / Edge; with sync the library is there too.', 7000);
+          return null;
+        }
+        return r.it.title;
+      });
     });
   }
   function practice(id) {
@@ -1003,8 +1045,9 @@
       if (!ws || typeof ws.importMidi !== 'function' || typeof ws.addScore !== 'function') throw new Error('The Woodshed is not available.');
       var sc = ws.importMidi(bufOf(r.data), r.it.title);
       if (!sc) throw new Error('The Woodshed could not read it.');
-      ws.addScore(sc);
       App.switchTo('shed');
+      // the same piece tapped again is shown, not added twice (and its row is scrolled into view)
+      if (typeof ws.addOrShow === 'function') ws.addOrShow(sc); else ws.addScore(sc);
       return r.it.title;
     });
   }
@@ -1019,18 +1062,15 @@
       return r.it.title;
     });
   }
+  // the file to the device the way Scan hands out its files (App.saveFile: a download, the iOS
+  // home-screen app's share sheet, a reason in the Android app, whose WebView has no downloads)
   function download(id, f) {
     f = f === 'musicxml' ? 'musicxml' : 'mid';
     return fileOf(id, f).then(function (r) {
-      var blob = new Blob([r.data], { type: f === 'mid' ? 'audio/midi' : 'application/vnd.recordare.musicxml+xml' });
-      var a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = slugify(r.it.title) + '.' + f;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
-      return a.download;
+      var name = App.fileName(r.it.title, f);
+      var how = App.saveFile(name, r.data, f === 'mid' ? 'audio/midi' : 'application/vnd.recordare.musicxml+xml',
+        { apkNote: 'The Android app cannot save files yet: open soundLAB in Chrome to download, or use Play on synth / Practice here.' });
+      return how === 'downloaded' || how === 'shared' ? name : null;
     });
   }
 
@@ -1097,6 +1137,7 @@
       '.lib-item{padding:14px 16px;margin-bottom:12px}' +
       '.lib-top{display:flex;gap:10px;align-items:baseline;justify-content:space-between;flex-wrap:wrap}' +
       '.lib-title{font-size:16px;font-weight:600;overflow-wrap:anywhere;min-width:0}' +
+      '.lib-sr{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}' +
       '.lib-kind{display:inline-block;margin-left:8px;padding:1px 8px;border-radius:999px;font-size:11.5px;font-weight:600;' +
         'letter-spacing:.3px;color:var(--accent-ink);background:var(--accent-soft);border:1px solid var(--accent-line);vertical-align:2px}' +
       '.lib-state{font-size:12.5px;color:var(--muted)}' +
@@ -1111,6 +1152,7 @@
       '.lib-set label.field{flex:1 1 170px;min-width:0}' +
       '.lib-set label.field .lib-in{width:100%;text-transform:none;letter-spacing:0}' +
       '.lib-set ol{margin:6px 0 0;padding-left:20px}.lib-set li{margin:3px 0}.lib-set a{color:var(--accent-ink)}' +
+      '.lib-pub{margin-top:8px;line-height:1.45;color:var(--text)}.lib-pub b{color:var(--warn)}' +
       '#lib-set-msg{margin-top:10px;line-height:1.45}' +
       '#lib-set-keystate{margin-top:6px}'
     );
@@ -1140,8 +1182,9 @@
         '</div>' +
         '<details class="tips"><summary>What is in here</summary>' +
           '<div>Scans you save from Play › Scan (MIDI + MusicXML) and what you play (Studio ideas, with <b>Save what I play</b> on, ' +
-          'or Save to library on an idea). Everything is kept on this device first; with an access key it is also kept in your GitHub ' +
-          'repository on its own <b>library</b> branch, so every device sees the same library.</div>' +
+          'or Save to my library on an idea). Everything is kept on this device first; with an access key it is also kept in your GitHub ' +
+          'repository on its own <b>library</b> branch, so every device sees the same library. Everything synced is as public as that ' +
+          'repository (' + esc(DEF.repo) + ' is public): anyone can read it, and it stays in the branch history even after Delete.</div>' +
         '</details>' +
       '</div>' +
       '<div id="lib-list"></div>';
@@ -1180,8 +1223,15 @@
       else if (e.key === 'Escape') { e.preventDefault(); ui.renaming = null; paint(); }
     });
     App.on('library:changed', function () { if (App.active === 'library') paint(); paintSettings(); });
-    window.addEventListener('online', function () { state.err = null; changed(); });
-    window.addEventListener('offline', function () { changed(); });
+    // the network back / gone: the status changes only where the library is in use, so a phone that
+    // drops signal never creates the 'soundlab-library' database for an owner who never opened it
+    // (and coming back sends nothing by itself: Sync now, a save or the next visit does)
+    function onNet(online) {
+      if (online) state.err = null;
+      if (dbp || mem || App.active === 'library' || (setEl && setEl.offsetParent)) changed();
+    }
+    window.addEventListener('online', function () { onNet(true); });
+    window.addEventListener('offline', function () { onNet(false); });
   }
 
   function paintFilter() {
@@ -1226,27 +1276,44 @@
   }
 
   function itemHtml(it) {
-    var st = stateOf(it), id = esc(it.id), busy = ui.busy[it.id];
+    var st = stateOf(it), id = esc(it.id), busy = ui.busy[it.id], t = esc(it.title);
+    // the pill's separator is for screen readers only ("Menuetto, Scan", not "MenuettoScan"); the
+    // title text node itself stays exactly the title
     var title = ui.renaming === it.id
       ? '<div class="lib-ren"><input type="text" class="lib-in" id="lib-ren-in" value="' + esc(ui.draft) + '" maxlength="120" aria-label="New name">' +
         '<button type="button" class="btn sm primary" data-act="ren-ok">Save</button><button type="button" class="btn sm" data-act="ren-no">Cancel</button></div>'
-      : '<div class="lib-title">' + esc(it.title) + '<span class="lib-kind">' + (it.kind === 'scan' ? 'Scan' : 'Played') + '</span></div>';
+      : '<div class="lib-title">' + t + '<span class="lib-kind"><span class="lib-sr">, </span>' + (it.kind === 'scan' ? 'Scan' : 'Played') + '</span></div>';
     var dis = busy ? ' disabled' : '';
     var armed = ui.armed === it.id;
+    // an entry that reached GitHub leaves it from the branch, not from the (public) history
+    var onGh = !!(it.remote && it.remote.loc === cfg().loc);
+    var delLbl = armed ? (onGh ? 'Delete? It stays in GitHub’s history' : 'Delete? Tap again') : 'Delete';
+    var delAria = armed ? 'Delete ' + t + ': tap again.' + (onGh ? ' Earlier versions stay in the GitHub history.' : '') : 'Delete ' + t;
+    var lbl = function (s) { return ' aria-label="' + s + '"'; };
     return '<div class="card lib-item" data-id="' + id + '">' +
       '<div class="lib-top">' + title + '<span class="lib-state ' + st.cls + '">' + esc(busy || st.txt) + '</span></div>' +
       '<div class="muted small lib-info">' + esc(info(it)) + '</div>' +
       '<div class="lib-acts">' +
-        '<button type="button" class="btn sm primary" data-act="synth"' + dis + ' title="Play it on your synth from the MIDI Hub Player">' + App.icon('play', 14) + 'Play on synth</button>' +
-        '<button type="button" class="btn sm" data-act="practice"' + dis + ' title="Practice it in the Woodshed">Practice</button>' +
-        '<button type="button" class="btn sm" data-act="tab"' + dis + ' title="Show it as guitar tab on the Songs page">Open as tab</button>' +
-        '<button type="button" class="btn sm" data-act="mid"' + dis + ' title="Download the MIDI file">' + App.icon('down', 14) + '.mid</button>' +
+        '<button type="button" class="btn sm primary" data-act="synth"' + dis + lbl('Play ' + t + ' on synth') + ' title="Play it on your synth from the MIDI Hub Player">' + App.icon('play', 14) + 'Play on synth</button>' +
+        '<button type="button" class="btn sm" data-act="practice"' + dis + lbl('Practice ' + t) + ' title="Practice it in the Woodshed">Practice</button>' +
+        '<button type="button" class="btn sm" data-act="tab"' + dis + lbl('Open ' + t + ' as tab') + ' title="Show it as guitar tab on the Songs page">Open as tab</button>' +
+        '<button type="button" class="btn sm" data-act="mid"' + dis + lbl('Download ' + t + ' as .mid') + ' title="Download the MIDI file">' + App.icon('down', 14) + '.mid</button>' +
         (it.kind === 'scan' && (it.files && typeof it.files.musicxml === 'string' || it.remote && it.remote.shas && it.remote.shas.musicxml)
-          ? '<button type="button" class="btn sm" data-act="musicxml"' + dis + ' title="Download the MusicXML score">' + App.icon('down', 14) + '.musicxml</button>' : '') +
-        '<button type="button" class="btn sm" data-act="rename"' + dis + '>Rename</button>' +
-        '<button type="button" class="btn sm danger" data-act="delete"' + dis + (armed ? ' aria-label="Delete for good: tap again"' : '') + '>' + (armed ? 'Delete for good?' : 'Delete') + '</button>' +
+          ? '<button type="button" class="btn sm" data-act="musicxml"' + dis + lbl('Download ' + t + ' as .musicxml') + ' title="Download the MusicXML score">' + App.icon('down', 14) + '.musicxml</button>' : '') +
+        '<button type="button" class="btn sm" data-act="rename"' + dis + lbl('Rename ' + t) + '>Rename</button>' +
+        '<button type="button" class="btn sm danger" data-act="delete"' + dis + lbl(delAria) + '>' + delLbl + '</button>' +
       '</div>' +
     '</div>';
+  }
+  // one entry's card; details that cannot be shown (a broken record) never blank the whole list
+  function cardHtml(it) {
+    try { return itemHtml(it); } catch (e) {
+      var t = '';
+      try { t = typeof it.title === 'string' ? it.title : ''; } catch (x) { t = ''; }
+      return '<div class="card lib-item" data-id="' + esc(String(it && it.id)) + '"><div class="lib-top"><div class="lib-title">' + esc(t || 'Untitled') +
+        '</div></div><div class="muted small lib-info">Details unreadable.</div><div class="lib-acts">' +
+        '<button type="button" class="btn sm danger" data-act="delete">' + (ui.armed === (it && it.id) ? 'Delete? Tap again' : 'Delete') + '</button></div></div>';
+    }
   }
 
   function paint() {
@@ -1262,16 +1329,28 @@
         if (ui.filter !== 'all' && it.kind !== ui.filter) return false;
         if (!q) return true;
         var m = it.meta || {};
-        return (it.title + ' ' + (m.source || '') + ' ' + (m.key || '')).toLowerCase().indexOf(q) !== -1;
+        try { return (it.title + ' ' + (m.source || '') + ' ' + (m.key || '')).toLowerCase().indexOf(q) !== -1; } catch (e) { return false; }
       }).sort(function (a, b) { return (b.created || 0) - (a.created || 0) || (a.id < b.id ? -1 : 1); });
       var any = items.some(function (it) { return it.pending !== 'delete'; });
-      var focusRename = ui.renaming && document.activeElement && document.activeElement.id === 'lib-ren-in';
+      var fa = document.activeElement;
+      var focusRename = ui.renaming && fa && fa.id === 'lib-ren-in';
+      // the button the keyboard / screen reader was on: the list is rebuilt, so it is found again in
+      // its entry's new card (the armed Delete must be reachable within its few seconds)
+      var fCard = !focusRename && fa && els.list.contains(fa) && fa.closest ? fa.closest('[data-id]') : null;
+      var fId = fCard && fCard.getAttribute('data-id'), fAct = fa && fa.getAttribute && fa.getAttribute('data-act');
       if (!shown.length) {
         els.list.innerHTML = '<div class="muted lib-empty">' + (any
           ? 'Nothing matches. Try All, or another search.'
           : 'Nothing here yet. Scans you save from Play › Scan land here, and so does what you play: capture an idea with the ● in the clef menu or “Keep the last 30s” on Studio › Ideas, with <b>Save what I play</b> on (Settings › Library sync).') + '</div>';
       } else {
-        els.list.innerHTML = shown.map(itemHtml).join('');
+        els.list.innerHTML = shown.map(cardHtml).join('');
+      }
+      if (fId && fAct && !ui.renaming) {
+        var cardNow = null;
+        Array.prototype.forEach.call(els.list.querySelectorAll('[data-id]'), function (c) { if (c.getAttribute('data-id') === fId) cardNow = c; });
+        var back = cardNow && cardNow.querySelector('[data-act="' + fAct + '"]');
+        if (back && back.disabled) back = cardNow.querySelector('[data-act]:not([disabled])') || back;
+        if (back) { try { back.focus({ preventScroll: true }); } catch (e) { /* fine */ } }
       }
       if (focusRename || ui.renaming) {
         var inp = document.getElementById('lib-ren-in');
@@ -1303,7 +1382,7 @@
     var card = b.closest('[data-id]'), id = card && card.getAttribute('data-id'), a = b.getAttribute('data-act');
     if (!id) return;
     if (a !== 'delete' && ui.armed) { ui.armed = null; clearTimeout(ui.armT); }
-    if (a === 'synth') act(id, 'Opening…', function () { return playOnSynth(id).then(function (t) { say('On the synth: ' + t); }); });
+    if (a === 'synth') act(id, 'Opening…', function () { return playOnSynth(id).then(function (t) { if (t) say('On the synth: ' + t); }); });
     else if (a === 'practice') act(id, 'Opening…', function () { return practice(id).then(function (t) { say('In the Woodshed: ' + t); }); });
     else if (a === 'tab') act(id, 'Opening…', function () { return openAsTab(id); });
     else if (a === 'mid' || a === 'musicxml') act(id, 'Downloading…', function () { return download(id, a); });
@@ -1356,12 +1435,10 @@
     el.innerHTML =
       '<div class="muted small">Scans you save and what you play are kept on this device. With an access key they are also kept in a folder of your ' +
         'GitHub repository, on a branch of their own (<b>library</b>), so every device sees the same library and saving never redeploys the app. ' +
-        'Without a key the library still lists and opens what is on GitHub (the repository is public) and saves on this device.</div>' +
-      '<div class="row">' +
-        '<label class="field">Repository<input type="text" class="lib-in" id="lib-set-repo" value="' + esc(c.repo) + '" spellcheck="false" autocomplete="off" autocapitalize="off"></label>' +
-        '<label class="field">Branch<input type="text" class="lib-in" id="lib-set-branch" value="' + esc(c.branch) + '" spellcheck="false" autocomplete="off" autocapitalize="off"></label>' +
-        '<label class="field">Folder<input type="text" class="lib-in" id="lib-set-folder" value="' + esc(c.folder) + '" spellcheck="false" autocomplete="off" autocapitalize="off"></label>' +
-      '</div>' +
+        'Without a key the library still lists and opens what is on GitHub and saves on this device.</div>' +
+      '<div class="small lib-pub" id="lib-set-public"><b>What is saved to GitHub is public</b> when the repository is public (' + esc(DEF.repo) + ' is): ' +
+        'anyone can open it and download it, and it stays in the repository’s history even after Delete. For private scans, put a ' +
+        '<b>private</b> repository of your own in Advanced › Repository below (then every device needs a key, also for listing).</div>' +
       '<div class="row">' +
         '<label class="field">Access key<input type="password" class="lib-in" id="lib-set-key" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="github_pat_…"></label>' +
         '<button type="button" class="btn sm" id="lib-set-test">Test connection</button>' +
@@ -1370,8 +1447,15 @@
       '<div class="muted small" id="lib-set-keystate"></div>' +
       '<div class="muted small" id="lib-set-msg" role="status" aria-live="polite"></div>' +
       '<label class="set-check"><input type="checkbox" id="lib-set-played"><span>Save what I play' +
-        '<small>Every idea you capture (the ● in the clef menu, Keep the last 30s on Studio › Ideas) goes to the library as a MIDI file too. ' +
-        'On by default once a key is set.</small></span></label>' +
+        '<small>Every idea you capture (the ● in the clef menu, Keep the last 30s on Studio › Ideas) goes to the library as a MIDI file too, ' +
+        'and with a key to GitHub (public in a public repository). On by default once a key is set.</small></span></label>' +
+      '<details class="tips"><summary>Advanced: where the library is kept</summary><div>' +
+        'Changing these uploads every entry again to the new place.' +
+        '<div class="row">' +
+          '<label class="field">Repository<input type="text" class="lib-in" id="lib-set-repo" value="' + esc(c.repo) + '" spellcheck="false" autocomplete="off" autocapitalize="off"></label>' +
+          '<label class="field">Branch<input type="text" class="lib-in" id="lib-set-branch" value="' + esc(c.branch) + '" spellcheck="false" autocomplete="off" autocapitalize="off"></label>' +
+          '<label class="field">Folder<input type="text" class="lib-in" id="lib-set-folder" value="' + esc(c.folder) + '" spellcheck="false" autocomplete="off" autocapitalize="off"></label>' +
+        '</div></div></details>' +
       '<details class="tips"><summary>How to make an access key</summary><ol>' +
         '<li>On a computer or tablet signed in to GitHub, open <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer"><b>github.com/settings/personal-access-tokens/new</b></a> ' +
           '(Settings › Developer settings › Personal access tokens › Fine-grained tokens › Generate new token).</li>' +
@@ -1379,7 +1463,9 @@
         '<li>Repository access: <b>Only select repositories</b> › <b>GuitarPak</b> (or the repository above).</li>' +
         '<li>Repository permissions › <b>Contents</b> › <b>Read and write</b>. Nothing else (Metadata: read is added by itself).</li>' +
         '<li>Generate token, copy it (it starts with github_pat_) and paste it into Access key above, then Test connection.</li>' +
-        '<li>Each device needs it once. The first save creates the <b>library</b> branch.</li>' +
+        '<li>Each device needs a key once. GitHub shows a token only once, so either repeat these steps on each device (one token per ' +
+          'device, so a lost phone can be revoked alone), or keep the token in your password manager and paste it from there. ' +
+          'The first save creates the <b>library</b> branch.</li>' +
       '</ol></details>' +
       '<details class="tips"><summary>Keep it safe</summary><div>' +
         'The key stays on this device (its own storage, never in Export settings) and is only sent to api.github.com. ' +
@@ -1484,6 +1570,8 @@
     config: cfg,
     setConfig: setConfig,
     get hasKey() { return !!getKey(); },
+    // the configured repository is the default one, which is public (another may be private)
+    get knownPublic() { return cfg().repo === DEF.repo; },
     setKey: setKey,
     forgetKey: function () { return setKey(''); },
     testConnection: testConnection,

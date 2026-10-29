@@ -646,7 +646,7 @@ async function leakSuite(cv) {
 }
 
 (async () => {
-  const cv = await H.cv();
+  const cv = await H.needCv();
   // SL_OMR_STAFF_ONLY=base: the fixture pages, edge cases and debug pictures; =audit: the audit
   // (tools/omr/dump_staff_audit.py, dump_staff_repair_fuzz.py); unset: everything
   const only = process.env.SL_OMR_STAFF_ONLY || '';

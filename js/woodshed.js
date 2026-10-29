@@ -414,6 +414,32 @@
     return sc;
   }
 
+  // a score handed over by Scan or My library (their Practice button): the same piece again (title,
+  // note count, the first notes) is shown instead of stored twice, and its row - far down the page,
+  // in the source library card - is scrolled into view and flashed. Generators and file imports keep
+  // using addScore (each of their taps is meant to add one).
+  function sameScore(a, b) {
+    if (!a || !b || a.title !== b.title || !a.notes || !b.notes || a.notes.length !== b.notes.length) return false;
+    for (var i = 0; i < Math.min(16, a.notes.length); i++) {
+      if (a.notes[i].m !== b.notes[i].m || Math.abs(a.notes[i].t - b.notes[i].t) > 1e-6) return false;
+    }
+    return true;
+  }
+  function addOrShow(sc) {
+    if (!sc) return null;
+    var have = lib().filter(function (x) { return sameScore(x, sc); })[0];
+    if (have) renderLib(); else addScore(sc);
+    var id = (have || sc).id;
+    setTimeout(function () {
+      var row = null;
+      Array.prototype.forEach.call(document.querySelectorAll('#ws-lib [data-wsid]'), function (r) { if (r.getAttribute('data-wsid') === id) row = r; });
+      if (!row) return;
+      try { row.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) { row.scrollIntoView(); }
+      row.classList.remove('ws-hl'); void row.offsetWidth; row.classList.add('ws-hl');
+    }, 30);
+    return have || sc;
+  }
+
   function bestKey(sc, mode) { return 'ws.best.' + sc.title.replace(/\W+/g, '_') + '.' + mode; }
 
   // ---------------- progression ----------------
@@ -1560,6 +1586,8 @@
   function init(rootEl) {
     App.injectCSS('woodshed',
       '.ws-row{padding:8px 0;border-bottom:1px solid var(--line)}' +
+      '.ws-row.ws-hl{animation:ws-hl 1.6s ease 1}' +
+      '@keyframes ws-hl{0%,40%{background:var(--accent-soft);box-shadow:0 0 0 2px var(--accent-line)}100%{background:transparent;box-shadow:none}}' +
       '.card h3.ws-rudh{margin:16px 0 8px}' +
       '.card h3.ws-rudh:first-of-type{margin-top:0}' +
       '.ws-j{font-weight:600;margin-right:10px}' +
@@ -1608,7 +1636,7 @@
     get view() { return view; },
     get cal() { return cal; },
     get mic() { return mic; },
-    importMidi: importMidi, addScore: addScore,
+    importMidi: importMidi, addScore: addScore, addOrShow: addOrShow,
     importAscii: importAscii,
     importTrack: importTrack,
     guidedScore: guidedScore,

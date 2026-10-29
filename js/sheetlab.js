@@ -1,7 +1,8 @@
 /* soundLAB SHEETLAB (page 'sheetlab', Play group pill "Scan", prefix sl-): printed sheet music
  * (a PDF, a photo or a scan) -> MusicXML + MIDI, read ON THIS DEVICE by the OMR engine in
  * js/omr (a port of homr, github.com/liebharc/homr, AGPL-3.0, wrapped by the owner's SheetLab
- * engine, js/omr/engine.js). Nothing is uploaded.
+ * engine, js/omr/engine.js). The file itself is never uploaded; only what the owner keeps in My
+ * library is copied to GitHub, and only when Library sync has a key on this device.
  *
  * - All recognition runs in a classic Web Worker (js/omr/worker.js; its message protocol is
  *   documented there). The page only decodes the file: pictures through createImageBitmap
@@ -103,6 +104,8 @@
     engineNote: '',       // why the engine is unavailable / the download failed
     pending: false,       // Convert was tapped before the engine was there: go on after Download
     starting: false,      // Convert tapped, the engine check (a worker round trip) still running: a token
+    retry: false,         // the engine check failed for a passing reason (no connection): Try again
+    used: false,          // the selected files were converted already: a new photo starts a new scan
     job: null, result: null, msg: '', msgErr: false, lib: '', dl: null
   };
   var W = { w: null, n: 0, waits: {}, jobs: {}, prepared: false, cacheAvailable: true, idleT: null };
@@ -122,9 +125,6 @@
     var ua = navigator.userAgent || '';
     return /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   }
-  function standalone() {
-    try { return navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches); } catch (e) { return false; }
-  }
   // the soundLAB Android app (window.GuitarLabHost): its WebView cannot open a file chooser
   // (MainActivity has no WebChromeClient.onShowFileChooser, shells up to 0.75.0), so a tap on
   // Choose a file / Take a photo does nothing there. A shell that can pick files says so with
@@ -138,6 +138,14 @@
     var here = /^https?:$/.test(location.protocol) ? String(location.host + location.pathname).replace(/index\.html$/, '') : 'mreindl118-boop.github.io/GuitarPak';
     return 'The soundLAB Android app cannot open files yet (that needs an app update). To scan sheet music on this phone, ' +
       'open ' + here + ' in Chrome; the recognition engine downloads there once.';
+  }
+  // where Scan cannot work at all, the reason (else ''): the Android app cannot pick files, and the
+  // claude.ai artifact has no models/omr (tools/artifact_build.py does not stage them). The engine is
+  // then never offered for download (107 MB that could not be used) and no worker starts.
+  function blockedNote() {
+    if (hostCannotPick()) return hostNote();
+    if (window.SL_ARTIFACT) return 'Scan needs the full site (the recognition models are not in this artifact): open mreindl118-boop.github.io/GuitarPak.';
+    return '';
   }
   function kindOf(f) {
     var n = String(f && f.name || ''), t = String(f && f.type || '');
@@ -155,8 +163,9 @@
   }
   function worker() {
     if (W.w) return W.w;
-    if (typeof Worker !== 'function') throw new Error('this browser cannot run background workers');
-    if (typeof WebAssembly !== 'object') throw new Error('this browser has no WebAssembly');
+    var no = function (m) { var e = new Error(m); e.permanent = true; return e; }; // nothing changes these but another browser
+    if (typeof Worker !== 'function') throw no('this browser cannot run background workers');
+    if (typeof WebAssembly !== 'object') throw no('this browser has no WebAssembly');
     var w = new Worker('js/omr/worker.js');
     w.onmessage = function (e) { onMsg(w, e.data || {}); };
     w.onerror = function (e) {
@@ -309,7 +318,10 @@
   // ---------------------------------------------------------------- engine status / download
 
   function checkEngine() {
+    var blocked = blockedNote();
+    if (blocked) { S.engine = 'unavailable'; S.engineNote = blocked; S.retry = false; paintEngine(); return Promise.resolve(S.engine); }
     if (S.engine === 'downloading') return Promise.resolve(S.engine);
+    if (S.retry) { S.retry = false; S.engineNote = ''; }
     if (W.prepared) { S.engine = 'ready'; paintEngine(); return Promise.resolve('ready'); }
     if (S.engine !== 'ready') S.engine = 'checking';
     paintEngine();
@@ -343,15 +355,23 @@
       return S.engine;
     }).catch(function (e) {
       if (isCancel(e)) { S.engine = 'unknown'; paintEngine(); return S.engine; }
-      S.engine = 'unavailable';
-      S.engineNote = 'The recognition engine cannot run here: ' + errText(e) + '.';
+      if (e && e.permanent) {
+        S.engine = 'unavailable';
+        S.engineNote = 'The recognition engine cannot run here: ' + errText(e) + '.';
+      } else {
+        // a worker that could not start (offline before the app files were cached, a flaky network):
+        // not for good - Try again, coming back online or the next visit checks again
+        S.engine = 'unknown'; S.retry = true;
+        S.engineNote = 'Could not start the recognition engine (no connection?).';
+        try { console.warn('sheetlab: engine check failed:', errText(e)); } catch (x) { /* no console */ }
+      }
       paintEngine();
       return S.engine;
     });
   }
 
   function downloadEngine() {
-    if (S.engine === 'downloading' || S.engine === 'unavailable') return Promise.resolve(false);
+    if (S.engine === 'downloading' || S.engine === 'unavailable' || blockedNote()) return Promise.resolve(false);
     S.engine = 'downloading';
     S.engineNote = '';
     var total = S.size ? S.size.total : ESTIMATE.models + ESTIMATE.runtime + ESTIMATE.pdf;
@@ -546,6 +566,7 @@
       say(other.length ? 'Skipped ' + other.length + ' file' + (other.length === 1 ? '' : 's') + ' that ' + (other.length === 1 ? 'is' : 'are') + ' not a picture.' : '');
     }
     if (S.phase !== 'running') { S.pending = false; }
+    S.used = false;
     paintSel();
     return fileInfo();
   }
@@ -574,16 +595,23 @@
       paintSel();
       // a worker that never answers: Convert works again after 20 s, and this start is superseded
       var unstick = setTimeout(function () { if (S.starting === token) { S.starting = false; paintSel(); } }, 20000);
-      // the cache may have been cleared since the last look: ask again (no request) before running
-      return checkEngine().then(function (st) {
+      // a picture in a format this browser may not open (HEIC outside Safari): found out now, before
+      // a first-time owner is sent through the 107 MB download; then the cache may have been cleared
+      // since the last look: ask again (no request) before running
+      return precheck(S.files).then(function () { return checkEngine(); }).then(function (st) {
         clearTimeout(unstick);
         if (S.starting !== token) return snapshot(); // superseded (see unstick)
         S.starting = false;
-        if (st !== 'ready') {
+        if (st === 'needed') {
           S.pending = true;
           say(S.size && S.size.update ? 'First tap Download above to update the recognition engine; this conversion starts right after.'
             : 'First tap Download above: the recognition engine comes onto this device once, and this conversion starts right after.');
           paintEngine(true);
+          return snapshot();
+        }
+        if (st !== 'ready') { // could not start (Try again above) / cannot run here
+          say(S.engineNote || 'The recognition engine cannot run in this browser.', true);
+          paintSel();
           return snapshot();
         }
         return run();
@@ -591,6 +619,12 @@
     } catch (e) { S.starting = false; fail(e); return Promise.resolve(snapshot()); }
   }
 
+  var ODD_IMG = /\.(heic|heif|avif|tiff?)$/i;
+  function precheck(files) {
+    if (!files.length || kindOf(files[0]) !== 'image') return Promise.resolve();
+    var odd = files.filter(function (f) { return ODD_IMG.test(String(f.name || '')); });
+    return odd.reduce(function (p, f) { return p.then(function () { return decodeImage(f).then(function (d) { d.close(); }); }); }, Promise.resolve());
+  }
   function jobOpts(o, src, files) {
     return {
       tempoBpm: o.bpm, instrumentName: o.instrument, program: o.program, transposeSemitones: o.transpose,
@@ -614,7 +648,7 @@
     job.abortP.catch(function () { /* raced by guard() */ });
     S.trail = job.trail;
     if (S.result) revokeThumbs(S.result.thumbs);
-    S.job = job; S.phase = 'running'; S.result = null; S.lib = ''; S.pending = false;
+    S.job = job; S.phase = 'running'; S.result = null; S.lib = ''; S.pending = false; S.used = true;
     say('');
     App.wake.acquire('sl-scan');
     var hadFocus = focusOnPage();
@@ -905,41 +939,12 @@
     p.catch(function () { if (r.exportsP && r.exportsP.p === p) r.exportsP = null; });
     return p;
   }
-  function fileName(title, ext) {
-    var b = String(title || '').replace(/[\\/:*?"<>|\u0000-\u001f]+/g, '-').replace(/\s+/g, ' ').trim().replace(/^\.+/, '').slice(0, 100);
-    return (b || 'score') + '.' + ext;
-  }
+  function fileName(title, ext) { return App.fileName(title, ext); }
   var TYPES = { mid: 'audio/midi', musicxml: 'application/vnd.recordare.musicxml+xml', mxl: 'application/vnd.recordare.musicxml' };
-  // one file to the device: a download; the share sheet in the iOS home-screen app; the Android
-  // app's WebView has no downloads (no DownloadListener), so it says what works instead
+  // one file to the device: App.saveFile (a download; the share sheet in the iOS home-screen app; the
+  // Android app's WebView has no downloads, so it says what works instead), shared with My library
   function saveFile(name, data, type) {
-    if (window.SL_ARTIFACT) { App.toast('Downloads are blocked here.', 3600); return 'blocked'; }
-    var blob = new Blob([data], { type: type });
-    var host = window.GuitarLabHost;
-    if ((host || (isIOS() && standalone())) && navigator.share && navigator.canShare && typeof File === 'function') {
-      try {
-        var file = new File([blob], name, { type: type });
-        if (navigator.canShare({ files: [file] })) {
-          navigator.share({ files: [file], title: name }).catch(function (e) {
-            if (e && e.name !== 'AbortError') App.toast('Could not share ' + name + ': ' + errText(e), 4200);
-          });
-          return 'shared';
-        }
-      } catch (e) { /* fall through */ }
-    }
-    if (host) {
-      App.toast('The Android app cannot save files. Use Save to my library, or open soundLAB in Chrome to download.', 6400);
-      return 'unsupported';
-    }
-    var a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = name;
-    a.rel = 'noopener';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(function () { URL.revokeObjectURL(a.href); }, 15000);
-    return 'downloaded';
+    return App.saveFile(name, data, type, { apkNote: 'The Android app cannot save files. Use Save to my library, or open soundLAB in Chrome to download.' });
   }
   function download(kind) {
     return exportsFor().then(function (x) {
@@ -962,7 +967,14 @@
     return exportsFor().then(function (x) {
       var hub = window.SLMidiHub && SLMidiHub.player;
       if (!hub) throw new Error('The MIDI Hub is not loaded.');
-      return Promise.resolve(hub.loadFile(fileName(x.title, 'mid'), bufOf(x.midi))).then(function () { hub.show(); return true; });
+      return Promise.resolve(hub.loadFile(fileName(x.title, 'mid'), bufOf(x.midi))).then(function () {
+        hub.show();
+        // iPad Safari / Chrome have no Web MIDI: the Player has it, but no synth can be reached here
+        if (App.midi && App.midi.supported === false) {
+          App.toast('No MIDI in this browser: save it to My library (with sync) or download it, then open it in a Web MIDI browser app.', 7000);
+        }
+        return true;
+      });
     }).catch(function (e) { fail(e); return false; });
   }
   function practice() {
@@ -971,8 +983,10 @@
       if (!ws || typeof ws.importMidi !== 'function' || typeof ws.addScore !== 'function') throw new Error('The Woodshed is not available in this build.');
       var sc = ws.importMidi(bufOf(x.midi), x.title);
       if (!sc) throw new Error('The Woodshed could not read the MIDI.');
-      ws.addScore(sc);
       App.switchTo('shed');
+      // tapped twice: the same score is shown (scrolled into view), not stored again
+      if (typeof ws.addOrShow === 'function') ws.addOrShow(sc); else ws.addScore(sc);
+      App.toast('In the Woodshed: ' + x.title, 4200);
       return true;
     }).catch(function (e) { fail(e); return false; });
   }
@@ -987,13 +1001,57 @@
       return true;
     }).catch(function (e) { fail(e); return false; });
   }
+  // with a key on this device a save is also an upload to GitHub (the default repository is public,
+  // and its history keeps what reached it): the first one waits for a tap on Save to my library after
+  // saying so - asked once (library.publicAck), in the page (confirm() is refused in the artifact)
+  function needsPublicOk() {
+    var lib = App.library;
+    return !!(lib && lib.hasKey) && App.store.get('library.publicAck', false) !== true;
+  }
+  function repoText() {
+    var lib = App.library, c = lib && lib.config ? lib.config() : null;
+    return (c ? c.repo : 'your repository') + (lib && lib.knownPublic ? ', a public repository' : '');
+  }
+  // the title edited after the result was saved: the saved entry takes the new name (instead of a
+  // second entry at the next Save). Its MIDI keeps the track name it was saved with.
+  function renameSaved(r) {
+    var lib = App.library;
+    r.libQ = Promise.resolve(r.libQ).then(function () { return r.libP; }).then(function () {
+      if (!r.libId || !lib) return null;
+      var t = cleanTitle(r.title) || r.origTitle;
+      return lib.get(r.libId).then(function (it) {
+        if (!it || it.pending === 'delete' || it.title === t) return null;
+        return lib.rename(r.libId, t).then(function (st) { if (S.result === r && st && st.message) libSay(st.message); return st; });
+      });
+    }).catch(function (e) { if (S.result === r) libSay('Not renamed in my library: ' + errText(e)); return null; });
+    return r.libQ;
+  }
   function saveToLibrary(auto) {
     var lib = App.library;
     if (!lib || typeof lib.saveScan !== 'function') { libSay('My library is not available in this build.'); return Promise.resolve(null); }
     var r = S.result;
     if (!r || !r.midi) return Promise.resolve(null);
+    // saved already (the auto-save, an earlier tap): the same entry, renamed when the title changed
+    if (!auto && (r.libId || r.libP)) {
+      return renameSaved(r).then(function (ren) {
+        return (r.libId ? lib.get(r.libId) : Promise.resolve(null)).then(function (it) {
+          if (!it || it.pending === 'delete') { r.libId = null; r.libP = null; return saveToLibrary(false); } // deleted meanwhile
+          if (S.result === r && !ren) libSay('“' + it.title + '” is already in your library.');
+          return { id: it.id, title: it.title, already: true };
+        });
+      });
+    }
+    if (needsPublicOk()) {
+      if (auto || !r.pubAsked) {
+        r.pubAsked = true;
+        if (S.result === r) libSay('Not saved yet: with the key on this device, saving also copies the scan to GitHub (' + repoText() + '), where ' +
+          (lib.knownPublic ? 'anyone can download it and ' : '') + 'it stays in the history. Tap Save to my library to keep it there (asked once).');
+        return Promise.resolve(null);
+      }
+      App.store.set('library.publicAck', true);
+    }
     libSay(auto ? 'Saving to my library…' : 'Saving…');
-    return exportsFor().then(function (x) {
+    var p = r.libP = exportsFor().then(function (x) {
       var sm = r.summary || {};
       return lib.saveScan({
         title: x.title, source: r.source, pages: r.sourcePages,
@@ -1002,12 +1060,15 @@
         midi: x.midi, musicxml: x.musicxml
       });
     }).then(function (st) {
+      if (st && st.id) r.libId = st.id;
       if (S.result === r) libSay(st && st.message ? st.message : 'Saved to my library.');
       return st;
     }, function (e) {
+      if (r.libP === p) r.libP = null;
       if (S.result === r) libSay('Not saved to my library: ' + errText(e));
       return null;
     });
+    return p;
   }
 
   // ---------------------------------------------------------------- page previews
@@ -1172,10 +1233,13 @@
     } else if (st === 'unavailable') {
       cls += ' bad';
       html = '<span>' + esc(S.engineNote || 'The recognition engine cannot run in this browser.') + '</span>';
+    } else if (st === 'unknown' && S.retry) {
+      cls += ' bad';
+      html = '<span class="sl-etext">' + esc(S.engineNote) + '</span><button type="button" class="btn" id="sl-retry">Try again</button>';
     } else {
       html = '<span class="muted">Checking the recognition engine…</span>';
     }
-    if (S.engineNote && st !== 'unavailable') html += '<div class="sl-enote">' + esc(S.engineNote) + '</div>';
+    if (S.engineNote && st !== 'unavailable' && !(st === 'unknown' && S.retry)) html += '<div class="sl-enote">' + esc(S.engineNote) + '</div>';
     if (S.pdfNote && st === 'ready') html += '<div class="sl-enote">' + esc(S.pdfNote) + '</div>';
     // rewrite only on a real change: an identical rewrite is announced again by screen readers and
     // takes the keyboard focus off the Download / Stop button
@@ -1222,15 +1286,18 @@
     els.go.disabled = running || S.starting || !n || S.engine === 'unavailable';
     els.go.textContent = running || S.starting ? 'Converting…' : S.pending && S.engine !== 'ready' ? 'Converts after the download' : 'Convert to MIDI';
     els.clear.disabled = running;
-    els.file.disabled = running; els.cam.disabled = running;
+    // the artifact can pick files but never convert them (no models there): the pickers are off
+    var off = running || !!window.SL_ARTIFACT;
+    els.file.disabled = off; els.cam.disabled = off;
     [els.choose, els.photo].forEach(function (lb) { // labels styled as buttons: keyboard-operable (see init)
-      lb.classList.toggle('dis', running);
-      lb.tabIndex = running ? -1 : 0;
-      lb.setAttribute('aria-disabled', running ? 'true' : 'false');
+      lb.classList.toggle('dis', off);
+      lb.tabIndex = off ? -1 : 0;
+      lb.setAttribute('aria-disabled', off ? 'true' : 'false');
     });
-    var imgs = n && kindOf(S.files[0]) === 'image';
+    // after a conversion the next photo is the next piece, not one more page of the last one
+    var imgs = n && kindOf(S.files[0]) === 'image' && !S.used;
     els.photoLabel.textContent = imgs ? 'Add a page (photo)' : 'Take a photo';
-    els.drop.classList.toggle('dis', running);
+    els.drop.classList.toggle('dis', off);
     if (els.optset) els.optset.disabled = running;
   }
   function paintOpts() {
@@ -1244,6 +1311,8 @@
     els.enhance.checked = o.enhance;
     els.autosave.checked = o.autosave;
     els.autosaveRow.hidden = !(App.library && typeof App.library.saveScan === 'function');
+    var at = document.getElementById('sl-autosave-txt');
+    if (at) at.textContent = App.library && App.library.hasKey ? 'Also save to my library (copied to GitHub: ' + repoText() + ')' : 'Also save to my library';
     Array.prototype.forEach.call(els.dpi.querySelectorAll('[data-v]'), function (b) {
       var on = parseInt(b.getAttribute('data-v'), 10) === o.dpi;
       b.classList.toggle('active', on);
@@ -1389,7 +1458,8 @@
         '.sl-opts{grid-template-columns:1fr 1fr;grid-auto-flow:dense;gap:12px}.sl-opts .sl-wide{grid-column:1/-1}' +
         '.sl-acts{grid-template-columns:1fr 1fr}.sl-acts .btn{padding-left:8px;padding-right:8px}.sl-pages{grid-template-columns:1fr}}' +
       '@media (max-width:340px){.sl-opts{grid-template-columns:1fr}}' +
-      '@media (pointer:coarse){#panel-sheetlab .btn{min-height:46px}}'
+      '@media (pointer:coarse){#panel-sheetlab .btn{min-height:46px}#panel-sheetlab .sl-dpi{min-height:52px}' +
+        '#panel-sheetlab details.tips>summary{padding:10px 0}}'
     );
   }
 
@@ -1412,7 +1482,7 @@
       '<div class="card" id="sl-card">' +
         '<h2>Sheet music to MIDI</h2>' +
         '<div class="muted sl-lead">A PDF, a photo or a scan of printed sheet music becomes MIDI and MusicXML to play, practise or keep. ' +
-          'It is read on this device; nothing is uploaded.</div>' +
+          'It is read on this device: the file itself is never uploaded. Only what you keep in My library is copied to GitHub, and only when Library sync has a key on this device.</div>' +
         '<div class="sl-engine" id="sl-engine" aria-live="polite"></div>' +
         '<div class="sl-drop" id="sl-drop">' +
           '<div class="sl-drop-ic">' + App.icon('note', 28) + '</div>' +
@@ -1439,7 +1509,8 @@
         '<fieldset id="sl-optset"><div class="sl-opts" id="sl-opts">' +
           '<label class="field">Tempo (BPM)<input type="number" id="sl-tempo" min="20" max="300" step="1" inputmode="numeric">' +
             '<span class="sl-tnote" id="sl-tnote"></span></label>' +
-          '<label class="field sl-wide">Instrument<select id="sl-inst">' + instOptions() + '</select></label>' +
+          '<label class="field sl-wide">Instrument<select id="sl-inst">' + instOptions() + '</select>' +
+            '<span class="sl-tnote">Saved in the files; Play on synth uses the synth’s own sound.</span></label>' +
           '<label class="field">Transpose<select id="sl-tr">' + trOptions() + '</select></label>' +
           '<div class="sl-field sl-wide"><span class="ctl-label" id="sl-dpilbl">PDF quality</span>' +
             '<div class="seg sl-dpi" id="sl-dpi" role="group" aria-labelledby="sl-dpilbl">' +
@@ -1449,7 +1520,7 @@
         '<div class="sl-checks">' +
           '<label class="sl-check"><input type="checkbox" id="sl-split"> Split 2-page spreads</label>' +
           '<label class="sl-check"><input type="checkbox" id="sl-enhance"> Enhance low-res scans</label>' +
-          '<label class="sl-check" id="sl-autosave-row" hidden><input type="checkbox" id="sl-autosave"> Also save to my library</label>' +
+          '<label class="sl-check" id="sl-autosave-row" hidden><input type="checkbox" id="sl-autosave"> <span id="sl-autosave-txt">Also save to my library</span></label>' +
         '</div></fieldset>' +
         '<details class="tips"><summary>What reads well</summary><div>Printed (engraved) music, one page at a time, flat and evenly lit; ' +
           'PDFs straight from a notation program read best. Handwriting, guitar tab, chord charts and lyrics are not read. ' +
@@ -1499,7 +1570,7 @@
 
     // picking
     els.file.addEventListener('change', function () { var f = this.files; setFiles(f, false); this.value = ''; if (S.engine === 'unknown') checkEngine(); });
-    els.cam.addEventListener('change', function () { var f = this.files; setFiles(f, true); this.value = ''; if (S.engine === 'unknown') checkEngine(); });
+    els.cam.addEventListener('change', function () { var f = this.files; setFiles(f, !S.used); this.value = ''; if (S.engine === 'unknown') checkEngine(); });
     // keyboard: Enter / Space on the two picker labels opens their file chooser (a label is not a button)
     [els.choose, els.photo].forEach(function (lb) {
       lb.addEventListener('keydown', function (e) {
@@ -1531,12 +1602,13 @@
     rootEl.addEventListener('dragover', function (e) { e.preventDefault(); });
     rootEl.addEventListener('drop', function (e) { e.preventDefault(); });
     els.go.addEventListener('click', function () { convert(); });
-    els.clear.addEventListener('click', function () { S.files = []; S.pending = false; say(''); paintSel(); paintEngine(); });
+    els.clear.addEventListener('click', function () { S.files = []; S.pending = false; S.used = false; say(''); paintSel(); paintEngine(); });
     els.engine.addEventListener('click', function (e) {
       var b = e.target.closest('button');
       if (!b) return;
       if (b.id === 'sl-dl') downloadEngine();
       else if (b.id === 'sl-dlstop') stopDownload();
+      else if (b.id === 'sl-retry') checkEngine();
     });
 
     // options
@@ -1562,6 +1634,7 @@
       paintOpts();
     });
     App.on('tempo', function () { if (App.store.get('sheetlab.tempo', null) == null && document.activeElement !== els.tempo) paintOpts(); });
+    window.addEventListener('online', function () { if (S.engine === 'unknown' && S.retry && App.active === 'sheetlab') checkEngine(); });
 
     // progress + result
     els.stop.addEventListener('click', function () { stop(); });
@@ -1571,6 +1644,7 @@
       r.title = cleanTitle(els.title.value) || r.origTitle;
       els.title.value = r.title;
       exportsFor().catch(function (e) { fail(e); }); // ready before the next tap
+      if (r.libId || r.libP) renameSaved(r); // the auto-saved entry takes the new name, no second copy
     });
     els.title.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); els.title.blur(); } });
     $('sl-play').addEventListener('click', function () { playOnSynth(); });

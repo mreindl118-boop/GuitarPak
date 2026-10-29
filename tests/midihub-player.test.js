@@ -96,6 +96,8 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
   const st = m1.sent.map(b => b[0] & 0xf0), ons = m1.sent.filter(b => (b[0] & 0xf0) === 0x90), offs = m1.sent.filter(b => (b[0] & 0xf0) === 0x80);
   ok(m1.sum.title === 'Test tune' && m1.sum.notes === 4 && m1.sum.channels.join() === '1,2' && /Test tune/.test(m1.info), 'reads title, 4 notes (one re-struck), channels 1 and 2: ' + JSON.stringify(m1.sum));
   ok(/left out/.test(m1.warn), 'says what it leaves out: ' + m1.warn);
+  const infoLine = await page.evaluate(() => { const m = document.querySelector('#mh-plwarn .muted'); return m ? m.textContent : ''; });
+  ok(/left out/.test(infoLine) && /own sound/.test(infoLine), 'the left-out program / controller line is a plain note (muted: every scan has one), not a red warning: ' + infoLine);
   ok(st.every(s => s === 0x90 || s === 0x80 || s === 0xb0) && m1.sent.filter(b => (b[0] & 0xf0) === 0xb0).every(b => b[1] === 64), 'only notes and the sustain pedal reach the synth (no program, mod wheel or SysEx)');
   ok(ons.length === 4 && offs.length === 4 && m1.lumi === 0, 'every note played and released, nothing sent to the LUMI: ' + ons.length + ' on / ' + offs.length + ' off');
   ok(Math.max(...ons.map(b => b[2])) === 60 && ons.some(b => b[0] === 0x91 && b[1] === 48), 'loudest note = the cap (60); channel 2 kept: ' + ons.map(b => b.join(' ')).join('|'));
@@ -206,6 +208,32 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
   ok(k.toG.join() === '55,57,59,60,62,64,66,67,61', 'C major as G major moves each degree to G major (down a 4th): ' + k.toG.join(','));
   ok(k.played.join() === k.toMinor.join() && k.offs.slice().sort().join() === k.played.slice().sort().join(), 'playback sends the shifted notes, and each Note Off matches its Note On: ' + k.played.join(','));
   ok(k.hidden && k.plain.join() === '60,62,64,65,67,69,71,72,66', 'Change key off: notes as written again');
+
+  console.log('# iPad Safari: no Web MIDI');
+  const ictx = await browser.newContext({ viewport: { width: 1024, height: 1366 }, hasTouch: true,
+    userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15' });
+  await ictx.addInitScript(() => {
+    ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
+    Object.defineProperty(navigator, 'platform', { get: () => 'MacIntel' });
+    Object.defineProperty(navigator, 'maxTouchPoints', { get: () => 5 });
+    try { delete Navigator.prototype.requestMIDIAccess; } catch (e) { /* not there */ }
+  });
+  const ip = await ictx.newPage();
+  ip.on('pageerror', e => errs.push('ipad: ' + e.message));
+  await ip.goto(env.URL);
+  await ip.waitForFunction(() => window.App && window.SLMidiHub && App.active);
+  const ipad = await ip.evaluate(async () => {
+    SLMidiHub.player.show();
+    await new Promise(r => setTimeout(r, 200));
+    const s0 = document.getElementById('mh-status').textContent, hidden = document.getElementById('mh-connect').hidden;
+    document.getElementById('mh-enable').click();
+    await new Promise(r => setTimeout(r, 200));
+    return { s0, hidden, s1: document.getElementById('mh-status').textContent, out: document.getElementById('mh-plout').textContent };
+  });
+  ok(/Safari and Chrome on iPad have no Web MIDI/.test(ipad.s0) && /Web MIDI browser app/.test(ipad.s0) && !/Chrome or Edge/.test(ipad.s0) && ipad.hidden,
+    'iPad Safari: the Hub names the fix (a Web MIDI browser app), not "use Chrome or Edge", and offers no Connect: ' + ipad.s0);
+  ok(!/declined or failed/.test(ipad.s1) && /No MIDI in this browser/.test(ipad.out), 'a Connect that cannot work never claims "declined or failed": ' + ipad.s1 + ' / ' + ipad.out);
+  await ictx.close();
 
   ok(errs.length === 0, 'no page errors' + (errs.length ? ': ' + errs.join(' | ') : ''));
   await ctx.close(); await browser.close();

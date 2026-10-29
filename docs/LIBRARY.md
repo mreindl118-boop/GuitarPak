@@ -3,15 +3,23 @@
 One place for the music you keep in soundLAB:
 
 - **Scans**: sheet music you turned into MIDI with Play › Scan (SheetLab). Each scan keeps its `.mid`, its
-  `.musicxml` and a `meta.json` (title, source file, pages, tempo / instrument / transpose, measures, notes,
-  chords, length, app version).
+  `.musicxml` and a `meta.json` (title, the source file's type such as `PDF` or `JPG` - not its name -,
+  pages, tempo / instrument / transpose, measures, notes, chords, length, app version).
 - **Played**: what you played in the app. Every idea you capture in the Studio (the ● in the clef menu, or
   **Keep the last 30s** on Studio › Ideas) becomes a Standard MIDI File with its tempo and key, when
-  **Save what I play** is on. Any idea (also older ones, and Woodshed runs) has a **Save to library** button.
+  **Save what I play** is on. Any idea (also older ones, and Woodshed runs) has a **Save to my library** button.
 
 The library works on this device first, offline and with no account. With an access key it is also kept in
 the soundLAB GitHub repository, on a branch of its own called `library`, so the iPad, the phone and the
 computer all see the same library.
+
+**What is synced is public.** `mreindl118-boop/GuitarPak` is a public repository: anyone can open and
+download what reaches its `library` branch, and it stays in the branch's Git history even after Delete. For
+private scans (copyrighted songbooks, private playing), point **Advanced › Repository** at a private
+repository of your own (then every device needs a key, also for listing). Settings › Library sync says this
+first; with a key, Scan's checkbox reads "Also save to my library (copied to GitHub …, a public repository)",
+and the first upload of a scan waits for a tap on **Save to my library** after saying where it goes (asked
+once, `guitarlab.library.publicAck`).
 
 ## Use it
 
@@ -23,13 +31,15 @@ Scans / Played**; search by title, source or key. Each entry:
 | **Play on synth** | Opens it in the MIDI Hub Player (tempo, key shifter, loop), ready to play on your synth. |
 | **Practice** | Adds it to the Woodshed library and opens the Woodshed (Wait for me / Play at tempo / Run…). |
 | **Open as tab** | Shows it as guitar tab on the Songs page. |
-| **.mid / .musicxml** | Downloads the file (.musicxml for scans). |
+| **.mid / .musicxml** | Downloads the file (.musicxml for scans), named after the title like Scan's downloads; the share sheet in the iOS home-screen app; in the Android app a note (its WebView has no downloads). |
 | **Rename** | Changes the title (in `meta.json` only: file names stay, so links keep working). |
-| **Delete** | Two taps: the first arms it ("Delete for good?"), the second deletes it here and on GitHub. |
+| **Delete** | Two taps: the first arms it ("Delete? Tap again", or "Delete? It stays in GitHub's history" for an entry on GitHub), the second deletes it here and from the current `library` branch. It stays in the branch's Git history on GitHub (public); removing it for good needs a history rewrite (`git filter-repo` + a force-push of the `library` branch) and GitHub Support for cached views. |
 
 The line under the title says where the entry is: *On GitHub · kept here*, *On GitHub* (another device saved
 it; the file is fetched the first time you use it, then kept here), *Waiting to upload*, or *On this device
-only* (no key yet). **Sync now** checks GitHub and uploads what is waiting.
+only* (no key yet). **Sync now** checks GitHub and uploads what is waiting; after a new key the next visit to the
+Library page lists and uploads at once (not only after the usual 30 s). The keyboard focus stays on the button just used (the list is rebuilt after each
+action), and every button names its entry for screen readers ("Delete Menuetto").
 
 ## Set up sync (once per device)
 
@@ -42,11 +52,15 @@ Settings › **Library sync**:
 4. Repository permissions › **Contents** › **Read and write** (Metadata: read is added automatically).
    Nothing else.
 5. Generate, copy the token (`github_pat_…`), paste it into **Access key**, press **Test connection**.
+6. Each device needs a key once. GitHub shows a token only once, so either repeat these steps on each device
+   (one token per device, so a lost phone can be revoked alone), or keep the token in your password
+   manager and paste it from there.
 
-The first save creates the `library` branch. Repository, branch and folder can be changed on the card
-(defaults `mreindl118-boop/GuitarPak`, `library`, `library`); `main`, `master` and `gh-pages` are refused as
-the branch, because saving there would redeploy the app. **Save what I play** is on by default once a key is
-set; switch it off to keep captured ideas out of the library.
+The first save creates the `library` branch. Repository, branch and folder can be changed under
+**Advanced: where the library is kept** (defaults `mreindl118-boop/GuitarPak`, `library`, `library`; a
+change uploads every entry again to the new place); `main`, `master` and `gh-pages` are refused as the
+branch, because saving there would redeploy the app. **Save what I play** is on by default once a key is
+set; switch it off to keep captured ideas out of the library (and off GitHub).
 
 Without a key the library still lists and opens everything on GitHub (the repository is public: GitHub allows
 60 such requests an hour per network), and saves on this device; those entries upload once a key is set.
@@ -56,7 +70,9 @@ Without a key the library still lists and opens everything on GitHub (the reposi
 - The key is stored on this device only, under `localStorage['soundlab.secret.library']`, outside the
   `guitarlab.*` keys, so **Export settings never contains it** (tested). It is sent only to api.github.com,
   only as the `Authorization` header (tested over every request of a session: never in a URL, a body,
-  another host or the console). Import settings only writes `guitarlab.*`, so a backup cannot plant a key.
+  another host or the console). Import settings only writes `guitarlab.*`, so a backup cannot plant a key,
+  and plugins in a backup are restored switched off (appended to this device's own; turning one on stays an
+  explicit toggle in Settings › Plugins), so a shared or crafted backup cannot run code that reads the key.
 - Pasting is forgiving: spaces, line breaks and zero-width characters around or inside the key are removed
   (left in, the browser refused the header and every request looked like "no network"); anything else that
   no GitHub key contains is refused with a reason.
@@ -157,11 +173,20 @@ Nothing is sent at boot or from any other page. Requests happen only:
 
 1. when the **Library page is shown**: one listing (at most every 30 s), the details of new entries, and
    the upload of what the owner already saved (with a key);
-2. on an **owner action**: a save, an auto-save the owner switched on (Save what I play), rename, delete,
-   Sync now, Test connection, or opening / downloading an entry that is only on GitHub.
+2. on an **owner action**: a save, an auto-save (SheetLab's **Also save to my library**, on by default, and
+   **Save what I play**, on by default once a key is set; the first scan upload waits for a tap, see above),
+   rename, delete, Sync now, Test connection, or opening / downloading an entry that is only on GitHub.
 
 Coming back online does not upload by itself: the status says how many changes wait, and the next save,
-Sync now or visit to the Library page sends them.
+Sync now or visit to the Library page sends them. The online/offline events only repaint the status where
+the library is in use, so a phone that drops signal never creates the database for an owner who never
+opened the library. Without a key the offline messages promise no upload ("everything stays on this
+device").
+
+A `meta.json` from GitHub is data: every field soundLAB shows must have its own type (a string, a finite
+number), or it is dropped, so a hand-edited or hostile one (`{"source": {"toString": 1}}`) cannot blank the
+list; fields soundLAB does not know are kept as they are (a rename writes them back). A record that still
+cannot be shown gets a plain card with its title and Delete.
 
 ### Races
 
@@ -174,7 +199,7 @@ entry learned from the listing never replaces a local one with the same id. `sav
 time and returns `{already: true}` for the same scan saved again (same title, byte-identical MIDI and
 MusicXML: a double tap, SheetLab's auto-save plus a tap); different content under one title gets `-2`.
 `savePlayed` checks "already
-in?" and inserts one idea at a time, so the auto-save of a new idea and a tap on its Save to library (or
+in?" and inserts one idea at a time, so the auto-save of a new idea and a tap on its Save to my library (or
 two quick taps) keep ONE entry. The database connection lets go when another tab upgrades or deletes it
 (`onversionchange`) and is opened again after the browser drops it (`onclose`, an `InvalidStateError`).
 
@@ -205,7 +230,7 @@ no third SMF writer.
 
 ## Tests
 
-`tests/library.test.js` (Playwright, 94 checks) drives the app against a fake GitHub (page routes for
+`tests/library.test.js` (Playwright) drives the app against a fake GitHub (page routes for
 api.github.com and raw.githubusercontent.com that keep a tree, compute git blob shas, record every request
 and inject faults): no request at boot / on other pages / after a reload with pending changes; listing
 without a key; saving a scan (MIDI bytes 0-255 and UTF-8 MusicXML round trip); the orphan branch sequence
@@ -220,8 +245,10 @@ the key pasted into Repository / Branch / Folder refused, `refs/heads/main` refu
 auto-save plus a tap, a lost answer continued without a `-2` copy, a folder switched away and back with no
 upload, a new file's 409 retried, a hung listing ending the sync, an entry deleted during another upload never sent, Test connection
 on a rate-limited listing, the key only as Authorization to api.github.com over a whole session, a stale CDN
-meta.json replaced by the exact blob, an unreachable repository changing nothing on the device, and the
-database letting go when another tab deletes or upgrades it.
+meta.json replaced by the exact blob, an unreachable repository changing nothing on the device, the
+database letting go when another tab deletes or upgrades it, a settings backup whose plugin comes back
+switched off, a malformed remote meta.json, network changes that never open the database, the focus kept
+on the armed Delete, the public notes and the keyless offline text.
 
 Run: `tests/run.sh library` (or `SL_URL=… node tests/library.test.js` against a running `tests/serve.py`).
 
@@ -231,6 +258,10 @@ Run: `tests/run.sh library` (or `SL_URL=… node tests/library.test.js` against 
   on each device is the end-to-end check.
 - Inside the claude.ai artifact viewer, requests to GitHub and file downloads may be refused by the frame;
   the library then works on the device only.
+- Android app (APK): Download cannot save a file in the WebView wrapper (no download support until a new
+  APK); the button says so. Use the site in Chrome to download, or Play on synth / Practice in the app.
+- Each iOS web container (Safari, the home-screen app, a Web MIDI browser app) has its own IndexedDB: an
+  entry *On this device only* in Safari is not in the Web MIDI app's library unless sync is set up.
 - Entries are listed from one tree call; a library larger than GitHub's tree limit (100,000 files) would
   be listed partly (nothing is pruned then).
-- Woodshed runs are not auto-saved (each run would add an entry); use Save to library on the idea.
+- Woodshed runs are not auto-saved (each run would add an entry); use Save to my library on the idea.

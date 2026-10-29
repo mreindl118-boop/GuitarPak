@@ -1,6 +1,8 @@
 /* soundLAB OMR: OpenCV with cv2-Python-shaped calls (OMR.cv2) over opencv.js 5.0.0
    (@techstark/opencv-js, the same OpenCV version as the Python reference), for the
    homr port (github.com/liebharc/homr, AGPL-3.0).
+   Contains code ported from OpenCV 5.0.0 (Apache-2.0); its copyright and licence are in
+   THIRD-PARTY-NOTICES.md.
 
    Conventions (see notes/foundation.md):
    - images are OMR.np images {h, w, c, data}; every wrapper copies into a cv.Mat,

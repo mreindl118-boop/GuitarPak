@@ -16,7 +16,7 @@ function targetSize(w, h) {
 }
 
 (async () => {
-  await H.cv(); // for the gray conversion of the synthetic cases
+  await H.needCv(); // for the gray conversion of the synthetic cases
   const pages = H.pages().filter((p) => H.has(p, '00-input.png') && H.has(p, '02-resized.png'));
   if (!pages.length) { H.skip('pil parity: no fixtures'); H.done(); return; }
   for (const page of pages) {

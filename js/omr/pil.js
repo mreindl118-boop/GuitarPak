@@ -4,7 +4,8 @@
    8-bit images: precompute_coeffs (filter support widened by the downscale factor),
    normalize_coeffs_8bpc (22-bit fixed point), the two separable passes in Pillow's order
    (vertical first when the height shrinks much more than the width) with its row trimming,
-   rounding and clipping. Checked against PIL in tests/omr-pil.test.js. */
+   rounding and clipping. Checked against PIL in tests/omr-pil.test.js.
+   Contains code ported from Pillow 13.0.0; its copyright and licence are in THIRD-PARTY-NOTICES.md. */
 (function (G) {
   'use strict';
   var OMR = G.OMR = G.OMR || {};

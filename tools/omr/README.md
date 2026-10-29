@@ -68,7 +68,13 @@ NODE_PATH=<scratch>/node_modules:<playwright> node tests/omr-e2e.test.js
 
 - **Without `SL_OMR_FIXTURES`:** the page checks print SKIP lines and pass. The small repo fixtures in
   `tests/fixtures/omr/` still run.
-- **Without `SL_OMR_MODELS`:** the model checks use `models/omr/` through the manifest.
-- **CI:** `tests/run.sh` runs every suite in this mode.
+- **Without `SL_OMR_MODELS`:** `omr-e2e` (its ci page) and `sheetlab` load `models/omr/` through the
+  manifest, and `OMR.runtime` verifies every part's and model's SHA-256 as it loads them; `omr-runtime`'s
+  manifest and session checks, `omr-segment`'s segnet parity and `omr-read`'s model sections skip.
+- **Without opencv.js / onnxruntime-web / pdfjs-dist on `NODE_PATH`:** the suites that need them print a
+  SKIP line and exit 0 (`tests/run.sh` reports them as "skipped").
+- **CI:** `tests/run.sh` runs every suite in this mode; it prints each suite's real checks and skips
+  ("pass (N checks, M skipped)").
 
-The full fixture run of `omr-read` and `omr-e2e` takes 10–25 minutes on 4 cores.
+The full fixture run of `omr-read` and `omr-e2e` takes about 35 minutes on 4 cores (`omr-e2e` about
+27–29 minutes, `omr-read` about 8; `omr-midi` under a minute).

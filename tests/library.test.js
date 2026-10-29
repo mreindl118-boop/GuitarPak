@@ -157,7 +157,12 @@ async function readDownload(page, clickFn) {
 const card = (title) => `.lib-item:has(.lib-title:text-is("${title}"))`;
 
 (async () => {
-  const browser = await chromium.launch({ executablePath: env.CHROMIUM });
+  // a download named after a title with ü or – : Chromium falls back to "download" under a POSIX
+  // (non-UTF-8) locale, as on a bare CI shell; devices and CI's C.UTF-8 keep the name
+  const utf8 = (v) => /utf-?8/i.test(v || '');
+  const benv = Object.assign({}, process.env);
+  if (!utf8(benv.LC_ALL || benv.LC_CTYPE || benv.LANG)) { benv.LANG = 'C.UTF-8'; benv.LC_ALL = 'C.UTF-8'; }
+  const browser = await chromium.launch({ executablePath: env.CHROMIUM, env: benv });
   let ctx = await newCtx(browser);
   let page = await ctx.newPage();
   const errs = [];
@@ -200,6 +205,18 @@ const card = (title) => `.lib-item:has(.lib-title:text-is("${title}"))`;
   const set0 = await page.evaluate(() => ({ repo: document.getElementById('lib-set-repo').value, branch: document.getElementById('lib-set-branch').value, folder: document.getElementById('lib-set-folder').value, played: document.getElementById('lib-set-played').checked, type: document.getElementById('lib-set-key').type, help: document.getElementById('set-library-card').textContent }));
   ok(set0.repo === OWNER + '/' + REPO && set0.branch === 'library' && set0.folder === 'library' && set0.type === 'password' && !set0.played, 'defaults: repo / library branch / library folder, password field, Save what I play off without a key');
   ok(/personal-access-tokens\/new/.test(set0.help) && /Only select repositories/.test(set0.help) && /Contents/.test(set0.help) && /Read and write/.test(set0.help) && /Expiration/.test(set0.help) && /ruleset/.test(set0.help) && /[Pp]lugins/.test(set0.help), 'step-by-step key instructions + security notes are on the card');
+  const pubNote = await page.evaluate(() => {
+    const c = document.getElementById('set-library-card'), pub = document.getElementById('lib-set-public'), key = document.getElementById('lib-set-key');
+    return { pub: pub ? pub.textContent : '', before: !!(pub && key && (pub.compareDocumentPosition(key) & Node.DOCUMENT_POSITION_FOLLOWING)),
+      repoInAdvanced: !!document.getElementById('lib-set-repo').closest('details'), repoAfterKey: !!(key.compareDocumentPosition(document.getElementById('lib-set-repo')) & Node.DOCUMENT_POSITION_FOLLOWING),
+      perDevice: /one token per device/.test(c.textContent) && /password manager/.test(c.textContent) };
+  });
+  ok(/saved to GitHub is public/.test(pubNote.pub) && /history even after Delete/.test(pubNote.pub) && /private/.test(pubNote.pub) && pubNote.before,
+    'the card says, above the key field and whether or not a key is set, that what reaches GitHub is public and stays in its history: ' + pubNote.pub);
+  ok(pubNote.repoInAdvanced && pubNote.repoAfterKey && pubNote.perDevice, 'Repository / Branch / Folder sit under Advanced after the key; the steps say how a once-shown token reaches each device');
+  const lic = await page.evaluate(() => { const l = document.getElementById('set-licence'); return l ? { t: l.textContent, links: [...l.querySelectorAll('a')].map(a => a.href + ' ' + a.rel) } : null; });
+  ok(lic && /AGPL-3\.0/.test(lic.t) && /homr/.test(lic.t) && /THIRD-PARTY-NOTICES/.test(lic.t) && lic.links.some(h => /github\.com\/mreindl118-boop\/GuitarPak\/blob\/main\/LICENSE noopener/.test(h)) && lic.links.some(h => /github\.com\/mreindl118-boop\/GuitarPak noopener/.test(h)),
+    'Settings › About names the licence (AGPL-3.0), links LICENSE and the source, and credits the bundled parts: ' + (lic && lic.t));
   await page.fill('#lib-set-key', KEY);
   await page.press('#lib-set-key', 'Enter');
   const keyState = await page.evaluate((K) => {
@@ -222,9 +239,11 @@ const card = (title) => `.lib-item:has(.lib-title:text-is("${title}"))`;
 
   console.log('# the first write creates the orphan library branch, then uploads');
   gh.log.length = 0;
+  // the key was just set: opening the Library page uploads what waits at once (it waited up to 30 s
+  // after the last listing, saying "2 changes waiting to upload")
   await page.evaluate(() => App.switchTo('library'));
-  await page.click('#lib-sync');
-  await waitLog(() => gh.messages.length >= 5);
+  const upByShow = await waitLog(() => gh.messages.length >= 5, 6000);
+  ok(upByShow, 'right after a key is set, opening the Library page lists and uploads (no Sync now needed)');
   await idle(page);
   L = libLog();
   const seq = L.map(r => r.m + ' ' + r.path.replace('/repos/' + OWNER + '/' + REPO, ''));
@@ -241,7 +260,7 @@ const card = (title) => `.lib-item:has(.lib-title:text-is("${title}"))`;
   ok(binBack && Buffer.compare(binBack, Buffer.from(bin)) === 0 && !F.has('library/scans/binary/binary.musicxml'), 'all 256 byte values survive the base64 round trip; no .musicxml when there is none');
   ok(xmlBack && xmlBack.toString('utf8') === XML, 'the MusicXML arrives as UTF-8 (ü, –, ♩ intact)');
   const meta1 = JSON.parse(F.get('library/scans/fur-elise-test/meta.json').toString('utf8'));
-  ok(meta1.kind === 'scan' && meta1.title === 'Für Elise – Test' && meta1.source === 'fur-elise.pdf' && meta1.pages === 2 && meta1.options.tempo === 96 && meta1.summary.measures === 12 && meta1.summary.seconds === 31.5 && meta1.app === 'soundLAB ' + V && !isNaN(Date.parse(meta1.created)), 'meta.json: kind, title, source, pages, created, options, summary, app version');
+  ok(meta1.kind === 'scan' && meta1.title === 'Für Elise – Test' && meta1.source === 'PDF' && meta1.pages === 2 && meta1.options.tempo === 96 && meta1.summary.measures === 12 && meta1.summary.seconds === 31.5 && meta1.app === 'soundLAB ' + V && !isNaN(Date.parse(meta1.created)), 'meta.json: kind, title, the source file\'s TYPE (not its name: the repository is public), pages, created, options, summary, app version');
   it = await items(page);
   ok(it.length === 2 && it.every(x => !x.pending && x.remote && x.hasMid), 'both entries uploaded, nothing pending');
   const st1 = await page.evaluate(() => ({ s: document.getElementById('lib-status').textContent, c: document.querySelector('.lib-item .lib-state').textContent }));
@@ -310,7 +329,7 @@ const card = (title) => `.lib-item:has(.lib-title:text-is("${title}"))`;
   const getC = L.find(r => r.m === 'GET');
   ok(getC && getC.query === '?ref=library', 'the sha is fetched from the library branch');
   const meta3 = JSON.parse(gh.branch.get(metaPath).toString('utf8'));
-  ok(meta3.title === 'Offline piece (edited)' && meta3.source === 'off.jpg' && gh.messages[0] === 'soundLAB: rename Offline piece (edited)' && libLog().filter(r => r.m === 'PUT').length === 2, 'rename rewrites meta.json only ("soundLAB: rename <title>"), the .mid is untouched');
+  ok(meta3.title === 'Offline piece (edited)' && meta3.source === 'JPG' && gh.messages[0] === 'soundLAB: rename Offline piece (edited)' && libLog().filter(r => r.m === 'PUT').length === 2, 'rename rewrites meta.json only ("soundLAB: rename <title>"), the .mid is untouched');
   ok(await page.isVisible(card('Offline piece (edited)')), 'the list shows the new name');
 
   console.log('# rate limit: stop, keep pending, say when');
@@ -348,15 +367,26 @@ const card = (title) => `.lib-item:has(.lib-title:text-is("${title}"))`;
   gh.log.length = 0; gh.messages.length = 0;
   await page.click('#lib-sync'); await idle(page); gh.log.length = 0;
   await page.click(card('Binary') + ' [data-act="delete"]');
-  await page.waitForFunction(() => /Delete for good/.test(document.querySelector('.lib-item[data-id="scans/binary"] [data-act="delete"]').textContent), null, { timeout: 3000 }).catch(() => {});
+  await page.waitForFunction(() => /Delete\?/.test(document.querySelector('.lib-item[data-id="scans/binary"] [data-act="delete"]').textContent), null, { timeout: 3000 }).catch(() => {});
   const armed = await page.textContent(card('Binary') + ' [data-act="delete"]');
-  ok(/Delete for good\?/.test(armed) && libLog().length === 0, 'first tap only arms it: ' + armed);
+  ok(/^Delete\? It stays in GitHub’s history$/.test(armed) && !/for good/.test(armed) && libLog().length === 0, 'first tap only arms it, and says the entry stays in GitHub\'s history: ' + armed);
+  const armedA11y = await page.evaluate(() => {
+    const a = document.activeElement, c = a && a.closest('[data-id]');
+    return { act: a && a.getAttribute('data-act'), id: c && c.getAttribute('data-id'), aria: a && a.getAttribute('aria-label'),
+      play: document.querySelector('.lib-item[data-id="scans/binary"] [data-act="synth"]').getAttribute('aria-label'),
+      sr: document.querySelector('.lib-item[data-id="scans/binary"] .lib-kind .lib-sr').textContent };
+  });
+  ok(armedA11y.act === 'delete' && armedA11y.id === 'scans/binary' && /^Delete Binary: tap again\. Earlier versions stay in the GitHub history\.$/.test(armedA11y.aria),
+    'the list is rebuilt, but the keyboard focus stays on the armed Delete (it fell to <body>): ' + JSON.stringify(armedA11y));
+  ok(armedA11y.play === 'Play Binary on synth' && armedA11y.sr === ', ', 'every button names its entry, and the kind pill reads ", Scan" (not "BinaryScan")');
   await page.click(card('Binary') + ' [data-act="delete"]');
   await waitLog(() => gh.messages.length >= 2);
   await idle(page);
   const dels = libLog().filter(r => r.m === 'DELETE');
   ok(dels.length === 2 && dels.every(r => r.body.sha && r.body.branch === 'library' && r.body.message === 'soundLAB: delete Binary' && r.auth === 'Bearer ' + KEY), 'two DELETEs with sha, branch and "soundLAB: delete <title>"');
   ok(![...gh.branch.keys()].some(p => p.indexOf('library/scans/binary/') === 0) && !(await items(page)).some(x => x.title === 'Binary') && !(await page.isVisible(card('Binary'))), 'gone from GitHub, this device and the list');
+  const delMsg = await page.evaluate(() => { const t = document.getElementById('app-toast'); return t ? t.textContent : ''; });
+  ok(/here and from the library branch on GitHub \(earlier versions stay in its history\)/.test(delMsg) && !/GitHub too/.test(delMsg), 'the message says the history keeps it: ' + delMsg);
 
   console.log('# another device\'s entries: listed, opened, played, practised, downloaded');
   const other = await page.evaluate(() => Array.from(SLMidiHub.scoreToMidi({ title: 'From the phone', bpm: 90, len: 3, notes: [67, 69, 71].map((m, i) => ({ t: i, d: 1, m, partId: 'p', v: 100 })) })));
@@ -400,15 +430,26 @@ const card = (title) => `.lib-item:has(.lib-title:text-is("${title}"))`;
   ok(await page.evaluate(() => (App.store.get('ws.lib') || []).some(s => s.title === 'From the phone' && s.notes.length === 3)), 'Practice: it is in the Woodshed library and the Woodshed is open');
   await page.click('#ws-mylib');
   await until(page, () => App.active === 'library');
+  await page.click(sel + ' [data-act="practice"]');
+  await until(page, () => App.active === 'shed');
+  await page.waitForTimeout(700);
+  const wsTwice = await page.evaluate(() => {
+    const rows = [...document.querySelectorAll('#ws-lib [data-wsid]')].filter(r => /From the phone/.test(r.textContent));
+    const b = rows[0] && rows[0].getBoundingClientRect();
+    return { n: (App.store.get('ws.lib') || []).filter(s => s.title === 'From the phone').length, rows: rows.length, inView: !!b && b.top >= 0 && b.bottom <= window.innerHeight };
+  });
+  ok(wsTwice.n === 1 && wsTwice.rows === 1 && wsTwice.inView, 'Practice tapped again: the Woodshed shows the same score (scrolled into view), not a second copy: ' + JSON.stringify(wsTwice));
+  await page.click('#ws-mylib');
+  await until(page, () => App.active === 'library');
   ok(true, 'the Woodshed\'s My library button opens the library page');
   await page.click(sel + ' [data-act="tab"]');
   await until(page, () => App.active === 'songs');
   ok(await page.evaluate(() => App.songs.current && App.songs.current.name === 'From the phone' && App.songs.current.steps.length > 0), 'Open as tab: the Songs page shows it as tab');
   await page.evaluate(() => App.switchTo('library'));
   const dl = await readDownload(page, () => page.click(sel + ' [data-act="mid"]'));
-  ok(dl.name === 'from-the-phone.mid' && Buffer.compare(dl.buf, Buffer.from(other)) === 0, 'Download .mid: ' + dl.name + ' byte for byte');
+  ok(dl.name === 'From the phone.mid' && Buffer.compare(dl.buf, Buffer.from(other)) === 0, 'Download .mid: ' + dl.name + ' byte for byte (named after the title, like Scan\'s downloads)');
   const dlx = await readDownload(page, () => page.click(card('Für Elise – Test') + ' [data-act="musicxml"]'));
-  ok(dlx.name === 'fur-elise-test.musicxml' && dlx.buf.toString('utf8') === XML, 'Download .musicxml of a scan');
+  ok(dlx.name === 'Für Elise – Test.musicxml' && dlx.buf.toString('utf8') === XML, 'Download .musicxml of a scan: ' + dlx.name);
 
   console.log('# a reload with a key and a pending change: still nothing until the library is opened');
   await ctx.setOffline(true);
@@ -611,6 +652,83 @@ const card = (title) => `.lib-item:has(.lib-title:text-is("${title}"))`;
   const after4 = await p4.evaluate(async () => { await App.library.sync(); return (await App.library.list()).length; });
   ok(vc.ok && !vc.blocked && after4 === n4, 'the database lets go when another tab deletes / upgrades it (it stayed blocked), then works again (' + after4 + ' entries listed back)');
   await ctx4.close();
+
+  console.log('# audit: a settings backup cannot plant a plugin that reads the key at boot');
+  const ctx5 = await newCtx(browser);
+  const p5 = await ctx5.newPage();
+  watch(p5);
+  await p5.goto(env.URL);
+  await p5.waitForFunction(() => window.App && App.library && App.active && window.SoundLab);
+  await p5.evaluate((K) => { App.library.setKey(K); App.switchTo('settings'); }, KEY);
+  const evil = { app: 'soundLAB', keys: {
+    'guitarlab.plugins.list': JSON.stringify([{ id: 'x1', name: 'MODX preset helper', code: "window.__stolen = localStorage.getItem('soundlab.secret.library')", on: true }, { name: 'junk', code: 42, on: true }]),
+    'guitarlab.met.bpm': '101' } };
+  const reloaded = p5.waitForEvent('load', { timeout: 10000 });
+  await p5.setInputFiles('#set-backup-in', { name: 'soundlab-settings.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(evil)) });
+  await until(p5, () => /reloading/.test(document.getElementById('set-backup-msg').textContent));
+  const imsg = await p5.evaluate(() => document.getElementById('set-backup-msg').textContent);
+  await reloaded;
+  await p5.waitForFunction(() => window.App && App.active && window.SoundLab);
+  await p5.waitForTimeout(300);
+  const planted = await p5.evaluate(() => ({ stolen: window.__stolen, list: App.store.get('plugins.list', []), bpm: App.store.get('met.bpm', 0), key: App.library.hasKey }));
+  ok(planted.stolen === undefined && planted.list.length === 1 && planted.list[0].on === false && planted.list[0].name === 'MODX preset helper' && planted.bpm === 101 && planted.key,
+    'Import settings: the other settings are restored, the plugin comes back switched off and did not run (the key stayed unread): ' + JSON.stringify({ n: planted.list.length, on: planted.list[0] && planted.list[0].on, bpm: planted.bpm }));
+  ok(/1 plugin came back switched off/.test(imsg) && /trust/.test(imsg), 'the import says so: ' + imsg);
+  await ctx5.close();
+
+  console.log('# audit: the Android app (no downloads, no Web MIDI), network changes, a malformed meta.json');
+  const ctx6 = await newCtx(browser, { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  await ctx6.addInitScript(() => {
+    window.GuitarLabHost = { setKeepScreenOn() {}, shellVersion() { return '0.75.0'; } };
+    try { delete Navigator.prototype.requestMIDIAccess; } catch (e) { /* not there */ }
+  });
+  const p6 = await ctx6.newPage();
+  watch(p6);
+  let downloads6 = 0;
+  p6.on('download', () => { downloads6++; });
+  await p6.goto(env.URL);
+  await p6.waitForFunction(() => window.App && App.library && App.active && window.SLMidiHub);
+  await ctx6.setOffline(true); await p6.waitForTimeout(150); await ctx6.setOffline(false); await p6.waitForTimeout(300);
+  const dbs = await p6.evaluate(async () => (indexedDB.databases ? (await indexedDB.databases()).map(d => d.name) : []));
+  ok(dbs.indexOf('soundlab-library') === -1, 'the network dropping and coming back never creates the library database for an owner who never opened it: ' + JSON.stringify(dbs));
+  await ctx6.setOffline(true);
+  const off6 = await p6.evaluate(() => App.library.sync());
+  await ctx6.setOffline(false);
+  ok(/^Offline: everything stays on this device\.$/.test(off6.error) && !/uploads/.test(off6.text), 'offline without a key: no promise of an upload that cannot happen: ' + off6.text);
+  const ph = await p6.evaluate(async (mid) => App.library.saveScan({ title: 'Phone scan', source: 'IMG_4021.JPG', midi: new Uint8Array(mid) }), mid1);
+  await p6.evaluate(() => App.switchTo('library'));
+  await until(p6, () => !!document.querySelector('.lib-item[data-id="scans/phone-scan"]'));
+  await p6.click('.lib-item[data-id="scans/phone-scan"] [data-act="mid"]');
+  await p6.waitForTimeout(800);
+  const apkDl = await p6.evaluate(() => { const t = document.getElementById('app-toast'); return t && !t.hidden ? t.textContent : ''; });
+  ok(ph.id === 'scans/phone-scan' && downloads6 === 0 && /Android app cannot save files/.test(apkDl) && /Chrome/.test(apkDl), 'in the Android app Download says why it cannot save (it flipped to "Downloading…" and did nothing): ' + apkDl);
+  await p6.click('.lib-item[data-id="scans/phone-scan"] [data-act="synth"]');
+  await until(p6, () => App.active === 'midihub');
+  await p6.waitForTimeout(300);
+  const noMidi = await p6.evaluate(() => ({ toast: document.getElementById('app-toast').textContent, status: document.getElementById('mh-status').textContent, connect: document.getElementById('mh-connect').hidden }));
+  ok(/No MIDI in this browser/.test(noMidi.toast) && /not available here/.test(noMidi.status) && noMidi.connect, 'no Web MIDI: Play on synth opens the Player, says so, and the Hub offers no Connect that could only fail: ' + JSON.stringify(noMidi));
+  // a meta.json written by hand / another app: fields of the wrong type are dropped, the list still paints
+  gh.branch.set('library/played/2026-09-01-090000-odd.mid', Buffer.from(other));
+  gh.branch.set('library/played/2026-09-01-090000-odd.json', Buffer.from('{"source":{"toString":1},"title":{"toString":1},"created":{"toString":1},"ideaId":{"toString":1},"bpm":"fast","kind":"played"}'));
+  await p6.evaluate(async () => {
+    App.switchTo('library');
+    await App.library.sync();
+    // an older record already stored with such a meta (before the cleaning): its card still renders
+    await new Promise((res, rej) => { const q = indexedDB.open('soundlab-library', 1); q.onsuccess = () => { const t = q.result.transaction('items', 'readwrite'); t.objectStore('items').put({ id: 'scans/broken', kind: 'scan', title: 'Broken', created: Date.now(), files: {}, meta: { source: { toString: 1 } }, remote: null, pending: null, dirty: [], rev: 0 }); t.oncomplete = () => { q.result.close(); res(); }; t.onerror = rej; }; q.onerror = rej; });
+    App.library.open('all');
+    await __wait(300);
+  });
+  await until(p6, () => !!document.querySelector('.lib-item[data-id="played/2026-09-01-090000-odd"]') && !!document.querySelector('.lib-item[data-id="scans/broken"]'));
+  const odd = await p6.evaluate(async () => ({
+    cards: document.querySelectorAll('.lib-item').length, n: (await App.library.list()).length,
+    odd: document.querySelector('.lib-item[data-id="played/2026-09-01-090000-odd"]').textContent,
+    broken: document.querySelector('.lib-item[data-id="scans/broken"]').textContent,
+    meta: (await App.library.get('played/2026-09-01-090000-odd')).meta
+  }));
+  ok(odd.cards === odd.n && odd.cards >= 4 && /Odd/.test(odd.odd) && odd.meta && odd.meta.source === undefined && odd.meta.bpm === undefined && odd.meta.kind === 'played',
+    'a remote meta.json with {"toString": 1} fields: every card paints (' + odd.cards + ' of ' + odd.n + '), the bad fields are dropped: ' + JSON.stringify(odd.meta));
+  ok(/Broken/.test(odd.broken) && /Details unreadable/.test(odd.broken), 'a stored record that still cannot be shown gets a plain card with its title and Delete: ' + odd.broken);
+  await ctx6.close();
 
   ok(errs.length === 0, 'no page errors' + (errs.length ? ': ' + errs.join(' | ') : ''));
   await ctx.close(); await browser.close();

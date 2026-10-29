@@ -1,4 +1,6 @@
 /* soundLAB OMR: port of homr/staff_dewarping.py (AGPL-3.0, github.com/liebharc/homr).
+   Contains code ported from OpenCV 5.0.0 (Subdiv2D); its copyright and licence are in
+   THIRD-PARTY-NOTICES.md.
    Straightens a staff image before the transformer reads it: points along the staff lines
    (span points) are mapped onto straight lines (optimal points) by a piecewise affine
    transformation over a Delaunay triangulation.
