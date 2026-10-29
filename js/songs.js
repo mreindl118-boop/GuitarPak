@@ -532,6 +532,7 @@
         '<h2>Open a score</h2>' +
         '<div class="muted small" style="margin-bottom:8px">A MIDI file, a MusicXML score (.musicxml, .xml or .mxl from MuseScore, Sibelius, Dorico, Finale) or a text tab &mdash; then choose where it goes. Printed sheet music as a PDF or a picture goes to Scan, which reads it into MIDI. Everything is read on your device.</div>' +
         '<div class="row tight"><label class="btn sm primary sg-openbtn">Choose a file<input type="file" id="sg-openfile" accept=".mid,.midi,.musicxml,.xml,.mxl,.txt,audio/midi,.pdf,application/pdf,.png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff,image/*" hidden></label>' +
+          '<button type="button" class="btn sm sg-openbtn" id="sg-mylib" title="Your saved scans and played MIDI">From my library</button>' +
           '<span class="muted small" id="sg-openmsg" role="status">Nothing open yet.</span></div>' +
         '<div class="row tight sg-opendest" id="sg-opendest" hidden>' +
           '<button type="button" class="btn sm primary" id="sg-opensynth" title="Play it on your synth from the MIDI Hub Player (tempo, key shifter, loop)">Play on synth</button>' +
@@ -676,6 +677,7 @@
     // ---- One Open ----
     var opened = null; // {name, kind: 'midi'|'xml'|'tab', buf, text}
     var openMsg = document.getElementById('sg-openmsg'), openDest = document.getElementById('sg-opendest');
+    document.getElementById('sg-mylib').addEventListener('click', function () { if (App.library) App.library.open(); else App.toast('My library is not available in this build.'); });
     function openKind(name) { return /\.(mid|midi)$/i.test(name) ? 'midi' : /\.(musicxml|xml|mxl)$/i.test(name) ? 'xml' : 'tab'; }
     function openSay(m) { openMsg.textContent = m; }
     document.getElementById('sg-openfile').addEventListener('change', function () {

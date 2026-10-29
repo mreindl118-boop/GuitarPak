@@ -28,6 +28,8 @@ Sound starts after your first click anywhere (browser autoplay policy). The Tune
 | **Helix Stadium** (Guitar › Helix) | Control a Line 6 Helix Stadium over USB MIDI — presets, snapshots, knobs, pedals, looper, Matrix mixer — and, with the helper on your computer, read and edit the loaded preset block by block. Disarmed until you press Arm. See [docs/HELIX-STADIUM.md](docs/HELIX-STADIUM.md). |
 | **LUMI practice** (Keys › LUMI) | Guided single-note and major/minor triad practice: see what to play, get correct/wrong feedback, and advance when the exact notes match. An on-screen 24-key preview works with simulated answers; optional Web MIDI listens to a selected LUMI or MODX and uses the LUMI key LEDs as the display. Physical lighting remains unverified. See [the practice guide](docs/LUMI-PRACTICE.md). |
 | **Guided performance** (Train › Woodshed) | **Wait for Me** follows exact notes/chords; **Play at Tempo** keeps time and reports accuracy, missed/wrong/extra notes, timing and hold measurements. Piano roll, target keyboard and upcoming notes work with touch/typing keys or MIDI, with optional shared LUMI cues. Includes original scale-based melody/chord exercises, MIDI/Studio/ASCII score sources, count-in, pause/resume, tempo, transpose and section looping. See [the player guide](docs/GUIDED-PERFORMANCE.md). |
+| **SheetLab** (Play › Scan) | Turn a PDF, a scan or a photo of printed sheet music into MIDI and MusicXML, read on your device by a built-in port of the [homr](https://github.com/liebharc/homr) recognition engine (nothing is uploaded). Play it on your synth, practise it in the Woodshed, open it as tab or download it. The engine (about 107 MB) downloads once, after you agree, then works offline. See [docs/SHEETLAB.md](docs/SHEETLAB.md). |
+| **My library** (Play › Library) | Your scans and the MIDI you play in the Studio, kept on the device and, with a GitHub key, on the `library` branch of this repository so every device sees the same library. See [docs/LIBRARY.md](docs/LIBRARY.md). |
 | **Trainer** | Practice session timer with a persistent log, random practice prompt generator, the classic one-minute chord-change drill with best scores, and an interval ear trainer. |
 
 For separate synth practice, LUMI targets and the synth's sound output are independently selected. The optional [scale-locked sound route](docs/PRACTICE-ROUTER.md) blocks out-of-scale MIDI notes without remapping and tracks note/pedal cleanup. The synth must have Local Control off for its own keyboard-to-engine sound to pass through the filter; soundLAB does not change that hardware setting. Physical lighting and audio behavior remain unverified.
@@ -88,3 +90,7 @@ releases/           built, signed APK
 - Practice streaks/goals and richer stats over the session log
 - Export/import settings and progressions
 - Custom tunings and 7-string support
+
+## Licence
+
+soundLAB is free software under the [GNU AGPL-3.0](LICENSE). It includes [homr](https://github.com/liebharc/homr) (AGPL-3.0) for SheetLab; the other parts it loads are listed with their licences in [docs/SHEETLAB.md](docs/SHEETLAB.md).
