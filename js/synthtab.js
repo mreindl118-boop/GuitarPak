@@ -368,7 +368,7 @@
       return ['No synth output', outs.length ? 'MIDI is on. Choose where the Synth tab sends:' : 'MIDI is on, but no output is listed. Plug the synth in by USB and switch it on; it appears here by itself.',
         outs.length ? '<select class="st-connout" data-conn="out" aria-label="Synth output"><option value="">Choose…</option>' + outOptions('') + '</select>' : ''];
     },
-    lumi: function (s) { return ['Sending to the LUMI', 'The synth output is the LUMI key lights, which never get synth messages. Choose your synth:', '<select class="st-connout" data-conn="out" aria-label="Synth output">' + outOptions(s.out) + '</select>']; }
+    lumi: function (s) { var nat = midi() && midi().platform !== 'web'; return ['Sending to the LUMI', 'The synth output is the LUMI key lights, which never get synth messages.' + (nat ? ' This device sends MIDI to one place at a time: the key lights stop while the synth has it (Settings › MIDI switches back).' : '') + ' Choose your synth:', '<select class="st-connout" data-conn="out" aria-label="Synth output">' + outOptions(s.out) + '</select>']; }
   };
   var connEls = [];
   function paintConn(el) {
@@ -378,8 +378,16 @@
       el.addEventListener('click', function (e) { var b = e.target.closest('[data-conn="go"]'); if (b) connect(); });
       el.addEventListener('change', function (e) {
         var s = e.target.closest('[data-conn="out"]'); if (!s || !s.value || !window.SLMidiHub) return;
-        SLMidiHub.api.set('outId', s.value); App.emit('midi:state', {}); repaintConn();
-        if (App.toast) App.toast('Synth out: ' + (SLMidiHub.api.hubOutName() || s.value));
+        var m = midi(), extra = '';
+        if (m && m.platform && m.platform !== 'web') {
+          // the Android / iOS app has ONE output, shared with the key lights: move it to the
+          // synth (as Settings › MIDI does); lights painted there as note-ons would PLAY, so they go off
+          var port = (m.outputs || []).filter(function (o) { return String(o.id) === s.value; })[0];
+          m.setOutput(port ? port.id : s.value);
+          if (m.lightsOn && !m.lumi && m.setLedMode) { m.setLedMode('off'); extra = ' · key lights off'; }
+        } else SLMidiHub.api.set('outId', s.value);
+        App.emit('midi:state', {}); repaintConn();
+        if (App.toast) App.toast('Synth out: ' + (SLMidiHub.api.hubOutName() || s.value) + extra);
       });
     }
     var s = connState(), key = s.k + '|' + (s.out || '') + '|' + (((midi() && midi().outputs) || []).length);
@@ -477,6 +485,24 @@
       p.tap(id); paintChips(); return;
     }
   }
+  // the CONTROLLER REMOTE (js/remote.js): NEXT / BACK step the active Live
+  // set like its foot switch (js/synthlive.js), else the program like Prev /
+  // Next above — both through the deck's funnel (LUMI guard, refusals). STOP
+  // has nothing to end here; the preset builder sheet is a form in progress.
+  function remote(action) {
+    if (action === 'stop' || (els.sheet && !els.sheet.hidden)) return false;
+    // the Map's MIDI Learn is waiting for a synth control: a remote press must not step the set under it
+    if (App.synthDeck && App.synthDeck.learning) { if (App.toast) App.toast('Map Learn is listening — move the synth control, or tap Learn to cancel'); return false; }
+    var dir = action === 'back' ? -1 : 1, lv = window.SLSynthLive, lset = lv ? lv.active() : null;
+    if (lset && lv.remoteStep && lset.pages.some(function (pg) { return pg.some(function (sl) { return !!sl; }); })) { var r = lv.remoteStep(dir); schedulePaint(); return r; }
+    var p = P(); if (!p) return false;
+    // refused (Synth out is the LUMI, no MIDI...): nothing moved — the deck's
+    // toast and the connection bar say why (synthlive.js re-says a repeat the
+    // deck skips, so the remote's 'Nothing to move on here' never covers it)
+    if (p.check && (lv && lv.refused ? lv.refused(p) : !p.check())) return false;
+    p.step(dir); paint();
+    return p.now().name || (dir > 0 ? 'Next' : 'Back');
+  }
   // Favourites: cycle a strip's CC through the Hub's knobs with a small sheet-less picker
   function pickFavs() {
     var all = P().knobs(), cur = favs();
@@ -549,6 +575,8 @@
         var t = s & 0xF0; if (t === 0xB0 || t === 0xC0 || s === 0xF0) schedulePaint();
       });
       App.on('midi:state', function () { if (App.active === 'deck') schedulePaint(); repaintConn(); });
+      // a refused send (the deck's funnel, a remote press): repaint and nudge the connect panel
+      App.on('synth:conn', function (d) { if (App.active !== 'deck') return; paint(); if (d && d.refused) nudgeConn(); });
       App.on('deck:assignnames', function () { if (App.active === 'deck') render(); }); // the strips take the Performance's knob names
       App.on('midihub:split', function () { if (App.active === 'deck') { paintChips(); if (els.sheet && !els.sheet.hidden) paintSplitBox(); } });
       App.on('synthlive:slot', function () { if (App.active === 'deck') schedulePaint(); });
@@ -572,7 +600,9 @@
       if (els.sheet && !els.sheet.hidden) { closeSheet(); return true; }
       if (mode() === 'edit') { set('mode', 'perform'); render(); return true; }
       return !!(App.synthDeck && App.synthDeck.onBack && App.synthDeck.onBack());
-    }
+    },
+    onRemote: function (action) { return remote(action); },
+    remoteKey: false // the lowest key plays the synth here
   });
   var paintT = 0;
   function schedulePaint() { if (paintT) return; paintT = setTimeout(function () { paintT = 0; paint(); }, 60); }

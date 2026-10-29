@@ -138,6 +138,11 @@
           '<span class="muted small" id="set-backup-msg"></span>' +
         '</div>' +
       '</div>' +
+      // My library's GitHub sync (js/library.js renders the card's body)
+      '<div class="card" id="set-library-card">' +
+        '<h2>Library sync</h2>' +
+        '<div id="set-library"></div>' +
+      '</div>' +
       '<div class="card">' +
         '<h2>Screen &amp; battery</h2>' +
         '<label class="set-check" style="margin-top:0">' +
@@ -178,6 +183,12 @@
           '<button type="button" class="btn sm" id="set-open-lights">Lights &amp; help</button>' +
           '<span class="muted small">Key lights (a LUMI shows the scale in your colors), brightness and the Help level live in one place: the keyboard icon at the top of every page.</span>' +
         '</div>' +
+      '</div>' +
+      // the controller remote (js/remote.js renders the rows)
+      '<div class="card" id="set-remote-card">' +
+        '<h2>Hands-free control</h2>' +
+        '<div class="muted small">Move practice on from the instrument: a pedal, a button on your synth or a page-turner pedal does Next, Back and Stop on Exercises, Keys lessons, the Woodshed, LUMI practice, the Practice plan, Songs, the fretboard runner, the Trainer, Live sets and the Deck.</div>' +
+        '<div id="set-remote"></div>' +
       '</div>' +
       '<div class="card" id="set-audio-card">' +
         '<h2>Sound input &amp; output</h2>' +
@@ -232,6 +243,13 @@
           '<button type="button" class="btn sm" id="set-update">Check now</button>' +
         '</div>' +
         '<div class="muted small set-theme-note" id="set-update-msg"></div>' +
+        // AGPL-3.0 §5: the licence notice and where the source is (links open outside the app)
+        '<div class="muted small" id="set-licence" style="margin-top:10px;line-height:1.5">soundLAB is free software under the ' +
+          '<a href="https://github.com/mreindl118-boop/GuitarPak/blob/main/LICENSE" target="_blank" rel="noopener">GNU AGPL-3.0</a>, ' +
+          'with no warranty. Source: <a href="https://github.com/mreindl118-boop/GuitarPak" target="_blank" rel="noopener">github.com/mreindl118-boop/GuitarPak</a>. ' +
+          'Includes homr (AGPL-3.0), ONNX Runtime Web (MIT), OpenCV.js (Apache-2.0), pdf.js (Apache-2.0) and code ported from Pillow, ' +
+          'music21 and mido: see <a href="https://github.com/mreindl118-boop/GuitarPak/blob/main/THIRD-PARTY-NOTICES.md" target="_blank" rel="noopener">THIRD-PARTY-NOTICES.md</a> ' +
+          'and docs/SHEETLAB.md; instrument samples: samples/CREDITS.md.</div>' +
       '</div>';
 
     // ---- accent ----
@@ -881,11 +899,18 @@
         try {
           var d = JSON.parse(rd.result);
           if (!d || d.app !== 'soundLAB' || !d.keys) throw new Error('not a soundLAB backup');
-          var n = 0;
+          var n = 0, plugs = 0;
           Object.keys(d.keys).forEach(function (k) {
-            if (k.indexOf('guitarlab.') === 0) { localStorage.setItem(k, d.keys[k]); n++; }
+            if (k.indexOf('guitarlab.') !== 0) return;
+            // plugins are CODE that runs at boot with full access (the library key too): a backup
+            // (shared, or made by someone else) brings them back switched off, next to this
+            // device's own, so turning one on stays an explicit choice in Settings › Plugins
+            if (k === 'guitarlab.plugins.list') { plugs = importPlugins(d.keys[k]); return; }
+            localStorage.setItem(k, d.keys[k]); n++;
           });
-          msg.textContent = n + ' settings restored — reloading…';
+          msg.textContent = n + ' settings restored' + (plugs ? '; ' + plugs + ' plugin' + (plugs === 1 ? '' : 's') +
+            ' came back switched off: turn them on in Settings › Plugins only if you trust their code (a plugin can read everything the app stores, the library key too)' : '') +
+            ' — reloading…';
           setTimeout(function () { location.reload(); }, 900);
         } catch (e) {
           msg.textContent = 'Import failed: ' + e.message;
@@ -893,15 +918,36 @@
       };
       rd.readAsText(f);
     });
+    // a backup's plugins.list (a JSON string) -> appended to this device's list, every one OFF
+    function importPlugins(raw) {
+      var got;
+      try { got = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch (e) { return 0; }
+      if (Object.prototype.toString.call(got) !== '[object Array]') return 0;
+      var cur = App.store.get('plugins.list', []);
+      if (Object.prototype.toString.call(cur) !== '[object Array]') cur = [];
+      var n = 0, t = Date.now().toString(36);
+      got.forEach(function (p, i) {
+        if (!p || typeof p.code !== 'string' || !p.code || p.code.length > 100 * 1024) return;
+        var same = cur.some(function (q) { return q && q.code === p.code; });
+        if (same) return; // already here (this device's own copy keeps its own switch)
+        cur.push({ id: 'p' + t + 'i' + i, name: (typeof p.name === 'string' && p.name ? p.name : 'plugin').slice(0, 40), code: p.code, on: false, error: '' });
+        n++;
+      });
+      if (n) App.store.set('plugins.list', cur);
+      return n;
+    }
 
     paintMidi();
+    if (App.remote) App.remote.mount(document.getElementById('set-remote'));
+    if (App.library) App.library.mountSettings(document.getElementById('set-library'));
   }
 
   App.register('settings', {
     init: init,
-    onHide: function () { if (audioUI) audioUI.hide(); },
+    onHide: function () { if (audioUI) audioUI.hide(); if (App.remote) App.remote.cancelLearn(); },
     onShow: function () {
       if (audioUI) audioUI.show();
+      if (App.remote) App.remote.paint();
       // dynamic prefs may have changed elsewhere (pads click chip, wake from
       // code, volume) — re-read them when the page opens
       var c = document.getElementById('set-click');

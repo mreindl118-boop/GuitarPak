@@ -702,11 +702,18 @@
     if (name === 'sysex') updatePreviews();
   }
 
+  function isAppleTouch() { var n = navigator; return /iPad|iPhone|iPod/.test(n.userAgent || '') || (n.platform === 'MacIntel' && n.maxTouchPoints > 1); }
+  function noMidiText() {
+    return isAppleTouch()
+      ? 'Safari and Chrome on iPad have no Web MIDI. Open soundLAB in a Web MIDI browser app (MIDIWeb Browser or Web MIDI Browser in the App Store), with the synth on a USB camera adapter.'
+      : 'MIDI is not available here — use Chrome or Edge (desktop or Android).';
+  }
   function paintPorts() {
     var m = midi(), sup = m && m.supported, ready = sup && m.ready;
-    els.connect.hidden = !!ready;
+    // no Web MIDI at all: a Connect button could only ever fail ("declined or failed")
+    els.connect.hidden = !!ready || !sup;
     els.ports.hidden = !ready;
-    if (!sup) { els.status.textContent = 'MIDI is not available here — use Chrome or Edge (desktop or Android).'; els.status.className = 'mh-status bad'; return; }
+    if (!sup) { els.status.textContent = noMidiText(); els.status.className = 'mh-status bad'; return; }
     if (!ready) { els.status.textContent = 'Not connected: the browser will ask for permission (allow SysEx too).'; els.status.className = 'mh-status'; return; }
     var fill = function (sel, list, cur, all) {
       sel.innerHTML = all ? '<option value="all">All keyboards</option>' : '<option value="">— none —</option>';
@@ -797,7 +804,7 @@
           '</div>' +
           '<p class="muted small" id="mh-plkeyinfo"></p>' +
           '<p class="mh-warn small" id="mh-plwarn" hidden></p>' +
-          '<details class="tips"><summary>Sheet music as a PDF?</summary><p class="muted small">A notation app turns a score into a file this player opens: if it came from MuseScore, open the original score there and choose <b>Export \u203a MIDI</b> or <b>MusicXML</b>. For a printed or PDF score, a free recognizer such as Audiveris reads it into MusicXML; check its result against the page before you rely on it. \u201cChannels as in file\u201d plays each part or track on its own channel (Part 1 = channel 1 on a MODX in Multi mode); \u201cAll on one Part\u201d sends everything to the Part picked in Control.</p></details>' +
+          '<details class="tips"><summary>Sheet music as a PDF?</summary><p class="muted small">A notation app turns a score into a file this player opens: if it came from MuseScore, open the original score there and choose <b>Export \u203a MIDI</b> or <b>MusicXML</b>. For a printed or PDF score, <b>Play \u203a Scan</b> reads it into MIDI and MusicXML on this device, and its <b>Play on synth</b> opens the result here; check it against the page before you rely on it. \u201cChannels as in file\u201d plays each part or track on its own channel (Part 1 = channel 1 on a MODX in Multi mode); \u201cAll on one Part\u201d sends everything to the Part picked in Control.</p></details>' +
         '</div>' +
       '</div>' +
 
@@ -973,7 +980,10 @@
 
   function wire() {
     els.enable.addEventListener('click', function () {
-      midi().enable().then(paintPorts).catch(function () { els.status.textContent = 'MIDI access was declined or failed.'; els.status.className = 'mh-status bad'; });
+      midi().enable().then(paintPorts).catch(function () {
+        if (!midi().supported) { paintPorts(); return; }
+        els.status.textContent = 'MIDI access was declined or failed.'; els.status.className = 'mh-status bad';
+      });
     });
     els.inSel.addEventListener('change', function () { midi().setInput(this.value); });
     els.outSel.addEventListener('change', function () { set('outId', this.value || 'shared'); paintPorts(); toast('Synth out: ' + (hubOutName() || 'none')); });
@@ -1309,10 +1319,13 @@
       e.t = sec; notes.push(e);
     });
     var bpm0 = 120, firstT = raw.filter(function (e) { return e.k === 'tempo' && e.us > 0; })[0]; if (firstT) bpm0 = 60000000 / firstT.us;
-    if (dropped) warnings.push(dropped + ' program, controller or SysEx message' + (dropped === 1 ? '' : 's') + ' left out (only notes and the sustain pedal are played).');
     if (notes.some(function (e) { return e.ch === 9; })) warnings.push('Channel 10 (drums in General MIDI) is included; on "All on one Part" those notes play pitched.');
     var songM = finishSong(title || fname.replace(/\.(mid|midi)$/i, ''), notes, warnings, 'MIDI');
     songM.bpm = bpm0;
+    // by design, not a problem: every file carries a program change (Scan's Instrument choice too),
+    // and the synth Part keeps its own sound - said plainly, not in the warning colour
+    if (dropped) songM.infos = [dropped + ' program, controller or SysEx message' + (dropped === 1 ? '' : 's') +
+      ' left out: your synth Part’s own sound plays (the file’s instrument choice is not sent; only notes and the sustain pedal are played).'];
     return songM;
   }
 
@@ -1661,14 +1674,16 @@
     var s = PL.song;
     els.plinfo.innerHTML = s ? '<b>' + esc(s.title) + '</b> <span class="muted">· ' + esc(s.source) + ' · ' + s.notes + (s.notes === 1 ? ' note · ' : ' notes · ') + clock(s.duration) +
       ' · channel' + (s.channels.length === 1 ? ' ' : 's ') + s.channels.join(', ') + '</span>' : '<span class="muted">No file open.</span>';
-    els.plwarn.hidden = !(s && s.warnings.length);
-    els.plwarn.innerHTML = s ? s.warnings.map(esc).join('<br>') : '';
+    var infos = (s && s.infos) || [];
+    els.plwarn.hidden = !(s && (s.warnings.length || infos.length));
+    els.plwarn.innerHTML = s ? s.warnings.map(esc).concat(infos.map(function (t) { return '<span class="muted">' + esc(t) + '</span>'; })).join('<br>') : '';
     els.plplay.textContent = PL.playing ? 'Pause' : 'Play';
     els.plplay.classList.toggle('active', PL.playing);
     els.plplay.disabled = els.plstop.disabled = els.plseek.disabled = !s;
     els.pltab.disabled = !s || !App.songs;
     var n = hubOutName();
-    els.plout.textContent = n ? '→ ' + n + (plRoute() === 'part' ? ' · ' + partLabel() + ' ' + (ch() + 1) : '') : 'No synth output yet — connect MIDI above';
+    els.plout.textContent = n ? '→ ' + n + (plRoute() === 'part' ? ' · ' + partLabel() + ' ' + (ch() + 1) : '') :
+      midi() && !midi().supported ? 'No MIDI in this browser (see above)' : 'No synth output yet — connect MIDI above';
     els.plpartlab.textContent = 'All on ' + partLabel() + ' ' + (ch() + 1);
     var sh = plShift(), t = plTrans();
     els.plshift.checked = sh.on; els.plkeys.hidden = !sh.on; els.pltrans.value = String(t);
@@ -1792,6 +1807,8 @@
     knobHTML: knobHTML, arcPath: arcPath, wireKnobs: wireKnobs, renderControl: renderControl,
     cc: cc, sendCh: sendCh, send: send, sendProgram: sendProgram, progNum: progNum, paintProg: paintProg,
     hubOutId: hubOutId, hubOutName: hubOutName, hasOut: hasOut, midi: midi, get sysexOk() { var m = midi(); return !!(m && m.sysexOk); },
+    // Synth out from another page (the Deck / Live connection bar): the same store the select writes
+    setOut: function (id) { set('outId', id == null || id === '' ? 'shared' : id); if (els.outSel) paintPorts(); },
     toast: toast, esc: esc, clamp: clamp, hex: hex, parseHex: parseHex, decode: decode, noteName: noteName, ccName: ccName, view: view,
     cv: function () { return root && root.querySelector('.mh-cv'); }, root: function () { return root; }, els: function () { return els; }
   };

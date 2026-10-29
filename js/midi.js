@@ -13,6 +13,8 @@
  *   'midi:bend'     {chan, semis}              pitch bend in semitones
  *   'midi:pressure' {chan, val}                channel pressure 0-127
  *   'midi:raw'      {bytes, portId}            every incoming message, untouched
+ *                                              (except one the controller remote claims:
+ *   'midi:remote'   {bytes, portId, port}       then only this — js/remote.js)
  *   'midi:out'      {bytes, portId, kind}      successful music, LED or cleanup writes
  *
  * MPE-style per-note expression works out of the box because bend/pressure
@@ -192,8 +194,56 @@
     return message && message[0] >= 0x80 && message[0] < 0xf0 && message.length === MSG_LEN[message[0] & 0xf0] &&
       Array.prototype.every.call(message, function (b, i) { return Number.isInteger(b) && b >= 0 && b <= (i ? 127 : 239); });
   }
+  // INPUT CLAIM (the controller remote, js/remote.js): ONE fn(bytes, {portId,
+  // port}) -> true = this channel message is a remote gesture (a learned pedal
+  // or button, the reserved double-tap key) and goes NOWHERE else: no
+  // 'midi:raw' (Thru, Woodshed grading, the Deck), no filter, no dispatch.
+  // The release of a note the app already received is never claimed.
+  var inputClaim = null, claimAllPorts = null;
+  // REMOTE ON EVERY PORT: with ONE keyboard chosen as the input, a pedal or
+  // button on another port (the synth's foot switch while the LUMI is the
+  // input) still reaches the claim — and nothing else of that port does.
+  // Only while the remote has something bound (claimAllPorts()).
+  var claimRun = {}; // running status per unchosen port (a pedal's release often omits it)
+  function claimOnly(bytes, id, name) {
+    if (!inputClaim) return;
+    var data = Array.prototype.slice.call(bytes), i = 0, sysex = false;
+    while (i < data.length) {
+      var b0 = data[i];
+      if (b0 >= 0xf8) { i++; continue; } // realtime may sit anywhere
+      if (b0 === 0xf0) { sysex = true; claimRun[id] = 0; i++; continue; }
+      if (b0 === 0xf7) { sysex = false; i++; continue; }
+      if (sysex) { i++; continue; }
+      var st = b0 >= 0x80 ? b0 : claimRun[id], len = st >= 0x80 && st < 0xf0 ? MSG_LEN[st & 0xf0] : 0;
+      if (b0 >= 0x80) { claimRun[id] = b0 < 0xf0 ? b0 : 0; i++; }
+      if (!len) { if (b0 < 0x80) i++; continue; } // stray data, system common
+      var msg = [st];
+      while (msg.length < len && i < data.length) { if (data[i] >= 0xf8) { i++; continue; } if (data[i] >= 0x80) break; msg.push(data[i++]); }
+      if (msg.length < len) continue;
+      if (msg.slice(1).some(function (b) { return b > 127; })) continue;
+      var claimed = false;
+      try { claimed = inputClaim(msg.slice(), { portId: id, port: name }) === true; } catch (e) { claimed = false; }
+      if (claimed) App.emit('midi:remote', { bytes: msg, portId: id, port: name });
+    }
+  }
+  function wantClaimPorts() { try { return !!(inputClaim && claimAllPorts && claimAllPorts()); } catch (e) { return false; } }
+  function attachClaimPorts() {
+    if (native || !access || allIn) return;
+    var want = wantClaimPorts();
+    access.inputs.forEach(function (p) {
+      if (inputs.indexOf(p) !== -1) return;
+      try { p.onmidimessage = want && p.state !== 'disconnected' ? function (e) { if (e && e.data) claimOnly(e.data, p.id, p.name || ''); } : null; } catch (e) {}
+    });
+  }
+  function claimedByRemote(state, message) {
+    if (!inputClaim || message[0] < 0x80 || message[0] >= 0xf0) return false;
+    var t = message[0] & 0xf0;
+    if ((t === 0x80 || (t === 0x90 && message[2] === 0)) && state.notes['note:' + (message[0] & 15) + ':' + message[1]]) return false;
+    try { return inputClaim(message.slice(), { portId: state.id, port: state.name }) === true; } catch (e) { return false; }
+  }
   function ingressMessage(state, message) {
     withIngressSource(state, function () {
+      if (claimedByRemote(state, message)) { App.emit('midi:remote', { bytes: message.slice(), portId: state.id, port: state.name }); return; }
       // Complete logical frames retain the pre-rule pitches/channels. One tap
       // per frame lets Hub learn/Thru and performance grading share raw input.
       App.emit('midi:raw', { bytes: message.slice(), portId: state.id, port: state.name });
@@ -490,6 +540,7 @@
       listen(input);
       App.store.set('midi.inputId', input.id);
     }
+    attachClaimPorts();
     announce();
   }
 
@@ -543,7 +594,10 @@
     },
     onmidi: function (inputPortId, bytes) {
       if (!nativeReady || !bytes) return;
-      if (nativeInId !== null && nativeInId !== ALL && inputPortId !== 0 && inputPortId !== nativeInId) return;
+      if (nativeInId !== null && nativeInId !== ALL && inputPortId !== 0 && inputPortId !== nativeInId) {
+        if (wantClaimPorts()) claimOnly(bytes, inputPortId, portName(nativePorts.inputs, inputPortId) || ''); // the remote hears every port
+        return;
+      }
       srcName = portName(nativePorts.inputs, inputPortId) || '';
       srcId = inputPortId;
       try { splitAndDispatch(bytes); } finally { srcId = null; srcName = ''; }
@@ -1166,6 +1220,11 @@
     get muted() { return muted(); },
     setInputFilter: function (fn) { inputFilter = typeof fn === 'function' ? fn : null; },
     get inputFilter() { return inputFilter; },
+    // the controller remote's claim (js/remote.js): runs before 'midi:raw'
+    // opts.allPorts() true = also hear the ports that are not the chosen input (for the claim only)
+    setInputClaim: function (fn, opts) { inputClaim = typeof fn === 'function' ? fn : null; claimAllPorts = opts && typeof opts.allPorts === 'function' ? opts.allPorts : null; attachClaimPorts(); },
+    get inputClaim() { return inputClaim; },
+    refreshClaim: function () { attachClaimPorts(); },
     setInput: setInput,
     setOutput: setOutput,
     bluetooth: function () { if (native) post({ cmd: 'bluetooth' }); },
@@ -1188,6 +1247,7 @@
     repaint: function () { repaintAll(true); },
     lumiSync: function () { repaintAll(true); },
     range: range,
+    learnRange: learnRange, // the remote: a claimed LUMI strike outside the window moves it, as a played one would
     fold: fold,
     get lumi() { return isLumi(); },
     get outputName() { return outName(); },

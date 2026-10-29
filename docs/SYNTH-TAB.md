@@ -59,6 +59,15 @@ changes and SysEx replies. A MODX with MIDI clock out sends about 36 clock ticks
 1.3.1 each one rebuilt the buttons, so a finger often lifted off a different element and the tap was
 lost (found on the MODX8+ on 2026-10-26).
 
+On the **Android / iOS** app MIDI has ONE output, shared with the key lights: picking the synth in the
+panel moves that output (`App.midi.setOutput`, as Settings › MIDI does) and, if the key lights would
+paint a non-LUMI output, sets the LED mode off — lights are note-ons and would play on the synth.
+
+A refused send (the deck's funnel, `txCheck`) toasts where the player is — `App.toast` on the Deck /
+Live pages, the Hub's own `#mh-toast` on the Hub page — with the reason (`connState()` in
+`js/synthdeck.js`), emits `synth:conn {refused}` and nudges the panel. A Live slot is marked loaded only
+when its program could go out (`perform.check()`).
+
 ## Presets (the builder)
 
 *Save preset* opens a sheet: name, tags, colour, and what the preset remembers — **Sound**
@@ -116,3 +125,4 @@ statechange path), offline (PWA + localStorage; export as the backup), readable 
 and slot badges; splits (rule + port, chip, bytes per zone, pedal copy, presets, the LUMI thru guard);
 Live sets (slots, MODX slot bytes, stepping, foot switch, Go live / lock / panic / exit, the Deck
 grid); profiles; the phone and iPad layouts. The LUMI bucket must stay empty throughout.
+`tests/synthconn.test.js`: refusals out loud next to the 1.3.1 panel (`tests/synthconnect.test.js`): the toast on the Deck / Live (the Hub keeps its own), the nudge, a refused strip drag speaking once, the Live slot that stays put, the Android one-output pick with the key lights off, and the same press sending after the fix.

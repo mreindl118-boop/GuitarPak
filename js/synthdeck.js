@@ -54,7 +54,9 @@
   function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
   function uid(p) { return (p || 'u_') + Date.now().toString(36).slice(-5) + Math.floor(Math.random() * 46656).toString(36); }
   function esc(s) { return api ? api.esc(s) : String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
-  function toast(m) { if (api && api.toast) api.toast(m); }
+  // the Hub's toast lives inside the Hub page: on the Deck / Live pages a
+  // refusal must show where the tap was, so it goes to the app's toast there
+  function toast(m) { if (App.active !== 'midihub' && App.toast) App.toast(m); else if (api && api.toast) api.toast(m); }
   function hex(b) { return api ? api.hex(b) : b.map(function (x) { return ('0' + x.toString(16).toUpperCase()).slice(-2); }).join(' '); }
   function q(sel, root) { return (root || box2 || document).querySelector(sel); }
   function qa(sel, root) { return Array.prototype.slice.call((root || box2 || document).querySelectorAll(sel)); }
@@ -369,15 +371,34 @@
     if (ctl.kind === 'pc') return { bytes: [0xC0 | c, data & 127], origin: undefined };
     return { bytes: [0xB0 | c, ctl.num & 127, data & 127], origin: undefined };
   }
-  function refuse(msg) { var now = Date.now(); if (now - lastRefuse > 400) toast(msg); lastRefuse = now; }
+  // one toast per burst (a refused strip drag calls this every frame); true = this call spoke
+  var lastRefuseOn = '';
+  function refuse(msg) { var now = Date.now(), fresh = now - lastRefuse > 400 || lastRefuseOn !== App.active; if (fresh) toast(msg); lastRefuse = now; lastRefuseOn = App.active; return fresh; }
   function outIsLumi() { return /lumi/i.test(api.hubOutName() || ''); }
   function txCheck(bytes) {
-    var why = !api.hasOut() ? (App.active === 'midihub' ? 'No MIDI output — pick one under Synth out' : 'Not connected to a synth — connect at the top of the page') : outIsLumi() ? 'That output is the LUMI (key lights) — pick the synth under Synth out' :
+    var c = !api.hasOut() || outIsLumi() ? connState() : null;
+    var why = c && c.kind !== 'ok' ? c.refuse :
       (bytes && bytes[0] === 0xF0 && !api.sysexOk) ? 'SysEx not allowed by the browser — reconnect MIDI and allow SysEx' : null;
     if (!why) return true;
-    refuse(why);
+    var fresh = refuse(why);
     if (mounted) { paintNow(); paintNative(); } // the Now bar shows the same reason
+    if (fresh) App.emit('synth:conn', { refused: why }); // the Deck / Live connection bar repaints + nudges
     return false;
+  }
+
+  // ---- why a send would reach nothing: the refusal toast's words (the Synth
+  // tab's connect panel, js/synthtab.js, shows the fix). The Hub page has its
+  // own In / Synth out row, so the words point there on the Hub.
+  function connState() {
+    var m = api && api.midi();
+    var onHub = App.active === 'midihub';
+    if (!m || !m.supported) return { kind: 'nomidi', refuse: 'Not sent: no MIDI in this browser' };
+    if (!m.ready) return { kind: 'off', refuse: 'Not sent: MIDI is off — tap Connect' + (onHub ? ' MIDI' : ' at the top of the page') };
+    var lumi = api.hasOut() && outIsLumi();
+    if (api.hasOut() && !lumi) return { kind: 'ok' };
+    var outs = (m.outputs || []).filter(function (p) { return !/lumi|microsoft gs wavetable/i.test(p.name || ''); }); // Windows' built-in GM synth is not the synth on the cable
+    if (!outs.length) return { kind: 'nosynth', refuse: 'Not sent: no synth connected' };
+    return { kind: 'pick', refuse: 'Not sent: ' + (lumi ? 'the output is the LUMI (key lights)' : 'no synth chosen') + (onHub ? ' — pick the synth under Synth out' : ' — pick the synth at the top of the page') };
   }
   // THE funnel: every byte the deck sends goes through here
   function tx(bytes, origin) {
@@ -588,7 +609,7 @@
   }
   function outLabel() {
     if (!api.hasOut()) return { text: 'no output', bad: true };
-    if (outIsLumi()) return { text: 'LUMI (key lights) — pick the synth under Synth out', bad: true };
+    if (outIsLumi()) return { text: 'LUMI (key lights)' + (App.active === 'midihub' ? ' — pick the synth under Synth out' : ''), bad: true }; // elsewhere the connection bar has the fix
     return { text: api.hubOutName() || 'output', bad: false };
   }
   function nowText() {
@@ -1728,7 +1749,11 @@
     persist: function () { persist('decklib'); if (mounted) { renderTiles(); paintNow(); } },
     // the Performance's own names for Assign knobs 1-8 (Read name from synth fills them), or null
     assignNames: function () { var p = hubProg(), an = App.store.get('midihub.assignnames', null); var a = an && an[p.msb + '/' + p.lsb + '/' + p.pc]; return Array.isArray(a) ? a : null; },
-    readName: readName
+    readName: readName,
+    // why a send would reach nothing ({kind, refuse}); the Synth tab's connect panel shows the fix
+    conn: function () { return api ? connState() : { kind: 'off' }; },
+    // can a channel message go out now? false = refused (toast + the bar says why)
+    check: function () { return !!api && txCheck([0xB0]); }
   };
 
   var DECK = {
@@ -1743,7 +1768,8 @@
     scopeFrame: function () { if (window.SLSynthScope && SLSynthScope.frame) return SLSynthScope.frame(); },
     scopeState: function () { return window.SLSynthScope && SLSynthScope.state ? SLSynthScope.state() : null; },
     get scopeRunning() { return !!(window.SLSynthScope && SLSynthScope.running); },
-    get held() { return Object.keys(heldSet); }
+    get held() { return Object.keys(heldSet); },
+    get learning() { return !!learning; } // Map Learn is listening (the remote leaves the Deck alone meanwhile)
   };
   window.SLSynthDeck = DECK;
   if (window.App) App.synthDeck = DECK;

@@ -4,7 +4,7 @@ const { chromium } = require('playwright');
 const fs = require('fs'), path = require('path'), env = require('./env');
 let checks = 0;
 function ok(value, message) { if (!value) throw new Error(message); checks++; console.log('  PASS', message); }
-const practice = ['quiz', 'practiceplan', 'fretboard', 'tab', 'notation', 'helix', 'chords', 'piano', 'synth', 'pads', 'deck', 'liveset', 'midihub', 'lumipractice', 'songs', 'jam', 'shed', 'tuner', 'trainer', 'theory', 'settings']; // 1.3: deck + liveset = the Synth tab
+const practice = ['quiz', 'practiceplan', 'fretboard', 'tab', 'notation', 'helix', 'chords', 'piano', 'synth', 'pads', 'deck', 'liveset', 'midihub', 'lumipractice', 'songs', 'jam', 'sheetlab', 'library', 'shed', 'tuner', 'trainer', 'theory', 'settings']; // 1.3: deck + liveset = the Synth tab
 const studio = ['arrange', 'tracks', 'song', 'ideas', 'settings'];
 async function switchTo(page, name) {
   await page.evaluate(name => App.switchTo(name), name);

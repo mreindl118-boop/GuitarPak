@@ -249,7 +249,8 @@
 
   var pl = {
     running: false, idx: 0, seq: [], bpm: 120, rate: 2, click: false,
-    loopA: 0, loopB: 0, timer: null, raf: 0, nextT: 0, vis: [], ctx: null
+    loopA: 0, loopB: 0, timer: null, raf: 0, nextT: 0, vis: [], ctx: null,
+    guided: false, lit: []    // the key-light guide is showing; the notes it lights (now + next)
   };
 
   function plSeq() {
@@ -322,10 +323,12 @@
   function plGuide(step) {
     if (!App.midi || !App.midi.guide) return;
     var pos = pl.seq.indexOf(step), nx = pos === -1 ? null : pl.seq[(pos + 1) % pl.seq.length];
-    App.midi.guide(stepMidis(step), nx == null ? null : stepMidis(nx));
+    var now = stepMidis(step), next = nx == null ? null : stepMidis(nx);
+    App.midi.guide(now, next);
     pl.guided = true;
+    pl.lit = (now || []).concat(next || []);
   }
-  function plGuideOff() { if (pl.guided && App.midi && App.midi.guide) App.midi.guide(null, null); pl.guided = false; }
+  function plGuideOff() { if (pl.guided && App.midi && App.midi.guide) App.midi.guide(null, null); pl.guided = false; pl.lit = []; }
 
   function plStart() {
     if (!cur) { plGuideOff(); plStatus('load a song first'); return; }
@@ -361,6 +364,43 @@
     var prev = els.tabout.querySelector('.now');
     if (prev) prev.classList.remove('now');
     plStatus('');
+  }
+
+  // the CONTROLLER REMOTE (js/remote.js): NEXT = the Play / Pause button,
+  // BACK = from loop A again, STOP = the reset button (pause + rewind). Where
+  // nothing happens the page's toast says why (it stands for the remote's own
+  // 'nothing to do' note) and the answer is false.
+  function plRemote(action) {
+    var was = pl.running;
+    if (!cur) {
+      if (action === 'stop') return false;
+      if (App.toast) App.toast('Load a song first'); // the player is at the keys, not reading the status line
+      return false;
+    }
+    if (action === 'stop') {
+      // already reset: no step marked, nothing lit (a tapped step lights both)
+      if (!was && !pl.idx && !pl.guided && !els.tabout.querySelector('.now')) return false;
+      plStop();
+      return 'Stopped';
+    }
+    if (action === 'back') { plStop(); plStart(); } else if (was) plPause(); else plStart();
+    if (pl.running) return action === 'back' ? 'Restart' : 'Play';
+    if (was && action === 'next') return 'Pause';
+    var why = els.status.textContent; // the loop range is empty
+    if (App.toast) App.toast(why ? why.charAt(0).toUpperCase() + why.slice(1) : 'The song can’t start here');
+    return false;
+  }
+  // the reserved double-tap key (js/remote.js, remoteKey): free unless the song
+  // lights it — while playing, any note of the loop folded onto the lowest
+  // key; stopped, the step a tap lit. A lit target must sound and must never
+  // pause the player.
+  function plRemoteKey() {
+    var mi = App.midi, lo = mi && mi.range ? mi.range().lo : 48;
+    function onLo(m) { return (mi && mi.fold ? mi.fold(m) : m) === lo; }
+    if (pl.running) {
+      return !cur || !pl.seq.some(function (i) { var st = cur.steps[i]; return !!st && st.notes.some(function (n) { return onLo(n.midi); }); });
+    }
+    return !(pl.guided && pl.lit.some(onLo));
   }
 
   // ---------------- song display (normalized tab, spans per step) ----------------
@@ -490,8 +530,9 @@
     rootEl.innerHTML =
       '<div class="card sg-open" id="sg-open">' +
         '<h2>Open a score</h2>' +
-        '<div class="muted small" style="margin-bottom:8px">A MIDI file, a MusicXML score (.musicxml, .xml or .mxl from MuseScore, Sibelius, Dorico, Finale) or a text tab &mdash; then choose where it goes. Everything is read on your device.</div>' +
-        '<div class="row tight"><label class="btn sm primary sg-openbtn">Choose a file<input type="file" id="sg-openfile" accept=".mid,.midi,.musicxml,.xml,.mxl,.txt,audio/midi" hidden></label>' +
+        '<div class="muted small" style="margin-bottom:8px">A MIDI file, a MusicXML score (.musicxml, .xml or .mxl from MuseScore, Sibelius, Dorico, Finale) or a text tab &mdash; then choose where it goes. Printed sheet music as a PDF or a picture goes to Scan, which reads it into MIDI. Everything is read on your device.</div>' +
+        '<div class="row tight"><label class="btn sm primary sg-openbtn">Choose a file<input type="file" id="sg-openfile" accept=".mid,.midi,.musicxml,.xml,.mxl,.txt,audio/midi,.pdf,application/pdf,.png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff,image/*" hidden></label>' +
+          '<button type="button" class="btn sm sg-openbtn" id="sg-mylib" title="Your saved scans and played MIDI">From my library</button>' +
           '<span class="muted small" id="sg-openmsg" role="status">Nothing open yet.</span></div>' +
         '<div class="row tight sg-opendest" id="sg-opendest" hidden>' +
           '<button type="button" class="btn sm primary" id="sg-opensynth" title="Play it on your synth from the MIDI Hub Player (tempo, key shifter, loop)">Play on synth</button>' +
@@ -509,7 +550,7 @@
           '<button type="button" class="btn sm" id="sg-midibtn">Import MIDI&hellip;</button>' +
           '<input type="file" id="sg-file" accept=".mid,.midi,audio/midi">' +
           '<input type="text" id="sg-name" placeholder="Song name" style="width:180px">' +
-          '<button type="button" class="btn sm" id="sg-save" disabled>Save to library</button>' +
+          '<button type="button" class="btn sm" id="sg-save" disabled title="Keep this tab in the Songs list below (not My library)">Save tab</button>' +
           '<button type="button" class="btn sm" id="sg-exporttab" disabled title="Download this tab as a text file">Export tab</button>' +
           '<span class="muted small" id="sg-addmsg"></span>' +
         '</div>' +
@@ -636,10 +677,18 @@
     // ---- One Open ----
     var opened = null; // {name, kind: 'midi'|'xml'|'tab', buf, text}
     var openMsg = document.getElementById('sg-openmsg'), openDest = document.getElementById('sg-opendest');
+    document.getElementById('sg-mylib').addEventListener('click', function () { if (App.library) App.library.open(); else App.toast('My library is not available in this build.'); });
     function openKind(name) { return /\.(mid|midi)$/i.test(name) ? 'midi' : /\.(musicxml|xml|mxl)$/i.test(name) ? 'xml' : 'tab'; }
     function openSay(m) { openMsg.textContent = m; }
     document.getElementById('sg-openfile').addEventListener('change', function () {
       var file = this.files && this.files[0], self = this; if (!file) return;
+      // sheet music (a PDF or a picture) is read by Scan (js/sheetlab.js), not here
+      if (/\.(pdf|png|jpe?g|webp|bmp|tiff?)$/i.test(file.name) || /^(image\/|application\/pdf$)/.test(file.type || '')) {
+        self.value = '';
+        if (App.sheetlab && typeof App.sheetlab.open === 'function') { openSay(file.name + ' · sheet music — opened in Scan'); App.sheetlab.open(file); }
+        else openSay('Reading sheet music (PDF or picture) is not available in this build.');
+        return;
+      }
       var kind = openKind(file.name), rd = new FileReader();
       rd.onload = function () {
         opened = { name: file.name, kind: kind, buf: kind === 'tab' ? null : rd.result, text: kind === 'tab' ? rd.result : null };
@@ -810,6 +859,8 @@
 
   App.register('songs', {
     init: init,
-    onHide: onHide
+    onHide: onHide,
+    onRemote: plRemote,
+    remoteKey: plRemoteKey
   });
 })();

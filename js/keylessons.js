@@ -33,6 +33,17 @@
  * card does the same on a touchscreen. The GUIDE COLORS chip mirrors
  * the legacy guide-style setting (App.midi.display); the single LUMI Display
  * master lives in the treble-clef menu.
+ *
+ * CONTROLLER REMOTE (js/remote.js, App.keysLessons.remote via the Keys
+ * page's onRemote only: the Synth page hides this card): NEXT = Start / Next
+ * level / Again / Go again (a passed top level selects the next lesson; a
+ * playing run ignores it unless every note is judged); BACK = restart the
+ * run, replay Listen first, or retry the level just played (start's step
+ * override, the saved level untouched) - a finished run or an infinite one
+ * past its count-in is scored first, never thrown away; STOP = the Stop /
+ * End run button (a finite run is never scored, an infinite count-in isn't
+ * either), on results = Lessons. The lowest-key double-tap above stays this
+ * card's own (no remoteKey here), on the Keys page only.
  */
 (function () {
   'use strict';
@@ -67,14 +78,17 @@
   var BY_ID = {};
   LESSONS.forEach(function (l) { BY_ID[l.id] = l; });
 
-  var root = null, view = 'list', R = null, last = null, demo = null, entryInstrument = null;
-  App.on('learn:lesson',function(e){if(e&&e.kind==='keys'){stopAll(true);entryInstrument=e.instrument==='synth'?'synth':'piano';if(root)paint();}});
+  var root = null, view = 'list', R = null, last = null, demo = null, entryInstrument = null, doneAt = 0;
+  App.on('learn:lesson',function(e){if(e&&e.kind==='keys'){stopAll(true);releaseRunner();entryInstrument=e.instrument==='synth'?'synth':'piano';if(root)paint();}});
   App.on('learn:instrument',function(){entryInstrument=null;if(R)stopAll(false);else if(root)paint();});
   function creditInstrument(){return R?R.instrument:entryInstrument||(App.active==='synth'?'synth':'piano');}
   function measure(r){if(!r||r.demo)return;var at=Date.now(),delta=(at-r.xpLast)/1000;r.xpLast=at;if(r.ctx.currentTime>=r.first&&delta>0&&delta<=1&&r.xpActivity!=null&&at-r.xpActivity<=5000)r.xpSeconds+=delta;}
   function recordRun(r,status){if(!r||r.demo||r.xpRecorded||!App.xp)return null;measure(r);r.xpRecorded=true;var hits=r.inf?r.inf.hits:r.targets.filter(function(t){return t.j&&t.j!=='miss';}).length,miss=r.inf?r.inf.miss:r.targets.filter(function(t){return t.j==='miss';}).length;return App.xp.finishLevel({sessionId:r.sessionId,instrument:r.instrument,status:status,mode:'keys:'+r.l.id,metrics:{engagedSeconds:r.xpSeconds,expected:r.inf?hits+miss:r.targets.length,matched:hits,missed:miss,extra:r.wrong,wrong:r.wrong}});}
 
   function K() { return App.keys; }
+  // a lesson was opened (Learn, Practice plan): a Keys runner the remote
+  // paused no longer takes NEXT, the lesson does
+  function releaseRunner() { var k = K(); if (k && k.releaseRemote) k.releaseRemote(); }
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function el(id) { return document.getElementById(id); }
   function stepName(i) { return RATE_NAME[STEPS[i][1]] + ' at ' + STEPS[i][0]; }
@@ -105,12 +119,99 @@
     lastTap = { midi: midi, at: now };
     return false;
   }
-  function onKeysPage() { return App.active === 'piano' || App.active === 'synth'; }
+  // the Keys page only: the Synth page borrows the keyboard but hides this card
+  function onKeysPage() { return App.active === 'piano'; }
   // start from the list / results view, stop a run
   function tapControl() {
     if (R) { if (R.inf && !R.demo) finish(); else stopAll(false); return true; }
     if (view === 'list' || view === 'done') { start(false); return true; }
     return false;
+  }
+
+  // CONTROLLER REMOTE (js/remote.js; piano.js onRemote asks here first):
+  // NEXT / BACK / STOP do what the card's own buttons do. false = nothing
+  // for the lessons (a playing Keys runner, or nothing at all), else true or
+  // the HUD label. Never touches the saved level (BACK retries via a step
+  // override) and never fires a demo-to-run or run-to-done race destructively.
+  function remote(action) {
+    if (!root || App.active !== 'piano') return false; // the card is on the Keys page only
+    if (R) {
+      var counting = R.ctx.currentTime - R.lat < R.first;
+      if (R.demo) {
+        // stopAll (in start) cancels the demo notes still queued
+        if (action === 'next') { start(false); return 'Start'; }       // done listening: play it
+        if (action === 'back') { start(true); return 'Listen again'; }
+        if (action === 'stop') { stopAll(false); return 'Stopped'; }
+        return false;
+      }
+      // every note already judged (the auto-score is ~0.4 s away)
+      var played = !R.inf && R.targets.every(function (t) { return t.j; });
+      if (action === 'back') {
+        // never throws work away: a finished run, or an infinite run past
+        // its count-in (its streak), is scored first, then the same level
+        // again - exactly what results + Retry would do
+        if (played || (R.inf && !counting)) { var r = R; finish(); retry(r); return played ? 'Retry' : 'Restart'; }
+        start(false, R.step); return 'Restart'; // unscored: the count-in, or a run still playing
+      }
+      if (action === 'stop') {
+        // = the Stop / End run button: a finite run is never scored, even
+        // with every note judged; End run scores an infinite run, but not
+        // one still counting in (that would save an empty streak)
+        if (R.inf && !counting) { finish(); return 'End run'; }
+        stopAll(false); return 'Stopped';
+      }
+      if (action === 'next') {
+        if (counting) return 'Starting…';
+        if (played) { finish(); return 'Results'; }
+        return 'Playing…';
+      }
+      return false;
+    }
+    if (K() && K().runnerBusy && K().runnerBusy()) return false; // the Keys runner has it
+    if (view === 'done' && last) {
+      if (action === 'stop') { view = 'list'; paint(); return 'Lessons'; } // = #kl-back
+      if (action === 'back') { retry(last.r); return 'Retry'; } // the level just played (after a level-up too)
+      if (action === 'next') {
+        if (Date.now() - doneAt < 600) return 'Results'; // the run just ended: let the score show
+        if (!last.inf && last.pass && last.r.step >= STEPS.length - 1) {
+          var n = nextLesson();
+          return n ? 'Next lesson: ' + n.name + ' · ' + handName(n.hand) : 'All lessons done';
+        }
+        if (!last.inf && !last.up) { retry(last.r); return 'Again'; } // the level the results show (after a Back retry too)
+        start(false);
+        return last.inf ? 'Go again' : 'Next level';
+      }
+      return false;
+    }
+    if (action === 'next') { start(false); return 'Start'; }
+    return false;
+  }
+
+  // a true retry of a run's lesson and level (the saved level untouched)
+  function retry(r) {
+    if (sel() !== r.l) App.store.set('kl.sel', r.l.id);
+    start(false, r.step);
+  }
+
+  // the lesson after the one just played (course order), selected in the list
+  function nextOf(l) { var i = LESSONS.indexOf(l); return i >= 0 && i < LESSONS.length - 1 ? LESSONS[i + 1] : null; }
+  function nextLesson() {
+    var n = last && last.r ? nextOf(last.r.l) : null;
+    if (!n) return null;
+    App.store.set('kl.sel', n.id);
+    App.store.set('kl.tier', n.tier);
+    view = 'list';
+    paint();
+    return n;
+  }
+
+  // is a controller-remote button set for this action? (a MIDI button, a
+  // learned key, or the page-turner switch for next / back). The remote's
+  // own double-tap option doesn't count: this card keeps kl.dbltap.
+  function pedal(a) {
+    var rm = App.remote;
+    if (!rm) return false;
+    try { var m = rm.map[a]; return !!(m && (m.midi || m.key)) || (a !== 'stop' && rm.pageTurner); } catch (e) { return false; }
   }
   function lumiDisplay() { return !!(App.midi && App.midi.display); }
   function cal(src) { var c = App.store.get('ws.cal', {}); return c && typeof c[src] === 'number' ? c[src] : 0; }
@@ -152,18 +253,22 @@
       }),
       inf: inf ? { k: 0, nextAt: first, loop: 0, bpm0: bpm, bpm: bpm, speedup: speedup(), dirty: {}, streak: 0, best: 0,
         hits: 0, miss: 0, errs: [], lastInput: first, beats: [], broke: 0 } : null,
-      clickT: t0, beatN: 0, wrong: 0, shown: -1, timer: 0, raf: 0, lastHit: null
+      clickT: t0, beatN: 0, wrong: 0, shown: -1, timer: 0, raf: 0, lastHit: null,
+      demoK: 0, voices: [] // Listen first: the next demo note to schedule, its queued piano voices
     };
   }
 
-  function start(isDemo) {
+  // stepOverride (optional): play that level instead of the saved one — the
+  // remote's BACK retries the level just played after a level-up; the saved
+  // progress is not touched until that run is scored
+  function start(isDemo, stepOverride) {
     stopAll(true);
     var l = sel(), p = prog(l.id);
-    try { R = build(l, p.step, isDemo ? 1 : reps(), isDemo); } catch (e) { R = null; return; }
+    var step = typeof stepOverride === 'number' && stepOverride >= 0 && stepOverride < STEPS.length ? stepOverride : p.step;
+    try { R = build(l, step, isDemo ? 1 : reps(), isDemo); } catch (e) { R = null; return; }
     R.instrument=entryInstrument||(App.active==='synth'?'synth':'piano');R.sessionId='keys-'+Date.now()+'-'+Math.random().toString(36).slice(2);R.xpLast=Date.now();R.xpSeconds=0;R.xpActivity=null;R.xpRecorded=false;if(!R.demo&&App.xp)App.xp.beginSession({id:R.sessionId,instrument:R.instrument,source:'keys'});
     App.emit('transport:claim', { owner: 'keys' });
     App.wake.acquire('kl-run');
-    if (R.demo) R.targets.forEach(function (tg) { K().play(tg.midi, tg.at - R.ctx.currentTime, Math.max(0.3, R.spn * 1.4), 0.5); });
     R.timer = setInterval(tick, 25);
     view = 'run';
     document.documentElement.classList.add('kl-running');
@@ -239,6 +344,17 @@
       while (R.clickT < now - 0.01) { R.clickT += R.beat; R.beatN++; }
       lastAt = R.targets[R.targets.length - 1].at;
       while (R.clickT < now + 0.12 && R.clickT <= lastAt + 0.001) { click(R.ctx, R.clickT, R.beatN % 4 === 0); R.clickT += R.beat; R.beatN++; }
+    }
+    // Listen first: the demo notes go out on the click's lookahead, not all
+    // at the start, so Stop / Listen again / Start leaves nothing of the old
+    // demo on the audio clock (stopAll hushes the few already queued)
+    if (R.demo) {
+      while (R.demoK < R.targets.length && R.targets[R.demoK].at < now + 0.15) {
+        var dn = R.targets[R.demoK++];
+        if (dn.at < now - 0.05) continue; // a stall: never a late burst
+        var v = K().play(dn.midi, dn.at - now, Math.max(0.3, R.spn * 1.4), 0.5);
+        if (v) R.voices.push(v);
+      }
     }
     // misses: the beat went by without the note
     if (!R.demo) {
@@ -327,11 +443,12 @@
     if (r.demo) { view = 'list'; paint(); return; }
     if (r.inf) { finishInfinite(r); return; }
     var st = stats(r), p = prog(r.l.id), stars = starsFor(st.score), pass = st.score >= 70;
+    var saved = p.step;
     p.best[r.step] = Math.max(p.best[r.step] || 0, st.score);
     if (pass && r.step > p.passed) p.passed = r.step;
     var up = st.score >= 85 && r.step < STEPS.length - 1;
-    if (up) p.step = r.step + 1;
-    p.fails = pass ? 0 : p.fails + 1;
+    if (up) p.step = Math.max(p.step, r.step + 1); // a retry of a lower level never lowers the saved one
+    if (r.step === saved) p.fails = pass ? 0 : p.fails + 1; // misses count against the level they were played at
     var mastered = !p.mastered && pass && r.step >= MASTER_STEP && r.help <= MASTER_HELP;
     if (mastered) p.mastered = true;
     p.runs.push({ instrument:r.instrument,sessionId:r.sessionId,d: App.xp ? App.xp.dayKey() : '', st: r.step, h: r.help, acc: Math.round(st.acc * 100), t: Math.round(st.meanAbs),
@@ -341,6 +458,7 @@
     var fin = credited;
     last = { r: r, st: st, stars: stars, pass: pass, up: up, mastered: mastered, fin: fin, p: p };
     view = 'done';
+    doneAt = Date.now();
     paint();
   }
 
@@ -360,6 +478,7 @@
     last = { r: r, inf: { best: I.best, old: old, isBest: isBest, acc: acc, meanAbs: meanAbs, mean: mean, sd: sd, bpm: I.bpm,
       loops: Math.floor(I.hits / r.one.length), notes: judged, wrong: r.wrong }, fin: fin, p: p };
     view = 'done';
+    doneAt = Date.now();
     paint();
   }
 
@@ -368,12 +487,22 @@
     if (!R) return;
     recordRun(R,'stopped');
     clearInterval(R.timer);
+    hush(R.voices, R.ctx.currentTime);
     App.wake.release('kl-run');
     document.documentElement.classList.remove('kl-running');
     var k = K();
     if (k) k.clearRing();
     R = null;
     if (!quiet) { view = 'list'; paint(); }
+  }
+
+  // demo notes still waiting on the audio clock never sound; one already
+  // sounding rings out (a hard cut would click)
+  function hush(voices, now) {
+    voices.splice(0).forEach(function (v) {
+      if (!(v.at > now)) return;
+      try { v.gain.gain.cancelScheduledValues(0); v.gain.gain.value = 0; v.src.stop(0); } catch (e) { /* ended */ }
+    });
   }
 
   // ---------------- views ----------------
@@ -428,7 +557,8 @@
         '<div class="kl-ctl">' +
           '<button type="button" class="chip fb-chip' + (lumiDisplay() ? ' active' : '') + '" id="kl-disp" aria-pressed="' + lumiDisplay() + '" title="Legacy guide focus; pitch colors are shared, LUMI Display master is in the clef menu">Guide focus</button>' +
           '<button type="button" class="chip fb-chip' + (dblOn() ? ' active' : '') + '" id="kl-dbltap" aria-pressed="' + dblOn() + '" title="Start and stop with a double-tap">Double-tap</button>' +
-          (dblOn() ? '<span class="muted small">Double-tap <b>' + ctrlName() + '</b> (your keyboard’s lowest key) or this card to start; again to stop.</span>' : '') +
+          (dblOn() ? '<span class="muted small">Double-tap <b>' + ctrlName() + '</b> (your keyboard’s lowest key) or this card to start' +
+            (pedal('next') ? ', or press your Next pedal; double-tap again to stop.' : '; again to stop.') + '</span>' : '') +
         '</div>' +
         (recent.length ? '<details class="kl-hist"><summary>Your runs (' + p.runs.length + ')</summary><div class="kl-tblwrap"><table class="kl-table"><thead><tr><th>Day</th><th>Level</th><th>Help</th><th>Notes</th><th>Timing</th><th>Score</th></tr></thead><tbody>' +
           recent.map(function (u) {
@@ -445,7 +575,7 @@
     return '<div class="kl-run">' +
       '<div class="kl-runrow"><div class="kl-runtop"><b>' + esc(R.l.name) + ' · ' + handName(R.l.hand) + '</b><span class="muted small">' + (R.demo ? 'Listening · ' : 'Level ' + (R.step + 1) + ' · ') + stepName(R.step) + (R.inf ? ' · Infinite' : '') + '</span></div>' +
         '<button type="button" class="btn sm" id="kl-stop">' + (R.inf ? 'End run' : 'Stop') + '</button></div>' +
-      (dblOn() ? '<div class="kl-taphint muted small">Double-tap ' + ctrlName() + ' to ' + (R.inf ? 'end the run' : 'stop') + '</div>' : '') +
+      (dblOn() ? '<div class="kl-taphint muted small">Double-tap ' + ctrlName() + (pedal('stop') ? ' or press your Stop pedal' : '') + ' to ' + (R.inf ? 'end the run' : 'stop') + '</div>' : '') +
       '<div class="kl-beats" aria-hidden="true"><i></i><i></i><i></i><i></i></div>' +
       '<div class="kl-call" id="kl-call" aria-live="polite"></div>' +
       '<div class="kl-needle" aria-hidden="true"><span class="kl-zone"></span><span class="kl-mid"></span><i id="kl-mark"></i>' +
@@ -516,7 +646,7 @@
     if (Math.abs(s.mean) >= 15) notes.push(s.mean < 0 ? 'You ran ahead of the click by ' + Math.round(-s.mean) + ' ms on average. Wait for it.' : 'You trailed the click by ' + Math.round(s.mean) + ' ms on average. Lean into the beat.');
     if (f.extended && f.streak) notes.push(f.streak === 1 ? 'Day 1 of a new streak.' : f.streak + '-day streak.');
     if (last.stars === 3 && r.help > 0) notes.push('Clean. Try it with less help.');
-    if (p.fails >= 2 && r.step > 0) notes.push('Two misses in a row: an easier level builds it back.');
+    if (p.fails >= 2 && r.step > 0 && r.step === p.step) notes.push('Two misses in a row: an easier level builds it back.');
     return '<div class="kl-done">' +
       '<div class="kl-runtop"><b>' + esc(r.l.name) + ' · ' + handName(r.l.hand) + '</b><span class="muted small">Level ' + (r.step + 1) + ' · ' + stepName(r.step) + ' · Help: ' + K().ASSIST_NAMES[r.help] + '</span></div>' +
       '<div class="kl-score"><span class="kl-big">' + s.score + '</span><span class="kl-stars" aria-label="' + last.stars + ' of 3 stars">' + star(last.stars) + '</span></div>' +
@@ -529,6 +659,8 @@
       '<div class="kl-strip" id="kl-strip" role="img" aria-label="Timing of each note against the beat"></div>' +
       '<ul class="kl-notes">' + notes.map(function (n) { return '<li>' + esc(n) + '</li>'; }).join('') + '</ul>' +
       '<div class="kl-acts"><button type="button" class="btn primary" id="kl-start">' + (last.up ? 'Next level' : 'Again') + '</button>' +
+        // top level passed: nothing faster to level up to, so offer the next lesson
+        (last.pass && r.step >= STEPS.length - 1 && nextOf(r.l) ? '<button type="button" class="btn" id="kl-nextlesson">Next lesson</button>' : '') +
         (r.step > 0 && !last.pass ? '<button type="button" class="btn" data-klstep="-1">Easier</button>' : '') +
         (last.stars === 3 && r.help > 0 ? '<button type="button" class="btn" id="kl-lesshelp">Less help</button>' : '') +
         '<button type="button" class="btn" id="kl-back">Lessons</button></div>' +
@@ -602,8 +734,12 @@
     if ((a = b.getAttribute('data-kltier'))) { App.store.set('kl.tier', a); paint(); return; }
     if ((a = b.getAttribute('data-klreps'))) { App.store.set('kl.reps', +a); paint(); return; }
     if ((a = b.getAttribute('data-klstep'))) {
-      var l = sel(), p = prog(l.id);
-      p.step = Math.max(0, Math.min(STEPS.length - 1, p.step + (+a)));
+      // on the results (Easier) it is relative to the level just played: a
+      // BACK retry may have played one below the saved level
+      var run = view === 'done' && last && !last.inf ? last.r : null;
+      var l = run ? run.l : sel(), p = prog(l.id);
+      if (run && sel() !== l) App.store.set('kl.sel', l.id);
+      p.step = Math.max(0, Math.min(STEPS.length - 1, (run ? run.step : p.step) + (+a)));
       p.fails = 0;
       saveProg(l.id, p);
       view = 'list';
@@ -611,13 +747,14 @@
       return;
     }
     switch (b.id) {
-      case 'kl-start': start(false); break;
+      case 'kl-start': if (view === 'done' && last && !last.inf && !last.up) retry(last.r); else start(false); break; // Again = the level just played
       case 'kl-listen': start(true); break;
       case 'kl-stop': if (R && R.inf) finish(); else stopAll(false); break;
       case 'kl-speedup': App.store.set('kl.speedup', !speedup()); paint(); break;
       case 'kl-dbltap': App.store.set('kl.dbltap', !dblOn()); paint(); break;
       case 'kl-disp': if (App.midi && App.midi.setDisplay) App.midi.setDisplay(!lumiDisplay()); paint(); break;
       case 'kl-back': view = 'list'; paint(); break;
+      case 'kl-nextlesson': nextLesson(); break;
       case 'kl-help': App.switchTo('lights'); break;
       case 'kl-lesshelp': K().setAssist(Math.max(0, K().assist() - 1)); view = 'list'; paint(); break;
     }
@@ -708,10 +845,13 @@
       App.on('note:input', function (d) { if (d && d.on && R) judge(d.midi, d.src === 'touch' ? 'touch' : 'qwerty'); });
       App.on('transport:claim', function (d) { if (R && d && d.owner !== 'keys') stopAll(false); });
       App.on('help:level', function () { if (view === 'list') paint(); });
+      App.on('remote:map', function () { if (view === 'list') paint(); }); // the pedal hint
       document.addEventListener('visibilitychange', function () { if (document.hidden) stopAll(false); });
       paint();
     },
     stop: function () { stopAll(false); entryInstrument=null; },
+    // the controller remote on the Keys / Synth page: false | true | HUD label
+    remote: remote,
     // for the Exercises Progress tab: every lesson that has runs
     summary: function (instrument) {
       return LESSONS.map(function (l) {
@@ -723,7 +863,7 @@
           streak: Math.max.apply(null, [0].concat(runs.map(function (r) { return r.inf || 0; }))) };
       }).filter(Boolean).sort(function (a, b) { return a.last < b.last ? 1 : -1; });
     },
-    open: function (id, instrument) { if (instrument==='piano'||instrument==='synth') {stopAll(true);entryInstrument=instrument;} if (BY_ID[id]) { App.store.set('kl.sel', id); App.store.set('kl.tier', BY_ID[id].tier); view = 'list'; paint(); } },
+    open: function (id, instrument) { releaseRunner(); if (instrument==='piano'||instrument==='synth') {stopAll(true);entryInstrument=instrument;} if (BY_ID[id]) { App.store.set('kl.sel', id); App.store.set('kl.tier', BY_ID[id].tier); view = 'list'; paint(); } },
     // tests
     get run() { return R; },
     get view() { return view; },

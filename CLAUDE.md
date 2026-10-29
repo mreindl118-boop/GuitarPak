@@ -2,6 +2,8 @@
 
 Guitar + keys practice PWA (vanilla HTML/CSS/JS, no build step) + Android
 WebView wrapper. GitHub: https://github.com/mreindl118-boop/GuitarPak
+LICENCE (1.4.0): AGPL-3.0 (LICENSE) because SheetLab ships homr's code and
+models; credits in docs/SHEETLAB.md.
 Branded **soundLAB** (formerly GuitarLab) since v0.43.0 — the rename is
 user-facing ONLY: storage keys stay 'guitarlab.*', the APK ships as
 soundLAB-alpha.apk (a GuitarLab-alpha.apk copy keeps old links alive), and
@@ -137,6 +139,33 @@ js/audioin.js     SOUND INPUT (App.audioIn): the ONE shared live-input service.
                   audio.outId is re-applied (setSinkId) when it is listed again.
                   Suite tests/audioin.test.js (Chromium fake media device).
                   Loaded right after tonein.js.
+js/remote.js      CONTROLLER REMOTE (App.remote, 1.4.0; docs/CONTROLLER-
+                  REMOTE.md): practice moves on from the instrument. Actions
+                  next / back / stop, each bound in Settings › Hands-free
+                  control (#set-remote-card, rows rendered by remote.js
+                  mount) to a learned MIDI CC press / Program Change / note
+                  (port name kept, any channel; an unconnected learned port =
+                  any port; 'latching' = every change) and/or a learned key;
+                  remote.pt = page-turner keys (PageDown/Right/Down = next,
+                  PageUp/Left/Up = back; capture phase, preventDefault, never
+                  while typing); remote.dbl = double-tap the lowest key
+                  (range().lo; only the LUMI's when one is connected) = next,
+                  on pages whose module declares remoteKey (that key is then
+                  reserved: claimed, silent, never graded). Bound MIDI is
+                  CLAIMED by midi.js setInputClaim BEFORE 'midi:raw' (no Thru,
+                  no grading, no dispatch; 'midi:remote' instead; a release of
+                  a note the app already got is never claimed). Fires through
+                  App.remoteAction (app.js): help tour -> clef/sheets fold ->
+                  Settings = a 'works' test -> the page's onRemote -> else an
+                  App.toast 'Nothing to move on here'. #remote-hud confirms.
+                  Store remote.map / remote.pt / remote.dbl; bus 'remote',
+                  'remote:map'. Loaded right after midi.js. Suites
+                  tests/remote.test.js (core) + tests/remote-<area>.test.js.
+                  ANSWER BY KEY (quiz.js keyAnswerable): a choice question with
+                  no playable answer takes a WHITE key per choice (<= 7: C-B
+                  any octave; more: white keys up from range().lo's C), badge
+                  .kb on each choice while a keyboard is in; the right key
+                  after a miss moves on; remoteKey is false there.
 js/metronome.js   ┐ feature modules; each registers (metronome = the corner
                   │  sheet, not a page — see OVERLAY SHEETS)
 js/fretboard.js   │ App.register(name, {init, onShow, onHide, onKey})
@@ -548,6 +577,55 @@ js/daw/synth.js   MPE poly synth ported from the OpenStudio DAW repo
                   envelopes, unison, glide, LFO, per-channel bend/pressure/
                   timbre. window.DAW.createSynth/defaultSynth/SYNTH_PRESETS.
                   More of that engine lands here as the studio grows.
+js/sheetlab.js    SHEETLAB page ('sheetlab', Play group pill "Scan", 1.4.0, prefix sl-;
+                  docs/SHEETLAB.md): PDF / photo / scan of printed sheet music ->
+                  MusicXML + MIDI ON THE DEVICE. Decodes only (pictures via
+                  createImageBitmap; PDFs via pdf.js 4.10.38 legacy, dynamic import
+                  of a sha256-checked blob, one page at a time) and drives
+                  js/omr/worker.js. CONSENT GATE: nothing downloads before the
+                  Download tap (~107 MB: models 77 + opencv/ort 28 + pdf.js 2);
+                  'size' cachedOnly makes no request. Stop = terminate the worker.
+                  Result: previews, counts, Play on synth (SLMidiHub.player),
+                  Practice (Woodshed), Open as tab (App.songs), downloads, Save to
+                  my library (App.library.saveScan; autosave on). Store
+                  sheetlab.* (tempo null = follow met.bpm, never written). Songs'
+                  Open a score hands PDFs/pictures to App.sheetlab.open(file).
+                  Android APK: no file chooser/DownloadListener in MainActivity
+                  yet -> the page says so (GuitarLabHost.canPickFiles()). Suite
+                  tests/sheetlab.test.js (CDN routed to local npm packages).
+js/omr/           the OMR ENGINE = a faithful JS port of homr (github.com/liebharc/
+                  homr @2d7e8c3, AGPL-3.0) + the owner's SheetLab engine: one file
+                  per homr module, load order = js/omr/manifest.js OMR.FILES
+                  (worker importScripts, Node require, sw ASSETS). np.js (Python/
+                  numpy semantics: banker's round, argsort tie order...), cv.js
+                  (OMR.cv2 = cv2-shaped wrappers over opencv.js 5.0.0 + exact
+                  ports of the x86 kernels it differs on; resetRNG per document),
+                  pil.js (Pillow bicubic, byte-exact), runtime.js (OMR.runtime:
+                  sha256-pinned CDN runtime + models/omr parts -> Cache Storage
+                  'soundlab-omr-v1'; ep ALWAYS 'wasm'), engine.js (OMR.main =
+                  homr main.py, OMR.engine = SheetLab translate), midi.js (OMR.xml
+                  + OMR.midi = music21+mido-identical MIDI), mxl.js, worker.js
+                  (classic worker, protocol in its header; helper-worker POOL of
+                  min(3, cores-1), 1 on iOS/Safari/low memory; segnet batches stay
+                  8 tiles for parity). Parity suites tests/omr-*.test.js vs the
+                  Python reference (tools/omr/README.md: SL_OMR_FIXTURES /
+                  SL_OMR_MODELS / SL_OMR_PYTHON; without them they SKIP).
+js/library.js     MY LIBRARY ('library', Play group pill "Library", 1.4.0;
+                  docs/LIBRARY.md): scans + played MIDI, local-first (IndexedDB
+                  'soundlab-library'), synced to the soundLAB repo's ORPHAN branch
+                  'library' (folder library/: scans/<slug>/*.mid|.musicxml|
+                  meta.json, played/<date>-<slug>.mid|.json) via the GitHub REST
+                  API with a per-device fine-grained key in localStorage
+                  'soundlab.secret.library' (NOT guitarlab.* -> never in backups;
+                  main/master/gh-pages refused as branch). Listing works keyless
+                  (public repo). Studio ideas auto-save when "Save what I play" is
+                  on. Settings card via App.library.mountSettings. Suite
+                  tests/library.test.js (fake GitHub API).
+models/omr/       the three recognition models (int8 segnet + encoder, homr's
+                  int8 decoder) in <= 14 MB parts + manifest.json (sha256).
+                  Never precached by sw.js (fetch passes models/omr/ through;
+                  activate keeps 'soundlab-omr-*' caches); not in the APK assets.
+tools/omr/        Python reference tools for the omr parity suites (README.md).
 samples/          MIT FluidR3 instrument MP3s (see samples/CREDITS.md)
 android/          APK project — build.ps1 (no Gradle: javac→d8→aapt→zipalign→
                   apksigner); keystore is gitignored, do NOT commit it.
@@ -600,7 +678,7 @@ version.json      auto-update feed (source of truth for latest version)
 - SECTION TAB BAR (v0.70.0; app.js GROUPS + populateNav): the main nav is a
   tab bar of GROUPS (icon + label), not a drop-down — practice: Learn
   (quiz=Exercises HOME/chords/theory), Guitar (fretboard/tab/notation/helix), Keys
-  (piano/synth/pads/lumipractice), SYNTH (1.3: deck/liveset/midihub), Play (songs/jam), Train (shed/trainer/tuner; 1.3: the Practice tab became Train, the space keeps the name);
+  (piano/synth/pads/lumipractice), SYNTH (1.3: deck/liveset/midihub), Play (songs/jam; 1.4: sheetlab = Scan, library = Library), Train (shed/trainer/tuner; 1.3: the Practice tab became Train, the space keeps the name);
   studio: Studio (arrange=Timeline HOME / tracks=Editor), Sketch (song/ideas).
   Rendered twice: #tabbar inside the top bar (> 900px) and #tabbar-m fixed
   along the bottom (<= 900px) — #tabbar-m sits OUTSIDE <header> because the
@@ -677,6 +755,16 @@ version.json      auto-update feed (source of truth for latest version)
   listeners that make SOUND register with App.on(evt, fn, true) — the third
   arg puts them first, ahead of visual listeners. App.keys.play(midi, when,
   dur, gain) = the Keys page's sampled piano for other modules (quiz).
+- onRemote(action, info) + remoteKey (1.4.0, js/remote.js): a page with
+  something to start / advance / retry / stop implements onRemote ('next' |
+  'back' | 'stop'; info.via cc|pc|note|key|dbltap|test) and returns false
+  (nothing here), true or a short HUD label; it must act exactly like the
+  on-screen button and never prompt, change ports, or arm hardware.
+  remoteKey (true / fn) only where losing the lowest key costs nothing.
+- App.toast(msg, ms?) (v1.3.1): the ONE app-wide status toast (#app-toast,
+  role=status) for a tap that did nothing visible elsewhere — use it instead of
+  a toast element inside a page that may be hidden (the Hub's #mh-toast only
+  shows on the Hub page; the Synth Deck routes its refusals here off it).
 - New bus events: `note:input` {on, midi, vel, src, dur?} — user played a note
   on an on-screen instrument (piano QWERTY/touch emit it; capture listens
   alongside midi:note), `space` {space} after a workspace switch.
