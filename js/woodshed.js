@@ -1199,7 +1199,9 @@
             (best ? ' <span class="muted">' + Math.round(best * 100) + '%</span>' : '') + '</button>';
         }).join('') + '</div>';
       }).join('') + '<div class="muted small" style="margin-top:12px">All 40 PAS rudiments with sticking + accent targets — the ladder raises tempo as you pass.</div></div>' +
-      '<div class="card"><h2>Shared source library</h2><p class="muted small">Practice credit: ' + esc(selectedInstrument()) + '. Source instrument describes the score, not your XP category.</p><div id="ws-lib">' + (lib().length ? lib().slice().reverse().map(function (sc) {
+      '<div class="card"><h2>Shared source library</h2><p class="muted small">Practice credit: ' + esc(selectedInstrument()) + '. Source instrument describes the score, not your XP category.</p>' +
+        '<div class="row tight" style="margin-bottom:10px"><button type="button" class="btn sm" id="ws-mylib" title="Scans and what you played, kept in My library (Play \u203a Library)">My library</button></div>' +
+        '<div id="ws-lib">' + (lib().length ? lib().slice().reverse().map(function (sc) {
         var best = parseInt(App.store.get(bestKey(sc, 'run'), 0), 10);
         return '<div class="row spread ws-row" data-wsid="' + sc.id + '">' +
           '<span><b>' + esc(sc.title) + '</b> <span class="muted small">' + sc.instrument + ' · ' + sc.bpm + ' BPM · ' +
@@ -1431,6 +1433,8 @@
       msg('“' + t.name + '” imported from the Studio.');
     });
     document.getElementById('ws-cal-btn').addEventListener('click', startCal);
+    // My library (js/library.js): pick a scan or something you played, then Practice there
+    document.getElementById('ws-mylib').addEventListener('click', function () { App.switchTo('library'); });
     els.root.onclick = function (e) {
       var rud = e.target.closest('[data-wsrud]');
       if (rud) {

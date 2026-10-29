@@ -60,6 +60,11 @@
       { t: 'Four ways to practice', x: 'Run = straight through, no mercy. Phrases = short chunks loop until you nail them twice. Wait = it freezes until you play the right note (great for learning). Ladder = tempo climbs as you pass. A Next pedal or synth button (Settings › Hands-free control) starts the count-in and goes again from the score, Back restarts (in Phrases: the phrase before) and Stop ends the run — Guided performance too.' },
       { t: 'Feed it music', x: 'Generate scales, Hanon and rudiments; import MIDI files; paste ASCII tab (Wait mode ready instantly); or pull in any Studio track. Generated exercises follow the treble-clef root and scale; MIDI, Studio and generated scores work in either guided mode. PDFs and images are not parsed scores. Calibrate timing once per input so scoring is honest.' }
     ],
+    library: [
+      { t: 'My library', x: 'Everything you keep: scans from Play \u203a Scan (MIDI + MusicXML) and what you play (Studio ideas). Each entry plays on your synth, opens in the Woodshed to practise, shows as guitar tab, or downloads as a file.' },
+      { sel: '#lib-filter', t: 'Find it', x: 'All, Scans or Played, and a search over the titles. Newest first.' },
+      { sel: '#lib-sync', t: 'On every device', x: 'The library lives on this device first. With an access key (Settings \u203a Library sync) it is also kept in your GitHub repository on its own library branch, so the iPad, the phone and the computer see the same music. Sync now checks GitHub and uploads what is waiting; without a key you can still list and open what is there.' }
+    ],
     tuner: [
       { t: 'Tuner', x: 'A chromatic tuner using your microphone. Press Start, allow mic access, and play one string at a time — the needle shows how far off you are; green means in tune.' }
     ],

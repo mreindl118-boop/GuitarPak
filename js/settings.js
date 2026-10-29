@@ -138,6 +138,11 @@
           '<span class="muted small" id="set-backup-msg"></span>' +
         '</div>' +
       '</div>' +
+      // My library's GitHub sync (js/library.js renders the card's body)
+      '<div class="card" id="set-library-card">' +
+        '<h2>Library sync</h2>' +
+        '<div id="set-library"></div>' +
+      '</div>' +
       '<div class="card">' +
         '<h2>Screen &amp; battery</h2>' +
         '<label class="set-check" style="margin-top:0">' +
@@ -902,6 +907,7 @@
 
     paintMidi();
     if (App.remote) App.remote.mount(document.getElementById('set-remote'));
+    if (App.library) App.library.mountSettings(document.getElementById('set-library'));
   }
 
   App.register('settings', {

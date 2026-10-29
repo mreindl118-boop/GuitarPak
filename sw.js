@@ -35,6 +35,7 @@ var ASSETS = [
   'js/daw/synth.js',
   'js/daw/engine.js',
   'js/studio.js',
+  'js/library.js',
   'js/arrange.js',
   'js/woodshed.js',
   'js/performance-engine.js',

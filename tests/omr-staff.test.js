@@ -34,87 +34,11 @@ const TOL4 = 0.6e-4; // the dump_stages fixtures keep 4 decimals
 const TOLX = 1e-9; // full-precision dumps (relative)
 
 // ---------------------------------------------------------------------------------------------
-// main.py, as the SheetLab engine calls it (load_and_preprocess_predictions done by the caller)
-
-// homr: main.py:149
-function predictSymbols(debug, predictions) {
-  eprint('Creating bounds for noteheads');
-  const noteheads = bbx.createBoundingEllipses(predictions.notehead, { minSize: [4, 4] });
-  eprint('Creating bounds for staff_fragments');
-  const staffFragments = bbx.createRotatedBoundingBoxes(predictions.staff, { skipMerging: true, minSize: [5, 1], maxSize: [10000, 100] });
-  eprint('Creating bounds for clefs_keys');
-  const clefsKeys = bbx.createRotatedBoundingBoxes(predictions.clefsKeys, { minSize: [20, 40], maxSize: [1000, 1000] });
-  eprint('Creating bounds for stems_rest');
-  const stemsRest = bbx.createRotatedBoundingBoxes(predictions.stemsRest);
-  eprint('Creating bounds for bar_lines');
-  const barLineImg = BL.prepareBarLineImage(predictions.stemsRest);
-  debug.writeThresholdImage('bar_line_img', barLineImg);
-  const barLines = bbx.createRotatedBoundingBoxes(barLineImg, { skipMerging: true, minSize: [1, 5] });
-  return { noteheads, staffFragments, clefsKeys, stemsRest, barLines };
-}
-
-// homr: main.py:263 detect_staffs_in_image, from the predictions on (no title detection).
+// main.py, as the SheetLab engine calls it: predict_symbols (main.py:149) and detect_staffs_in_image
+// (main.py:263) from the predictions on (no title detection) live in js/omr/engine.js (OMR.main);
 // rec (optional) receives the intermediates dump_stages writes into 07-staff.json.
-function detectStaffsInImage(predictions, debug, rec) {
-  rec = rec || {};
-  const symbols = predictSymbols(debug, predictions);
-  rec.symbols = symbols;
-
-  symbols.staffFragments = SD.breakWideFragments(symbols.staffFragments);
-  rec.staffFragments = symbols.staffFragments;
-  debug.writeBoundingBoxes('staff_fragments', symbols.staffFragments);
-  eprint('Found ' + symbols.staffFragments.length + ' staff line fragments');
-
-  const noteheadsWithStems = ND.combineNoteheadsWithStems(symbols.noteheads, symbols.stemsRest);
-  rec.noteheadsWithStems = noteheadsWithStems;
-  debug.writeBoundingBoxesAlternatingColors('notehead_with_stems', noteheadsWithStems);
-  eprint('Found ' + noteheadsWithStems.length + ' noteheads');
-  let averageNoteHeadHeight;
-  if (noteheadsWithStems.length > 0) {
-    averageNoteHeadHeight = np.median(noteheadsWithStems.map((notehead) => notehead.notehead.size[1]));
-  } else {
-    const unitSize = SD.estimateUnitSizeFromClefs(symbols.staffFragments, symbols.clefsKeys);
-    rec.unitSizeFromClefs = unitSize;
-    if (unitSize === null) throw OMR.py.error('Exception', 'No noteheads or clefs found');
-    averageNoteHeadHeight = unitSize;
-  }
-  rec.averageNoteHeadHeight = averageNoteHeadHeight;
-  eprint('Average note head height: ' + OMR.py.floatRepr(averageNoteHeadHeight)); // str(float)
-
-  const allNoteheads = noteheadsWithStems.map((notehead) => notehead.notehead);
-  const allStems = noteheadsWithStems.filter((note) => note.stem !== null).map((note) => note.stem);
-  const barLinesOrRests = symbols.barLines.filter((line) =>
-    !line.isOverlappingWithAny(allNoteheads) && !line.isOverlappingWithAny(allStems));
-  rec.barLinesOrRests = barLinesOrRests;
-  const barLineBoxes = BL.detectBarLines(barLinesOrRests, averageNoteHeadHeight);
-  rec.barLineBoxes = barLineBoxes;
-  debug.writeBoundingBoxesAlternatingColors('bar_lines', barLineBoxes);
-  eprint('Found ' + barLineBoxes.length + ' bar lines');
-
-  debug.writeBoundingBoxes('anchor_input', symbols.staffFragments.concat(barLineBoxes, symbols.clefsKeys));
-  const staffs = SD.detectStaff(debug, predictions.staff, symbols.staffFragments, symbols.clefsKeys, barLineBoxes);
-  rec.staffs = staffs;
-  if (staffs.length === 0) throw OMR.py.error('Exception', 'No staffs found');
-  // (title detection: off)
-  debug.writeBoundingBoxesAlternatingColors('staffs', staffs);
-
-  const braceDotImg = BD.prepareBraceDotImage(predictions.symbols, predictions.staff);
-  rec.braceDotImg = braceDotImg;
-  debug.writeThresholdImage('brace_dot', braceDotImg);
-  const braceDot = bbx.createRotatedBoundingBoxes(braceDotImg, { skipMerging: true, maxSize: [100, -1] });
-  rec.braceDot = braceDot;
-
-  const notes = ND.addNotesToStaffs(staffs, noteheadsWithStems, predictions.symbols, predictions.notehead);
-  rec.notes = notes;
-
-  const multiStaffs = BD.findBracesBracketsAndGrandStaffLines(debug, staffs, braceDot);
-  rec.multiStaffs = multiStaffs;
-  eprint('Found', multiStaffs.length, 'connected staffs (after merging grand staffs, multiple voices): ',
-    '[' + multiStaffs.map((staff) => staff.staffs.length).join(', ') + ']');
-
-  debug.writeAllBoundingBoxesAlternatingColors('notes', multiStaffs, notes);
-  return [multiStaffs, predictions.preprocessed, debug, staffs.length];
-}
+require(path.join(H.ROOT, 'js', 'omr', 'engine.js'));
+const { predictSymbols, detectStaffsInImage } = OMR.main;
 
 // ---------------------------------------------------------------------------------------------
 // comparisons
