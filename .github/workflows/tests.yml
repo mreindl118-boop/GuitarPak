@@ -24,8 +24,9 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    # A cold hosted install took 9 minutes; retain time for all UI contexts.
-    timeout-minutes: 30
+    # A cold hosted install took 9 minutes; retain time for all UI contexts and the
+    # SheetLab engine suites (they run the real recognition models).
+    timeout-minutes: 45
     outputs:
       source_sha: ${{ steps.source.outputs.sha }}
     steps:
@@ -46,7 +47,7 @@ jobs:
         run: |
           set -euo pipefail
           ci_deps="$RUNNER_TEMP/soundlab-ci"
-          npm install --prefix "$ci_deps" --no-save --ignore-scripts playwright@1.62.1
+          npm install --prefix "$ci_deps" --no-save --ignore-scripts playwright@1.62.1 onnxruntime-web@1.31.1 @techstark/opencv-js@5.0.0-release.1 pdfjs-dist@4.10.38
           npx --prefix "$ci_deps" --no-install playwright install --with-deps chromium
           export NODE_PATH="$ci_deps/node_modules"
           echo "NODE_PATH=$NODE_PATH" >> "$GITHUB_ENV"

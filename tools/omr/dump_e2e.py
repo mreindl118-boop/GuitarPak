@@ -5,6 +5,7 @@ from file to file inside a Python process; the JS engine resets it once per docu
 
 usage:
   python -I tools/omr/dump_e2e.py --engine SHEETLAB_ENGINE.py --models SHIPMODELS [--jobs N] [--contexts] OUTDIR CASE...
+  python -I tools/omr/dump_e2e.py ... [--jobs N] [--contexts] --docs DOCS.json OUTDIR   (documents of page images)
   python -I tools/omr/dump_e2e.py ... --repo-fixture CASE TESTS_FIXTURES_DIR   (the small CI set)
   python -I tools/omr/dump_e2e.py --titles tests/fixtures/omr/e2e-titles.json   (Python's str.title())
 CASE = a .pdf or an image file (the engine renders a PDF itself with PyMuPDF at 300 dpi; an image goes
@@ -25,6 +26,14 @@ through PIL convert('RGB')). Each case writes OUTDIR/<stem>/:
 Models: --models DIR holds the three shipping files (segnet int8, encoder int8, decoder) under
 homr's file names; the engine runs on the CPU (transformer_use_gpu False -> encoder_path /
 decoder_path, which are pointed at DIR).
+
+--docs DOCS.json OUTDIR: documents made of page images, each run like a PDF of those pages (the
+engine's own PDF path, translate_file unchanged: PyMuPDF's fitz.open answers with the given pictures as
+the rendered pages, PIL convert('RGB') each, and the metadata title), one fresh process per document,
+into OUTDIR/<key>/ (as above). DOCS.json = {"docs": [{"key", "title", "pages": [png, ...]}]}, page
+paths relative to DOCS.json. tests/omr-e2e.test.js runs SL_OMR_DIR/e2e-ref/docs.json's documents too:
+multi-page merges with different part counts, a cover page between music, documents without music,
+tiny / 600 dpi / gray pages.
 
 --repo-fixture: runs CASE (a one-page PDF) and writes TESTS_FIXTURES_DIR/e2e-<stem>-p1.png (the page
 as homr read it, i.e. after preprocess_sheet_image, which must leave a CI page unchanged; 8-bit gray
@@ -106,11 +115,14 @@ def midi_events(mid_bytes):
     return {'type': mid.type, 'ticks_per_beat': mid.ticks_per_beat, 'tracks': tracks}, notes
 
 
-def run_one(engine_path, models, case, outdir, page_png=None, contexts=False):
-    """In a fresh process: translate_file(case) like the owner's app, record everything."""
+def run_one(engine_path, models, case, outdir, page_png=None, contexts=False, doc=None):
+    """In a fresh process: translate_file(case) like the owner's app, record everything.
+    doc = {'title', 'pages': [png paths]}: case is a PDF of those pages (see --docs)."""
     sys.path.insert(0, os.path.dirname(os.path.abspath(engine_path)))
     sys.path.insert(0, HERE)
     setup_models(models)
+    if doc is not None:
+        case = fake_pdf(case, doc)
     from pathlib import Path
     import music21
     import sheetlab_engine as E
@@ -219,6 +231,56 @@ def run_one(engine_path, models, case, outdir, page_png=None, contexts=False):
     return rec
 
 
+def fake_pdf(case, doc):
+    """PyMuPDF answers translate_file's fitz.open(src) with doc's pictures as the pages it renders
+    (get_pixmap(dpi, alpha=False).samples = the RGB pixels) and doc's title as the metadata title; the
+    engine checks that src exists, so an empty <key>.pdf is made for it. -> that path"""
+    import tempfile
+    import fitz
+    from PIL import Image
+
+    class Pix:
+        def __init__(self, path):
+            im = Image.open(path).convert('RGB')
+            self.width, self.height = im.size
+            self.samples = im.tobytes()
+
+    class Page:
+        def __init__(self, path):
+            self.path = path
+
+        def get_pixmap(self, dpi=300, alpha=False):
+            return Pix(self.path)
+
+    class Doc:
+        metadata = {'title': doc.get('title', '')}
+
+        def __len__(self):
+            return len(doc['pages'])
+
+        def __getitem__(self, i):
+            return Page(doc['pages'][i])
+
+        def close(self):
+            pass
+
+    fitz.open = lambda *a, **k: Doc()
+    path = os.path.join(tempfile.mkdtemp(prefix='e2e_doc_'), os.path.basename(case))
+    open(path, 'wb').close()
+    return path
+
+
+def read_docs(docs_json):
+    """--docs: {key: {'title', 'pages': [absolute png paths]}} in file order"""
+    with open(docs_json) as f:
+        spec = json.load(f)
+    base = os.path.dirname(os.path.abspath(docs_json))
+    out = {}
+    for d in spec['docs']:
+        out[d['key']] = {'title': d.get('title', ''), 'pages': [os.path.normpath(os.path.join(base, p)) for p in d['pages']]}
+    return out
+
+
 def write_titles(out):
     """Python's str.title() (the engine's title fallback: Path(src).stem with - and _ as spaces) on
     strings that cover every cased character Python knows: each alone after a space (its full
@@ -269,12 +331,15 @@ def main():
     ap.add_argument('--contexts', action='store_true', help="also write each staff's encoder output (ctx-NN.bin, 2.6 MB each)")
     ap.add_argument('--repo-fixture', nargs=2, metavar=('CASE', 'DIR'))
     ap.add_argument('--titles', metavar='OUT', help="write Python's str.title() of test strings (no engine run)")
+    ap.add_argument('--docs', metavar='DOCS_JSON', help='documents made of page images (see the module notes); OUTDIR follows')
+    ap.add_argument('--doc-key', help=argparse.SUPPRESS)
     ap.add_argument('out', nargs='?')
     ap.add_argument('cases', nargs='*')
     args = ap.parse_args()
     if args.one:
         try:
-            run_one(args.engine, args.models, args.one, args.out, args.page_png, args.contexts)
+            doc = read_docs(args.docs)[args.doc_key] if args.doc_key else None
+            run_one(args.engine, args.models, args.one, args.out, args.page_png, args.contexts, doc)
         except Exception:
             traceback.print_exc()
             sys.exit(1)
@@ -313,6 +378,15 @@ def main():
         print('wrote', name + '-p1.png', os.path.getsize(os.path.join(fixdir, name + '-p1.png')), 'bytes,',
               name + '.json', os.path.getsize(os.path.join(fixdir, name + '.json')), 'bytes')
         return
+    if args.docs:
+        if not args.out:
+            ap.error('--docs DOCS_JSON OUTDIR')
+        docs = read_docs(args.docs)
+        extra = ['--contexts'] if args.contexts else []
+        with ThreadPoolExecutor(max_workers=max(1, args.jobs)) as ex:
+            rcs = list(ex.map(lambda k: spawn(args, k + '.pdf', os.path.join(args.out, k),
+                                              extra + ['--docs', os.path.abspath(args.docs), '--doc-key', k]), docs))
+        sys.exit(1 if any(rcs) else 0)
     if not args.out or not args.cases:
         ap.error('OUTDIR and at least one CASE are needed')
     with ThreadPoolExecutor(max_workers=max(1, args.jobs)) as ex:

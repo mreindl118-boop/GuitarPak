@@ -530,8 +530,8 @@
     rootEl.innerHTML =
       '<div class="card sg-open" id="sg-open">' +
         '<h2>Open a score</h2>' +
-        '<div class="muted small" style="margin-bottom:8px">A MIDI file, a MusicXML score (.musicxml, .xml or .mxl from MuseScore, Sibelius, Dorico, Finale) or a text tab &mdash; then choose where it goes. Everything is read on your device.</div>' +
-        '<div class="row tight"><label class="btn sm primary sg-openbtn">Choose a file<input type="file" id="sg-openfile" accept=".mid,.midi,.musicxml,.xml,.mxl,.txt,audio/midi" hidden></label>' +
+        '<div class="muted small" style="margin-bottom:8px">A MIDI file, a MusicXML score (.musicxml, .xml or .mxl from MuseScore, Sibelius, Dorico, Finale) or a text tab &mdash; then choose where it goes. Printed sheet music as a PDF or a picture goes to Scan, which reads it into MIDI. Everything is read on your device.</div>' +
+        '<div class="row tight"><label class="btn sm primary sg-openbtn">Choose a file<input type="file" id="sg-openfile" accept=".mid,.midi,.musicxml,.xml,.mxl,.txt,audio/midi,.pdf,application/pdf,.png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff,image/*" hidden></label>' +
           '<span class="muted small" id="sg-openmsg" role="status">Nothing open yet.</span></div>' +
         '<div class="row tight sg-opendest" id="sg-opendest" hidden>' +
           '<button type="button" class="btn sm primary" id="sg-opensynth" title="Play it on your synth from the MIDI Hub Player (tempo, key shifter, loop)">Play on synth</button>' +
@@ -680,6 +680,13 @@
     function openSay(m) { openMsg.textContent = m; }
     document.getElementById('sg-openfile').addEventListener('change', function () {
       var file = this.files && this.files[0], self = this; if (!file) return;
+      // sheet music (a PDF or a picture) is read by Scan (js/sheetlab.js), not here
+      if (/\.(pdf|png|jpe?g|webp|bmp|tiff?)$/i.test(file.name) || /^(image\/|application\/pdf$)/.test(file.type || '')) {
+        self.value = '';
+        if (App.sheetlab && typeof App.sheetlab.open === 'function') { openSay(file.name + ' · sheet music — opened in Scan'); App.sheetlab.open(file); }
+        else openSay('Reading sheet music (PDF or picture) is not available in this build.');
+        return;
+      }
       var kind = openKind(file.name), rd = new FileReader();
       rd.onload = function () {
         opened = { name: file.name, kind: kind, buf: kind === 'tab' ? null : rd.result, text: kind === 'tab' ? rd.result : null };

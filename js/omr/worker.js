@@ -16,19 +16,27 @@
          no request at all; {known:false} until the manifest was cached)  -> {type:'size', id, ...}
      {cmd:'prepare', id?}  download / load everything now (progress stage 'download')
                                                                            -> {type:'prepared', id, info}
-     {cmd:'page', id, label, index, count, image:{w, h, data}, opts}
-         one page of document `id` (a new id starts a new document; opts of its first page count):
+     {cmd:'page', id, label, index, count, totalPages?, image:{w, h, data}, opts}
+         one page of document `id` (a new id opens a new document; opts of its first page count;
+         documents with different ids are kept apart until their 'finish' or 'cancel'):
          data = canvas ImageData RGBA (Uint8ClampedArray, transfer its buffer); index = 0-based page of
-         the file, count = pages in the file (for the progress fraction). Send the next page after
+         the file, count = pages in the file (for the progress fraction; totalPages = the pages after
+         spread splitting when the page module knows them). Send the next page after
          its 'pageDone' so that only one page image is in memory.        -> 'staffs', 'page', 'pageDone'
          opts (OMR.engine.Translation): {tempoBpm 112, instrumentName 'Acoustic Grand Piano',
          program?, transposeSemitones 0, splitWideSpreads true, upscaleLowRes true, title (the PDF's
          metadata title, '' for images), sourceName (the file name)}; diagnostics: withVoices (the
          page's voices as symbol strings), recordStaffs (each transformer call's input sha1 + tokens)
      {cmd:'finish', id}    merge the pages, MusicXML, MIDI, .mxl          -> {type:'result', ...}
-     {cmd:'cancel', id}    stops at the next check (between pages, segmentation batches and staffs;
-         one dense staff can take ~40 s on a phone): to stop at once, terminate() the worker and
-         make a new one (js/sheetlab.js does)                             -> {type:'cancelled', id}
+     {cmd:'cancel', id?}   stops document `id` (no id: every open one) at the next check (between
+         pages, segmentation batches and staffs; one dense staff can take ~40 s on a phone): to stop
+         at once, terminate() the worker and make a new one (js/sheetlab.js does)
+                                                    -> {type:'cancelled', id, cmd:'cancel'} once the
+         document has stopped (also when nothing was running)
+   Every 'page', 'finish' and 'cancel' gets exactly ONE final answer: page -> pageDone | error |
+   cancelled; finish -> result | error | cancelled; cancel -> cancelled. A 'cancelled' carries the
+   command it answers (cmd: 'page' (+ index) | 'finish' | 'cancel'); a page or finish of a cancelled
+   document is answered 'cancelled' at once, so a page module waiting for an answer never hangs.
    worker -> main
      {type:'progress', id, stage, fraction (0..1 overall), message?, done?, total?, label?, note?}
          stage 'download' (bytes; note = file), 'engine' (the engine's own progress_fn: fraction +
@@ -45,7 +53,8 @@
          mxl: ArrayBuffer | null, summary:{pagesProcessed, pagesSkipped, totalMeasures, totalNotes,
          totalChords, durationSeconds, pageSummaries, warnings, repeatsExpanded, pages, noteEvents,
          timings, tempoBpm, program, instrumentName, transposeSemitones, sourceName}}
-     {type:'error', id, name, message}    {type:'cancelled', id}    {type:'log', message} (debug)
+     {type:'error', id, cmd, index?, name, message}    {type:'cancelled', id, cmd, index?}
+     {type:'log', message} (debug)
 
    Pages: RGBA is composited over WHITE, then RGB -> BGR (OMR.engine.imageFromRgba). The Python
    engine's PIL convert('RGB') drops alpha instead, which turns a transparent PNG black.
@@ -73,7 +82,9 @@
     runtimeCfg: null,     // what helpers are configured with
     poolWanted: 'auto', hints: {}, poolSize: 1,
     ready: null, pool: null,
-    doc: null, docId: null, cancelled: Object.create(null),
+    docs: new Map(),      // id -> OMR.engine.Translation: the open documents
+    current: null,        // the id whose page / finish runs now
+    cancelled: Object.create(null),
     queue: Promise.resolve()
   };
 
@@ -318,14 +329,17 @@
   function startDoc(id, opts) {
     const o = Object.assign({}, opts || {});
     o.pool = state.pool || null;
+    let doc = null;
+    // nothing more about a document once it is cancelled (pool work still finishing must stay silent)
+    const live = () => !state.cancelled[id];
     const hooks = {
       cancelled: () => !!state.cancelled[id],
-      progress: (p, message) => post({ type: 'progress', id: id, stage: 'engine', fraction: p, message: message }),
-      stage: (s) => post({ type: 'progress', id: id, stage: s.stage, done: s.done, total: s.total, label: s.label,
-        fraction: state.doc ? stageFraction(state.doc, s) : undefined }),
-      staffs: (label, teaser, n) => post({ type: 'staffs', id: id, label: label, staffCount: n,
+      progress: (p, message) => live() && post({ type: 'progress', id: id, stage: 'engine', fraction: p, message: message }),
+      stage: (s) => live() && post({ type: 'progress', id: id, stage: s.stage, done: s.done, total: s.total, label: s.label,
+        fraction: doc ? stageFraction(doc, s) : undefined }),
+      staffs: (label, teaser, n) => live() && post({ type: 'staffs', id: id, label: label, staffCount: n,
         preview: teaser ? { w: teaser.width, h: teaser.height, items: teaser.items } : null }),
-      page: (info, analysis) => post({ type: 'page', id: id, pageNumber: info.pageNumber, label: info.label, staffCount: info.staffCount,
+      page: (info, analysis) => live() && post({ type: 'page', id: id, pageNumber: info.pageNumber, label: info.label, staffCount: info.staffCount,
         voiceCount: info.voiceCount, skipped: info.skippedReason, summary: info.summary, width: info.width, height: info.height,
         preview: info.teaser ? { w: info.teaserWidth, h: info.teaserHeight, items: info.teaser } : null, timings: info.timings,
         // opts.withVoices (tests / diagnostics): the page's voices as homr's symbol strings
@@ -333,9 +347,10 @@
         // opts.recordStaffs: every transformer call {sha1 of the staff image, shape, tokens}
         staffs: info.staffs })
     };
-    state.doc = new OMR.engine.Translation(o, hooks);
-    state.docId = id;
-    state.doc.start();
+    doc = new OMR.engine.Translation(o, hooks);
+    state.docs.set(id, doc);
+    doc.start();
+    return doc;
   }
 
   function sendResult(id, r) {
@@ -357,11 +372,14 @@
     }, transfer);
   }
 
-  function fail(id, e) {
-    if (e && (e.name === 'AbortError' || e.omrCancel)) { post({ type: 'cancelled', id: id }); return; }
+  function isCancelErr(e) { return !!e && (e.name === 'AbortError' || e.omrCancel === true); }
+  // the one final answer of a command (extra: {cmd, index?})
+  function fail(id, e, extra) {
+    if (isCancelErr(e)) { post(Object.assign({ type: 'cancelled', id: id }, extra || {})); return; }
     const i = errInfo(e);
-    post({ type: 'error', id: id, name: i.name, message: i.message });
+    post(Object.assign({ type: 'error', id: id }, extra || {}, { name: i.name, message: i.message }));
   }
+  function cancelledAnswer(id, extra) { post(Object.assign({ type: 'cancelled', id: id }, extra)); }
 
   function onMain(m) {
     const id = m.id;
@@ -388,46 +406,65 @@
         if (!state.runtimeCfg) configure({});
         const img = m.image;
         m.image = null;
+        const index = m.index || 0, extra = { cmd: 'page', index: index };
+        if (!img || !img.data || !(img.w > 0) || !(img.h > 0)) {
+          fail(id, new TypeError('OMR worker: a page needs image {w, h, data}'), extra);
+          return;
+        }
         enqueue(async () => {
-          if (state.cancelled[id]) return;
-          await ensureReady(id);
-          if (state.cancelled[id]) return;
-          if (!state.doc || state.docId !== id) startDoc(id, m.opts);
-          // RGBA (canvas ImageData) unless the page says it is BGR already ({format: 'bgr'}, tests)
-          let bgr = img.format === 'bgr' ? { h: img.h, w: img.w, c: 3, data: img.data } : OMR.engine.imageFromRgba(img.w, img.h, img.data);
-          img.data = null;
-          await state.doc.addPage(bgr, m.label || ('Page ' + ((m.index || 0) + 1)),
-            { sourcePages: m.count, pageIndex: m.index || 0, totalPages: m.totalPages });
-          bgr = null;
-          post({ type: 'pageDone', id: id, index: m.index || 0 });
+          if (state.cancelled[id]) { cancelledAnswer(id, extra); return; }
+          state.current = id; // (a cancel without an id during the first download stops this too)
+          try {
+            await ensureReady(id);
+            if (state.cancelled[id]) { cancelledAnswer(id, extra); return; }
+            const doc = state.docs.get(id) || startDoc(id, m.opts);
+            // RGBA (canvas ImageData) unless the page says it is BGR already ({format: 'bgr'}, tests).
+            // Held in a box that addPage empties: the page's own reference is the only one left, so
+            // the full-size picture can go once addPage has split / preprocessed it.
+            const box = [img.format === 'bgr' ? { h: img.h, w: img.w, c: 3, data: img.data } : OMR.engine.imageFromRgba(img.w, img.h, img.data)];
+            img.data = null;
+            await doc.addPage(box.pop(), m.label || ('Page ' + (index + 1)),
+              { sourcePages: m.count, pageIndex: index, totalPages: m.totalPages });
+          } finally { state.current = null; }
+          post({ type: 'pageDone', id: id, index: index });
         }).catch((e) => {
-          if (state.docId === id && (state.cancelled[id] || (e && e.omrCancel))) {
-            state.doc = null; state.docId = null;
+          if (state.cancelled[id] || isCancelErr(e)) {
+            // this document stopped mid-page: its pool tasks nobody started yet go too (pages run one
+            // at a time, so every queued task is this page's)
+            state.docs.delete(id);
             if (state.pool) state.pool.dropQueued();
+            cancelledAnswer(id, extra);
+            return;
           }
-          fail(id, e);
+          fail(id, e, extra);
         });
         return;
       }
       case 'finish':
         enqueue(async () => {
-          if (state.cancelled[id]) throw Object.assign(new Error('Cancelled'), { name: 'AbortError' });
-          if (!state.doc || state.docId !== id) {
-            await ensureReady(id);
-            startDoc(id, m.opts);
-          }
-          const doc = state.doc;
-          state.doc = null; state.docId = null;
-          const r = await doc.finish();
-          if (r.cancelled) throw Object.assign(new Error('Cancelled'), { name: 'AbortError' });
+          if (state.cancelled[id]) { cancelledAnswer(id, { cmd: 'finish' }); return; }
+          // a document without pages needs no runtime or models: the engine's own "No musical
+          // staves..." answer, also offline and before anything was downloaded
+          const doc = state.docs.get(id) || startDoc(id, m.opts);
+          state.docs.delete(id);
+          state.current = id;
+          let r;
+          try { r = await doc.finish(); } finally { state.current = null; }
+          if (r.cancelled) { cancelledAnswer(id, { cmd: 'finish' }); return; }
           sendResult(id, r);
-        }).catch((e) => fail(id, e));
+        }).catch((e) => fail(id, e, { cmd: 'finish' }));
         return;
-      case 'cancel':
-        // checked between pages, segmentation batches and staffs; queued pages of this id are dropped
-        if (id !== undefined) state.cancelled[id] = true;
-        else if (state.docId !== null) state.cancelled[state.docId] = true;
+      case 'cancel': {
+        // checked between pages, segmentation batches and staffs; later pages / finish of these ids
+        // are answered 'cancelled'. The answer to the cancel itself comes once whatever ran has stopped.
+        const ids = id !== undefined ? [id] : Array.from(new Set(Array.from(state.docs.keys()).concat(state.current !== null ? [state.current] : [])));
+        for (const x of ids) state.cancelled[x] = true;
+        enqueue(() => {
+          for (const x of ids) state.docs.delete(x);
+          post(id !== undefined ? { type: 'cancelled', id: id, cmd: 'cancel' } : { type: 'cancelled', id: id, cmd: 'cancel', ids: ids });
+        });
         return;
+      }
       default:
         post({ type: 'error', id: id, name: 'Error', message: 'unknown command ' + m.cmd });
     }

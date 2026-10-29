@@ -35,7 +35,10 @@
      progress fraction uses the page total when it is known up front (translate()), else an
      estimate (Translation.addPage meta.totalPages).
    - Cancellation (hooks.cancelled(), checked between pages, segmentation batches and staffs)
-     resolves with {success: false, cancelled: true}.
+     resolves with {success: false, cancelled: true}; pool work still finishing after that reports
+     no more progress.
+   - Each Translation starts from a fresh cv::theRNG (one Python process per file) and keeps its own
+     state between its pages, so documents interleaved in one worker read exactly as they would alone.
    - The low-res upscale (cv2.resize INTER_CUBIC on uint8) follows Intel IPP, which the x86
      opencv-python wheels use for it (resizeCubicU8: all but ~0.001 % of the values, near-ties at .5);
      opencv.js' fixed-point cubic differs in ~1-5 % of the values (cv2 without IPP, e.g. on ARM, too).
@@ -333,19 +336,26 @@
     }
     const total = tiles.length, plane = winSize * winSize, tileSize = c * plane;
     const nBatches = Math.ceil(total / batchSize), results = new Array(nBatches);
-    let doneTiles = 0;
+    let doneTiles = 0, stopped = false;
     if (extra.onProgress) extra.onProgress(0, total);
-    await runLimited(nBatches, Math.max(1, (pool.size || 1) + 1), async (bi) => {
-      if (extra.signal && extra.signal.aborted) throw abortErr(extra.signal);
-      const first = bi * batchSize, n = Math.min(batchSize, total - first);
-      const buf = new Float32Array(n * tileSize);
-      for (let t = 0; t < n; t++) IS.extractPatch(imageOrg, tiles[first + t][0], tiles[first + t][1], winSize, buf, t * tileSize);
-      const maps = await pool.segnet(buf, [n, c, winSize, winSize]);
-      if (!maps || maps.length !== n) throw new Error('OMR pool: a segnet batch returned ' + (maps && maps.length) + ' tiles, expected ' + n);
-      results[bi] = maps;
-      doneTiles += n;
-      if (extra.onProgress) extra.onProgress(doneTiles, total);
-    });
+    try {
+      await runLimited(nBatches, Math.max(1, (pool.size || 1) + 1), async (bi) => {
+        if (stopped || (extra.signal && extra.signal.aborted)) throw abortErr(extra.signal);
+        const first = bi * batchSize, n = Math.min(batchSize, total - first);
+        const buf = new Float32Array(n * tileSize);
+        for (let t = 0; t < n; t++) IS.extractPatch(imageOrg, tiles[first + t][0], tiles[first + t][1], winSize, buf, t * tileSize);
+        const maps = await pool.segnet(buf, [n, c, winSize, winSize]);
+        if (!maps || maps.length !== n) throw new Error('OMR pool: a segnet batch returned ' + (maps && maps.length) + ' tiles, expected ' + n);
+        // a batch that comes back after the page stopped (cancel / another batch failed) reports nothing
+        if (stopped) return;
+        results[bi] = maps;
+        doneTiles += n;
+        if (extra.onProgress) extra.onProgress(doneTiles, total);
+      });
+    } catch (e) {
+      stopped = true;
+      throw e;
+    }
     const data = [].concat.apply([], results);
     eprint('Segnet Inference time: ' + ((nowMs() - t0) / 1000) + '; batch_size ' + batchSize);
     const merged = IS.mergePatches(data, [h, w], winSize, stepSize);
@@ -373,8 +383,9 @@
     const SPT = OMR.staff_parsing_tromr, SP = OMR.staff_parsing, identity = OMR.point_mapping.identity;
     const saved = SPT._getInference();
     const recorded = [];
-    let loopDone = false, done = 0;
-    const report = () => { if (opts.onProgress) opts.onProgress(done, recorded.length); };
+    let loopDone = false, done = 0, stopped = false;
+    // (staffs that come back after the page stopped report nothing)
+    const report = () => { if (!stopped && opts.onProgress) opts.onProgress(done, recorded.length); };
     try {
       SPT._setInference({
         predict(img) {
@@ -404,6 +415,9 @@
         }
       });
       return await SP.parseStaffs(debug, multiStaffs, image, config, -1, identity, { signal: opts.signal });
+    } catch (e) {
+      stopped = true;
+      throw e;
     } finally {
       SPT._setInference(saved);
     }
@@ -871,6 +885,9 @@
       this.started = true;
       this.t0 = nowMs();
       if (this.options.resetRng !== false) OMR.cv2.resetRNG();
+      // this document's own cv::theRNG state, put back before each of its pages: a worker that
+      // interleaves two documents gives each the draws it would get alone (a process per file)
+      this.rng = OMR.cv2._rngState ? OMR.cv2._rngState() : null;
       this.progress(0.05, 'Loading ' + (this.options.sourceName.split(/[\\/]/).pop() || 'sheet music') + '...'); // src.name
     }
     // one decoded page (BGR). label: 'Page N' (the spread halves become 'Page N (Left)' / '(Right)').
@@ -901,11 +918,13 @@
         const frac = 0.12 + 0.65 * (i / Math.max(1, total));
         this.progress(frac, 'Recognizing musical notation on ' + lbl + ' (' + (i + 1) + '/' + total + ')...');
         const width = prep.w, height = prep.h;
+        if (this.rng) OMR.cv2._rngState(this.rng);
         const analysis = await analyzePage(prep, {
           pageNumber: i + 1, label: lbl, pool: o.pool, signal: this.signal, debug: o.debug, recordStaffs: !!o.recordStaffs,
           onStage: this.hooks.stage,
           onStaffs: this.hooks.staffs ? (teaser, n) => this.hooks.staffs(lbl, teaser, n) : null
         });
+        if (this.rng) this.rng = OMR.cv2._rngState();
         prep = null;
         if (this.isCancelled()) throw this.cancelErr;
         const r = this.result;

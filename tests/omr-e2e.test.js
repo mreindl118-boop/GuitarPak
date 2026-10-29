@@ -14,20 +14,23 @@
 //                         shipping-model voices (12-lang-ship-voices.json), generate_xml against
 //                         12-lang-ship-xml.json and 11-score.musicxml (fp16 models: INFO), the MIDI of both
 //   prep     preprocessSheetImage / maybeSplitLandscapeSpread == sheetlab-prep/<case>/02-prep-*.png, split.json
-//   files    every PDF page set (sheetlab-prep/pdf/<name>-pN.png) and synthetic scan (synth-in/*.png)
+//   files    every PDF page set (sheetlab-prep/pdf/<name>-pN.png), synthetic scan (synth-in/*.png) and
+//                         page-image document (e2e-docs/docs.json: dump_e2e.py --docs; part counts that differ
+//                         between pages, a cover page between music, no music at all, tiny / 600 dpi / gray)
 //                         through the worker (pool) against e2e-ref/<case>/summary.json (dump_e2e.py
 //                         --contexts: the Python engine, one fresh process per file) and sheetlab-ref{,2}:
 //                         success / title / summaries / progress, every transformer input (staff image
 //                         sha1), tokens, merged MusicXML and the .mid
 //   pool     the single-thread engine on files' cases == the worker pool's results, byte for byte
-//   worker   cancel, a transparent page, a blank page among music, a file without music (pool)
+//   worker   one answer per command (cancel mid-page / while idle, pages after a cancel), documents kept
+//                         apart by id, a transparent page, a blank page among music, a file without music (pool)
 // Token differences between the JS and Python transformers come from the int8 encoder's numerics
 // (onnxruntime-web WASM vs CPU, notes/read.md): where a staff reads differently, the JS decoder is run on
 // Python's own encoder output (ctx-NN.bin) and must read Python's tokens (or diverge only at a decoder
 // near-tie, margin < 1.0); the counts are INFO, and the XML / MIDI checks of such a file are INFO too.
 //   SL_OMR_E2E_ONLY=units,ci,...   sections;  SL_OMR_E2E_CASES=belle-let,spread   files' cases
 //   SL_OMR_E2E_POOL=n (helpers, default 3);  SL_OMR_DIR (default: SL_OMR_FIXTURES/..) holds sheetlab-prep,
-//   synth-in, e2e-ref, sheetlab-ref, sheetlab-ref2
+//   synth-in, e2e-docs, e2e-ref, sheetlab-ref, sheetlab-ref2
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -354,6 +357,13 @@ async function units() {
     w.post({ cmd: 'bogus', id: 'b1' });
     const b1 = await w.wait((m) => m.type === 'error' && m.id === 'b1', 60000);
     H.ok(/unknown command/.test(b1.message), 'an unknown command answers an error');
+    // a document without any page (e.g. no page of a PDF could be rendered): the engine's own answer,
+    // with nothing downloaded or loaded (this worker has no models at all)
+    w.post({ cmd: 'init', pool: 1, models: 'missing/' });
+    w.post({ cmd: 'finish', id: 'f0', opts: { sourceName: 'empty.pdf' } });
+    const f0 = await w.wait((m) => m.id === 'f0' && (m.type === 'result' || m.type === 'error' || m.type === 'cancelled'), 60000);
+    H.ok(f0.type === 'result' && !f0.success && f0.errorMessage === 'No musical staves or noteheads could be detected in this file.' && f0.summary.pageSummaries.length === 0,
+      'finish without pages -> "No musical staves..." without loading the runtime or models (' + f0.type + ': ' + (f0.errorMessage || f0.message) + ')');
   } finally { await w.terminate(); }
   const w2 = new ShimWorker({ noNested: true });
   try {
@@ -397,6 +407,34 @@ async function ci() {
     'brahms-vals3: .musicxml / .mxl = homr\'s MusicXML with the GM instrument in the part-list');
   H.ok(r.totalMeasures > 0 && r.totalNotes > 0 && r.durationSeconds > 0 && r.noteEvents.length > 0, 'brahms-vals3: summary ' + r.totalMeasures + ' measures, ' + r.totalNotes + ' notes, ' + r.totalChords + ' chords, ' + r.durationSeconds.toFixed(1) + ' s');
   info('ci single thread: ' + secs(ms) + ' (detect ' + secs(pageInfo.timings.detect) + ', read ' + secs(pageInfo.timings.read) + ')');
+
+  // each document keeps its own cv::theRNG (fitEllipse's jitter draws): another document started
+  // between two of its pages (the worker keeps documents apart by id) must not change what its
+  // next page draws. A 600 x 300 crop with notes and no staff consumes draws in a few seconds.
+  const crop = { h: 300, w: 600, c: 3, data: new Uint8Array(600 * 300 * 3) };
+  for (let y = 0; y < 300; y++) for (let x = 0; x < 600; x++) crop.data.fill(page.data[((280 + y) * page.w + 300 + x) * 3], (y * 600 + x) * 3, (y * 600 + x) * 3 + 3);
+  const ro = { sourceName: 'crop.png', upscaleLowRes: false };
+  const A = new E.Translation(ro, {});
+  await A.addPage(crop, 'Page 1');
+  const s1 = OMR.cv2._rngState();
+  new E.Translation(ro, {}).start(); // another document starts: a fresh theRNG
+  await A.addPage(crop, 'Page 2');
+  const s2 = OMR.cv2._rngState();
+  OMR.cv2._rngState(s1);
+  await E.analyzePage(crop, {});
+  const s2seq = OMR.cv2._rngState();
+  H.ok(s1.join() !== '4294967295,0' && s2.join() !== s1.join() && s2.join() === s2seq.join(),
+    'a document\'s second page draws from its own theRNG although another document started in between (' + s2 + ' == ' + s2seq + ')');
+  // cancelled during pooled segmentation: a batch already running when the page stopped reports nothing
+  let stop = false, resolved = false;
+  const late = [];
+  const cr = await E.translate([{ label: 'Page 1', image: page }], { sourceName: 'c.pdf', pool: E.localPool() }, {
+    cancelled: () => stop,
+    stage: (s) => { if (resolved) late.push(s.stage + ' ' + s.done); if (s.stage === 'segment' && s.done > 0) stop = true; }
+  });
+  resolved = true;
+  await new Promise((r) => setTimeout(r, 8000)); // the batch that was still running finishes meanwhile
+  H.ok(cr.cancelled && late.length === 0, 'cancel during pooled segmentation: cancelled, no progress after the result (' + late.join(', ') + ')');
 
   // the same through the worker, with helper workers
   const nh = Math.max(2, Math.min(POOL, 3));
@@ -503,6 +541,15 @@ function fileCases() {
       out.push({ key: f.replace(/\.png$/, ''), source: f, title: '', pages: [{ label: 'Page 1', file: path.join(synth, f) }] });
     }
   }
+  // documents made of page images (tools/omr/dump_e2e.py --docs: the engine's PDF path with these
+  // pictures as the rendered pages): part counts that differ between pages, a cover page between
+  // music, documents without music, tiny / 600 dpi / gray pages
+  const docs = path.join(OMRDIR, 'e2e-docs', 'docs.json');
+  if (fs.existsSync(docs)) {
+    for (const d of H.readJson(docs).docs) {
+      out.push({ key: d.key, source: d.key + '.pdf', title: d.title || '', pages: d.pages.map((p, i) => ({ label: 'Page ' + (i + 1), file: path.resolve(path.dirname(docs), p) })) });
+    }
+  }
   return out.filter((c) => !CASES.length || CASES.indexOf(c.key) >= 0);
 }
 function loadPages(c) { return c.pages.map((p) => ({ label: p.label, image: H.readPng(p.file) })); }
@@ -575,9 +622,13 @@ async function files(poolResults) {
       T.files.push([c.key, c.pages.length, out.ms]);
       if (!r) { H.ok(false, c.key + ': worker error ' + JSON.stringify(out.error)); continue; }
       const nPages = out.pages.length;
-      H.ok(r.success === true && (ref.success || ref.lenient), c.key + ': success (Python: ' + (ref.lenient ? 'fails the file: ' + ref.engine_error + '; the JS engine writes the MIDI unexpanded' : 'success') + ')');
+      const pyOk = !!(ref.success || ref.lenient);
+      H.ok(r.success === pyOk && (pyOk || r.errorMessage === ref.error), c.key + ': success ' + r.success + ' (Python: ' + (ref.lenient ? 'fails the file: ' + ref.engine_error + '; the JS engine writes the MIDI unexpanded' : ref.success ? 'success' : 'fails: ' + ref.error) + ')');
+      // the one documented difference: homr's "No noteheads or clefs found" is a cover page here (the
+      // engine looks for the older "No noteheads found")
+      const pySummaries = ref.page_summaries.map((t) => t.replace(/Skipped \u2014 OMR skipped page \((No noteheads[^)]*)\)$/, 'Skipped \u2014 Non-music / cover page ($1)'));
       H.ok(r.title === ref.title && r.summary.pagesProcessed === ref.pages_processed && r.summary.pagesSkipped === ref.pages_skipped &&
-        JSON.stringify(r.summary.pageSummaries) === JSON.stringify(ref.page_summaries),
+        JSON.stringify(r.summary.pageSummaries) === JSON.stringify(pySummaries),
       c.key + ': title "' + r.title + '", ' + nPages + ' page(s), summaries == Python ' + JSON.stringify(r.summary.pageSummaries));
       H.ok(JSON.stringify(out.progress) === JSON.stringify(ref.progress), c.key + ': progress fractions + messages == Python (' + out.progress.length + ')');
       // every transformer call: the same staff image (sha1) and, where the tokens differ, proof that
@@ -593,11 +644,12 @@ async function files(poolResults) {
       const raw = r.xmlRaw;
       if (edits === 0) {
         H.ok(true, c.key + ': voices == Python on every page (' + tokens + ' tokens)');
-        H.ok(strip(raw) === strip(ref.musicxml), c.key + ': merged MusicXML == Python apart from imgpos comments');
+        if (ref.musicxml) H.ok(strip(raw) === strip(ref.musicxml), c.key + ': merged MusicXML == Python apart from imgpos comments');
+        else H.ok(!raw && r.midi === null && r.mxl === null, c.key + ': no MusicXML / MIDI, like the engine');
         if (ref.mid) H.ok(sameBytes(new Uint8Array(r.midi), Buffer.from(ref.mid, 'base64')), c.key + ': MIDI == the engine\'s .mid byte for byte' + (ref.lenient ? ' (with music21 left unexpanded)' : ''));
       } else {
         const midiSame = ref.mid ? sameBytes(new Uint8Array(r.midi), Buffer.from(ref.mid, 'base64')) : null;
-        info(c.key + ': ' + edits + ' token edit(s) in ' + tokens + ' vs Python (transformer near-ties); MusicXML apart from imgpos ' + (strip(raw) === strip(ref.musicxml) ? 'equal' : 'differs') + ', MIDI ' + (midiSame === null ? 'n/a' : midiSame ? 'byte-identical' : 'differs'));
+        info(c.key + ': ' + edits + ' token edit(s) in ' + tokens + ' vs Python (transformer near-ties); MusicXML apart from imgpos ' + (strip(raw) === strip(ref.musicxml || '') ? 'equal' : 'differs') + ', MIDI ' + (midiSame === null ? 'n/a' : midiSame ? 'byte-identical' : 'differs'));
       }
       for (const old of ['sheetlab-ref', 'sheetlab-ref2']) {
         const f = path.join(OMRDIR, old, c.key + '.musicxml');
@@ -646,10 +698,41 @@ async function workerBehaviour() {
     w.post({ cmd: 'page', id: 'c1', label: 'Page 2', index: 1, count: 2, image: { w: page.w, h: page.h, data: d2 }, opts: {} }, [d2.buffer]);
     w.post({ cmd: 'finish', id: 'c1' });
     const c = await w.wait((m) => m.id === 'c1' && (m.type === 'cancelled' || m.type === 'result' || m.type === 'error'));
-    await w.wait((m) => m.id === 'c1' && m.type === 'cancelled' && m !== c, 120000).catch(() => null);
+    await w.wait((m) => m.id === 'c1' && m.type === 'cancelled' && m.cmd === 'finish', 120000).catch(() => null);
+    // (helpers still finishing a batch of the stopped page must not report progress for it)
+    await new Promise((r) => setTimeout(r, 5000));
     const after = w.messages.filter((m) => m.id === 'c1');
-    H.ok(c.type === 'cancelled' && !after.some((m) => m.type === 'page' || m.type === 'result' || m.type === 'pageDone'),
-      'cancel during segmentation: "cancelled", no page / result afterwards (' + after.map((m) => m.type).filter((t, i, a) => a.indexOf(t) === i) + ')');
+    const late = after.slice(after.indexOf(c)).filter((m) => m.type === 'progress' || m.type === 'staffs');
+    H.ok(late.length === 0, 'no progress of a cancelled document after its "cancelled" (' + late.length + ' late: ' + late.map((m) => m.stage).join(', ') + ')');
+    const answers = after.filter((m) => m.type === 'cancelled').map((m) => m.cmd + (m.index !== undefined ? m.index : ''));
+    H.ok(c.type === 'cancelled' && !after.some((m) => m.type === 'page' || m.type === 'result' || m.type === 'pageDone' || m.type === 'error') &&
+      JSON.stringify(answers) === JSON.stringify(['page0', 'cancel', 'page1', 'finish']),
+    'cancel during segmentation: one "cancelled" answer per command (page 1, the cancel, page 2, finish), no page / result afterwards (' + answers + ')');
+    // the protocol: every command gets exactly one answer, documents are kept apart by id
+    const small = { h: 400, w: 300, c: 3, data: new Uint8Array(400 * 300 * 3).fill(255) };
+    const send = (id, img, i, n, o) => { const d = rgbaOf(img); w.post({ cmd: 'page', id: id, label: 'Page ' + (i + 1), index: i, count: n, image: { w: img.w, h: img.h, data: d }, opts: o || {} }, [d.buffer]); };
+    send('i1', small, 0, 2);
+    await w.wait((m) => m.id === 'i1' && m.type === 'pageDone');
+    w.post({ cmd: 'cancel', id: 'i1' });
+    const ic = await w.wait((m) => m.id === 'i1' && m.type === 'cancelled', 60000).catch(() => null);
+    send('i1', small, 1, 2);
+    const ip = await w.wait((m) => m.id === 'i1' && m.type === 'cancelled' && m.cmd === 'page', 60000).catch(() => null);
+    w.post({ cmd: 'finish', id: 'i1' });
+    const iff = await w.wait((m) => m.id === 'i1' && m.cmd === 'finish', 60000).catch(() => null);
+    H.ok(ic && ic.cmd === 'cancel' && ip && ip.index === 1 && iff && iff.type === 'cancelled' && !w.messages.some((m) => m.id === 'i1' && (m.type === 'result' || m.type === 'error')),
+      'cancel while idle between pages is answered at once ({cmd: "cancel"}); a later page / finish of that document is answered "cancelled", never left hanging');
+    send('x1', page, 0, 1, opts);
+    send('y1', small, 0, 1, { sourceName: 'cover.png' });
+    w.post({ cmd: 'finish', id: 'x1' });
+    w.post({ cmd: 'finish', id: 'y1' });
+    const rx = await w.wait((m) => m.id === 'x1' && (m.type === 'result' || m.type === 'error' || m.type === 'cancelled'));
+    const ry = await w.wait((m) => m.id === 'y1' && (m.type === 'result' || m.type === 'error' || m.type === 'cancelled'));
+    H.ok(rx.type === 'result' && rx.success && strip(rx.xmlRaw) === strip(fx.musicxml) && JSON.stringify(rx.summary.pageSummaries) === JSON.stringify(fx.page_summaries) &&
+      ry.type === 'result' && !ry.success && JSON.stringify(ry.summary.pageSummaries) === JSON.stringify(['Page 1: Skipped — Non-music / cover page (No noteheads or clefs found)']),
+    'two documents interleaved (page A, page B, finish A, finish B): each keeps its own pages (A ' + JSON.stringify(rx.summary && rx.summary.pageSummaries) + ', B ' + JSON.stringify(ry.summary && ry.summary.pageSummaries) + ')');
+    w.post({ cmd: 'page', id: 'z1', index: 0 });
+    const z = await w.wait((m) => m.id === 'z1', 60000).catch(() => null);
+    H.ok(z && z.type === 'error' && z.cmd === 'page' && !w.messages.some((m) => m.id === 'z1' && m.type === 'progress'), 'a page without an image is answered with an error (no document opened)');
     // a transparent picture (ink as alpha, RGB 0 everywhere): composited over white it reads like the opaque page
     const tp = new Uint8ClampedArray(page.w * page.h * 4);
     for (let i = 0; i < page.w * page.h; i++) tp[i * 4 + 3] = 255 - page.data[i * 3];

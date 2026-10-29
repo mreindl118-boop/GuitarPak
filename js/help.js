@@ -60,6 +60,13 @@
       { t: 'Four ways to practice', x: 'Run = straight through, no mercy. Phrases = short chunks loop until you nail them twice. Wait = it freezes until you play the right note (great for learning). Ladder = tempo climbs as you pass. A Next pedal or synth button (Settings › Hands-free control) starts the count-in and goes again from the score, Back restarts (in Phrases: the phrase before) and Stop ends the run — Guided performance too.' },
       { t: 'Feed it music', x: 'Generate scales, Hanon and rudiments; import MIDI files; paste ASCII tab (Wait mode ready instantly); or pull in any Studio track. Generated exercises follow the treble-clef root and scale; MIDI, Studio and generated scores work in either guided mode. PDFs and images are not parsed scores. Calibrate timing once per input so scoring is honest.' }
     ],
+    sheetlab: [
+      { t: 'Scan: sheet music to MIDI', x: 'Printed sheet music (a PDF, a photo or a scan) becomes MIDI and MusicXML. It is read on this device by a recognition engine; nothing is uploaded.' },
+      { sel: '#sl-engine', t: 'One download, then offline', x: 'The first time, tap Download: the recognition engine (about 107 MB) comes onto this device once. After that Scan works offline. Nothing downloads before you tap.' },
+      { sel: '#sl-drop', t: 'Pick the music', x: 'Choose a PDF or pictures (several pictures become several pages), drop a file here, or take a photo on a phone or tablet. Flat, sharp, evenly lit pages read best; PDFs from a notation program read best of all.' },
+      { sel: '#sl-opts', t: 'Options', x: 'Tempo starts at the shared tempo, Instrument is the sound the MIDI asks for, and Transpose moves the music up or down. PDF quality 200 dpi is faster; 300 reads small print better. Your choices are remembered.' },
+      { t: 'Use what it read', x: 'While it reads you can keep using other pages, or tap Stop. Then: Play on synth (the MIDI Hub Player), Practice (the Woodshed), Open as tab, download .mid / .musicxml / .mxl, or keep it in My library. Each page shows the staffs it found.' }
+    ],
     library: [
       { t: 'My library', x: 'Everything you keep: scans from Play \u203a Scan (MIDI + MusicXML) and what you play (Studio ideas). Each entry plays on your synth, opens in the Woodshed to practise, shows as guitar tab, or downloads as a file.' },
       { sel: '#lib-filter', t: 'Find it', x: 'All, Scans or Played, and a search over the titles. Newest first.' },
