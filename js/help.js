@@ -14,7 +14,7 @@
   var TOURS = {
     practiceplan: [
       { t: 'Practice plan', x: 'A short session built from your teacher’s notes. Open Teacher’s lesson notes, paste or import the text, review the mapping and accept it. Each student keeps a separate plan on this device.' },
-      { sel: '#pp-today', t: 'One block at a time', x: 'Start opens the linked tool with its supported settings. New lesson runs and recorded playing or answering time measure completion. Old scores and idle page time do not finish today’s blocks.' },
+      { sel: '#pp-today', t: 'One block at a time', x: 'Start opens the linked tool with its supported settings. New lesson runs and recorded playing or answering time measure completion. Old scores and idle page time do not finish today’s blocks. A Next pedal or synth button (Settings › Hands-free control) opens the next unfinished block from here, and Back opens the last one again.' },
       { sel: '#pp-gaps', t: 'What to build next', x: 'Unmatched assignments and missing setup hooks become module gaps with their original text. Export them to choose future improvements. Google Doc links are bookmarks; no account connection is required.' }
     ],
     metronome: [
@@ -44,7 +44,7 @@
       { sel: '#pn-play', t: 'Practice runner', x: 'Runs scale exercises on the keys with fingering numbers — pick right or left hand and it moves to where that hand plays.' },
       { sel: '#pn-guide', t: 'Guide mode', x: 'Instead of playing FOR you, Guide waits for you to play each lit note — on screen, or lit up on a LUMI’s own keys.' },
       { sel: '#pn-assist', t: 'Help level', x: 'How much the keyboard tells you. Full shows the scale colors, note names, fingers and the next note; Colors drops the names; Target only rings the note to play; Tonic marks home; None is a bare keyboard. Pressed keys always flash their color.' },
-      { sel: '.kl-card', t: 'Scale lessons', x: 'Graded scale lessons played with the click. Every note is checked for the right key and how close it lands to the beat. Score 85 to level up to a faster tempo. Pick ∞ to loop the scale until you stop and go for your longest streak of clean notes. Runs, best scores and streaks are saved here and on the Exercises Progress tab.' }
+      { sel: '.kl-card', t: 'Scale lessons', x: 'Graded scale lessons played with the click. Every note is checked for the right key and how close it lands to the beat. Score 85 to level up to a faster tempo. Pick ∞ to loop the scale until you stop and go for your longest streak of clean notes. Runs, best scores and streaks are saved here and on the Exercises Progress tab. A Next pedal or synth button (Settings › Hands-free control) starts the lesson and moves on to the next level without touching the screen.' }
     ],
     songs: [
       { t: 'Songs', x: 'Bring your own music: paste an ASCII guitar tab (the six-line kind from any tab site) or import a MIDI file. soundLAB detects the key, and you can loop any bars at your own tempo to practice them.' }
@@ -57,8 +57,20 @@
     ],
     shed: [
       { t: 'The Woodshed', x: 'Gamified practice: pick an exercise or song and play it for score — Perfect/Great/Good/Miss timing, combos, stars, XP, streaks. Every run is captured as a take in your Studio Ideas.' },
-      { t: 'Four ways to practice', x: 'Run = straight through, no mercy. Phrases = short chunks loop until you nail them twice. Wait = it freezes until you play the right note (great for learning). Ladder = tempo climbs as you pass.' },
-      { t: 'Feed it music', x: 'Generate scales, Hanon and rudiments; import MIDI files; paste ASCII tab (Wait mode ready instantly); or pull in any Studio track. Generated exercises follow the treble-clef root and scale; MIDI, Studio and generated scores work in either guided mode. PDFs and images are not parsed scores. Calibrate timing once per input so scoring is honest.' }
+      { t: 'Four ways to practice', x: 'Run = straight through, no mercy. Phrases = short chunks loop until you nail them twice. Wait = it freezes until you play the right note (great for learning). Ladder = tempo climbs as you pass. A Next pedal or synth button (Settings › Hands-free control) starts the count-in and goes again from the score, Back restarts (in Phrases: the phrase before) and Stop ends the run — Guided performance too.' },
+      { t: 'Feed it music', x: 'Generate scales, Hanon and rudiments; import MIDI files; paste ASCII tab (Wait mode ready instantly); or pull in any Studio track. Generated exercises follow the treble-clef root and scale; MIDI, Studio and generated scores work in either guided mode. Printed sheet music (a PDF or a picture) goes through Play › Scan first; its Practice button brings the result here. Calibrate timing once per input so scoring is honest.' }
+    ],
+    sheetlab: [
+      { t: 'Scan: sheet music to MIDI', x: 'Printed sheet music (a PDF, a photo or a scan) becomes MIDI and MusicXML. It is read on this device by a recognition engine: the file itself is never uploaded. Only what you keep in My library is copied to GitHub, and only when Library sync has a key on this device (the default repository is public).' },
+      { sel: '#sl-engine', t: 'One download, then offline', x: 'The first time, tap Download: the recognition engine (about 107 MB) comes onto this device once. After that Scan works offline. Nothing downloads before you tap.' },
+      { sel: '#sl-drop', t: 'Pick the music', x: 'Choose a PDF or pictures (several pictures become several pages), drop a file here, or take a photo on a phone or tablet. Flat, sharp, evenly lit pages read best; PDFs from a notation program read best of all.' },
+      { sel: '#sl-opts', t: 'Options', x: 'Tempo starts at the shared tempo, Instrument is the sound the MIDI asks for, and Transpose moves the music up or down. PDF quality 200 dpi is faster; 300 reads small print better. Your choices are remembered.' },
+      { t: 'Use what it read', x: 'While it reads you can keep using other pages, or tap Stop. Then: Play on synth (the MIDI Hub Player), Practice (the Woodshed), Open as tab, download .mid / .musicxml / .mxl, or keep it in My library. Each page shows the staffs it found.' }
+    ],
+    library: [
+      { t: 'My library', x: 'Everything you keep: scans from Play \u203a Scan (MIDI + MusicXML) and what you play (Studio ideas). Each entry plays on your synth, opens in the Woodshed to practise, shows as guitar tab, or downloads as a file.' },
+      { sel: '#lib-filter', t: 'Find it', x: 'All, Scans or Played, and a search over the titles. Newest first.' },
+      { sel: '#lib-sync', t: 'On every device', x: 'The library lives on this device first. With an access key (Settings \u203a Library sync) it is also kept in your GitHub repository on its own library branch, so the iPad, the phone and the computer see the same music. Sync now checks GitHub and uploads what is waiting; without a key you can still list and open what is there.' }
     ],
     tuner: [
       { t: 'Tuner', x: 'A chromatic tuner using your microphone. Press Start, allow mic access, and play one string at a time — the needle shows how far off you are; green means in tune.' }
@@ -71,7 +83,8 @@
       { sel: '#learn-instrument', t: 'Your instrument', x: 'Exercises count for the instrument picked here. Notation, ear training and theory are shared by every instrument; a run keeps the instrument it started with, and history from before instruments were tracked stays as Legacy / unassigned.' },
       { sel: '.qz-strip', t: 'Your day', x: 'Your streak grows each day you finish a level or play for 5 minutes on any page. The ring fills toward your daily XP goal, and XP raises your consistency level: a habit meter that fades after a break, not a skill level. Seven days in a row earns a streak freeze that covers a missed day.' },
       { sel: '.qz-hometabs', t: 'Path, Topics, Progress', x: 'The Path walks you through the course step by step, and each step opens the next. Topics lets you practice anything. Progress shows your XP, practice time and how your answer speed improves.' },
-      { t: 'Sprints, streaks and jumps', x: 'Tap a step on the path for its levels, a 60-second sprint (as many right answers as you can) and an Endless streak (questions until your first miss), each against your own record. The answer clock (Off, 8, 5 or 3 s) times every Endless and drill question: answer on instinct before it runs out. Already know it? Tap a locked step and Jump here: 9 out of 10 opens the path up to there.' }
+      { t: 'Sprints, streaks and jumps', x: 'Tap a step on the path for its levels, a 60-second sprint (as many right answers as you can) and an Endless streak (questions until your first miss), each against your own record. The answer clock (Off, 8, 5 or 3 s) times every Endless and drill question: answer on instinct before it runs out. Already know it? Tap a locked step and Jump here: 9 out of 10 opens the path up to there.' },
+      { t: 'Hands off the screen', x: 'Practising at the keyboard? A pedal, a button on your synth or a Bluetooth page turner can be your Next button: set it up in Settings › Hands-free control. Next starts a level and moves on (press it twice to show an answer, not in an Endless streak), Back plays the sound again or retries, Stop ends the run. Multiple-choice answers have a white key each (C, D, E… on the button): play it to answer.' }
     ],
     theory: [
       { t: 'Theory', x: 'The circle of fifths, a guide to what chords live in every key, and an ear quiz for scale degrees. Tap around the circle — the app’s key follows.' }
@@ -135,10 +148,12 @@
     lights: [
       { t: 'Lights & help', x: 'One place for how much the app helps you. The Help level is the difficulty: Full shows the scale in color with names, fingers and the next note; None is a bare keyboard. It applies to the Keys page, Scale lessons, Exercises and your keyboard’s own lights.' },
       { t: 'Your keyboard’s lights', x: 'A LUMI lights every key of the scale in the same color as the screen (Color notes by: Interval = by scale degree, Note = every C one color), and follows the app’s key on every page. Play a note after pressing its octave buttons and the app follows the new octave too.' },
-      { t: 'LUMI Display', x: 'On by default: during a lesson or practice run the LUMI shows only what to play \u2014 the note to play now steady in its color, the next one blinking \u2014 and the full scale comes back when the run ends. Songs and the Woodshed light the notes to play the same way; Woodshed Wait mode holds the light until you play it. Double-tap your keyboard\u2019s lowest key, or the lesson card, to start and stop a lesson.' }
+      { t: 'LUMI Display', x: 'On by default: during a lesson or practice run the LUMI shows only what to play \u2014 the note to play now steady in its color, the next one blinking \u2014 and the full scale comes back when the run ends. Songs and the Woodshed light the notes to play the same way; Woodshed Wait mode holds the light until you play it. Double-tap your keyboard\u2019s lowest key, or the lesson card, to start and stop a lesson.' },
+      { sel: '#lc-remote', t: 'Hands-free', x: 'A pedal, a button on your synth or a page-turner pedal can press Next, Back and Stop on the practice pages, so you never reach for the screen. Set up opens Settings › Hands-free control.' }
     ],
     settings: [
-      { t: 'Settings', x: 'App-wide preferences, grouped by section: theme and accent color, one master volume for everything, studio capture options, screen wake, MIDI setup, and plugins for advanced workflows.' }
+      { t: 'Settings', x: 'App-wide preferences, grouped by section: theme and accent color, one master volume for everything, studio capture options, screen wake, MIDI setup, hands-free control and plugins for advanced workflows.' },
+      { sel: '#set-remote-card', t: 'Hands-free control', x: 'Press Learn beside Next, Back or Stop, then the pedal, synth button or page-turner key. From then on it only moves practice on — it never plays a note, sustains or answers a question. Try it here: the screen says it works.' }
     ]
   };
 

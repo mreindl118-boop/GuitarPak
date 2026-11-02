@@ -1,0 +1,71 @@
+{
+ "version": "omr-75a43a9362f6",
+ "partMax": 14000000,
+ "models": {
+  "segnet": {
+   "source": "segnet_308-3296ccd40960f90ca6ab9c035cca945675d30a0f.onnx",
+   "note": "segmentation net, int8",
+   "bytes": 14389494,
+   "sha256": "e56904423e192e3f30a65a54b0bd76f4d578ad39d267898470c0b465ecf9714b",
+   "parts": [
+    {
+     "file": "segnet.onnx.part00",
+     "bytes": 14000000,
+     "sha256": "fea0d85b7eb84bedf68e97918a05cabadfc290c6dc5fa4c29099f8591c8886ae"
+    },
+    {
+     "file": "segnet.onnx.part01",
+     "bytes": 389494,
+     "sha256": "559f415cfbf8ac5c36a9ce852a19afc664535358e0717224183ff7b5c20a66c5"
+    }
+   ]
+  },
+  "encoder": {
+   "source": "encoder_pytorch_model_509-2293bba14bfea47d9d28411339362af15fce4c31.onnx",
+   "note": "TrOMR encoder, int8",
+   "bytes": 15428359,
+   "sha256": "ee1fbb97d90017ab7c851caa222aaef23e299dfb6272015b65b13a5d8e7606fc",
+   "parts": [
+    {
+     "file": "encoder.onnx.part00",
+     "bytes": 14000000,
+     "sha256": "b09354c6c6e8fb5def422b96433c360e66a0fde2ef915700e2a6b187c95788e8"
+    },
+    {
+     "file": "encoder.onnx.part01",
+     "bytes": 1428359,
+     "sha256": "a39274a590b2fe8b4fe1c4aa7a4dfb30de9312b4488a8f7534c3c49aaeb3f04c"
+    }
+   ]
+  },
+  "decoder": {
+   "source": "decoder_pytorch_model_509-2293bba14bfea47d9d28411339362af15fce4c31.onnx",
+   "note": "TrOMR decoder, int8",
+   "bytes": 47356003,
+   "sha256": "99a6ac39770616bc1a20d6c409bb85fbbe21ba47f972984f9ef834fb5741b96f",
+   "parts": [
+    {
+     "file": "decoder.onnx.part00",
+     "bytes": 14000000,
+     "sha256": "4ef93a847a5acb42ea2fc26a3ce04b4162738accc2c19872cbff750334e693f4"
+    },
+    {
+     "file": "decoder.onnx.part01",
+     "bytes": 14000000,
+     "sha256": "ef2ee7ae0c2f576802f56eb9ee241d31d638c4869f9aa6ace19b0b0f4d2fea23"
+    },
+    {
+     "file": "decoder.onnx.part02",
+     "bytes": 14000000,
+     "sha256": "07b9f2c9971122c53cb6346784145d31be2e4b29f516ab87e46965895da706ce"
+    },
+    {
+     "file": "decoder.onnx.part03",
+     "bytes": 5356003,
+     "sha256": "4ce857eaf09864d392204f8d8aec1a7e56fe0897781fc0d05edf067198d07c9f"
+    }
+   ]
+  }
+ },
+ "bytes": 77173856
+}

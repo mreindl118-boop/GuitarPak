@@ -117,7 +117,20 @@
     saveIdeas(list);
     renderIdeas();
     renderSong();
+    toLibrary(idea, true);
     return true;
+  }
+
+  // My library (js/library.js): with "Save what I play" on, every captured idea is kept
+  // there as a MIDI file too; the idea's "Save to my library" button does it on demand
+  function toLibrary(idea, auto) {
+    var lib = window.App && App.library;
+    if (!lib || !idea || (auto && !lib.savePlayedOn)) return;
+    lib.savePlayed(idea, { auto: auto }).then(function (r) {
+      if (!auto && r && r.message) App.toast(r.message, 4200);
+    }, function (e) {
+      App.toast('Not saved to the library: ' + (e && e.message ? e.message : e), 4200);
+    });
   }
 
   function startRec() {
@@ -283,6 +296,7 @@
           '<span class="row tight">' +
             '<button type="button" class="btn sm" data-itrk="' + it.id + '" title="Turn this idea into a synth track in the loop">To track</button>' +
             '<button type="button" class="btn sm" data-ikey="' + it.id + '" title="Set the app key/scale to this idea’s">Use key</button>' +
+            '<button type="button" class="btn sm" data-ilib="' + it.id + '" title="Keep this idea in My library as a MIDI file">Save to my library</button>' +
             '<button type="button" class="btn sm" data-idel="' + it.id + '" aria-label="Delete idea">' + App.icon('close', 13) + '</button>' +
           '</span>' +
         '</div>' +
@@ -329,10 +343,12 @@
     });
 
     els.list.addEventListener('click', function (e) {
-      var b = e.target.closest('[data-iplay],[data-idel],[data-ikey],[data-itrk]');
+      var b = e.target.closest('[data-iplay],[data-idel],[data-ikey],[data-itrk],[data-ilib]');
       if (!b) return;
       var idea;
-      if (b.hasAttribute('data-itrk')) {
+      if (b.hasAttribute('data-ilib')) {
+        toLibrary(ideaById(b.getAttribute('data-ilib')), false);
+      } else if (b.hasAttribute('data-itrk')) {
         idea = ideaById(b.getAttribute('data-itrk'));
         if (idea) ideaToTrack(idea);
       } else if (b.hasAttribute('data-iplay')) {

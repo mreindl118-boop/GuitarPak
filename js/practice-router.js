@@ -121,6 +121,9 @@
       if (decode.data.length === length - 1) {
         var complete = [decode.status].concat(decode.data);
         decode.data = []; decode.status = decode.running;
+        // a learned remote gesture (a key or the sustain pedal bound in
+        // Settings › Hands-free control) only advances: never routed to the synth
+        if (App.remote && App.remote.owns && App.remote.owns(complete, { port: input.name || '' })) continue;
         routeMessage(complete);
       }
     }
