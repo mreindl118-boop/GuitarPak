@@ -3,5 +3,7 @@ build/
 *.apk
 *.idsig
 
-# signing key — keep private, regenerate with build.ps1 if lost
+# signing key — keep private; NEVER regenerate it (a new key = every user reinstalls).
+# The only backup is in the owner's private claude.ai artifact (docs/DEV-HANDBOOK.md 4.7)
+*.keystore.b64
 *.keystore

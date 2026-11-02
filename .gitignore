@@ -2,6 +2,7 @@
 releases/*.idsig
 # signing keys never belong in the repo
 *.keystore
+*.keystore.b64
 *.jks
 *.p12
 

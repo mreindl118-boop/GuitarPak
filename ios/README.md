@@ -43,7 +43,7 @@ or App Store. This is the only route with friction-free updates.
 | Concern              | android/                          | ios/                                        |
 |----------------------|-----------------------------------|---------------------------------------------|
 | Web bundle           | `assets/` in the APK              | `WebAssets/` folder reference in the bundle |
-| MIDI                 | (WebView: none)                   | CoreMIDI bridge, incl. Bluetooth pairing    |
+| MIDI                 | `MidiBridge` (USB + Bluetooth LE) | CoreMIDI bridge, incl. Bluetooth pairing    |
 | Mic permission       | `onPermissionRequest` + runtime   | `WKUIDelegate` grant + usage description    |
 | Keep screen on       | `FLAG_KEEP_SCREEN_ON` bridge      | `isIdleTimerDisabled` via script message    |
 | External links       | `Intent.ACTION_VIEW`              | `UIApplication.open`, policy = cancel       |

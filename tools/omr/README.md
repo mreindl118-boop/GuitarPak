@@ -56,8 +56,9 @@ example `02-entree-p1.png` or `belle-p1.png`.
    | `dump_read*.py` | reading |
    | `dump_e2e.py`, `dump_sheetlab_prep.py` | the SheetLab engine |
 
-3. `dump_e2e.py` and `dump_sheetlab_prep.py` run the owner's SheetLab engine (`sheetlab_engine.py`, adapted
-   to the current homr API). Give its path with `--engine`.
+3. `dump_e2e.py` and `dump_sheetlab_prep.py` run the owner's SheetLab engine, adapted to the current homr
+   API: `--engine tools/omr/sheetlab_engine.py`. The port's working notes (what each JS module mirrors,
+   the parity runs and their numbers) are in `notes/`, starting with `notes/OMR-PORT.md`.
 
 ## Running the suites
 

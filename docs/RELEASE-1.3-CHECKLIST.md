@@ -55,7 +55,7 @@ Tick items here as they land (commit in brackets).
 - [ ] 5.1 tools/score-helper.py (Matt's vector OMR, hardened) on 127.0.0.1:4576; Connect helper
       button, never auto-connects; tests/score-helper.test.js; docs/SCORE-HELPER.md
 
-## 6. Hardware checks already done — mine, PRs open
+## 6. Hardware checks already done — mine (pushed branches; no PR was ever opened, see docs/MODX-SOUNDLAB.md)
 - [x] 6.1 MODX maps checked on the MODX8+ (check/modx-maps-claude e6ce52c)
 - [x] 6.2 LUMI: relight, no config-frame storms, stale-output stand-in (check/lumi-claude 5cdc826)
 

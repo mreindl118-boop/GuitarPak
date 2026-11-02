@@ -896,6 +896,8 @@ dialogs are refused by the frame — everything else runs. `tools/bundle.py`
 
 ## Cloud / mobile sessions (claude.ai/code, PC off)
 
+START HERE without the laptop: docs/DEV-HANDBOOK.md (every process, secrets by name).
+
 APK NOTE (2026-10-12, v0.70.2; v0.75.0 = the MIDI bridge APK, also built
 in the cloud the same way): re-keyed at the owner's request. The app is
 now com.mreindl.soundlab, signed with a NEW key (soundlab.keystore,
@@ -911,12 +913,11 @@ Never copy it into this public repo, never share that artifact. Plus the SDK
 pieces: dl.google.com platform-34 + build-tools 34, and r8 8.7.x.
 
 All web work is possible (js/css/html, sw.js, version.json, README), and so
-is republishing the claude.ai artifact (see that section). NOT possible:
-building/signing the APK (the keystore and Android toolchain exist only on
-the owner's PC). For a release from the cloud: do checklist steps 1–4 only, note
-in the commit that releases/GuitarLab-alpha.apk is stale until the next PC
-session runs android\build.ps1, and open a pull request instead of pushing
-to main so the owner can review from their phone.
+is republishing the claude.ai artifact (see that section) and building the
+APK: `eval "$(bash tools/cloud/setup.sh --android)"` fetches the Android
+toolchain, the key comes from the artifact above (DEV-HANDBOOK 4.7). For a
+web release from the cloud: do checklist steps 1–4, and open a pull request
+instead of pushing to main so the owner can review from their phone.
 
 ## Gotchas
 
