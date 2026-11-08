@@ -108,13 +108,30 @@
   // (the MIDI Hub page while open), tags midi:note with mute:true - the
   // visuals, pads, lessons and the keybed still react, only the Keys page
   // voice stays quiet. Distinct from tone-in's silent:true (not a keyboard).
+  // v1.4.0 VOICE MODE: midi.appSound 'auto' (the default) | true | false.
+  // Auto keeps soundLAB quiet only for notes that come FROM a keyboard that
+  // makes its own sound (a MODX, a Nord...) and plays everything else (a
+  // LUMI), so a LUMI + MODX rig on All keyboards needs no switch at all.
+  // A stored false from the old checkbox (the only way to stop a MODX
+  // doubling) moves to auto once; Never stays available.
+  var SELF_SOUND_RE = /MODX|MONTAGE|MOXF|MOTIF|Nord|Kronos|Nautilus|Fantom|Juno|Jupiter|Clavinova|Digital Piano|\bCP\s?(?:73|88)\b|Kurzweil|Prophet/i;
+  function selfSounding(name) { return SELF_SOUND_RE.test(name || ''); }
+  if (App.store.get('midi.voiceAuto', false) !== true) {
+    if (App.store.get('midi.appSound', 'auto') === false) App.store.set('midi.appSound', 'auto');
+    App.store.set('midi.voiceAuto', true);
+  }
+  function voiceMode() {
+    var v = App.store.get('midi.appSound', 'auto');
+    return v === false ? 'off' : v === true ? 'on' : 'auto';
+  }
   var muteOwners = {};
-  function muted() { return App.store.get('midi.appSound', true) === false || Object.keys(muteOwners).length > 0; }
+  function muted() { return voiceMode() === 'off' || Object.keys(muteOwners).length > 0; }
+  function mutedFrom(name) { return muted() || (voiceMode() === 'auto' && selfSounding(name)); }
 
   // one complete channel message -> app events
   function dispatch(d) {
     if (!d || d.length < 2) return;
-    var st = d[0] & 0xf0, chan = d[0] & 0x0f, mute = muted();
+    var st = d[0] & 0xf0, chan = d[0] & 0x0f, mute = mutedFrom(srcName);
     if (st === 0x90 && d[2] > 0) {
       var blocked = !!(App.scaleLock && App.scaleLock.on && !App.scaleLock.contains(d[1]));
       held[d[1]] = d[2];
@@ -1160,8 +1177,11 @@
     bindMusicalOutput: bindMusicalOutput,
     get musicCleanupOk() { return musicCleanupOk; },
     // app sound for MIDI notes: the Settings switch + per-owner mutes (Hub)
-    get appSound() { return App.store.get('midi.appSound', true) !== false; },
+    get appSound() { return voiceMode() !== 'off'; },
     setAppSound: function (on) { App.store.set('midi.appSound', on !== false); },
+    get voice() { return voiceMode(); },
+    setVoice: function (m) { App.store.set('midi.appSound', m === 'off' ? false : m === 'on' ? true : 'auto'); App.emit('midi:voice', { mode: voiceMode() }); },
+    selfSounding: selfSounding,
     mute: function (owner, on) { if (on) muteOwners[owner] = true; else delete muteOwners[owner]; },
     get muted() { return muted(); },
     setInputFilter: function (fn) { inputFilter = typeof fn === 'function' ? fn : null; },
