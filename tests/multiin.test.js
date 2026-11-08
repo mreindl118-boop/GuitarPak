@@ -127,6 +127,43 @@ async function newPage(browser, seed) {
   ok(m2 === 'in-lumi', 'after the migration a single-input choice is kept: ' + m2);
   await ctx.close();
 
+  console.log('# soundLAB plays my keys: Auto stays quiet for the MODX only');
+  ({ ctx, page, errs } = await newPage(browser));
+  const v = await page.evaluate(async () => {
+    const got = []; App.on('midi:note', d => { if (d.on) got.push((/MODX/.test(d.port) ? 'modx' : 'lumi') + (d.mute ? ':mute' : ':play')); });
+    const o = { mode: App.midi.voice };
+    __play('modx', 60); __play('lumi', 64); o.auto = got.splice(0).join();
+    App.midi.setVoice('on'); __play('modx', 60); __play('lumi', 64); o.on = got.splice(0).join();
+    App.midi.setVoice('off'); __play('modx', 60); __play('lumi', 64); o.off = got.splice(0).join(); o.appSound = App.midi.appSound;
+    App.midi.setVoice('auto');
+    App.switchTo('settings');
+    await new Promise(r => setTimeout(r, 300));
+    o.seg = document.querySelector('#set-midi-voice .active').textContent;
+    o.chips = document.getElementById('set-midi-gear').textContent;
+    o.note = document.getElementById('set-midi-voicenote').textContent;
+    document.querySelector('#set-midi-voice [data-voice="off"]').click();
+    o.clicked = [App.midi.voice, JSON.parse(localStorage.getItem('guitarlab.midi.appSound'))];
+    o.bendHidden = !!document.getElementById('set-midi-bend').closest('details') && !document.getElementById('set-midi-more').open;
+    return o;
+  });
+  ok(v.mode === 'auto' && v.auto === 'modx:mute,lumi:play', 'Auto (the default): the MODX sounds itself, the LUMI plays soundLAB: ' + v.auto);
+  ok(v.on === 'modx:play,lumi:play' && v.off === 'modx:mute,lumi:mute' && v.appSound === false, 'Always / Never: ' + v.on + ' / ' + v.off);
+  ok(v.seg === 'Auto' && /MODX-1.*makes its own sound/.test(v.chips) && /LUMI.*key lights/.test(v.chips), 'Settings shows Auto and what each keyboard does: ' + v.chips);
+  ok(v.clicked[0] === 'off' && v.clicked[1] === false, 'the Never button stores the old off value: ' + JSON.stringify(v.clicked));
+  ok(v.bendHidden, 'pitch bend sits under More MIDI options');
+  ok(!errs.length, 'no page errors: ' + errs.join(' | '));
+  await ctx.close();
+
+  console.log('# upgrade: the old voice OFF checkbox becomes Auto once');
+  ({ ctx, page, errs } = await newPage(browser, { 'midi.appSound': false }));
+  const u1 = await page.evaluate(() => App.midi.voice);
+  ok(u1 === 'auto', 'a stored off (set only to stop a MODX doubling) moves to Auto: ' + u1);
+  await ctx.close();
+  ({ ctx, page, errs } = await newPage(browser, { 'midi.appSound': false, 'midi.voiceAuto': true }));
+  const u2 = await page.evaluate(() => App.midi.voice);
+  ok(u2 === 'off', 'after the move, Never is kept: ' + u2);
+  await ctx.close();
+
   await browser.close();
   console.log(fails ? fails + ' FAILED' : 'ALL PASS');
   process.exit(fails ? 1 : 0);

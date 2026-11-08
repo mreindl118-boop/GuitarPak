@@ -232,7 +232,7 @@ const noErrs = (errs, what) => ok(errs.length === 0, 'no page errors (' + what +
   }, dev2);
   ok(plug.before.on && plug.before.reaches, 'a new pick re-opens with Hear input still on');
   ok(!plug.gone.s.on && !plug.gone.reaches && /unplugged/.test(plug.gone.s.msg), 'the device unplugged: closed, says so: ' + plug.gone.s.msg);
-  ok(plug.gone.stored === dev2 && plug.gone.opt === 'Chosen device (not connected)' && /input is not connected/.test(plug.gone.msg),
+  ok(plug.gone.stored === dev2 && /\(not connected\)$/.test(plug.gone.opt || '') && /input is not connected/.test(plug.gone.msg),
     'the choice is KEPT while it is gone (Settings shows it as not connected): ' + plug.gone.msg);
   ok(plug.back.s.on && plug.back.s.monitor && plug.back.reaches && plug.back.s.device === dev2, 'plugged back in: Hear input resumes on THAT device');
 
@@ -313,9 +313,10 @@ const noErrs = (errs, what) => ok(errs.length === 0, 'no page errors (' + what +
   });
   ok(ui.title === 'Sound input & output', 'the card is "Sound input & output"');
   ok(ui.input && !ui.btn && ui.opts >= 3, 'names are readable: the Input select shows, List devices is gone (' + ui.opts + ' options)');
-  ok(ui.seg && ui.meter && ui.gain && ui.gainVal === '100%' && ui.tone, 'Hear input seg, gain + readout, level meter and the tone-in checkbox are there');
-  ok(ui.segOff && ui.aria === 'true,false' && ui.hold.indexOf('settings-meter') >= 0 && !ui.test,
-    'seg shows Off (aria-pressed ' + ui.aria + '); an input is in use, so the meter holds it (no Test button)');
+  ok(ui.seg && ui.meter && !ui.gain && ui.gainVal === '100%' && !ui.tone && !ui.test,
+    'one "Use the input to" choice + level meter; no separate tone-in checkbox or Test button; the level slider waits for Hear it');
+  ok(!ui.segOff && ui.aria === 'false,false,true,false' && ui.hold.indexOf('settings-meter') >= 0,
+    'tone-in on = Show notes is lit (aria-pressed ' + ui.aria + '); the input is in use, so the meter holds it');
   const meterLive = await page.evaluate(async () => {
     let w = 0;
     const end = Date.now() + 4000;
@@ -371,17 +372,14 @@ const noErrs = (errs, what) => ok(errs.length === 0, 'no page errors (' + what +
     App.switchTo('settings');
     await __wait(600);
     const test = document.getElementById('set-ain-test');
-    const r = { gum: __gum.length, holds: App.audioIn._t().holds, stream: !!App.audioIn._t().stream, test: !test.hidden && test.offsetParent !== null };
-    test.click();
-    await __wait(700);
-    r.tested = { holds: App.audioIn._t().holds, stream: !!App.audioIn._t().stream, reaches: __reachesMaster(), testGone: test.hidden };
+    const r = { gum: __gum.length, holds: App.audioIn._t().holds, stream: !!App.audioIn._t().stream, test: !!test,
+      meterRow: document.getElementById('set-ain-meterrow').offsetParent !== null };
     App.switchTo('quiz');
     await __wait(200);
     r.left = !!App.audioIn._t().stream;
     return r;
   });
-  ok(quiet.gum === 0 && quiet.holds.length === 0 && !quiet.stream && quiet.test, 'no input in use: Settings opens no capture (no getUserMedia), a Test input button instead');
-  ok(quiet.tested.stream && quiet.tested.holds.indexOf('settings-meter') >= 0 && !quiet.tested.reaches && quiet.tested.testGone, 'Test input opens it for the meter only');
+  ok(quiet.gum === 0 && quiet.holds.length === 0 && !quiet.stream && !quiet.test && !quiet.meterRow, 'no input in use: Settings opens no capture (no getUserMedia) and hides the meter');
   ok(!quiet.left, 'and leaving Settings lets it go');
   noErrs(errs, 'quiet Settings');
   await ctx.close();
@@ -444,7 +442,7 @@ const noErrs = (errs, what) => ok(errs.length === 0, 'no page errors (' + what +
   });
   ok(mx.id === 'modx-line' && /Line \(MODX\)/.test(mx.msg), 'nothing picked yet: the MODX input is selected, like the Helix: ' + mx.msg);
   ok(mx.monitor === false && !mx.s.monitor && !mx.reaches, 'Hear input is never switched on by the auto-detect');
-  ok(/MODX audio is your Input/.test(mx.hint), 'the hint says to turn on Hear input: ' + mx.hint);
+  ok(/Your MODX is the input\. Pick Hear it/.test(mx.hint), 'the hint says to pick Hear it: ' + mx.hint);
   ok(mx.s.on && /not connected/.test(mx.s.msg), 'an exact device that will not open: the meter falls back to the default, with a message: ' + mx.s.msg);
   const mxOn = await page.evaluate(async () => {
     __gum.length = 0;
@@ -472,9 +470,48 @@ const noErrs = (errs, what) => ok(errs.length === 0, 'no page errors (' + what +
     const hint = document.getElementById('set-audio-hint');
     return { id: App.store.get('audio.inId', ''), hint: hint.hidden ? '' : hint.textContent };
   });
-  ok(other.id !== 'modx-line' && other.hint === 'MODX audio found — pick it as Input and turn on Hear input to play it through soundLAB.',
+  ok(other.id !== 'modx-line' && other.hint === 'MODX found. Pick it as Input to use it.',
     'the user picked another input: never auto-switched back, the hint says how: ' + other.hint);
   noErrs(errs, 'MODX');
+  await ctx.close();
+
+  console.log('# your gear: Steinberg first, System default can be pinned, one choice for hear + notes');
+  ({ ctx, page, errs } = await newPage(browser, { 'audio.inPicked': true }));
+  const gear = await page.evaluate(async () => {
+    window.__devMap = l => l.concat([
+      { deviceId: 'modx-line', kind: 'audioinput', label: 'Line (MODX)', groupId: 'g-modx' },
+      { deviceId: 'ur24c', kind: 'audioinput', label: 'IN 1-2 (Steinberg UR24C)', groupId: 'g-ur' },
+      { deviceId: 'helix', kind: 'audioinput', label: 'Helix Stadium Audio', groupId: 'g-hx' }]);
+    App.switchTo('settings');
+    await __wait(200); __plug(); await __wait(700);
+    const o = { id: App.store.get('audio.inId', ''), msg: document.getElementById('set-audio-msg').textContent,
+      hint: document.getElementById('set-audio-hint').textContent };
+    const sel = document.getElementById('set-audio-in');
+    sel.value = ''; sel.dispatchEvent(new Event('change'));
+    await __wait(200); __plug(); await __wait(600);
+    o.pinned = App.store.get('audio.inId', '');
+    o.pinHint = document.getElementById('set-audio-hint').textContent;
+    sel.value = 'ur24c'; sel.dispatchEvent(new Event('change'));
+    await __wait(300);
+    document.querySelector('#set-ain-mon [data-mon="both"]').click();
+    await __wait(600);
+    o.both = { mon: App.store.get('audio.monitor', null), tone: App.store.get('audio.tonein', null), toneRun: App.tonein.running,
+      gain: document.getElementById('set-ain-gain').offsetParent !== null, lit: document.querySelector('#set-ain-mon .active, #set-ain-mon .held').textContent };
+    document.querySelector('#set-ain-mon [data-mon="notes"]').click();
+    await __wait(400);
+    o.notes = { mon: App.store.get('audio.monitor', null), tone: App.store.get('audio.tonein', null), gain: document.getElementById('set-ain-gain').offsetParent !== null };
+    document.querySelector('#set-ain-mon [data-mon="off"]').click();
+    await __wait(300);
+    o.off = { mon: App.store.get('audio.monitor', null), tone: App.store.get('audio.tonein', null), toneRun: App.tonein.running };
+    return o;
+  });
+  ok(gear.id === 'ur24c' && /Steinberg UR24C/.test(gear.msg), 'an old "picked" System default no longer blocks it: the Steinberg wins over the Helix and the MODX: ' + gear.msg);
+  ok(/Your Steinberg is the input/.test(gear.hint), 'the hint names it: ' + gear.hint);
+  ok(gear.pinned === '' && /Steinberg found/.test(gear.pinHint), 'picking System default by hand sticks; the hint says the Steinberg is there: ' + gear.pinHint);
+  ok(gear.both.mon === true && gear.both.tone === true && gear.both.gain && gear.both.lit === 'Both', 'Both = hear it + show notes, with the level slider: ' + JSON.stringify(gear.both));
+  ok(gear.notes.mon === false && gear.notes.tone === true && !gear.notes.gain, 'Show notes = tone-in only, no level slider');
+  ok(gear.off.mon === false && gear.off.tone === false && !gear.off.toneRun, 'Off = neither');
+  noErrs(errs, 'gear');
   await ctx.close();
 
   console.log('# the chosen output device');

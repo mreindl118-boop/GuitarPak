@@ -67,6 +67,13 @@ js/midi.js        MIDI service (App.midi: in/out ports, note/bend/pressure
                   output) and App.midi.setInputFilter(fn) — ONE fn(bytes) ->
                   bytes|null run before dispatch (null drops it); the Hub
                   installs its rules there when midihub.rulesIn is on.
+                  1.4.0 VOICE MODE: midi.appSound 'auto' (default) | true |
+                  false; Auto mutes only notes FROM a self-sounding synth
+                  port (SELF_SOUND_RE: MODX/MONTAGE/Nord/...;
+                  App.midi.selfSounding), so LUMI + MODX on All keyboards
+                  need no switch; a stored false moved to 'auto' once
+                  (midi.voiceAuto marker). App.midi.voice / setVoice,
+                  'midi:voice' event; appSound/setAppSound kept.
                   v0.78.1 APP SOUND: midi:note carries mute:true when
                   midi.appSound is false (Settings > MIDI keyboard switch,
                   App.midi.setAppSound) or any App.midi.mute(owner, on) is
@@ -221,6 +228,23 @@ js/trainer.js     │
 js/theorytab.js   │ (theory: circle of fifths + key guide + degree ear quiz)
 js/settings.js    ┘ (settings: app-level prefs — theme dark/light/auto; MIDI
                      ports + bend; lighting moved to Lights & help)
+                     1.4.0 GEAR CARDS (rebuilt, not patched): MIDI keyboard =
+                     Connect -> "Found:" chips per device (what soundLAB does
+                     with it) -> Keyboard / Key lights selects -> "soundLAB
+                     plays my keys" Auto/Always/Never (#set-midi-voice ->
+                     App.midi.voice/setVoice) -> details for Windows Bluetooth
+                     (#set-midi-btnote) and More MIDI options (pitch bend,
+                     Lights & help). Sound input & output = Find my gear ->
+                     Input/Output -> ONE "Use the input to" seg #set-ain-mon
+                     (data-mon off/on=Hear it/notes=Show notes/both) writing
+                     audio.monitor + audio.tonein; level slider only while
+                     heard; meter only while an input is in use; no Test
+                     button, no tone-in checkbox. AUTO-PICK while Input is
+                     System default: Steinberg/UR > other interfaces > Helix
+                     > MODX (GEAR list); choosing System default by hand pins
+                     it (audio.inDefault); the old audio.inPicked no longer
+                     blocks it. Windows "Default"/"Communications" duplicates
+                     are not listed.
 js/lights.js      LIGHTS & HELP control center (sheet 'lights', header
                   #lights-btn): Help level + key lights (on/off, LUMI colors,
                   brightness, keyboard type, status/range, test) — the same
