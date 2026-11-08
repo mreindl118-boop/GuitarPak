@@ -18,7 +18,7 @@ const SCORE = { title: 'Original safety fixture', bpm: 120, len: 5,
       ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
       localStorage.setItem('guitarlab.fb.root', '0'); localStorage.setItem('guitarlab.fb.scale', '"major"');
       localStorage.setItem('guitarlab.ws.performance.input', '"synth-in"');
-      localStorage.setItem('guitarlab.midi.appSound', 'false');
+      localStorage.setItem('guitarlab.midi.appSound', 'false'); localStorage.setItem('guitarlab.midi.voiceAuto', 'true');
       localStorage.setItem('guitarlab.lights.displayEnabled', 'true');
       window.__sent = [];
       class Port extends EventTarget {
