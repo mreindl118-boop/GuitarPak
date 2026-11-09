@@ -1,0 +1,146 @@
+/* soundLAB 2.0 design tokens — the "E · Stage" look (docs/DESIGN-SYSTEM.md).
+ *
+ * Phase 0 of the 2.0 roadmap (docs/ROADMAP-2.0.md): the tokens exist and load
+ * first; the 1.x pages keep using style.css's older variables until Phase B
+ * rebuilds them on these. Rules:
+ *   - every NEW 2.0 component uses ONLY --sl-* tokens, never a raw color;
+ *   - both themes are defined here and both must pass WCAG AA contrast;
+ *   - no token is read before this file loads (it is the first stylesheet).
+ */
+
+:root {
+  color-scheme: dark;
+
+  /* ---- surfaces ---------------------------------------------------- */
+  --sl-bg: #0f0d10;             /* the stage */
+  --sl-bg-raised: #161317;      /* header, footer, sheets */
+  --sl-surface: #1c191d;        /* cards */
+  --sl-surface-2: #262128;      /* rows inside cards, inputs */
+  --sl-line: rgba(255, 255, 255, 0.08);
+  --sl-line-strong: #302a32;
+  --sl-overlay: rgba(0, 0, 0, 0.6);
+
+  /* ---- ink ---------------------------------------------------------- */
+  --sl-ink: #f6f1ea;
+  --sl-ink-muted: #9d939b;      /* ≥ 4.5:1 on --sl-bg */
+  --sl-ink-faint: #6a6168;      /* decorative only, never for text that matters */
+
+  /* ---- accent: tube amber ------------------------------------------ */
+  --sl-accent: #ffab47;
+  --sl-accent-ink: #1a1206;     /* text ON the accent */
+  --sl-accent-soft: rgba(255, 171, 71, 0.14);
+  --sl-accent-line: rgba(255, 171, 71, 0.6);
+  --sl-accent-glow: 0 14px 40px rgba(255, 171, 71, 0.28);
+
+  /* ---- status ------------------------------------------------------- */
+  --sl-ok: #6fd58f;
+  --sl-warn: #ffb36b;
+  --sl-bad: #ff6f6f;
+  --sl-info: #6ea8fe;
+
+  /* ---- scale-degree colors (the default color mode: 1 is always the
+          1 color in every key; the LUMI gets the same seven) ---------- */
+  --sl-deg-1: #ff4d4d;
+  --sl-deg-2: #ff9a3c;
+  --sl-deg-3: #ffd23f;
+  --sl-deg-4: #4cd964;
+  --sl-deg-5: #34d0e0;
+  --sl-deg-6: #4d7dff;
+  --sl-deg-7: #b36bff;
+
+  /* ---- keys and strings -------------------------------------------- */
+  --sl-key-white: #ece5db;
+  --sl-key-black: #1b171c;
+  --sl-string: #b9bccb;
+  --sl-fret: #3a3c4d;
+
+  /* ---- type ---------------------------------------------------------- */
+  --sl-font-display: 'Bebas Neue', 'Barlow Condensed', 'Segoe UI', system-ui, sans-serif;
+  --sl-font-body: 'Barlow', 'Segoe UI', system-ui, sans-serif;
+  --sl-font-cond: 'Barlow Condensed', 'Segoe UI', system-ui, sans-serif;
+  --sl-text-xs: 12px;
+  --sl-text-sm: 14px;
+  --sl-text-md: 16px;
+  --sl-text-lg: 20px;
+  --sl-text-xl: 26px;
+  --sl-display-sm: 34px;                      /* wordmark, sheet titles */
+  --sl-display-md: 56px;                      /* big numbers (streak) */
+  --sl-display-lg: clamp(44px, 7.8vw, 100px); /* the one headline on a page */
+  --sl-eyebrow-ls: 0.16em;                    /* small caps labels */
+  --sl-caps-ls: 0.08em;                       /* Bebas buttons and tabs */
+  --sl-leading-tight: 0.92;
+  --sl-leading: 1.4;
+
+  /* ---- space (4 px grid) -------------------------------------------- */
+  --sl-space-1: 4px;
+  --sl-space-2: 8px;
+  --sl-space-3: 12px;
+  --sl-space-4: 16px;
+  --sl-space-5: 24px;
+  --sl-space-6: 32px;
+  --sl-space-7: 48px;
+  --sl-space-8: 72px;
+  --sl-gutter: 16px;                          /* phone side gutter */
+
+  /* ---- shape ---------------------------------------------------------- */
+  --sl-radius-sm: 8px;
+  --sl-radius-md: 12px;
+  --sl-radius-lg: 20px;
+  --sl-radius-pill: 999px;
+
+  /* ---- controls ------------------------------------------------------- */
+  --sl-control-h: 44px;                       /* every tappable control */
+  --sl-tap-min: 44px;
+  --sl-focus: 0 0 0 3px rgba(255, 171, 71, 0.55);
+  --sl-shadow-1: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --sl-shadow-2: 0 10px 30px rgba(0, 0, 0, 0.35);
+
+  /* ---- motion --------------------------------------------------------- */
+  --sl-dur-fast: 120ms;
+  --sl-dur: 200ms;
+  --sl-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+
+  /* ---- layers --------------------------------------------------------- */
+  --sl-z-bar: 20;
+  --sl-z-sheet: 40;
+  --sl-z-toast: 60;
+}
+
+/* Light theme: same tokens re-inked so every pairing keeps ≥ 4.5:1. */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --sl-bg: #f5f1ea;
+  --sl-bg-raised: #efe9df;
+  --sl-surface: #ffffff;
+  --sl-surface-2: #f1ebe1;
+  --sl-line: rgba(0, 0, 0, 0.08);
+  --sl-line-strong: #d8cfc1;
+  --sl-overlay: rgba(20, 16, 12, 0.45);
+  --sl-ink: #1d1a1c;
+  --sl-ink-muted: #6d646b;
+  --sl-ink-faint: #a39aa0;
+  --sl-accent: #c96f0a;         /* amber deepened for white cards */
+  --sl-accent-ink: #ffffff;
+  --sl-accent-soft: rgba(201, 111, 10, 0.12);
+  --sl-accent-line: rgba(201, 111, 10, 0.55);
+  --sl-accent-glow: 0 10px 30px rgba(201, 111, 10, 0.22);
+  --sl-ok: #1f8a46;
+  --sl-warn: #9a5a0c;
+  --sl-bad: #c23434;
+  --sl-info: #2f68c8;
+  --sl-key-white: #ffffff;
+  --sl-key-black: #2a2429;
+  --sl-string: #6f7384;
+  --sl-fret: #c9ccd8;
+  --sl-focus: 0 0 0 3px rgba(201, 111, 10, 0.5);
+  --sl-shadow-1: 0 1px 3px rgba(0, 0, 0, 0.1);
+  --sl-shadow-2: 0 10px 30px rgba(23, 26, 31, 0.08);
+}
+
+@media (pointer: coarse) {
+  :root { --sl-control-h: 48px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --sl-dur-fast: 0ms; --sl-dur: 0ms; }
+}

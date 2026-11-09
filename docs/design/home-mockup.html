@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>soundLAB 2.0 home mockup — round 2</title>
+<style>
+@font-face{font-family:Bebas;src:url(../../fonts/bebasneue-400.ttf)}
+@font-face{font-family:Barlow;src:url(../../fonts/barlow-400.woff2);font-weight:400}
+@font-face{font-family:Barlow;src:url(../../fonts/barlow-500.woff2);font-weight:500}
+@font-face{font-family:BarlowCond;src:url(../../fonts/barlowcond-600.woff2);font-weight:600}
+@font-face{font-family:BarlowCond;src:url(../../fonts/barlowcond-700.woff2);font-weight:700}
+
+html[data-theme=e]{
+  --bg:#0f0d10; --ink:#f6f1ea; --muted:#8e858c; --accent:#ffab47; --accent-ink:#1a1206;
+  --font-display:Bebas,sans-serif; --font-body:Barlow,sans-serif; --font-cond:BarlowCond,sans-serif;
+  --h1:100px; --h1w:400; --h1ls:.01em; --caps:uppercase; --radius:10px;
+  --key-w:#ece5db; --key-b:#1b171c; --line:rgba(255,255,255,.08);
+}
+html[data-theme=f]{
+  --bg:#0b0c12; --ink:#f2f3f7; --muted:#7f8597; --accent:#8b7cff; --accent-ink:#ffffff;
+  --font-display:'Inter Display',Inter,sans-serif; --font-body:Inter,sans-serif; --font-cond:Inter,sans-serif;
+  --h1:84px; --h1w:800; --h1ls:-.045em; --caps:none; --radius:18px;
+  --key-w:#f2f3f7; --key-b:#1a1b24; --line:rgba(255,255,255,.08);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1280px;height:800px;overflow:hidden}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);position:relative}
+html[data-theme=e] body{background:radial-gradient(1200px 600px at 50% 110%, rgba(255,171,71,.16), transparent 60%), var(--bg)}
+html[data-theme=f] body{background:radial-gradient(900px 500px at 85% 20%, rgba(139,124,255,.22), transparent 60%), var(--bg)}
+.ribbon{position:absolute;top:0;left:50%;transform:translateX(-50%);border-radius:0 0 10px 10px !important;background:var(--ink);color:var(--bg);font:600 12px/1 var(--font-body);padding:7px 12px;border-radius:0 0 10px 0;letter-spacing:.04em;z-index:5}
+
+header{position:absolute;top:0;left:0;right:0;height:64px;display:flex;align-items:center;padding:0 36px;gap:28px}
+.wordmark{font-family:var(--font-display);font-size:30px;color:var(--ink);letter-spacing:.01em}
+html[data-theme=e] .wordmark{font-size:34px}
+html[data-theme=f] .wordmark{font-weight:800;letter-spacing:-.04em}
+.wordmark b{color:var(--accent);font-weight:inherit}
+nav{display:flex;gap:26px;margin-left:12px}
+nav a{font-family:var(--font-cond);font-weight:600;font-size:14px;text-transform:var(--caps);letter-spacing:.08em;color:var(--muted)}
+html[data-theme=f] nav a{letter-spacing:0;font-size:15px;font-weight:500}
+nav a.on{color:var(--ink);border-bottom:2px solid var(--accent);padding-bottom:3px}
+.spacer{flex:1}
+.status{display:flex;align-items:center;gap:18px;color:var(--muted);font-size:14px}
+.status span{display:flex;align-items:center;gap:7px}
+.status i{width:8px;height:8px;border-radius:50%;background:#5fd38a;display:inline-block}
+.status i.k{background:var(--accent)}
+.status .gear{width:34px;height:34px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;color:var(--muted)}
+
+.stage{position:absolute;left:0;right:0;top:176px;padding:0 72px}
+.eyebrow{font-family:var(--font-cond);font-weight:600;font-size:14px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent)}
+html[data-theme=f] .eyebrow{letter-spacing:.1em;font-weight:600}
+h1{font-family:var(--font-display);font-size:var(--h1);font-weight:var(--h1w);letter-spacing:var(--h1ls);line-height:.92;margin-top:14px;text-transform:var(--caps);max-width:1140px;white-space:nowrap}
+.sub{margin-top:18px;font-size:20px;color:var(--muted);display:flex;gap:26px;align-items:center}
+.sub b{color:var(--ink);font-weight:600}
+.cta{display:flex;align-items:center;gap:22px;margin-top:28px}
+.btn{display:inline-flex;align-items:center;gap:14px;background:var(--accent);color:var(--accent-ink);border-radius:999px;padding:20px 38px;font-weight:700;font-size:22px;font-family:var(--font-cond);text-transform:var(--caps);letter-spacing:.08em}
+html[data-theme=f] .btn{letter-spacing:-.01em;border-radius:var(--radius);box-shadow:0 14px 40px rgba(139,124,255,.35)}
+html[data-theme=e] .btn{box-shadow:0 14px 40px rgba(255,171,71,.28)}
+.btn .tri{width:0;height:0;border-left:16px solid currentColor;border-top:10px solid transparent;border-bottom:10px solid transparent}
+.link{color:var(--muted);font-size:16px}
+.link u{text-decoration:none;color:var(--ink);border-bottom:1px solid var(--muted)}
+
+/* hero: keyboard (c) */
+.kbd{position:absolute;left:36px;right:36px;bottom:92px;height:230px}
+.kbd .w{position:absolute;top:0;height:230px;background:var(--key-w);border-radius:0 0 10px 10px;border-left:1px solid rgba(0,0,0,.18)}
+.kbd .b{position:absolute;top:0;height:140px;background:var(--key-b);border-radius:0 0 8px 8px;z-index:2;box-shadow:0 4px 10px rgba(0,0,0,.5)}
+.kbd .k.lit::after{content:"";position:absolute;left:50%;transform:translateX(-50%);width:22px;height:22px;border-radius:50%;background:var(--c);box-shadow:0 0 22px var(--c),0 0 6px var(--c)}
+.kbd .w.lit::after{bottom:70px}
+.kbd .b.lit::after{bottom:22px;width:18px;height:18px}
+.kbd .w.now{background:var(--c)}
+.kbd .w.now::after{display:none}
+.kbd .fade{position:absolute;left:-40px;right:-40px;bottom:-2px;height:70px;background:linear-gradient(to bottom, transparent, var(--bg) 85%);z-index:3;pointer-events:none}
+.kbd .nm{position:absolute;bottom:-26px;left:50%;transform:translateX(-50%);font-size:13px;color:var(--muted);font-family:var(--font-cond);letter-spacing:.06em}
+
+/* hero: neck (d) */
+.neck{position:absolute;left:36px;right:36px;bottom:78px;height:280px}
+.neck svg{width:100%;height:100%;display:block}
+.neck .fade{position:absolute;left:-40px;right:-40px;bottom:-2px;height:40px;background:linear-gradient(to bottom, transparent, var(--bg) 85%);pointer-events:none}
+
+footer{position:absolute;left:0;right:0;bottom:0;height:64px;display:flex;align-items:center;padding:0 36px;gap:34px;color:var(--muted);font-size:15px;border-top:1px solid var(--line);background:var(--bg)}
+footer b{color:var(--ink);font-weight:600}
+footer .ring{width:28px;height:28px;position:relative;display:inline-block;vertical-align:middle;margin-right:10px}
+footer .ring svg{transform:rotate(-90deg)}
+footer .hint{margin-left:auto;font-size:13px;color:var(--muted)}
+
+.strip{position:absolute;top:84px;left:72px;right:72px;display:flex;align-items:center;gap:10px}
+.ctl{display:flex;align-items:center;gap:10px;height:44px;padding:0 16px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.03);font-size:15px;color:var(--ink)}
+html[data-theme=f] .ctl{border-radius:12px}
+.ctl .l{font-family:var(--font-cond);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
+html[data-theme=f] .ctl .l{letter-spacing:.04em}
+.ctl b{font-weight:600}
+.ctl .car{color:var(--muted);font-size:11px;margin-left:2px}
+.ctl .pm{display:inline-flex;gap:4px;margin-left:4px}
+.ctl .pm i{width:24px;height:24px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;font-style:normal;font-size:14px;color:var(--muted)}
+.sw{width:44px;height:24px;border-radius:999px;background:var(--accent);position:relative;flex:none}
+.sw::after{content:"";position:absolute;top:3px;right:3px;width:18px;height:18px;border-radius:50%;background:#fff}
+.sw.off{background:rgba(255,255,255,.14)}
+.sw.off::after{right:auto;left:3px;background:#9a9aa6}
+.ctl.lock{border-color:var(--accent);background:rgba(255,171,71,.08)}
+html[data-theme=f] .ctl.lock{background:rgba(139,124,255,.10)}
+.ctl.lock .on{color:var(--accent);font-family:var(--font-cond);font-weight:700;letter-spacing:.08em;font-size:13px}
+html[data-theme=f] .ctl.lock .on{letter-spacing:0}
+.sep{width:1px;height:28px;background:var(--line);margin:0 6px}
+.help{display:inline-flex;gap:4px;margin-left:2px}
+.help i{width:8px;height:8px;border-radius:50%;background:var(--accent)}
+.help i.o{background:rgba(255,255,255,.18)}
+.ctl,.ctl *{white-space:nowrap}
+html[data-theme=f] .ctl{font-size:14px;padding:0 14px;gap:8px}
+html[data-theme=f] .ctl.lock .on{font-size:12px}
+html[data-theme=f] .strip{gap:8px}
+</style>
+</head>
+<body>
+<div class="ribbon" id="ribbon"></div>
+<header>
+  <div class="wordmark">sound<b>LAB</b></div>
+  <nav><a class="on">Learn</a><a>Guitar</a><a>Keys</a><a>Play</a><a>Train</a></nav>
+  <div class="spacer"></div>
+  <div class="status">
+        <span><i></i>LUMI</span>
+    <span><i></i>FL Studio</span>
+    <span class="gear"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></span>
+  </div>
+</header>
+
+
+<div class="strip">
+  <div class="ctl"><span class="l">Key</span><b>A Dorian</b><span class="car">▼</span></div>
+  <div class="ctl"><span class="l">Tempo</span><b>100</b><span class="pm"><i>−</i><i>+</i></span></div>
+  <div class="sep"></div>
+  <div class="ctl lock"><span class="sw"></span><span class="l" style="color:var(--ink)">Scale lock</span><span class="on">ON · only A Dorian notes sound</span></div>
+  <div class="ctl"><span class="l">LUMI lights</span><b>Scale</b><span class="car">▼</span></div>
+  <div class="ctl"><span class="l">Help</span><span class="help"><i></i><i></i><i></i><i class="o"></i></span><b>Colors</b></div>
+</div>
+<section class="stage">
+  <div class="eyebrow" id="eyebrow">Next up · Keys lesson 7 · from James</div>
+  <h1 id="h1">A Dorian, up and down</h1>
+  <div class="sub"><span><b>72</b> BPM</span><span>pass <b>2</b> of 3</span><span>about <b>6</b> min</span></div>
+  <div class="cta">
+    <div class="btn"><span class="tri"></span>Start</div>
+    <div class="link"><u>Something else</u> · 2 blocks left this week</div>
+  </div>
+</section>
+
+<div class="kbd" id="kbd" hidden><div class="fade"></div></div>
+<div class="neck" id="neck" hidden><div class="fade"></div></div>
+
+<footer>
+  <span><span class="ring"><svg width="28" height="28" viewBox="0 0 28 28"><circle cx="14" cy="14" r="11" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="4"/><circle cx="14" cy="14" r="11" fill="none" stroke="var(--accent)" stroke-width="4" stroke-linecap="round" stroke-dasharray="69.1" stroke-dashoffset="20.7"/></svg></span>Today <b>14</b> of 20 min</span>
+  <span><b>12</b>-day streak</span>
+  <span>This week <b>1</b> of 3 blocks done</span>
+  <span class="hint" id="hint"></span>
+</footer>
+
+<script>
+(function(){
+  var q = new URLSearchParams(location.search), t = q.get('theme') || 'e';
+  document.documentElement.setAttribute('data-theme', t);
+  document.getElementById('ribbon').textContent = t === 'e' ? 'E  ·  STAGE' : 'F  ·  POSTER';
+  var deg = {9:1, 11:2, 0:3, 2:4, 4:5, 6:6, 7:7};
+  var colors = ['', '#ff4d4d', '#ff9a3c', '#ffd23f', '#4cd964', '#34d0e0', '#4d7dff', '#b36bff'];
+  var names = {9:'A',11:'B',0:'C',2:'D',4:'E',6:'F♯',7:'G'};
+  if (t === 'e') {
+    document.getElementById('hint').textContent = 'The LUMI shows the same lights · filled key = play this now';
+    var kbd = document.getElementById('kbd'); kbd.hidden = false;
+    var whites = [0,2,4,5,7,9,11];
+    var order = [];
+    for (var o = 0; o < 2; o++) for (var i = 0; i < 7; i++) order.push(whites[(i + 5) % 7]);
+    order.push(9);
+    var total = order.length, W = kbd.clientWidth / total;
+    var positions = [];
+    order.forEach(function(pc, i){
+      var k = document.createElement('div'); k.className = 'k w';
+      k.style.left = (i * W) + 'px'; k.style.width = W + 'px';
+      var d = deg[pc];
+      if (d) { k.classList.add('lit'); k.style.setProperty('--c', colors[d]); }
+      if (i === 7) k.classList.add('now');
+      if (names[pc]) { var n = document.createElement('span'); n.className = 'nm'; n.textContent = names[pc]; k.appendChild(n); }
+      kbd.appendChild(k);
+      positions.push({pc: pc, x: i * W});
+    });
+    for (var j = 0; j < positions.length - 1; j++) {
+      var a = positions[j].pc, b = positions[j+1].pc;
+      if (((b - a) + 12) % 12 === 2) {
+        var bk = document.createElement('div'); bk.className = 'k b';
+        var bw = W * 0.58;
+        bk.style.left = (positions[j].x + W - bw/2) + 'px'; bk.style.width = bw + 'px';
+        var pc = (a + 1) % 12, d2 = deg[pc];
+        if (d2) { bk.classList.add('lit'); bk.style.setProperty('--c', colors[d2]); }
+        kbd.appendChild(bk);
+      }
+    }
+  } else {
+    document.getElementById('eyebrow').textContent = 'Next up · Neck lesson 4 · from James';
+    document.getElementById('h1').textContent = 'A Dorian, 5th position';
+    document.getElementById('hint').textContent = 'Play through the UR24C or a MIDI guitar · filled dot = play this now';
+    var neck = document.getElementById('neck'); neck.hidden = false;
+    var Wn = neck.clientWidth, Hn = 280;
+    var tuning = [64,59,55,50,45,40]; // high e .. low E, top to bottom
+    var frets = 13, fl = 60, fr = Wn - 20;
+    var fx = function(f){ return fl + (fr - fl) * (f / frets); };
+    var sy = function(s){ return 34 + s * 36; };
+    var svg = '<svg viewBox="0 0 ' + Wn + ' ' + Hn + '" xmlns="http://www.w3.org/2000/svg">';
+    svg += '<rect x="' + fl + '" y="' + (sy(0) - 18) + '" width="' + (fr - fl) + '" height="' + (sy(5) - sy(0) + 36) + '" fill="#141520" rx="6"/>';
+    for (var f = 0; f <= frets; f++) svg += '<line x1="' + fx(f) + '" y1="' + (sy(0) - 18) + '" x2="' + fx(f) + '" y2="' + (sy(5) + 18) + '" stroke="' + (f === 0 ? '#e9e6f0' : '#3a3c4d') + '" stroke-width="' + (f === 0 ? 8 : 2) + '"/>';
+    [3,5,7,9,12].forEach(function(f){ var cx = (fx(f-1) + fx(f)) / 2; var cy = (sy(2) + sy(3)) / 2; if (f === 12) { svg += '<circle cx="' + cx + '" cy="' + ((sy(1)+sy(2))/2) + '" r="4" fill="#2a2c3a"/><circle cx="' + cx + '" cy="' + ((sy(3)+sy(4))/2) + '" r="4" fill="#2a2c3a"/>'; } else svg += '<circle cx="' + cx + '" cy="' + cy + '" r="4" fill="#2a2c3a"/>'; });
+    for (var s = 0; s < 6; s++) svg += '<line x1="' + fl + '" y1="' + sy(s) + '" x2="' + fr + '" y2="' + sy(s) + '" stroke="#b9bccb" stroke-width="' + (1 + s * 0.5) + '" opacity=".9"/>';
+    for (var s2 = 0; s2 < 6; s2++) for (var f2 = 4; f2 <= 8; f2++) {
+      var pc2 = (tuning[s2] + f2) % 12, d3 = deg[pc2];
+      if (!d3) continue;
+      var cx2 = (fx(f2-1) + fx(f2)) / 2, cy2 = sy(s2);
+      var now = (s2 === 4 && f2 === 7) || (s2 === 1 && f2 === 10);
+      if (d3 === 1) svg += '<circle cx="' + cx2 + '" cy="' + cy2 + '" r="15" fill="' + colors[1] + '" style="filter:drop-shadow(0 0 10px ' + colors[1] + ')"/>';
+      else svg += '<circle cx="' + cx2 + '" cy="' + cy2 + '" r="12" fill="' + colors[d3] + '" opacity=".95" style="filter:drop-shadow(0 0 8px ' + colors[d3] + ')"/>';
+      if (now) svg += '<circle cx="' + cx2 + '" cy="' + cy2 + '" r="20" fill="none" stroke="#fff" stroke-width="3"/>';
+    }
+    for (var f3 = 1; f3 <= frets; f3++) svg += '<text x="' + ((fx(f3-1) + fx(f3)) / 2) + '" y="' + (sy(5) + 44) + '" text-anchor="middle" font-family="Inter" font-size="13" fill="#7f8597">' + f3 + '</text>';
+    svg += '</svg>';
+    neck.insertAdjacentHTML('afterbegin', svg);
+  }
+})();
+</script>
+</body>
+</html>
