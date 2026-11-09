@@ -335,6 +335,22 @@
   }
   function sendToOutput(portId, bytes) { return sendToOutputKind(portId, bytes, 'music'); }
 
+  // 1.4.1 PORTS BY NAME: Chrome on Windows numbers ports by position
+  // ("output-1", "output-2"...), and the order changes when another app
+  // (FL Studio) lets go of a device or a new one appears. A saved id is
+  // therefore checked against the saved port NAME and re-found by name.
+  // A LUMI has two ports; its first one (no "MIDIOUT2"/"2" mark) takes
+  // the light commands.
+  function secondPort(name) { return /MIDI(?:IN|OUT)\s*\d|\(\s*\d\s*\)|\s\d$|port\s*2/i.test(name || ''); }
+  function webOutputByName(name, test) {
+    var best = null;
+    if (access) access.outputs.forEach(function (p) {
+      if (p.state === 'disconnected') return;
+      var ok = name ? (p.name || '') === name : test(p.name || '');
+      if (ok && (!best || (secondPort(best.name) && !secondPort(p.name)))) best = p;
+    });
+    return best;
+  }
   function knownLumi(name) { return /lumi/i.test(name || '') && !/modx|montage|helix|stadium|seaboard|lightpad|virtual|loopback|loopmidi|thru|through/i.test(name || ''); }
   function configuredLumiRoute() {
     var id = App.store.get('lights.outputId', null);
@@ -344,6 +360,16 @@
         return nr && String(nr.id) === String(id) && knownLumi(nr.name) ? nr : null;
       }
       var p = webPort('outputs', id);
+      var savedName = App.store.get('lights.outputName', '');
+      if (id !== '' && (!p || !knownLumi(p.name) || (savedName && (p.name || '') !== savedName))) {
+        // the saved spot now holds another port: find the LUMI by name
+        var q = (savedName && webOutputByName(savedName)) || webOutputByName('', knownLumi);
+        if (q && knownLumi(q.name)) {
+          p = q;
+          App.store.set('lights.outputId', String(q.id));
+          App.store.set('lights.outputName', q.name || '');
+        }
+      } else if (p && knownLumi(p.name) && !savedName) App.store.set('lights.outputName', p.name || '');
       return p && knownLumi(p.name) ? { port: p, id: p.id, name: p.name || '', native: false } : null;
     }
     var route = selectedOutputRoute();
@@ -394,6 +420,8 @@
   function setDisplayOutput(id) {
     allDark();
     App.store.set('lights.outputId', typeof id === 'string' ? id : id == null ? '' : String(id));
+    var dp = !native && id != null && id !== '' ? webPort('outputs', String(id)) : null;
+    App.store.set('lights.outputName', dp ? dp.name || '' : '');
     resetOutputLights(); repaintAll(true);
     App.emit('lights:master', displayState());
     App.emit('lights:display-enabled', displayState());
@@ -510,11 +538,20 @@
     announce();
   }
 
-  function pickWebOutput(id) {
+  function pickWebOutput(id, explicit) {
     var nextOutput = null;
+    var savedOutName = App.store.get('midi.outputName', '');
     if (access && id) access.outputs.forEach(function (port) {
       if (port.id === id && port.state !== 'disconnected') nextOutput = port;
     });
+    // the saved spot now holds another port (Windows renumbers): re-find
+    // the chosen output by its name; a LUMI's first port is preferred
+    if (!explicit && access && id && savedOutName && (!nextOutput || (nextOutput.name || '') !== savedOutName)) {
+      nextOutput = webOutputByName(savedOutName) || nextOutput;
+    }
+    if (!explicit && nextOutput && /lumi/i.test(nextOutput.name || '') && secondPort(nextOutput.name)) {
+      nextOutput = webOutputByName('', function (n) { return /lumi/i.test(n) && !secondPort(n); }) || nextOutput;
+    }
     // nothing chosen yet: prefer an LED keyboard (a LUMI) for the lights
     if (!nextOutput && access && !id) access.outputs.forEach(function (port) {
       if (!nextOutput && port.state !== 'disconnected' && /lumi/i.test(port.name || '')) nextOutput = port;
@@ -529,7 +566,7 @@
       resetOutputLights();
     }
     output = nextOutput;
-    if (output) App.store.set('midi.outputId', output.id);
+    if (output) { App.store.set('midi.outputId', output.id); App.store.set('midi.outputName', output.name || ''); }
     announce();
   }
 
@@ -623,7 +660,7 @@
       announce();
       return;
     }
-    pickWebOutput(id);
+    pickWebOutput(id, true);
   }
 
   function hasOutput() {
