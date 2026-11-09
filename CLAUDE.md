@@ -67,6 +67,13 @@ js/midi.js        MIDI service (App.midi: in/out ports, note/bend/pressure
                   output) and App.midi.setInputFilter(fn) — ONE fn(bytes) ->
                   bytes|null run before dispatch (null drops it); the Hub
                   installs its rules there when midihub.rulesIn is on.
+                  1.4.1 PORTS BY NAME: Chrome on Windows ids are positional
+                  (output-N) and reorder when another app (FL Studio) frees
+                  a device. midi.outputName / lights.outputName are saved
+                  with the ids; a restore re-finds the port by name
+                  (webOutputByName) and a LUMI's second port (MIDIOUT2 (...))
+                  is skipped for lights (secondPort); explicit setOutput
+                  choices are kept. Suite tests/portnames.test.js.
                   1.4.0 VOICE MODE: midi.appSound 'auto' (default) | true |
                   false; Auto mutes only notes FROM a self-sounding synth
                   port (SELF_SOUND_RE: MODX/MONTAGE/Nord/...;
