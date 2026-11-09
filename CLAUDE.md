@@ -14,6 +14,21 @@ bottom): inline in index.html's header (theme-aware via currentColor +
 --accent), standalone in icons/logo.svg, app icon icons/icon.svg (three
 black keys on amber) rendered to icons/icon-192/512.png.
 
+## soundLAB 2.0 (branch `v2`) — read first
+
+2.0 is being built on branch `v2` and published to the BETA address
+https://mreindl118-boop.github.io/GuitarPak/next/ by
+`.github/workflows/pages-next.yml` (full suite first; replaces only `next/` on
+gh-pages; `pages.yml` carries `next/` over on live deploys). The live 1.x app
+stays on `main` until the 2.0 release. Plan: `docs/ROADMAP-2.0.md` (decisions +
+phases). Look: `docs/DESIGN-SYSTEM.md` ("E · Stage"), tokens in `css/tokens.css`
+(every new 2.0 component uses only `--sl-*`). Work = one phase per draft PR into
+`v2`; the owner merges. Known Phase 0 caveats: beta + live share `localStorage`
+(prefix `soundlab2.*` comes in Phase A) and the live service worker clears the
+beta's `soundlab2-*` caches when it updates. 2.0 cuts the Studio/DAW, sampler and
+plug-in API and splits gear control into `gear.html` (soundLAB Gear) — see the
+roadmap before touching those areas.
+
 ## Layout
 
 ```

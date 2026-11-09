@@ -41,17 +41,29 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           source_commit=$(git rev-parse 'HEAD^{commit}')
-          # Build the exact source tree, including deletions, without changing
-          # the checkout or its index. .nojekyll serves these files verbatim.
-          deploy_index=$(mktemp)
-          trap 'rm -f "$deploy_index"' EXIT
-          rm -f "$deploy_index"
-          export GIT_INDEX_FILE="$deploy_index"
-          git read-tree "${source_commit}^{tree}"
+          # .nojekyll serves these files verbatim. The deployment tree is
+          # rebuilt on every attempt because it carries over whatever the
+          # current gh-pages tip holds under next/ — the 2.0 beta published by
+          # pages-next.yml. main never owns next/ and never deletes it.
           nojekyll=$(git hash-object -w --stdin </dev/null)
-          git update-index --add --cacheinfo "100644,$nojekyll,.nojekyll"
-          deploy_tree=$(git write-tree)
-          unset GIT_INDEX_FILE
+          deploy_index=$(mktemp -u)
+          trap 'rm -f "$deploy_index"' EXIT
+          build_tree() {
+            # $1 = the gh-pages parent commit, or empty for a first deployment.
+            # Builds the exact source tree, including deletions, in a temporary
+            # index without changing the checkout or its index.
+            local parent=$1 next_tree=
+            if [ -n "$parent" ]; then
+              next_tree=$(git rev-parse --verify -q "${parent}:next" || true)
+            fi
+            rm -f "$deploy_index"
+            GIT_INDEX_FILE="$deploy_index" git read-tree "${source_commit}^{tree}"
+            if [ -n "$next_tree" ]; then
+              GIT_INDEX_FILE="$deploy_index" git read-tree --prefix=next/ "$next_tree"
+            fi
+            GIT_INDEX_FILE="$deploy_index" git update-index --add --cacheinfo "100644,$nojekyll,.nojekyll"
+            GIT_INDEX_FILE="$deploy_index" git write-tree
+          }
           check_source() {
             local current_main
             current_main=$(git ls-remote --exit-code --heads origin refs/heads/main) || return 1
@@ -66,18 +78,20 @@ jobs:
           for attempt in 1 2 3; do
             check_source || exit 1
             parents=()
+            parent=
             if git ls-remote --exit-code --heads origin refs/heads/gh-pages >/dev/null; then
               git fetch --no-tags --depth=1 origin refs/heads/gh-pages
               parent=$(git rev-parse 'FETCH_HEAD^{commit}')
               parents=(-p "$parent")
-              if [ "$(git rev-parse "${parent}^{tree}")" = "$deploy_tree" ]; then
-                echo "gh-pages already contains the exact main snapshot $source_commit"
-                exit 0
-              fi
             else
               status=$?
               # ls-remote exits 2 only when the reachable remote has no match.
               [ "$status" -eq 2 ] || exit "$status"
+            fi
+            deploy_tree=$(build_tree "$parent")
+            if [ -n "$parent" ] && [ "$(git rev-parse "${parent}^{tree}")" = "$deploy_tree" ]; then
+              echo "gh-pages already contains the exact main snapshot $source_commit"
+              exit 0
             fi
             deployment=$(git -c commit.gpgsign=false commit-tree "$deploy_tree" "${parents[@]}" \
               -m "pages: snapshot main @ $source_commit" \
