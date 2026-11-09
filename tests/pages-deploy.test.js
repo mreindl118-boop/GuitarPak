@@ -22,8 +22,8 @@ const baseEnv = Object.assign({}, process.env, {
   GIT_AUTHOR_NAME: 'Local deployment test', GIT_AUTHOR_EMAIL: 'pages-test@example.invalid',
   GIT_COMMITTER_NAME: 'Local deployment test', GIT_COMMITTER_EMAIL: 'pages-test@example.invalid'
 });
-function command(bin, args, cwd = checkout, extra = {}) {
-  const result = spawnSync(bin, args, { cwd, encoding: 'utf8', env: Object.assign({}, baseEnv, extra), maxBuffer: 4 * 1024 * 1024 });
+function command(bin, args, cwd = checkout, extra = {}, input) {
+  const result = spawnSync(bin, args, { cwd, encoding: 'utf8', env: Object.assign({}, baseEnv, extra), maxBuffer: 4 * 1024 * 1024, input });
   if (result.error || result.status !== 0) throw new Error([bin, ...args].join(' ') + '\n' + (result.error || result.stderr || result.stdout));
   return result.stdout.trim();
 }
@@ -34,9 +34,10 @@ function successful(result, label) { ok(result.status === 0 && !result.error, la
 function put(name, content) { const full = path.join(checkout, name); fs.mkdirSync(path.dirname(full), { recursive: true }); fs.writeFileSync(full, content); }
 function saveSource(message) { git('add', '-A'); git('-c', 'commit.gpgsign=false', 'commit', '-m', message); git('push', 'origin', 'main'); return git('rev-parse', 'HEAD'); }
 function entries(ref) { return bare('ls-tree', '-r', '-z', ref).split('\0').filter(Boolean).sort(); }
+let carried = []; // entries under next/ (the 2.0 beta) that every live deployment must carry over
 function expectedTree(source) {
   return entries(source).filter(entry => entry.split('\t')[1] !== '.nojekyll')
-    .concat('100644 blob e69de29bb2d1d6434b8b29ae775ad8c2e48c5391\t.nojekyll').sort();
+    .concat('100644 blob e69de29bb2d1d6434b8b29ae775ad8c2e48c5391\t.nojekyll', carried).sort();
 }
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 function tip() { return bare('rev-parse', 'refs/heads/gh-pages'); }
@@ -86,10 +87,22 @@ try {
   ok(bare('show', '-s', '--format=%B', deployed2).includes('Source-commit: ' + source2), 'deployment commit records exact source provenance for review or rollback');
   successful(deploy(), 'an already exact snapshot is a successful no-op');
   ok(tip() === deployed2, 'identical source does not add an unnecessary deployment commit');
+  // The 2.0 beta (pages-next.yml) is published under next/ on this same branch.
+  // A live deployment must carry it over untouched: main never owns next/.
+  const betaBlob = command(realGit, ['--git-dir=' + remote, 'hash-object', '-w', '--stdin'], checkout, {}, '<main>2.0 beta</main>\n');
+  const betaDir = command(realGit, ['--git-dir=' + remote, 'mktree', '-z'], checkout, {}, '100644 blob ' + betaBlob + '\tindex.html\0');
+  const liveTop = bare('ls-tree', '-z', deployed2).split('\0').filter(Boolean);
+  const withBeta = command(realGit, ['--git-dir=' + remote, 'mktree', '-z'], checkout, {}, liveTop.concat('040000 tree ' + betaDir + '\tnext').join('\0') + '\0');
+  const betaCommit = bare('-c', 'commit.gpgsign=false', 'commit-tree', withBeta, '-p', deployed2, '-m', 'pages: beta snapshot v2 (next/)');
+  bare('update-ref', 'refs/heads/gh-pages', betaCommit, deployed2);
+  carried = ['100644 blob ' + betaBlob + '\tnext/index.html'];
+  successful(deploy(), 'with the beta under next/, an unchanged live source is still a no-op');
+  ok(tip() === betaCommit, 'the no-op never rewrites or drops the beta deployment');
+  const liveTip = tip();
   git('reset', '--', 'staged-only.txt'); fs.unlinkSync(path.join(checkout, 'staged-only.txt')); fs.unlinkSync(path.join(checkout, 'untracked-only.txt'));
 
   put('index.html', '<main>third source</main>\n'); const source3 = saveSource('source three');
-  const race = bare('-c', 'commit.gpgsign=false', 'commit-tree', deployed2 + '^{tree}', '-p', deployed2, '-m', 'Concurrent deployment');
+  const race = bare('-c', 'commit.gpgsign=false', 'commit-tree', liveTip + '^{tree}', '-p', liveTip, '-m', 'Concurrent deployment');
   const wrapperDir = path.join(root, 'git-wrapper'); fs.mkdirSync(wrapperDir);
   const once = path.join(root, 'race-once'), count = path.join(root, 'race-count'); fs.writeFileSync(once, 'pending');
   const wrapper = `#!/usr/bin/env bash
@@ -114,9 +127,10 @@ exec "$PAGES_REAL_GIT" "$@"
 `;
   fs.writeFileSync(path.join(wrapperDir, 'git'), wrapper, { mode: 0o755 });
   const racingEnv = { PATH: wrapperDir + path.delimiter + process.env.PATH, PAGES_REAL_GIT: realGit, PAGES_TEST_REMOTE: remote };
-  const recovered = deploy(Object.assign({}, racingEnv, { PAGES_RACE_ONCE: once, PAGES_RACE_COMMIT: race, PAGES_OLD_TIP: deployed2 }));
+  const recovered = deploy(Object.assign({}, racingEnv, { PAGES_RACE_ONCE: once, PAGES_RACE_COMMIT: race, PAGES_OLD_TIP: liveTip }));
   successful(recovered, 'a concurrently advanced target recovers with a fetched-parent retry');
   const deployed3 = tip();
+  ok(entries(deployed3).some(entry => /\tnext\/index\.html$/.test(entry)) && !entries(deployed3).some(entry => /\tnext\/\.nojekyll$/.test(entry)), 'a live deployment carries the 2.0 beta under next/ untouched');
   ok(!fs.existsSync(once) && /attempt 1 of 3/.test(recovered.stderr) && same(parent(deployed3), [race]), 'the raced first normal push is rejected; the successful retry preserves the concurrent deployment as parent');
   ok(same(entries(deployed3), expectedTree(source3)) && bare('merge-base', '--is-ancestor', deployed1, deployed3) === '', 'race recovery preserves prior history and the exact requested source tree');
 
