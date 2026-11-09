@@ -1,0 +1,91 @@
+# Publishes the 2.0 work in progress (branch v2) to the BETA address
+#   https://mreindl118-boop.github.io/GuitarPak/next/
+# The live app at the main address keeps coming from main through pages.yml.
+# Same gate as the live site: the complete test suite must pass on the exact
+# commit, and the deployment is an ordinary (never force) append to gh-pages
+# that replaces ONLY the next/ folder. pages.yml keeps next/ when main deploys.
+name: Deploy 2.0 beta (next/)
+
+on:
+  push:
+    branches: [v2]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # Its own group: a beta deploy must never cancel a live deploy or the reverse.
+  group: pages-next
+  cancel-in-progress: true
+
+jobs:
+  test:
+    uses: ./.github/workflows/tests.yml
+    permissions:
+      contents: read
+    with:
+      source_ref: v2
+  sync:
+    needs: test
+    if: ${{ needs.test.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Deploy the exact tested commit even if v2 moved while tests ran.
+          ref: ${{ needs.test.outputs.source_sha }}
+      - name: Replace next/ on gh-pages with the tested v2 snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          source_commit=$(git rev-parse 'HEAD^{commit}')
+          check_source() {
+            local current
+            current=$(git ls-remote --exit-code --heads origin refs/heads/v2) || return 1
+            if [ "${current%%$'\t'*}" != "$source_commit" ]; then
+              echo "v2 moved beyond tested source $source_commit; refusing a stale beta deployment." >&2
+              return 1
+            fi
+          }
+          # The beta marker lets people (and the app) tell the beta from the live
+          # site. No timestamp: the same source must produce the same tree, so a
+          # re-run is a no-op instead of a new deployment commit.
+          marker=$(printf '{"channel":"beta","branch":"v2","source":"%s"}\n' "$source_commit" | git hash-object -w --stdin)
+          nojekyll=$(git hash-object -w --stdin </dev/null)
+          for attempt in 1 2 3; do
+            check_source || exit 1
+            # gh-pages must already exist: the live site lives there and this
+            # workflow never creates or replaces it, it only swaps next/.
+            git fetch --no-tags --depth=1 origin refs/heads/gh-pages
+            parent=$(git rev-parse 'FETCH_HEAD^{commit}')
+            deploy_index=$(mktemp -u)
+            export GIT_INDEX_FILE="$deploy_index"
+            git read-tree "${parent}^{tree}"
+            git ls-files -z -- 'next/' | git update-index -z --force-remove --stdin
+            git read-tree --prefix=next/ "${source_commit}^{tree}"
+            git update-index --add --cacheinfo "100644,$marker,next/beta.json"
+            git update-index --add --cacheinfo "100644,$nojekyll,.nojekyll"
+            deploy_tree=$(git write-tree)
+            unset GIT_INDEX_FILE
+            rm -f "$deploy_index"
+            if [ "$(git rev-parse "${parent}^{tree}")" = "$deploy_tree" ]; then
+              echo "gh-pages already carries v2 snapshot $source_commit under next/"
+              exit 0
+            fi
+            deployment=$(git -c commit.gpgsign=false commit-tree "$deploy_tree" -p "$parent" \
+              -m "pages: beta snapshot v2 @ $source_commit (next/)" \
+              -m "Source-commit: $source_commit")
+            check_source || exit 1
+            if git push origin "${deployment}:refs/heads/gh-pages"; then
+              echo "Beta published: https://mreindl118-boop.github.io/GuitarPak/next/"
+              exit 0
+            fi
+            echo "Deployment push failed (attempt $attempt of 3); refreshing gh-pages." >&2
+          done
+          echo "gh-pages did not accept a safe fast-forward beta deployment after three attempts." >&2
+          exit 1

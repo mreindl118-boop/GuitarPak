@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#131114">
+<title>soundLAB — Practice Companion (alpha)</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='96' fill='%23f0a441'/%3E%3Cpath d='M118 96 H206 V308 A44 44 0 0 1 118 308 Z M212 96 H300 V372 A44 44 0 0 1 212 372 Z M306 96 H394 V308 A44 44 0 0 1 306 308 Z' fill='%23131114'/%3E%3C/svg%3E">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="soundLAB">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/lumi-practice.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <svg class="wordmark" viewBox="0 0 399 106" role="img" aria-label="soundLAB">
+      <path d="M40.5 46 C 40.5 39.5 30 36.5 26 36.5 C 14.5 36.5 11.5 40 11.5 47 C 11.5 54 21 57.5 26 61.5 C 31 65.5 40.5 69 40.5 75.5 C 40.5 82.5 40.5 86 40.5 89.5 C 40.5 96.5 30 99.5 26 99.5 C 22 99.5 11.5 96 11.5 90" fill="none" stroke="currentColor" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M71 36 H81 A15 15 0 0 1 96 51 V85 A15 15 0 0 1 81 100 H71 A15 15 0 0 1 56 85 V51 A15 15 0 0 1 71 36 Z M75 47 H77 A8 8 0 0 1 85 55 V81 A8 8 0 0 1 77 89 H75 A8 8 0 0 1 67 81 V55 A8 8 0 0 1 75 47 Z" fill="currentColor" fill-rule="evenodd"/>
+    <path d="M111.5 36 V80 A14.5 14.5 0 0 0 140.5 80 V36" fill="none" stroke="currentColor" stroke-width="11" stroke-linecap="butt" stroke-linejoin="round"/>
+    <path d="M161.5 94.5 V56 A14.5 14.5 0 0 1 190.5 56 V94.5" fill="none" stroke="currentColor" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M221 36 H231 A15 15 0 0 1 246 51 V85 A15 15 0 0 1 231 100 H221 A15 15 0 0 1 206 85 V51 A15 15 0 0 1 221 36 Z M225 47 H227 A8 8 0 0 1 235 55 V81 A8 8 0 0 1 227 89 H225 A8 8 0 0 1 217 81 V55 A8 8 0 0 1 225 47 Z" fill="currentColor" fill-rule="evenodd"/>
+    <path d="M235 12 H246 V94.5 A5.5 5.5 0 0 1 235 94.5 Z" fill="currentColor"/>
+      <g class="wm-lab">
+      <path d="M264 12 H275 V89 H288.5 A5.5 5.5 0 0 1 288.5 100 H269.5 A5.5 5.5 0 0 1 264 94.5 Z" fill="var(--accent,#ffab47)"/>
+    <path d="M309.5 94.5 V33 A15.5 15.5 0 0 1 340.5 33 V94.5" fill="none" stroke="var(--accent,#ffab47)" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M309.5 60 H340.5 V71 H309.5 Z" fill="var(--accent,#ffab47)"/>
+    <path d="M356 12 H372 A21 21 0 0 1 372 54 A21 23 0 0 1 372 100 H361.5 A5.5 5.5 0 0 1 356 94.5 Z M367 23 H372 A10 10 0 0 1 372 43 H367 Z M367 65 H372 A10 12 0 0 1 372 89 H367 Z" fill="var(--accent,#ffab47)" fill-rule="evenodd"/>
+      </g>
+    </svg>
+    <span class="tag">alpha</span>
+  </div>
+  <nav class="tabbar tabbar-top" id="tabbar" aria-label="Sections"></nav>
+  <div class="tb-tools" id="tabs">
+    <button type="button" class="btn sm" id="space-btn" aria-label="Switch workspace"></button>
+    <button type="button" class="btn sm icon-btn" id="help-btn" aria-label="Help for this page" title="What is this page?"></button>
+    <button type="button" class="btn sm icon-btn" id="settings-btn" aria-label="Settings" title="Settings"></button>
+    <button type="button" class="btn sm icon-btn" id="ctx-btn" aria-label="Key, scale and tempo" title="Key, scale &amp; tempo" aria-expanded="false" aria-controls="ctxbar"></button>
+    <button type="button" class="btn sm icon-btn" id="lights-btn" aria-label="Lights and help" title="Lights &amp; help" aria-haspopup="dialog" aria-expanded="false" aria-controls="sheet-lights"></button>
+    <button type="button" class="btn sm icon-btn" id="met-btn" aria-label="Metronome" title="Metronome" aria-haspopup="dialog" aria-expanded="false" aria-controls="sheet-metronome"></button>
+  </div>
+  <div class="ctxbar" id="ctxbar" role="region" aria-label="Global key, scale, tempo and sound settings" hidden>
+    <label class="cx-field">Key<select id="cx-root"></select></label>
+    <label class="cx-field cx-scale">Scale<select id="cx-scale"></select></label>
+    <label class="cx-field" id="cx-mode-wrap">Mode<select id="cx-mode"></select></label>
+    <label class="cx-field">BPM<input id="cx-bpm" type="number" min="30" max="280" step="1"></label>
+    <label class="cx-field">Time<select id="cx-sig"></select></label>
+    <button type="button" class="btn sm" id="cx-met" title="Start / stop the metronome (works on every tab)" aria-label="Start or stop the metronome"></button>
+    <button type="button" class="btn sm" id="cx-rec" aria-label="Capture what you play into the current song"></button>
+    <span id="cx-rec-msg" style="display:none" role="status"></span>
+    <div class="cx-toggles">
+      <button type="button" class="chip" id="cx-led" aria-pressed="false" title="Show the selected scale and practice targets on the configured LUMI; independent of Scale Lock"></button>
+      <button type="button" class="chip" id="cx-lock" aria-pressed="false" title="Block out-of-scale pitched notes across instruments, playback and musical MIDI output; drums and recorded/live audio are separate"></button>
+      <span class="cx-tnote" id="cx-tnote" role="status" hidden></span>
+    </div>
+  </div>
+  <div class="subnav" id="subnav" hidden></div>
+</header>
+<nav class="tabbar tabbar-bottom" id="tabbar-m" aria-label="Sections"></nav>
+<div class="sheet" id="sheet-metronome" hidden>
+  <div class="sheet-card" role="dialog" aria-modal="true" aria-labelledby="sheet-metronome-t">
+    <div class="sheet-head">
+      <h2 id="sheet-metronome-t">Metronome</h2>
+      <button type="button" class="btn sm icon-btn" data-sheet-help="metronome" aria-label="Help for the metronome" title="How it works"></button>
+      <button type="button" class="btn sm icon-btn" data-sheet-close aria-label="Close the metronome" title="Close (Esc)"></button>
+    </div>
+    <section class="sheet-body" id="panel-metronome"></section>
+  </div>
+</div>
+<div class="sheet" id="sheet-lights" hidden>
+  <div class="sheet-card" role="dialog" aria-modal="true" aria-labelledby="sheet-lights-t">
+    <div class="sheet-head">
+      <h2 id="sheet-lights-t">Lights &amp; help</h2>
+      <button type="button" class="btn sm icon-btn" data-sheet-help="lights" aria-label="Help for lights and help" title="How it works"></button>
+      <button type="button" class="btn sm icon-btn" data-sheet-close aria-label="Close" title="Close (Esc)"></button>
+    </div>
+    <section class="sheet-body" id="panel-lights"></section>
+  </div>
+</div>
+<div id="wipe" aria-hidden="true" style="display:none">
+  <svg viewBox="0 0 512 512" width="120" height="120">
+    <path d="M118 96 H206 V308 A44 44 0 0 1 118 308 Z M212 96 H300 V372 A44 44 0 0 1 212 372 Z M306 96 H394 V308 A44 44 0 0 1 306 308 Z" fill="#ffab47" opacity="0.9"/>
+  </svg>
+</div>
+<main>
+  <section class="panel" id="panel-quiz"></section>
+  <section class="panel" id="panel-practiceplan"></section>
+  <section class="panel" id="panel-fretboard"></section>
+  <section class="panel" id="panel-tab"></section>
+  <section class="panel" id="panel-notation"></section>
+  <section class="panel" id="panel-helix"></section>
+  <section class="panel" id="panel-chords"></section>
+  <section class="panel" id="panel-piano"></section>
+  <section class="panel" id="panel-synth"></section>
+  <section class="panel" id="panel-songs"></section>
+  <section class="panel" id="panel-jam"></section>
+  <section class="panel" id="panel-tuner"></section>
+  <section class="panel" id="panel-trainer"></section>
+  <section class="panel" id="panel-theory"></section>
+  <section class="panel" id="panel-shed"></section>
+  <section class="panel" id="panel-settings"></section>
+  <section class="panel" id="panel-song"></section>
+  <section class="panel" id="panel-arrange"></section>
+  <section class="panel" id="panel-tracks"></section>
+  <section class="panel" id="panel-pads"></section>
+  <section class="panel" id="panel-deck"></section>
+  <section class="panel" id="panel-liveset"></section>
+  <section class="panel" id="panel-midihub"></section>
+  <section class="panel" id="panel-lumipractice"></section>
+  <section class="panel" id="panel-ideas"></section>
+</main>
+<footer class="foot">
+  soundLAB alpha &mdash; runs entirely in your browser
+</footer>
+<script src="js/theory.js"></script>
+<script src="js/note-palette.js"></script>
+<script src="js/app.js"></script>
+<script src="js/learn-instruments.js"></script>
+<script src="js/midi.js"></script>
+<script src="js/practice-router.js"></script>
+<script src="js/pitch-detector.js"></script>
+<script src="js/tonein.js"></script>
+<script src="js/audioin.js"></script>
+<script src="js/practice-input.js"></script>
+<script src="js/metronome.js"></script>
+<script src="js/fretboard.js"></script>
+<script src="js/chords.js"></script>
+<script src="js/piano.js"></script>
+<script src="js/keylessons.js"></script>
+<script src="js/songs.js"></script>
+<script src="js/jam.js"></script>
+<script src="js/tuner.js"></script>
+<script src="js/trainer.js"></script>
+<script src="js/theorytab.js"></script>
+<script src="js/daw/synth.js"></script>
+<script src="js/daw/engine.js"></script>
+<script src="js/studio.js"></script>
+<script src="js/practice-progress.js"></script>
+<script src="js/practice-progress-ui.js"></script>
+<script src="js/performance-engine.js"></script>
+<script src="js/performance-player.js"></script>
+<script src="js/woodshed.js"></script>
+<script src="js/arrange.js"></script>
+<script src="js/pads.js"></script>
+<script src="js/midihub.js"></script>
+<script src="js/synthtab.js"></script>
+<script src="js/synthlive.js"></script>
+<script src="js/synthdeck-maps.js"></script>
+<script src="js/synthdeck-scope.js"></script>
+<script src="js/synthdeck.js"></script>
+<script src="js/lumi-practice.js"></script>
+<script src="js/xp.js"></script>
+<script src="js/quiz.js"></script>
+<script src="js/practiceplan.js"></script>
+<script src="js/helix.js"></script>
+<script src="js/help.js"></script>
+<script src="js/plugins.js"></script>
+<script src="js/settings.js"></script>
+<script src="js/lights.js"></script>
+<script>
+App.boot();
+// Offline support — only meaningful when served over http(s); file:// and
+// sandboxed embeds skip it silently.
+if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+  navigator.serviceWorker.register('sw.js').catch(function () { /* non-fatal */ });
+}
+</script>
+</body>
+</html>

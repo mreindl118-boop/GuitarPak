@@ -1,0 +1,474 @@
+/* soundLAB drum pads — a finger-drumming controller surface for the Studio.
+ * Registers as 'pads'. Prefix pd-.
+ *
+ * Eight velocity-sensitive pads wired to a DRUM track's real channel (so the
+ * track's FX slot and mixer settings apply), playable three ways at once:
+ *   - touch/click on the pads
+ *   - QWERTY while the page is open: Z X C V (kick snare clap hat) and
+ *     A S D F (open hat, low tom, hi tom, crash)
+ *   - MIDI, everywhere in the Studio when the drum track is armed Live, in
+ *     one of two mappings:
+ *       ROLI octave — eight chromatic keys from a base note (default C3),
+ *                     one per lane, true velocity
+ *       GM drums    — the General MIDI drum map (36 kick, 38 snare, 39 clap,
+ *                     42/46 hats, 45/50 toms, 49 crash) for pad controllers
+ *
+ * RECORD quantizes hits into the drum track's step pattern live while the
+ * loop plays (nearest 1/16, timed against st:step). ROLI key lights: the
+ * eight mapped keys stay dimly lit while the page is open, flash bright on
+ * every hit — including the loop's own hits, so the LUMI shows the beat.
+ */
+(function () {
+  'use strict';
+
+  var els = {};
+  var rec = false;
+  var lastStep = { step: -1, at: 0 };
+  var LANE_KEYS = ['KeyZ', 'KeyX', 'KeyC', 'KeyV', 'KeyA', 'KeyS', 'KeyD', 'KeyF'];
+  var KEY_HINTS = ['Z', 'X', 'C', 'V', 'A', 'S', 'D', 'F'];
+  var GM_MAP = { 36: 0, 35: 0, 38: 1, 40: 1, 39: 2, 42: 3, 44: 3, 46: 4, 45: 5, 41: 5, 47: 6, 48: 6, 50: 6, 49: 7, 51: 7, 57: 7 };
+
+  // lane tints: the 7 degree colors (App.colors — a lane is a drum, not a
+  // pitch, so Interval | Note doesn't apply) + a neutral 8th for the crash
+  function padColors() {
+    return App.colors.degrees().concat(['#c8c2b8']);
+  }
+
+  function mode() { return App.store.get('pads.mode', 'roli') === 'gm' ? 'gm' : 'roli'; }
+  function base() {
+    var b = parseInt(App.store.get('pads.base', 48), 10);
+    return (b >= 24 && b <= 96) ? b : 48;
+  }
+  function ledsOn() { return App.store.get('pads.leds', true) !== false; }
+
+  function drumTracks() {
+    return DAW.engine.tracks.filter(function (t) { return t.kind === 'drums'; });
+  }
+
+  function padTrack() {
+    var id = App.store.get('pads.track', null);
+    var list = drumTracks();
+    for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i];
+    return list[0] || null;
+  }
+
+  // no drum track yet? make one — pads must work the moment the page opens
+  function ensureTrack() {
+    if (padTrack() || !(window.DAW && DAW.engine)) return;
+    var s = [];
+    for (var l = 0; l < 8; l++) { var r = []; for (var i = 0; i < 64; i++) r.push(0); s.push(r); }
+    DAW.engine.tracks.push({
+      id: 'tp' + Date.now().toString(36), name: 'Drums', kind: 'drums', voice: 'keys',
+      synth: { cutoff: 0, attack: null, release: null, glide: null },
+      sampler: { rootNote: 60, loop: false, name: '' },
+      steps: s, notes: null, fx: { type: 'none', mix: 0.3 },
+      mix: { vol: 80, mute: false, solo: false }
+    });
+    App.store.set('st.tracks', DAW.engine.tracks);
+  }
+
+  function customMap() {
+    var m = App.store.get('pads.map', null);
+    return (m && typeof m === 'object') ? m : {};
+  }
+
+  function laneForMidi(midi) {
+    var cm = customMap();
+    for (var l in cm) { if (cm[l] === midi) return parseInt(l, 10); }
+    if (mode() === 'gm') {
+      var l = GM_MAP[midi];
+      return l == null ? null : l;
+    }
+    // WHITE-KEY layout, octave-agnostic: drummers on a keyboard play the
+    // naturals — C D E F G A B carry the seven main lanes, ANY black key
+    // is the crash. (The old chromatic layout hid the snare on C#.)
+    var pc = ((midi - base()) % 12 + 12) % 12;
+    var W = { 0: 0, 2: 1, 4: 2, 5: 3, 7: 4, 9: 5, 11: 6 };
+    return W[pc] !== undefined ? W[pc] : 7;
+  }
+
+  function midiForLane(lane) {
+    var cm = customMap();
+    if (cm[lane] != null) return cm[lane];
+    if (mode() === 'gm') return [36, 38, 39, 42, 46, 45, 50, 49][lane];
+    return lane < 7 ? base() + [0, 2, 4, 5, 7, 9, 11][lane] : base() + 1; // crash: any black key
+  }
+
+  // ---------------- triggering ----------------
+
+  function hit(lane, vel, fromLoop) {
+    var t = padTrack();
+    if (!t) return;
+    if (!fromLoop) {
+      try {
+        var c = DAW.engine.liveChannel(t.id);
+        if (c) c.instrument.noteOn(lane, vel, App.getAudio().currentTime);
+      } catch (e) { /* audio unavailable */ }
+      if (rec && DAW.engine.playing) recordHit(t, lane);
+    }
+    flashPad(lane);
+    if (ledsOn() && App.midi && App.midi.hasOutput) {
+      var m = midiForLane(lane);
+      App.midi.light(m, 127);
+      setTimeout(function () { App.midi.light(m, App.active === 'pads' ? 20 : 0); }, 120);
+    }
+  }
+
+  function recordHit(t, lane) {
+    // quantize against the last st:step heartbeat: nearest 1/16
+    var stepDur = 60 / bpmNow() / 4;
+    var elapsed = (performance.now() - lastStep.at) / 1000;
+    var q = (lastStep.step + Math.round(elapsed / stepDur)) % (DAW.engine.bars * 16);
+    if (q < 0) q = 0;
+    if (!t.steps[lane]) t.steps[lane] = [];
+    t.steps[lane][q] = 1;
+    App.store.set('st.tracks', DAW.engine.tracks);
+    paintRecCount(t);
+  }
+
+  function bpmNow() {
+    var v = parseInt(App.store.get('met.bpm', 100), 10);
+    return (v >= 30 && v <= 280) ? v : 100;
+  }
+
+  function flashPad(lane) {
+    if (!els.grid) return;
+    var pad = els.grid.querySelector('.pd-pad[data-lane="' + lane + '"]');
+    if (!pad) return;
+    pad.classList.add('pd-hit');
+    setTimeout(function () { pad.classList.remove('pd-hit'); }, 110);
+  }
+
+  // ---------------- ROLI key lights ----------------
+
+  function lightBase() {
+    if (!ledsOn() || !App.midi || !App.midi.hasOutput) return;
+    for (var l = 0; l < 8; l++) App.midi.light(midiForLane(l), 20);
+  }
+
+  function darkBase() {
+    if (!App.midi || !App.midi.hasOutput) return;
+    for (var l = 0; l < 8; l++) App.midi.dark(midiForLane(l));
+  }
+
+  // ---------------- UI ----------------
+
+  function render() {
+    if (!els.grid) return;
+    var t = padTrack();
+    var cs = padColors();
+    if (!t) {
+      els.grid.innerHTML = '<div class="muted" style="padding:16px 4px">No drum track yet.</div>';
+      els.mkbtn.style.display = '';
+      els.recbtn.disabled = true;
+      return;
+    }
+    els.mkbtn.style.display = 'none';
+    els.recbtn.disabled = false;
+    var h = '';
+    for (var l = 0; l < 8; l++) {
+      h += '<button type="button" class="pd-pad" data-lane="' + l + '" style="--pd:' + cs[l] + '">' +
+        '<span class="pd-name">' + DAW.DRUM_LANES[l] + '</span>' +
+        '<span class="pd-sub">' + KEY_HINTS[l] + ' · ' + Theory.midiName(midiForLane(l)) + '</span>' +
+        '</button>';
+    }
+    els.grid.innerHTML = h;
+    paintTrackSel();
+    paintRecCount(t);
+  }
+
+  function paintTrackSel() {
+    var list = drumTracks();
+    var t = padTrack();
+    els.tsel.innerHTML = list.map(function (x) {
+      return '<option value="' + x.id + '"' + (t && x.id === t.id ? ' selected' : '') + '>' + x.name.replace(/</g, '&lt;') + '</option>';
+    }).join('');
+    els.tsel.style.display = list.length > 1 ? '' : 'none';
+  }
+
+  function paintRecCount(t) {
+    if (!els.recinfo) return;
+    var n = 0;
+    (t.steps || []).forEach(function (row) {
+      (row || []).forEach(function (v, i) { if (v && i < DAW.engine.bars * 16) n++; });
+    });
+    els.recinfo.textContent = t.name + ' · ' + n + ' hits in the loop';
+  }
+
+  function paintControls() {
+    els.modeSeg.querySelectorAll('button').forEach(function (b) {
+      b.classList.toggle('active', b.getAttribute('data-pdm') === mode());
+    });
+    els.baseWrap.style.display = mode() === 'roli' ? '' : 'none';
+    els.baseSel.value = String(base());
+    els.leds.checked = ledsOn();
+    els.recbtn.classList.toggle('active', rec);
+    els.recbtn.innerHTML = (rec ? App.icon('stop', 14) : App.icon('record', 14)) + (rec ? ' Recording' : ' Record hits');
+    els.play.innerHTML = DAW.engine.playing ? App.icon('stop', 15) + ' Stop' : App.icon('play', 15) + ' Play loop';
+    var ck = document.getElementById('pd-click');
+    if (ck) ck.classList.toggle('active', App.store.get('app.click', false) === true);
+  }
+
+  function init(rootEl) {
+    App.injectCSS('pads',
+      '.pd-pad.pd-learn{outline:3px dashed var(--accent);outline-offset:2px}' +
+      // minmax(0,1fr): four pads always fit the card (390px phone = 77px pads)
+      '.pd-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;max-width:720px}' +
+      '.pd-pad{position:relative;aspect-ratio:1.15;border-radius:16px;border:1px solid var(--line);cursor:pointer;' +
+        'font-family:var(--font-body);color:var(--text);' +
+        'background:linear-gradient(180deg,rgba(255,255,255,0.05),rgba(0,0,0,0.18)),var(--card2);' +
+        'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;' +
+        'box-shadow:inset 0 -3px 0 rgba(0,0,0,0.25);touch-action:manipulation;padding:6px}' +
+      '.pd-pad::before{content:"";position:absolute;left:10px;right:10px;top:8px;height:5px;border-radius:3px;' +
+        'background:var(--pd);opacity:0.8}' +
+      '.pd-pad.pd-hit{background:var(--pd);box-shadow:0 0 18px var(--pd);border-color:var(--pd)}' +
+      '.pd-pad.pd-hit .pd-name,.pd-pad.pd-hit .pd-sub{color:#141216}' +
+      '.pd-name{font-weight:700;font-size:15px;line-height:1.15;text-align:center;color:var(--text)}' +
+      '.pd-sub{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}' +
+      // light theme: a clean raised pad (the dark gradient stop turned it
+      // muddy); :not(.pd-hit) keeps the hit flash winning
+      ':root[data-theme="light"] .pd-pad:not(.pd-hit){background:linear-gradient(180deg,#fff,var(--card2));' +
+        'box-shadow:inset 0 -3px 0 rgba(0,0,0,0.08)}' +
+      // transport: Play loop and Record share one height, icons centred
+      '#pd-play,#pd-rec{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:48px;padding-top:0;padding-bottom:0}' +
+      // recording = solid record red with white text (readable in both themes)
+      '#pd-rec.active{border-color:#c93b3e;color:#fff;background:#c93b3e}' +
+      '#pd-rec .ic{flex:none}#pd-rec:not(.active) .ic{color:var(--red)}' +
+      // 'Pads follow' reads like the 'From key' field label beside it
+      '.pd-lbl{display:inline-flex;flex-direction:column;gap:5px;font-size:11.5px;font-weight:600;letter-spacing:1.4px;' +
+        'text-transform:uppercase;color:var(--label)}' +
+      // phones: square pads with room under the color bar, so a two-word
+      // name ('Open hat' at 360px) wraps without running into it
+      '@media (max-width:640px){.pd-grid{gap:8px}.pd-pad{aspect-ratio:1;padding:17px 4px 6px;gap:3px}' +
+        '.pd-name{font-size:14px;line-height:1.1}}'
+    );
+
+    rootEl.innerHTML =
+      '<div class="card">' +
+        '<div class="row spread">' +
+          '<span class="row tight">' +
+            '<button type="button" class="btn big primary" id="pd-play"></button>' +
+            '<button type="button" class="btn" id="pd-rec"></button>' +
+            '<button type="button" class="chip fb-chip" id="pd-remap" title="Remap: tap a pad, then press the key that should trigger it">Remap</button>' +
+            '<button type="button" class="btn sm" id="pd-mapreset" title="Back to the standard mapping" style="display:none">Reset map</button>' +
+            '<span class="muted small" id="pd-maphint" style="display:none"></span>' +
+            '<button type="button" class="chip fb-chip" id="pd-click" title="Metronome click during the loop — a global setting, also in Settings › Sound">Click</button>' +
+            '<button type="button" class="btn sm" id="pd-clear" title="Wipe every hit from this drum track&rsquo;s pattern">Clear</button>' +
+            '<span class="muted small" id="pd-recinfo"></span>' +
+          '</span>' +
+          '<span class="row tight">' +
+            '<select id="pd-track" title="Which drum track the pads play"></select>' +
+            '<button type="button" class="btn sm" id="pd-mk">' + App.icon('plus', 13) + ' Drum track</button>' +
+          '</span>' +
+        '</div>' +
+        '<div class="pd-grid" id="pd-grid" style="margin-top:16px"></div>' +
+        '<div class="muted small" style="margin-top:12px">Play the pads with touch, the Z X C V / A S D F keys, or your MIDI keys. ' +
+          'With Record on and the loop playing, every hit lands on the nearest 1/16 of the pattern — fix details on the Tracks page.</div>' +
+      '</div>' +
+      '<div class="card">' +
+        '<h2>MIDI &amp; ROLI</h2>' +
+        '<div class="row">' +
+          '<div class="pd-lbl">Pads follow<div class="seg" id="pd-mode">' +
+            '<button type="button" data-pdm="roli">ROLI octave</button>' +
+            '<button type="button" data-pdm="gm">GM drums</button></div></div>' +
+          '<label class="field" id="pd-basewrap">From key<select id="pd-base">' +
+            (function () {
+              var h = '';
+              for (var m = 36; m <= 72; m += 12) h += '<option value="' + m + '">' + Theory.midiName(m) + '</option>';
+              return h;
+            })() + '</select></label>' +
+          '<label class="row tight small" style="gap:6px"><input type="checkbox" id="pd-leds">Key lights</label>' +
+        '</div>' +
+        '<div class="muted small" style="margin-top:10px">Key lights keep the eight pad keys lit on the ROLI and flash them with every hit — including the loop&rsquo;s own beat. ' +
+          'ROLI octave = eight keys up from the base note, one pad each, full velocity. ' +
+          'GM drums = the standard drum map (kick 36, snare 38&hellip;) for hardware pad controllers. ' +
+          'Arm the drum track <b>Live</b> on the Tracks page and your MIDI pads work from anywhere in the Studio.</div>' +
+      '</div>';
+
+    els.grid = document.getElementById('pd-grid');
+    els.play = document.getElementById('pd-play');
+    els.recbtn = document.getElementById('pd-rec');
+    els.recinfo = document.getElementById('pd-recinfo');
+    els.tsel = document.getElementById('pd-track');
+    els.mkbtn = document.getElementById('pd-mk');
+    els.modeSeg = document.getElementById('pd-mode');
+    els.baseWrap = document.getElementById('pd-basewrap');
+    els.baseSel = document.getElementById('pd-base');
+    els.leds = document.getElementById('pd-leds');
+
+    render();
+    paintControls();
+
+    els.play.addEventListener('click', function () {
+      if (DAW.engine.playing) DAW.engine.stop(); else if (padTrack()) DAW.engine.play();
+      paintControls();
+    });
+    var forcedClick = false;
+    els.recbtn.addEventListener('click', function () {
+      rec = !rec;
+      if (rec) {
+        // recording NEEDS a time reference: force the click on for the take
+        // (restored after) unless it's already on
+        if (App.store.get('app.click', false) !== true) {
+          App.store.set('app.click', true);
+          forcedClick = true;
+        }
+        if (!DAW.engine.playing && padTrack()) DAW.engine.play();
+      } else if (forcedClick) {
+        App.store.set('app.click', false);
+        forcedClick = false;
+      }
+      paintControls();
+    });
+    var learn = { on: false, lane: null };
+    function paintLearn() {
+      var chip = document.getElementById('pd-remap');
+      var hint = document.getElementById('pd-maphint');
+      var rst = document.getElementById('pd-mapreset');
+      chip.classList.toggle('active', learn.on);
+      rst.style.display = learn.on ? '' : 'none';
+      hint.style.display = learn.on ? '' : 'none';
+      hint.textContent = !learn.on ? ''
+        : learn.lane == null ? 'tap a pad to remap it'
+        : 'press the key for ' + DAW.DRUM_LANES[learn.lane] + '…';
+      if (els.grid) els.grid.querySelectorAll('.pd-pad').forEach(function (p) {
+        p.classList.toggle('pd-learn', learn.on && parseInt(p.getAttribute('data-lane'), 10) === learn.lane);
+      });
+    }
+    document.getElementById('pd-remap').addEventListener('click', function () {
+      learn.on = !learn.on;
+      learn.lane = null;
+      paintLearn();
+    });
+    document.getElementById('pd-mapreset').addEventListener('click', function () {
+      App.store.set('pads.map', null);
+      learn.lane = null;
+      render();
+      paintLearn();
+    });
+
+    document.getElementById('pd-click').addEventListener('click', function () {
+      App.store.set('app.click', App.store.get('app.click', false) !== true);
+      forcedClick = false; // an explicit choice sticks
+      paintControls();
+    });
+    document.getElementById('pd-clear').addEventListener('click', function () {
+      var t = padTrack();
+      if (!t) return;
+      for (var l = 0; l < (t.steps || []).length; l++) {
+        for (var s = 0; s < t.steps[l].length; s++) t.steps[l][s] = 0;
+      }
+      App.store.set('st.tracks', DAW.engine.tracks);
+      paintRecCount(t);
+    });
+    els.mkbtn.addEventListener('click', function () {
+      // a fresh, EMPTY kit — the pads are for playing your own beat in
+      var t = {
+        id: 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+        name: 'Drums', kind: 'drums', voice: 'keys',
+        synth: {}, sampler: { rootNote: 60, loop: false, name: '' },
+        steps: (function () {
+          var s = [];
+          for (var l = 0; l < 8; l++) { var r = []; for (var i = 0; i < 64; i++) r.push(0); s.push(r); }
+          return s;
+        })(),
+        notes: null, fx: { type: 'none', mix: 0.3 },
+        mix: { vol: 80, mute: false, solo: false }
+      };
+      DAW.engine.tracks.push(t);
+      App.store.set('st.tracks', DAW.engine.tracks);
+      App.store.set('pads.track', t.id);
+      render();
+      paintControls();
+    });
+    els.tsel.addEventListener('change', function () {
+      App.store.set('pads.track', this.value);
+      render();
+    });
+
+    els.grid.addEventListener('pointerdown', function (e) {
+      var padl = e.target.closest ? e.target.closest('.pd-pad') : null;
+      if (learn.on && padl) {
+        learn.lane = parseInt(padl.getAttribute('data-lane'), 10);
+        paintLearn();
+        return;
+      }
+      var pad = e.target.closest('.pd-pad');
+      if (!pad) return;
+      e.preventDefault();
+      hit(parseInt(pad.getAttribute('data-lane'), 10), 0.9, false);
+    });
+
+    els.modeSeg.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-pdm]');
+      if (!b) return;
+      darkBase();
+      App.store.set('pads.mode', b.getAttribute('data-pdm'));
+      paintControls();
+      render();
+      if (App.active === 'pads') lightBase();
+    });
+    els.baseSel.addEventListener('change', function () {
+      darkBase();
+      App.store.set('pads.base', parseInt(this.value, 10));
+      render();
+      if (App.active === 'pads') lightBase();
+    });
+    els.leds.addEventListener('change', function () {
+      App.store.set('pads.leds', !!this.checked);
+      if (this.checked && App.active === 'pads') lightBase(); else darkBase();
+    });
+
+    // MIDI: pads page open, or the pad drum track armed Live (anywhere in Studio)
+    App.on('midi:note', function (d) {
+      if (!d || !d.on || d.silent) return; // tone-in notes never drum
+      if (learn.on && App.active === 'pads') {
+        if (learn.lane != null) {
+          var cm = customMap();
+          cm[learn.lane] = d.midi;
+          App.store.set('pads.map', cm);
+          learn.lane = null;
+          render();
+          paintLearn();
+        }
+        return; // learning: keys assign, they don't play
+      }
+      var t = padTrack();
+      if (!t) return;
+      // on the Pads page: always. Elsewhere: only in the Studio with the
+      // drum track armed (pads now lives on the practice Instrument tab)
+      var armed = App.store.get('st.armed', null) === t.id;
+      if (App.active !== 'pads' && !(App.space === 'studio' && armed)) return;
+      var lane = laneForMidi(d.midi);
+      if (lane == null) return;
+      hit(lane, Math.max(0.15, (d.vel || 90) / 127), false);
+    }, true); // sound first
+
+    // loop heartbeat: quantize reference + light the beat on the keys/pads
+    App.on('st:step', function (d) {
+      lastStep = { step: d.step, at: performance.now() };
+      var t = padTrack();
+      if (!t || App.active !== 'pads') return;
+      for (var l = 0; l < 8; l++) {
+        if (t.steps[l] && t.steps[l][d.step]) hit(l, 0, true);
+      }
+    });
+    App.on('st:state', paintControls);
+    App.on('midi:state', function () { if (App.active === 'pads') lightBase(); });
+    App.on('colors', function (d) { if (d && d.what === 'degrees') render(); }); // lane tints = degree colors
+  }
+
+  App.register('pads', {
+    init: init,
+    // the pads own the keybed while open (the scale layout steps aside)
+    onShow: function () { ensureTrack(); render(); paintControls(); if (App.midi && App.midi.claim) App.midi.claim('pads'); lightBase(); },
+    onHide: function () { rec = false; darkBase(); paintControls(); if (App.midi && App.midi.release) App.midi.release('pads'); },
+    onKey: function (e) {
+      if (e.repeat || e.type !== 'keydown') return;
+      var lane = LANE_KEYS.indexOf(e.code);
+      if (lane === -1) return;
+      e.preventDefault();
+      hit(lane, 0.85, false);
+    }
+  });
+})();

@@ -1,0 +1,45 @@
+/* Scoped LUMI practice page; uses soundLAB's shared theme tokens. */
+#panel-lumipractice .lp-top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:16px}
+#panel-lumipractice .lp-top h2{margin-bottom:4px}
+#panel-lumipractice .lp-top p{max-width:640px;color:var(--muted);margin:0}
+#panel-lumipractice .lp-badge{padding:8px 12px;border:1px solid var(--teal);border-radius:8px;color:var(--teal);font-size:12px;letter-spacing:.06em}
+#panel-lumipractice .lp-badge.lp-live{border-color:var(--accent);color:var(--accent)}
+#panel-lumipractice .lp-controls{display:flex;align-items:flex-end;flex-wrap:wrap;gap:12px}
+#panel-lumipractice .lp-controls .field{flex:1 1 180px;min-width:0}
+#panel-lumipractice .lp-controls .field select{width:100%;max-width:100%}
+#panel-lumipractice .lp-controls input{width:100%}
+#panel-lumipractice .lp-range{font-weight:600;margin:12px 0 4px}
+#panel-lumipractice .lp-warning{border-left:3px solid var(--accent);padding:10px 12px;background:var(--card2);line-height:1.5}
+#panel-lumipractice .lp-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:12px 0}
+#panel-lumipractice .lp-output{padding:10px 12px;border:1px solid var(--line);border-radius:8px;font-weight:500;line-height:1.5}
+#panel-lumipractice .lp-question{margin-top:16px}
+#panel-lumipractice .lp-eyebrow{font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin:0 0 6px}
+#panel-lumipractice #lp-target{font-family:var(--font-condensed);font-size:36px;line-height:1.1;margin:6px 0}
+#panel-lumipractice .lp-keyboard{display:grid;grid-template-columns:repeat(24,minmax(0,1fr));gap:3px;overflow-x:auto;padding:8px 2px 12px}
+#panel-lumipractice .lp-key{display:flex;min-height:94px;min-width:0;flex-direction:column;align-items:center;justify-content:flex-end;gap:5px;padding:6px 1px;border:1px solid #9a9187;border-radius:0 0 5px 5px;background:#f3efe8;color:#3a302a;font-family:var(--font-body);font-size:12px;box-sizing:border-box}
+#panel-lumipractice button.lp-key{cursor:pointer}
+#panel-lumipractice .lp-key small{font-size:10px}
+#panel-lumipractice .lp-key.lp-black{background:#302a2d;color:#f5efe6;border-color:#60565b}
+#panel-lumipractice .lp-key.lp-target-key{border:2px solid var(--accent)}
+#panel-lumipractice .lp-key.lp-held{background:var(--teal);color:#122521;border:2px solid #268d78}
+#panel-lumipractice .lp-role{font:600 10px/1.2 var(--font-body);font-style:normal;min-height:24px;text-align:center;overflow-wrap:anywhere}
+#panel-lumipractice .lp-key.lp-correct-key{border:2px solid #268d78;box-shadow:inset 0 0 0 2px #268d78}
+#panel-lumipractice .lp-key.lp-wrong-key{border:2px solid #ff3355;box-shadow:inset 0 0 0 2px #ff3355}
+#panel-lumipractice .lp-feedback{font-weight:600;line-height:1.5;padding:10px 12px;border:1px solid var(--line);border-radius:8px}
+#panel-lumipractice .lp-feedback[data-feedback="correct"]{border-color:#4cc9b0}
+#panel-lumipractice .lp-feedback[data-feedback="wrong"]{border-color:#ff7189}
+#panel-lumipractice .lp-sound-route{border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin:14px 0}
+#panel-lumipractice .lp-ack{display:flex;gap:10px;align-items:flex-start;line-height:1.5;margin-top:12px}
+#panel-lumipractice .lp-ack input{flex:none;margin-top:5px}
+#panel-lumipractice .lp-mocks{border:1px dashed var(--teal);margin-top:16px}
+#panel-lumipractice .lp-mocks>strong{font-size:12px;letter-spacing:.06em;color:var(--teal)}
+#panel-lumipractice fieldset{min-width:0;border:0;padding:14px 0;margin:0}
+#panel-lumipractice legend{padding:0;font-weight:600}
+#panel-lumipractice .lp-mock-output{padding-top:12px;border-top:1px dashed var(--line);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+#panel-lumipractice .lp-mock-output p{width:100%;margin:0}
+#panel-lumipractice .lp-answer{margin-top:16px}
+#panel-lumipractice #lp-result{min-height:24px;line-height:1.5}
+#panel-lumipractice button:focus-visible,#panel-lumipractice select:focus-visible,#panel-lumipractice input:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+#panel-lumipractice [hidden]{display:none!important}
+@media(max-width:1100px){#panel-lumipractice .lp-keyboard{grid-template-columns:repeat(12,minmax(0,1fr))}}
+@media(max-width:700px){#panel-lumipractice .lp-keyboard{grid-template-columns:repeat(6,minmax(0,1fr))}#panel-lumipractice .lp-key{min-height:72px}#panel-lumipractice .lp-actions .btn{flex:1 1 160px}#panel-lumipractice .lp-badge{font-size:11px}}
