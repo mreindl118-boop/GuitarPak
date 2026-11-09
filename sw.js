@@ -1,8 +1,11 @@
 /* GuitarLab service worker — cache-first so the app works fully offline once visited. */
-var CACHE = 'guitarlab-v130';
+// 2.0 (branch v2): caches are 'soundlab2-*' so the beta at /next/ never touches the
+// live app's 'guitarlab-*' caches on the same origin (and only cleans up its own).
+var CACHE = 'soundlab2-v1';
 var ASSETS = [
   '.',
   'index.html',
+  'css/tokens.css',
   'css/style.css',
   'css/lumi-practice.css',
   'fonts/barlow-400.woff2',
@@ -105,7 +108,7 @@ self.addEventListener('install', function (e) {
 self.addEventListener('activate', function (e) {
   e.waitUntil(
     caches.keys().then(function (keys) {
-      return Promise.all(keys.filter(function (k) { return k !== CACHE; }).map(function (k) { return caches.delete(k); }));
+      return Promise.all(keys.filter(function (k) { return k !== CACHE && k.indexOf('soundlab2-') === 0; }).map(function (k) { return caches.delete(k); }));
     }).then(function () { return self.clients.claim(); })
   );
 });

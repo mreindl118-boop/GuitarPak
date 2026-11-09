@@ -133,3 +133,27 @@ physical LUMI program, RGB appearance, octave alignment, Local Control, external
 synth sound or real microphone/instrument performance. See
 [the palette/profile evidence](NOTE-PALETTE.md),
 [guided practice](LUMI-PRACTICE.md), and the validation report for those limits.
+
+## 2.0 beta at next/ (branch v2)
+
+`.github/workflows/pages-next.yml` runs on every push to `v2` (and by hand). It
+calls the same reusable test workflow with `source_ref: v2`, then checks out the
+exact tested commit and appends ONE ordinary commit to `gh-pages` whose tree is
+the current gh-pages tree with `next/` replaced by the tested `v2` tree plus
+`next/beta.json` (`{"channel":"beta","branch":"v2","source":"<sha>"}`). It never
+creates or replaces `gh-pages`, never touches anything outside `next/`, uses its
+own concurrency group (`pages-next`), refuses a stale source if `v2` moved, and
+retries a rejected push at most three times like the live deployment. The beta
+is served at <https://mreindl118-boop.github.io/GuitarPak/next/>.
+
+The live deployment (`pages.yml`) carries the current `next/` over on every main
+snapshot, so a release of the live app never deletes the beta, and the beta
+never changes the live app. Both scripts are exercised locally by
+`tests/pages-deploy.test.js` and `tests/pages-next.test.js` against disposable
+bare repositories, with no network.
+
+Caveats of sharing one origin: the beta and the live app share `localStorage`
+until the 2.0 storage prefix lands (roadmap Phase A), and the live service
+worker deletes every cache it does not own when it updates, so the beta
+(caches `soundlab2-*`) refills on its next visit. The beta's worker only ever
+deletes `soundlab2-*` caches.
