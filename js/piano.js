@@ -306,6 +306,7 @@
   function trackPianoSource(src, gain) {
     var v = { src: src, gain: gain }; pianoSources.push(v);
     src.onended = function () { var i = pianoSources.indexOf(v); if (i >= 0) pianoSources.splice(i, 1); };
+    return v;
   }
   function clearPianoSound() {
     arpStop();
@@ -566,9 +567,11 @@
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.06);
     src.connect(g);
     g.connect(ctx.destination);
-    trackPianoSource(src, g);
+    var v = trackPianoSource(src, g);
+    v.at = t;
     src.start(t, App.sampleLead(src.buffer));
     src.stop(t + dur + 0.1);
+    return v; // {src, gain, at}: a caller can hush a note still waiting to sound
   }
 
   // ---------------- keyboard rendering ----------------
@@ -990,6 +993,7 @@
   }
 
   function ppStart() {
+    ppHeld = false;
     if (pp.guide) { guideStart(); return; }
     pp.path = practicePath();
     if (!pp.path.length) { ledClear(); ppStatus('no notes'); return; }
@@ -1028,6 +1032,7 @@
 
   function ppStop() {
     ppPause();
+    ppHeld = false;
     pp.idx = 0;
     pp.pausedAtIdx = -1;
     var ring = document.getElementById('pn-now');
@@ -1038,6 +1043,45 @@
   }
 
   function ppToggle() { if (pp.running || pp.guiding) ppPause(); else ppStart(); }
+
+  // CONTROLLER REMOTE (js/remote.js): the scale lessons answer first
+  // (App.keysLessons.remote: a lesson run, else the lesson card unless this
+  // runner is busy), then the runner. The runner owns the remote while it
+  // plays or guides, and after the remote paused it (so its NEXT resumes; an
+  // on-screen pause, leaving the page or opening a lesson hands NEXT back to
+  // the lesson card). NEXT = skip a note in Guide / resume (a timed run just
+  // plays on); BACK = a note back in Guide, else restart from the first
+  // note; STOP = pause, keeping the place. The Synth page hides the lesson
+  // card, so there the remote drives this runner only.
+  var ppHeld = false;
+  function ppBusy() { return pp.running || pp.guiding || ppHeld; }
+  function ppRemote(action) {
+    if (!ppBusy()) return false;
+    var live = pp.running || pp.guiding;
+    if (action === 'stop') {
+      if (!live) return false;
+      ppPause();
+      ppHeld = true;
+      return 'Paused';
+    }
+    if (action === 'next') {
+      if (pp.guiding) { pp.idx++; guideTarget(); return 'Skip note'; }
+      if (pp.running) return 'Playing…';
+      ppStart();
+      return pp.running || pp.guiding ? 'Resume' : false;
+    }
+    if (action === 'back') {
+      if (pp.guiding) { pp.idx = Math.max(0, pp.idx - 1); guideTarget(); return 'Note back'; }
+      ppStop();
+      ppStart();
+      return pp.running || pp.guiding ? 'Restart' : false;
+    }
+    return false;
+  }
+  function onRemote(action, info) {
+    var kl = App.keysLessons, r = kl && kl.remote ? kl.remote(action, info) : false;
+    return r || ppRemote(action) || false;
+  }
 
   function ppRebuild() {
     pp.idx = 0;
@@ -1783,6 +1827,7 @@
 
   function onHide() {
     ppPause();      // exercise pauses (keeps its place) when leaving the tab
+    ppHeld = false; // leaving is not a remote pause: NEXT is the lessons' again
     if (App.keysLessons) App.keysLessons.stop(); // a lesson run ends (unscored)
     // release any computer-keyboard notes whose keyup we'll never see
     Object.keys(qw.held).forEach(function (c) {
@@ -1808,6 +1853,8 @@
     clearRing: function () { ppRing(null, null); ledClear(); },
     flash: flashKey,
     stopRunner: ppStop,
+    runnerBusy: ppBusy, // playing, guiding, or paused by the remote
+    releaseRemote: function () { ppHeld = false; }, // a lesson was opened: NEXT starts it
     scrollTo: function (alignLeft) { scrollToWindow(!!alignLeft); },
     render: function () { render(); },
     warm: function () { try { decodeAll(App.getAudio()); } catch (e) { /* no audio */ } },
@@ -1817,7 +1864,8 @@
   App.register('piano', {
     init: init,
     onShow: onShow,
-    onHide: onHide
+    onHide: onHide,
+    onRemote: onRemote // no remoteKey: the lessons keep their own lowest-key double-tap
   });
 
   // ---- the SYNTH page: the same playable keyboard, voice forced to the
@@ -1852,7 +1900,10 @@
         while (synthRoot.firstChild) pianoRoot.appendChild(synthRoot.firstChild);
       }
     },
-    onKey: modules_onKey_passthrough
+    onKey: modules_onKey_passthrough,
+    // the runner strip only: the lesson card is hidden on this page
+    // ('#panel-synth #pn-lessons'), so NEXT never starts a lesson nobody sees
+    onRemote: function (action) { return ppRemote(action) || false; }
   });
 
   function modules_onKey_passthrough(e) { /* QWERTY handled by document-level qw listeners */ }

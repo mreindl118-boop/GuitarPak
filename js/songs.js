@@ -249,7 +249,8 @@
 
   var pl = {
     running: false, idx: 0, seq: [], bpm: 120, rate: 2, click: false,
-    loopA: 0, loopB: 0, timer: null, raf: 0, nextT: 0, vis: [], ctx: null
+    loopA: 0, loopB: 0, timer: null, raf: 0, nextT: 0, vis: [], ctx: null,
+    guided: false, lit: []    // the key-light guide is showing; the notes it lights (now + next)
   };
 
   function plSeq() {
@@ -322,10 +323,12 @@
   function plGuide(step) {
     if (!App.midi || !App.midi.guide) return;
     var pos = pl.seq.indexOf(step), nx = pos === -1 ? null : pl.seq[(pos + 1) % pl.seq.length];
-    App.midi.guide(stepMidis(step), nx == null ? null : stepMidis(nx));
+    var now = stepMidis(step), next = nx == null ? null : stepMidis(nx);
+    App.midi.guide(now, next);
     pl.guided = true;
+    pl.lit = (now || []).concat(next || []);
   }
-  function plGuideOff() { if (pl.guided && App.midi && App.midi.guide) App.midi.guide(null, null); pl.guided = false; }
+  function plGuideOff() { if (pl.guided && App.midi && App.midi.guide) App.midi.guide(null, null); pl.guided = false; pl.lit = []; }
 
   function plStart() {
     if (!cur) { plGuideOff(); plStatus('load a song first'); return; }
@@ -361,6 +364,43 @@
     var prev = els.tabout.querySelector('.now');
     if (prev) prev.classList.remove('now');
     plStatus('');
+  }
+
+  // the CONTROLLER REMOTE (js/remote.js): NEXT = the Play / Pause button,
+  // BACK = from loop A again, STOP = the reset button (pause + rewind). Where
+  // nothing happens the page's toast says why (it stands for the remote's own
+  // 'nothing to do' note) and the answer is false.
+  function plRemote(action) {
+    var was = pl.running;
+    if (!cur) {
+      if (action === 'stop') return false;
+      if (App.toast) App.toast('Load a song first'); // the player is at the keys, not reading the status line
+      return false;
+    }
+    if (action === 'stop') {
+      // already reset: no step marked, nothing lit (a tapped step lights both)
+      if (!was && !pl.idx && !pl.guided && !els.tabout.querySelector('.now')) return false;
+      plStop();
+      return 'Stopped';
+    }
+    if (action === 'back') { plStop(); plStart(); } else if (was) plPause(); else plStart();
+    if (pl.running) return action === 'back' ? 'Restart' : 'Play';
+    if (was && action === 'next') return 'Pause';
+    var why = els.status.textContent; // the loop range is empty
+    if (App.toast) App.toast(why ? why.charAt(0).toUpperCase() + why.slice(1) : 'The song can’t start here');
+    return false;
+  }
+  // the reserved double-tap key (js/remote.js, remoteKey): free unless the song
+  // lights it — while playing, any note of the loop folded onto the lowest
+  // key; stopped, the step a tap lit. A lit target must sound and must never
+  // pause the player.
+  function plRemoteKey() {
+    var mi = App.midi, lo = mi && mi.range ? mi.range().lo : 48;
+    function onLo(m) { return (mi && mi.fold ? mi.fold(m) : m) === lo; }
+    if (pl.running) {
+      return !cur || !pl.seq.some(function (i) { var st = cur.steps[i]; return !!st && st.notes.some(function (n) { return onLo(n.midi); }); });
+    }
+    return !(pl.guided && pl.lit.some(onLo));
   }
 
   // ---------------- song display (normalized tab, spans per step) ----------------
@@ -810,6 +850,8 @@
 
   App.register('songs', {
     init: init,
-    onHide: onHide
+    onHide: onHide,
+    onRemote: plRemote,
+    remoteKey: plRemoteKey
   });
 })();

@@ -1310,6 +1310,46 @@
     else prStart(); // resumes from pr.idx after a pause
   }
 
+  // the CONTROLLER REMOTE (js/remote.js) on the Neck, Tab and Notation pages:
+  // NEXT = the Play / Pause button, BACK = from the first note again, STOP =
+  // the reset button (pause + back to the first note).
+  function prRemote(action) {
+    var was = pr.running;
+    if (action === 'stop') {
+      if (!was && !pr.idx && !prShown()) return false; // already reset: nothing on the board or the keys
+      prStop();
+      return 'Stopped';
+    }
+    if (action === 'back') { prStop(); prStart(); } else prToggle();
+    if (pr.running) return action === 'back' ? 'Restart' : 'Play';
+    if (was && action === 'next') return 'Pause';
+    // it could not start (no notes in this position): say why where the player
+    // looks; the toast stands for the remote's own 'nothing to do' note
+    var st = document.getElementById('fb-pr-status'), why = st && st.textContent;
+    if (App.toast) App.toast(why ? why.charAt(0).toUpperCase() + why.slice(1) : 'The runner can’t start here');
+    return false;
+  }
+  // does the runner still show something the reset button clears (a ring, the
+  // n / total status, the stroke readout, lit keys)? A pattern or direction
+  // change while paused rewinds pr.idx but leaves them in place.
+  function prShown() {
+    var st = document.getElementById('fb-pr-status'), sk = document.getElementById('fb-pr-stroke');
+    return prGuided || !!document.getElementById('fb-pr-ring') || !!(st && st.textContent) ||
+      !!(sk && sk.style.display !== 'none');
+  }
+  // the reserved double-tap key (js/remote.js, remoteKey): free while the
+  // runner stands still; during a run only while no note of the exercise lands
+  // on it (folded into the keyboard's window, as the key lights show it) — a
+  // lit target must sound and must never pause the run.
+  function prRemoteKey() {
+    if (!pr.running) return true;
+    var mi = App.midi, lo = mi && mi.range ? mi.range().lo : 48;
+    return !(pr.seq || []).some(function (i) {
+      var n = pr.path[i];
+      return !!n && (mi && mi.fold ? mi.fold(n.midi) : n.midi) === lo;
+    });
+  }
+
   var PAT_RE = /^(scale|g[3-7]|i([2-9]|1[0-6])(m([1-9]|[1-5][0-9]|6[0-2]))?|ss[0-5])$/;
 
   function prWire() {
@@ -2160,7 +2200,9 @@
   App.register('fretboard', {
     init: init,
     onShow: onShow,
-    onHide: onHide
+    onHide: onHide,
+    onRemote: prRemote,
+    remoteKey: prRemoteKey
   });
 
   // ---------------- Tab + Notation as full pages ----------------
@@ -2232,12 +2274,16 @@
   App.register('tab', {
     init: function (el) { altInit(el, 'tab'); },
     onShow: function () { altShow('tab'); },
-    onHide: maybePause
+    onHide: maybePause,
+    onRemote: prRemote,
+    remoteKey: prRemoteKey
   });
 
   App.register('notation', {
     init: function (el) { altInit(el, 'notation'); },
     onShow: function () { altShow('notation'); },
-    onHide: maybePause
+    onHide: maybePause,
+    onRemote: prRemote,
+    remoteKey: prRemoteKey
   });
 })();

@@ -1792,6 +1792,8 @@
     knobHTML: knobHTML, arcPath: arcPath, wireKnobs: wireKnobs, renderControl: renderControl,
     cc: cc, sendCh: sendCh, send: send, sendProgram: sendProgram, progNum: progNum, paintProg: paintProg,
     hubOutId: hubOutId, hubOutName: hubOutName, hasOut: hasOut, midi: midi, get sysexOk() { var m = midi(); return !!(m && m.sysexOk); },
+    // Synth out from another page (the Deck / Live connection bar): the same store the select writes
+    setOut: function (id) { set('outId', id == null || id === '' ? 'shared' : id); if (els.outSel) paintPorts(); },
     toast: toast, esc: esc, clamp: clamp, hex: hex, parseHex: parseHex, decode: decode, noteName: noteName, ccName: ccName, view: view,
     cv: function () { return root && root.querySelector('.mh-cv'); }, root: function () { return root; }, els: function () { return els; }
   };
