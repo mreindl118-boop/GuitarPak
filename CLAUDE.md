@@ -166,7 +166,7 @@ js/audioin.js     SOUND INPUT (App.audioIn): the ONE shared live-input service.
                   audio.outId is re-applied (setSinkId) when it is listed again.
                   Suite tests/audioin.test.js (Chromium fake media device).
                   Loaded right after tonein.js.
-js/remote.js      CONTROLLER REMOTE (App.remote, 1.4.0; docs/CONTROLLER-
+js/remote.js      CONTROLLER REMOTE (App.remote, 2.0 beta / v2; docs/CONTROLLER-
                   REMOTE.md): practice moves on from the instrument. Actions
                   next / back / stop, each bound in Settings › Hands-free
                   control (#set-remote-card, rows rendered by remote.js
@@ -750,13 +750,14 @@ version.json      auto-update feed (source of truth for latest version)
   listeners that make SOUND register with App.on(evt, fn, true) — the third
   arg puts them first, ahead of visual listeners. App.keys.play(midi, when,
   dur, gain) = the Keys page's sampled piano for other modules (quiz).
-- onRemote(action, info) + remoteKey (1.4.0, js/remote.js): a page with
+- onRemote(action, info) + remoteKey (2.0 beta / v2, js/remote.js): a page with
   something to start / advance / retry / stop implements onRemote ('next' |
   'back' | 'stop'; info.via cc|pc|note|key|dbltap|test) and returns false
   (nothing here), true or a short HUD label; it must act exactly like the
   on-screen button and never prompt, change ports, or arm hardware.
   remoteKey (true / fn) only where losing the lowest key costs nothing.
-- App.toast(msg, ms?) (v1.3.1): the ONE app-wide status toast (#app-toast,
+- App.toast(msg, ms?) (2.0 beta / v2, with the remote; main 1.3.1-1.4.1 only
+  call it behind if (App.toast)): the ONE app-wide status toast (#app-toast,
   role=status) for a tap that did nothing visible elsewhere — use it instead of
   a toast element inside a page that may be hidden (the Hub's #mh-toast only
   shows on the Hub page; the Synth Deck routes its refusals here off it).
