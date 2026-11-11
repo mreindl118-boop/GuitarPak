@@ -21,6 +21,7 @@
 
   var els = {};
   var state = {
+    look: 'dots', // 2.0: 'dots' (one colored dot per scale key) | 'keys' (whole key painted)
     display: 'notes',  // notes | intervals | degrees  (pn.display)
     orient: 'h'        // h = landscape strip, v = portrait column (pn.orient)
   };
@@ -626,7 +627,7 @@
       var kc = inScale ? App.colors.forNote(pc, step) : null;
       var keyStyle = '', dc = kc ? ' data-dc="' + kc + '"' : '';
       if (isRoot && assist > 0 && assist < 3) keyStyle = ' style="stroke:var(--accent);stroke-width:3.5"';
-      if (kc && assist >= 3) {
+      if (kc && assist >= 3 && state.look === 'keys') {
         var fillC = isWhite
           ? (outWin ? mixHex(kc, '#f7f3ea', 0.55) : kc)
           : (outWin ? mixHex(kc, '#221d20', 0.72) : mixHex(kc, '#221d20', 0.35));
@@ -668,13 +669,23 @@
         labels += '<text class="' + (isWhite ? 'pn-fing' : 'pn-fingb') + '" x="' + cx +
           '" y="' + (cy - 17) + '"' + up(cx, cy - 17, 11) + ' text-anchor="middle">' + fingerMap[midi] + '</text>';
       }
+      if (inScale && state.look === 'dots' && assist >= 3) {
+        // 2.0 DOTS (Matt, 2026-11-10): the keys stay ivory/ebony and ONE
+        // round dot per scale key carries the degree/note color (the same
+        // App.colors palette the LUMI lights use) - far easier to read than
+        // whole painted keys. The tonic dot gets a ring. Labels (Full) sit
+        // inside the dot; keys outside a mode window fade.
+        var dr = isWhite ? 12.5 : 10.5;
+        dots += '<circle class="pn-sdot' + (isRoot ? (isWhite ? ' pn-sroot pn-sroot-w' : ' pn-sroot') : '') + '" data-midi="' + midi + '" data-pc="' + pc + '" cx="' + cx +
+          '" cy="' + cy + '" r="' + dr + '" fill="' + kc + '"' + (outWin ? ' opacity="0.6"' : '') + '/>';
+      }
       if (inScale) {
         // the KEY is the color now — the old degree dot is gone; the label
         // sits straight on the painted key, contrast-picked per key type
         dots += '<g class="pn-dotg" data-midi="' + midi + '" data-pc="' + pc + '" data-cx="' + cx + '" data-cy="' + cy + '">' +
           '<circle class="pn-jamring" data-pc="' + pc + '" cx="' + cx + '" cy="' + cy + '" r="15.5" fill="none"/>' +
           (assist >= 4 ? '<text class="pn-dott" x="' + cx + '" y="' + (cy + 3.5) + '"' + up(cx, cy + 3.5, 11) + ' text-anchor="middle"' +
-          (isWhite ? '' : ' fill="#f2ede4"') + '>' + keyLabel(midi, info, pf) + '</text>' : '') + '</g>';
+          (isWhite || state.look === 'dots' ? '' : ' fill="#f2ede4"') + '>' + keyLabel(midi, info, pf) + '</text>' : '') + '</g>';
       }
     }
 
@@ -753,7 +764,7 @@
   function keyDown(k, down) {
     k.classList.toggle('pn-down', down);
     var dc = k.getAttribute('data-dc');
-    if (!dc || assist >= 3) return; // painted keys already show their color
+    if (!dc || (assist >= 3 && state.look === 'keys')) return; // painted keys already show their color
     k.style.fill = down ? dc : '';
   }
 
@@ -1215,6 +1226,9 @@
         'stroke:#ffffff !important;stroke-width:3 !important}' +
       '.pn-dotg{pointer-events:none}' +
       '.pn-dott{font:700 11px var(--font-body);fill:#1c1206}' +
+      '.pn-sdot{stroke:rgba(0,0,0,.45);stroke-width:1;pointer-events:none}' +
+      '.pn-sdot.pn-sroot{stroke:#fff;stroke-width:2.5}.pn-sdot.pn-sroot-w{stroke:#1c1206}' +
+      '#pn-look[hidden]{display:none!important}' +
       '#pn-perf [hidden],#pn-display[hidden],#pn-legend[hidden]{display:none!important}' +
       '.pn-oct{font:600 11px var(--font-body);fill:var(--muted)}' +
       '.pn-jamring{opacity:0;stroke:rgba(0,0,0,0.65);stroke-width:2.5;transition:opacity 0.25s ease}' +
@@ -1263,6 +1277,10 @@
           '<span class="row tight">' +
             '<div class="seg" id="pn-assist" role="group" aria-label="Help level" title="How much the keyboard helps: Full shows colors, names, fingers and the next note; None is a plain keyboard">' +
               ASSIST_NAMES.map(function (nm, i) { return '<button type="button" data-pnassist="' + i + '">' + nm + '</button>'; }).reverse().join('') +
+            '</div>' +
+            '<div class="seg" id="pn-look" role="group" aria-label="How the scale shows" title="How the scale shows on the keys: one colored dot per key, or the whole key colored">' +
+              '<button type="button" data-pnlook="dots">Dots</button>' +
+              '<button type="button" data-pnlook="keys">Whole keys</button>' +
             '</div>' +
             '<div class="seg" id="pn-display">' +
               '<button type="button" data-pnmode="notes">Notes</button>' +
@@ -1373,6 +1391,24 @@
     state.display = String(App.store.get('pn.display', 'notes'));
     if (!/^(notes|intervals|degrees)$/.test(state.display)) state.display = 'notes';
     state.orient = App.store.get('pn.orient', 'h') === 'v' ? 'v' : 'h';
+    state.look = App.store.get('pn.look', 'dots') === 'keys' ? 'keys' : 'dots';
+    var lookSeg = document.getElementById('pn-look');
+    function paintLook() {
+      lookSeg.querySelectorAll('button').forEach(function (b) {
+        var on = b.getAttribute('data-pnlook') === state.look;
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-pressed', String(on));
+      });
+    }
+    paintLook();
+    lookSeg.addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-pnlook]');
+      if (!b) return;
+      state.look = b.getAttribute('data-pnlook') === 'keys' ? 'keys' : 'dots';
+      App.store.set('pn.look', state.look);
+      paintLook();
+      render();
+    });
     assist = App.help.level();
     document.getElementById('pn-assist').addEventListener('click', function (e) {
       var b = e.target.closest('button[data-pnassist]');
@@ -1741,6 +1777,8 @@
     });
     var disp = document.getElementById('pn-display');
     if (disp) disp.hidden = assist < 4; // labels only show at Full
+    var look = document.getElementById('pn-look');
+    if (look) look.hidden = assist < 3; // nothing colored below Colors
   }
 
   // one Help level for the whole app: set here or in Lights & help
