@@ -399,9 +399,9 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
 html:not(.ctx-open) .ctxbar, .ctxbar[hidden] { display: none; }
 .ctx-open .ctxbar { animation: ctx-in 140ms ease-out; }
 @keyframes ctx-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
-/* 1.3 (primer A2): the clef is an icon button like its five neighbours - same
+/* 1.3 (primer A2): the clef is an icon button like its four neighbours - same
    height, ghost until hovered / open - so the corner reads as ONE toolset;
-   the caret and the capture dot ride along in its corners */
+   the caret rides along in its corner */
 #ctx-btn { position: relative; }
 .ctx-caret { position: absolute; right: 2px; bottom: 4px; width: 7px; height: 5px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
 #ctx-btn[aria-expanded="true"] .ctx-caret { transform: rotate(180deg); }
