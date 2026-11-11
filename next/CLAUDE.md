@@ -166,6 +166,33 @@ js/audioin.js     SOUND INPUT (App.audioIn): the ONE shared live-input service.
                   audio.outId is re-applied (setSinkId) when it is listed again.
                   Suite tests/audioin.test.js (Chromium fake media device).
                   Loaded right after tonein.js.
+js/remote.js      CONTROLLER REMOTE (App.remote, 2.0 beta / v2; docs/CONTROLLER-
+                  REMOTE.md): practice moves on from the instrument. Actions
+                  next / back / stop, each bound in Settings › Hands-free
+                  control (#set-remote-card, rows rendered by remote.js
+                  mount) to a learned MIDI CC press / Program Change / note
+                  (port name kept, any channel; an unconnected learned port =
+                  any port; 'latching' = every change) and/or a learned key;
+                  remote.pt = page-turner keys (PageDown/Right/Down = next,
+                  PageUp/Left/Up = back; capture phase, preventDefault, never
+                  while typing); remote.dbl = double-tap the lowest key
+                  (range().lo; only the LUMI's when one is connected) = next,
+                  on pages whose module declares remoteKey (that key is then
+                  reserved: claimed, silent, never graded). Bound MIDI is
+                  CLAIMED by midi.js setInputClaim BEFORE 'midi:raw' (no Thru,
+                  no grading, no dispatch; 'midi:remote' instead; a release of
+                  a note the app already got is never claimed). Fires through
+                  App.remoteAction (app.js): help tour -> clef/sheets fold ->
+                  Settings = a 'works' test -> the page's onRemote -> else an
+                  App.toast 'Nothing to move on here'. #remote-hud confirms.
+                  Store remote.map / remote.pt / remote.dbl; bus 'remote',
+                  'remote:map'. Loaded right after midi.js. Suites
+                  tests/remote.test.js (core) + tests/remote-<area>.test.js.
+                  ANSWER BY KEY (quiz.js keyAnswerable): a choice question with
+                  no playable answer takes a WHITE key per choice (<= 7: C-B
+                  any octave; more: white keys up from range().lo's C), badge
+                  .kb on each choice while a keyboard is in; the right key
+                  after a miss moves on; remoteKey is false there.
 js/metronome.js   ┐ feature modules; each registers (metronome = the corner
                   │  sheet, not a page — see OVERLAY SHEETS)
 js/fretboard.js   │ App.register(name, {init, onShow, onHide, onKey})
@@ -739,6 +766,17 @@ version.json      auto-update feed (source of truth for latest version)
   listeners that make SOUND register with App.on(evt, fn, true) — the third
   arg puts them first, ahead of visual listeners. App.keys.play(midi, when,
   dur, gain) = the Keys page's sampled piano for other modules (quiz).
+- onRemote(action, info) + remoteKey (2.0 beta / v2, js/remote.js): a page with
+  something to start / advance / retry / stop implements onRemote ('next' |
+  'back' | 'stop'; info.via cc|pc|note|key|dbltap|test) and returns false
+  (nothing here), true or a short HUD label; it must act exactly like the
+  on-screen button and never prompt, change ports, or arm hardware.
+  remoteKey (true / fn) only where losing the lowest key costs nothing.
+- App.toast(msg, ms?) (2.0 beta / v2, with the remote; main 1.3.1-1.4.1 only
+  call it behind if (App.toast)): the ONE app-wide status toast (#app-toast,
+  role=status) for a tap that did nothing visible elsewhere — use it instead of
+  a toast element inside a page that may be hidden (the Hub's #mh-toast only
+  shows on the Hub page; the Synth Deck routes its refusals here off it).
 - New bus events: `note:input` {on, midi, vel, src, dur?} — user played a note
   on an on-screen instrument (piano QWERTY/touch emit it; capture listens
   alongside midi:note), `space` {space} after a workspace switch.
