@@ -40,6 +40,13 @@ own and next to FL Studio. The design system is `docs/DESIGN-SYSTEM.md`.
   `.github/workflows/pages-next.yml` after the full test suite passes. The live
   app stays on `main`. The main address flips at the release.
 
+- **Added 2026-11-10 (Matt):** scales on the Keys page show as ONE colored dot
+  per key (the LUMI colors) instead of whole painted keys ("Whole keys" stays
+  as an option), and a **chord chart maker** (Keys › Charts, `js/chordchart.js`,
+  `docs/CHORD-CHARTS.md`): tap keys for dots, finger numbers, chord names,
+  chords or a bass line, lit on the LUMI, saved as a file, MIDI or printed.
+  Piano first; a guitar-neck chart reuses the same format later (Phase C).
+
 ## Phases
 
 | # | Phase | Scope | Needs |
