@@ -20,6 +20,43 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
   await page.waitForFunction(() => window.App && App.keys && App.keysLessons && App.active === 'quiz');
   await page.evaluate(() => App.switchTo('piano'));
 
+  console.log('# Scale look: dots (2.0 default) vs whole keys');
+  const look = await page.evaluate(() => {
+    App.emit('fb:set', { source: 't', root: 0, scale: 'major', mode: 1 });
+    App.keys.setAssist(3);
+    const keys = () => [...document.querySelectorAll('#pn-svg .pn-key')];
+    const o = {
+      def: document.querySelector('#pn-look .active').getAttribute('data-pnlook'),
+      dots: document.querySelectorAll('#pn-svg .pn-sdot').length,
+      painted: keys().filter(k => /fill:/.test(k.getAttribute('style') || '')).length,
+      roots: document.querySelectorAll('#pn-svg .pn-sdot.pn-sroot').length,
+      blackDots: [...document.querySelectorAll('#pn-svg .pn-sdot')].filter(d => [1, 3, 6, 8, 10].includes(+d.getAttribute('data-pc'))).length
+    };
+    App.emit('midi:note', { on: true, midi: 64, vel: 90, silent: true });
+    o.pressDot = document.querySelector('#pn-svg .pn-key[data-midi="64"]').style.fill;
+    App.emit('midi:note', { on: false, midi: 64, silent: true });
+    App.keys.setAssist(2);
+    o.dotsTarget = document.querySelectorAll('#pn-svg .pn-sdot').length;
+    o.lookHidden = document.getElementById('pn-look').hidden;
+    App.keys.setAssist(3);
+    document.querySelector('#pn-look [data-pnlook="keys"]').click();
+    o.keysDots = document.querySelectorAll('#pn-svg .pn-sdot').length;
+    o.keysPainted = keys().filter(k => /fill:/.test(k.getAttribute('style') || '')).length;
+    o.stored = localStorage.getItem('guitarlab.pn.look');
+    // D major puts dots on black keys too (F#, C#)
+    App.emit('fb:set', { source: 't', root: 2, scale: 'major', mode: 1 });
+    document.querySelector('#pn-look [data-pnlook="dots"]').click();
+    o.dBlack = [...document.querySelectorAll('#pn-svg .pn-sdot')].filter(d => [1, 6].includes(+d.getAttribute('data-pc'))).length;
+    document.querySelector('#pn-look [data-pnlook="keys"]').click(); // the Help-level checks below read painted keys
+    App.emit('fb:set', { source: 't', root: 0, scale: 'major', mode: 1 });
+    return o;
+  });
+  ok(look.def === 'dots' && look.dots > 20 && look.painted === 0 && look.roots >= 4 && look.blackDots === 0, 'dots are the default: one dot per C-major key, keys stay ivory, tonic dots ringed ' + JSON.stringify(look));
+  ok(/^#|rgb/.test(look.pressDot), 'a pressed key still flashes its color with dots: ' + look.pressDot);
+  ok(look.dotsTarget === 0 && look.lookHidden, 'Target level: no dots, the Dots/Whole keys switch hides');
+  ok(look.keysDots === 0 && look.keysPainted > 20 && look.stored === '"keys"', 'Whole keys paints the keys and is remembered');
+  ok(look.dBlack >= 6, 'D major: dots on the F# and C# black keys (' + look.dBlack + ')');
+
   console.log('# Help levels');
   const lv = await page.evaluate(() => {
     App.emit('fb:set', { source: 't', root: 0, scale: 'major', mode: 1 });

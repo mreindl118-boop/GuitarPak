@@ -240,6 +240,22 @@ js/keylessons.js  │ SCALE LESSONS on the Keys page (mounted into #pn-lessons
                   │  Stores kl.prog/kl.sel/kl.tier/kl.reps; wake tag kl-run
                   │  (ledger area Keys); stops on transport:claim, page
                   │  hide, app hide; summary() feeds Exercises Progress.
+js/chordchart.js  │ CHORD CHART MAKER (2.0, page 'chart', Keys pill "Charts",
+                  │  prefix cc-, store cc.charts / cc.active / cc.lumi): Matt's
+                  │  paper chord sheets in the app - rows of 2-3 octave keyboards,
+                  │  tap = dot (App.colors.forPitch = LUMI colors), finger tool
+                  │  1-5, Add fingers (teacher rules: 135 / 125 / 1245 / 1235,
+                  │  L hand mirrored), chord names found from the dots (slash
+                  │  chords), Chord or Line (bass line, in placed order), Undo,
+                  │  Play it in (midi:note drops dots), Light the LUMI (App.midi.
+                  │  guide now + next), Play all (1 bar per keyboard at met.bpm,
+                  │  transport:claim 'chart'), Save file (.chart.json v1, clean()
+                  │  on open), Save MIDI, Practice with LUMI (-> Woodshed
+                  │  importMidi/addScore), Print (chart only). Hook window.SLChart,
+                  │  suite tests/chordchart.test.js, docs/CHORD-CHARTS.md.
+                  │  KEYS PAGE DOTS (2.0): pn.look 'dots' (default: one colored
+                  │  .pn-sdot per scale key, tonic ringed, keys stay ivory) |
+                  │  'keys' (the old whole-key paint); seg #pn-look.
 js/songs.js       │ (songs: user-imported ASCII tab / MIDI parsed on-device,
                   │  bar-loop player at shared tempo, key detect → fb:set)
                   │  1.3 ONE OPEN: the "Open a score" card above Add a song
