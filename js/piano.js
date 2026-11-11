@@ -265,7 +265,7 @@
   // per-channel bend (ROLI key wiggle) and pressure shape the live note.
   var heldVoices = {};
 
-  // ---- synth voice (the Studio's MPE synth, playable right here) ----
+  // ---- synth voice (the MPE synth from js/daw/synth.js, playable right here) ----
   // pn.voice: 'piano' (sampled grand) or a DAW.SYNTH_PRESETS id. The synth
   // gets true MPE: per-channel bend and pressure route straight into it.
 
@@ -284,7 +284,7 @@
     if (!preset) { pnSyn = null; return null; }
     pnSyn = DAW.createSynth(ctx, preset.params);
     var trim = ctx.createGain();
-    trim.gain.value = 0.55; // presets are mixed hot for the studio chain
+    trim.gain.value = 0.55; // the presets are mixed hot
     pnSyn.output.connect(trim);
     trim.connect(ctx.destination);
     pnSynFor = pnVoice;
@@ -1337,7 +1337,7 @@
               '<span class="chip" id="pn-octlabel"></span>' +
               '<button type="button" class="btn sm" id="pn-octup" aria-label="Keys octave up">' + App.icon('plus', 13) + '</button>' +
             '</span>' +
-            '<label class="field pn-inl" title="What this keyboard sounds like — the sampled grand, or the Studio&rsquo;s MPE synth presets (full pitch-bend / pressure expression from a ROLI)">Voice' +
+            '<label class="field pn-inl" title="What this keyboard sounds like — the sampled grand, or the MPE synth presets (full pitch-bend / pressure expression from a ROLI)">Voice' +
               '<select id="pn-voice"><option value="piano">Grand piano</option></select></label>' +
             '<button type="button" class="btn sm" id="pn-qwmap" title="Remap which computer key plays which note">Remap</button>' +
             '<button type="button" class="btn sm" id="pn-rotate" title="Rotate the keyboard (portrait / landscape)" aria-label="Rotate the keyboard">' + App.icon('rotate', 14) + '</button>' +
@@ -1752,7 +1752,7 @@
       setTimeout(function () { noteOff(midi, 98); }, 450);
       pressKey(midi);
       guideCheck(midi);
-      // tap = a short note for the capture service (no key-up to wait for)
+      // tap = one short note for the note:input listeners (no key-up to wait for)
       App.emit('note:input', { on: true, midi: midi, vel: 90, src: 'touch', dur: 0.5 });
     });
 
@@ -1761,12 +1761,9 @@
     // is held — same visual language as QWERTY input. ----
     App.on('midi:note', function (d) {
       if (!d) return;
-      // in the Studio with a track armed, the TRACK's instrument sounds the
-      // note (studio.js routes it) — the piano voice would double it
-      var studioArmed = App.space === 'studio' && App.store.get('st.armed', null);
       var padsOwn = App.active === 'pads'; // the pads page owns the keys there
       if (d.on) {
-        if (!studioArmed && !padsOwn && !d.silent && !d.mute) noteOn(d.midi, d.vel, d.chan);
+        if (!padsOwn && !d.silent && !d.mute) noteOn(d.midi, d.vel, d.chan);
         pressKeyHold(d.midi, true);
         guideCheck(d.midi);
       } else {
@@ -1859,7 +1856,7 @@
 
   function onShow() {
     render();       // palette may have been customized in the fretboard settings
-    paintVoiceSel(); // synth presets (incl. plugins) are loaded by now
+    paintVoiceSel(); // synth presets are loaded by now
     scrollToWindow();
   }
 
@@ -1907,7 +1904,7 @@
   });
 
   // ---- the SYNTH page: the same playable keyboard, voice forced to the
-  // Studio synth presets. One DOM, borrowed while the page is open — every
+  // synth presets. One DOM, borrowed while the page is open — every
   // input path (touch, QWERTY, MIDI, tone-in) and the Perform layer come
   // along for free.
   App.register('synth', {

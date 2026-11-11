@@ -1,7 +1,7 @@
 /* GuitarLab service worker — cache-first so the app works fully offline once visited. */
 // 2.0 (branch v2): caches are 'soundlab2-*' so the beta at /next/ never touches the
 // live app's 'guitarlab-*' caches on the same origin (and only cleans up its own).
-var CACHE = 'soundlab2-v3';
+var CACHE = 'soundlab2-v5';
 var ASSETS = [
   '.',
   'index.html',
@@ -38,8 +38,6 @@ var ASSETS = [
   'js/settings.js',
   'js/daw/synth.js',
   'js/daw/engine.js',
-  'js/studio.js',
-  'js/arrange.js',
   'js/woodshed.js',
   'js/performance-engine.js',
   'js/performance-player.js',
@@ -61,7 +59,6 @@ var ASSETS = [
   'js/practiceplan.js',
   'js/helix.js',
   'js/help.js',
-  'js/plugins.js',
   'manifest.webmanifest',
   'icons/icon-192.png',
   'icons/logo.svg',
@@ -120,7 +117,7 @@ self.addEventListener('fetch', function (e) {
   // never intercept cross-origin requests (e.g. the version.json update check)
   if (e.request.url.indexOf(self.location.origin) !== 0) return;
   e.respondWith(
-    caches.match(e.request, { ignoreSearch: true }).then(function (hit) {
+    caches.open(CACHE).then(function (c) { return c.match(e.request, { ignoreSearch: true }); }).then(function (hit) {
       return hit || fetch(e.request).then(function (res) {
         var copy = res.clone();
         caches.open(CACHE).then(function (c) { c.put(e.request, copy); });

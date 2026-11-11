@@ -51,7 +51,7 @@ async function newPage(browser, seed, native) {
   page.on('pageerror', e => errs.push(e.message));
   await page.goto(env.URL);
   await page.waitForFunction(() => window.App && App.midi && App.midi.ready && App.active === 'quiz' && App.remote);
-  // a test page that records what reaches it (addPage = the plugin page API)
+  // a test page that records what reaches it (addPage = the internal page hook; its third argument is ignored)
   await page.evaluate(() => {
     window.__rm = []; window.__rmKey = true;
     App.addPage('rmtest', 'RM test', 'practice', { init: function () {}, remoteKey: function () { return window.__rmKey; },

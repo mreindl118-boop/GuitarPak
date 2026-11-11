@@ -2948,7 +2948,7 @@
     // new in 0.69: land here once so the course is the first thing seen
     if (!App.store.get('qz.landed', false)) {
       App.store.set('qz.landed', true);
-      setTimeout(function () { if (App.space === 'practice' && App.active !== 'quiz') App.switchTo('quiz'); }, 0);
+      setTimeout(function () { if (App.active !== 'quiz') App.switchTo('quiz'); }, 0);
     }
   }
 
@@ -2982,7 +2982,7 @@
   App.register('quiz', {
     init: init,
     onShow: function () {
-      // a focused space: silence the metronome / jam / loops while here
+      // a focused space: silence the metronome / jam / lesson and chart runs while here
       App.emit('transport:claim', { owner: 'quiz' });
       if (App.midi && App.midi.hideLayout) App.midi.hideLayout('quiz', view === 'run');
       if (view !== 'run') {

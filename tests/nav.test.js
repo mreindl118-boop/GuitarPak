@@ -151,26 +151,6 @@ const tabs = sel => [...document.querySelectorAll(sel + ' .tabbar-btn')].map(b =
   ok(!ov, 'phone: no sideways scroll');
   ok(errs.length === 0, 'no page errors (phone)' + (errs.length ? '\n    ' + errs.join('\n    ') : ''));
   await ctx.close();
-
-  console.log('# studio space');
-  ({ ctx, page, errs } = await open(b, { width: 1280, height: 800 }));
-  await page.click('#space-btn'); await page.waitForTimeout(900);
-  const st = await page.evaluate(() => ({ space: App.space, tabs: [...document.querySelectorAll('#tabbar .tabbar-btn')].map(b => b.textContent).join('|'), active: App.active }));
-  ok(st.space === 'studio' && st.tabs === 'Studio|Sketch', 'studio tabs: ' + JSON.stringify(st));
-  // a second switch started right after the first finished must not be eaten
-  // by the first wipe's leftover safety timers (it used to land nowhere)
-  const quick = await page.evaluate(async () => {
-    const wipe = document.getElementById('wipe'), t0 = performance.now();
-    App.setSpace('practice');
-    while (performance.now() - t0 < 2000 && (App.space !== 'practice' || wipe.style.display !== 'none')) await new Promise(r => setTimeout(r, 10));
-    const firstMs = Math.round(performance.now() - t0);
-    App.setSpace('studio');
-    await new Promise(r => setTimeout(r, 1500));
-    return { firstMs, space: App.space, curtain: wipe.style.display };
-  });
-  ok(quick.space === 'studio' && quick.curtain === 'none', 'a quick second workspace switch lands: ' + JSON.stringify(quick));
-  ok(errs.length === 0, 'no page errors (studio)' + (errs.length ? '\n    ' + errs.join('\n    ') : ''));
-  await ctx.close();
   await b.close();
   console.log(fails ? '\nFAILED: ' + fails : '\nALL PASS');
   process.exit(fails ? 1 : 0);
