@@ -152,8 +152,14 @@ never changes the live app. Both scripts are exercised locally by
 `tests/pages-deploy.test.js` and `tests/pages-next.test.js` against disposable
 bare repositories, with no network.
 
-Caveats of sharing one origin: the beta and the live app share `localStorage`
-until the 2.0 storage prefix lands (roadmap Phase A), and the live service
-worker deletes every cache it does not own when it updates, so the beta
+Sharing one origin. Storage is no longer shared between the beta and the live
+app (roadmap Phase A, step A4): the beta keeps its data under
+`soundlab2-next.*`, the live 1.x app under `guitarlab.*`, and 2.0 at the live
+address will use `soundlab2.*`. The beta copies the live app's data across once,
+at its first start in a browser, and never writes, deletes or changes a
+`guitarlab.*` key; a change made in one app no longer shows in the other. The
+browser still gives the origin ONE `localStorage` budget, so that copy counts
+against the same limit as the live app's data. One caveat remains: the live
+service worker deletes every cache it does not own when it updates, so the beta
 (caches `soundlab2-*`) refills on its next visit. The beta's worker only ever
 deletes `soundlab2-*` caches.

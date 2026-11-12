@@ -76,7 +76,7 @@ The step-by-step plan is `docs/plans/phase-a/PLAN.md`.
 | A2 | Trainer cards on the Plan page; Synth pill = the Sound picker on Piano; LUMI practice = a section under the Keys lessons | in review (draft pull request) | #100 |
 | A3a | Score player, synth-out and rule engine are shared files; the main app no longer calls the Hub | in review (draft pull request) | #101 |
 | A3b | soundLAB Gear (`gear.html`): Deck, Live sets, MIDI Hub, Helix leave the main app | in review (draft pull request) | — |
-| A4 | Storage prefix `soundlab2.*` (beta: `soundlab2-next.*`) with the one-time copy from `guitarlab.*` | planned | — |
+| A4 | Storage prefix `soundlab2.*` (beta: `soundlab2-next.*`) with the one-time copy from `guitarlab.*` | in review (draft pull request) | — |
 
 Decided while trimming (each takes effect with its step):
 
@@ -90,6 +90,9 @@ Decided while trimming (each takes effect with its step):
 - LUMI practice on the Piano page: while its section is open it owns the pedal; starting a lesson closes it.
 - The copy from `guitarlab.*` runs once per browser and never changes or deletes the 1.x data. Items that do
   not fit are tried again at each start. Studio, sampler and plug-in data is not copied and not deleted.
+- The beta has its own data (`soundlab2-next.*`). Practice done in the beta does not flow into the live app at
+  the release: the live address copies its own 1.x data then. Settings › Backup offers to copy again, and a
+  backup file from the beta restores on the live address.
 
 Removed in 2.0: `js/studio.js`, `js/arrange.js`, `js/plugins.js`, `plugins/`, `PLUGINS.md`.
 
@@ -99,7 +102,11 @@ Removed in 2.0: `js/studio.js`, `js/arrange.js`, `js/plugins.js`, `plugins/`, `P
 - Nothing lands on `main` before Phase I except the deployment plumbing.
 - Tests green before every merge; add suites for new features.
 - Private songs, teacher material and signing keys never enter the repo.
-- Phase 0 beta caveats: the beta and the live app share the browser origin, so
-  they share `localStorage` until Phase A adds the `soundlab2.*` prefix, and
-  the live service worker clears the beta's cache whenever the live app
-  updates (the beta refills on the next visit).
+- Beta caveats: the beta and the live app share the browser origin. The
+  shared-`localStorage` caveat of Phase 0 ended with Phase A (step A4): the
+  beta keeps its data under `soundlab2-next.*`, 2.0 at the live address will
+  use `soundlab2.*`, and neither writes, deletes or changes the live 1.x
+  app's `guitarlab.*` data (it is copied across once). What stays shared is
+  the browser's storage budget for the origin. The cache caveat stays: the
+  live service worker clears the beta's cache whenever the live app updates
+  (the beta refills on the next visit).

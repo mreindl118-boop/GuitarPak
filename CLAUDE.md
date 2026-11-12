@@ -3,9 +3,14 @@
 Guitar + keys practice PWA (vanilla HTML/CSS/JS, no build step) + Android
 WebView wrapper. GitHub: https://github.com/mreindl118-boop/GuitarPak
 Branded **soundLAB** (formerly GuitarLab) since v0.43.0 — the rename is
-user-facing ONLY: storage keys stay 'guitarlab.*', the APK ships as
-soundLAB-alpha.apk (a GuitarLab-alpha.apk copy keeps old links alive), and
-internal ids/comments are untouched. ANDROID (v0.70.2): the app is now
+user-facing ONLY: the APK ships as soundLAB-alpha.apk (a GuitarLab-alpha.apk
+copy keeps old links alive), and internal ids/comments are untouched.
+STORAGE: the 1.x app (branch main) keeps its data under 'guitarlab.*'. 2.0
+(branch v2, since Phase A4) keeps its own under 'soundlab2.*'
+('soundlab2-next.*' on the beta under /next/). For 2.0 'guitarlab.*' is the
+1.x store: copied across ONCE at the first start and never written, deleted
+or changed (App.store in js/app.js; Phase A section, A4).
+ANDROID (v0.70.2): the app is now
 com.mreindl.soundlab signed with soundlab.keystore (new key) — the old
 com.mreindl.guitarlab (old key) is retired; users installed the new app and
 deleted the old one. The wordmark is a
@@ -56,7 +61,8 @@ css/style.css     design system ("stage gear": #131114 ground, #ffab47 amber,
 js/theory.js      pure music-theory engine (scales, tunings, chords, diatonic
                   harmony, progressions) — no DOM
 js/app.js         shell: module registry, tab switching, shared AudioContext +
-                  App.pluck, App.store (localStorage 'guitarlab.*'), App.on/emit
+                  App.pluck, App.store (JSON localStorage under the 2.0
+                  prefix: STORAGE at the end of this entry), App.on/emit
                   event bus, APP_VERSION + auto-update checker. 2.0 Phase A3b
                   TWO APPS FROM ONE FILE: APPS = {main, gear}, each {url,
                   name, tabKey, pages, groups}; APP_ID ('gear' when <html
@@ -69,6 +75,87 @@ js/app.js         shell: module registry, tab switching, shared AudioContext +
                   address (gear.html#midihub, index.html#settings) is read at
                   boot and on hashchange, then cleared. Details: Phase A
                   section, A3b.
+                  2.0 Phase A4 STORAGE (App.store; the ONLY code in js/ that
+                  touches localStorage). ONE PREFIX PER ADDRESS: App.store.
+                  prefix = 'soundlab2-next.' when the path ends in
+                  /next/<file> (the beta), else 'soundlab2.' (the live
+                  address, the test server, file://, the artifact).
+                  App.store.legacy = 'guitarlab.' = the 1.x store: READ by
+                  the copy below, never written, deleted or changed (the
+                  live 1.x app on the same origin still uses it). get(key,
+                  fallback) / set(key, value) = JSON, as always (a refused
+                  write is swallowed); keys() = this scope's keys WITHOUT
+                  the prefix; raw(key) = the stored string as it is, or
+                  null; setRaw(key, raw) = store a string as it is, true
+                  when it read back (the Backup import). App.store.deny =
+                  a RegExp tested against a key WITHOUT its prefix = the
+                  keys of features Phase A removed, never copied and never
+                  imported: st.*, ideas.*, song.*, sd.*, plugins.*,
+                  app.space, app.tabStudio, app.click, pads.track,
+                  app.gtab.gstudio / gsketch / gpl-*, tr.earBest,
+                  tr.earHarm. A DENY list, not an allow list: everything
+                  else travels, also a key nobody listed, and with it the
+                  five one-time migration markers (fb.migr24,
+                  midi.allIn.v1, midi.voiceAuto, lights.v1, jam2.migr),
+                  which must arrive together with the settings they guard
+                  or a 1.x migration runs again.
+                  THE ONE-TIME COPY, importOnce(): once per scope, run
+                  SYNCHRONOUSLY right where the store is defined (never in
+                  boot(): js/midi.js writes to the store while it loads,
+                  and a later copy would find those keys taken and leave
+                  the user's values behind). Triggered by the MARKER key
+                  'store.imported' (never by a version number) = {v, from,
+                  at, copied, skipped, failed: [keys], kept: [keys]}. No
+                  marker = copy from the source ('guitarlab.'; on the beta
+                  'soundlab2.' once the live scope has its own marker),
+                  copy-only, never over a key this scope already has, then
+                  write the marker. COPY ORDER (every write on its own,
+                  read back, a refused one listed in failed, never
+                  thrown): 1 every value of at most 4,096 characters
+                  (STORE_SMALL: settings, flags, the migration markers),
+                  2 longer values of STORE_PROGRESS keys (practice.
+                  progress.*, lesson.*, qz.*, kl.*, xp.*, pp.*, tr.*, the
+                  ws.* progress keys: what cannot be made again), 3 longer
+                  values of STORE_LIBS keys (ws.lib, sg.lib, cc.charts,
+                  jam2.sections, midihub.*, synthtab.*, hx.*: what a file
+                  can bring back), 4 any other longer value; smallest
+                  first inside a group. HEADROOM: after the last write a
+                  probe of 200,000 characters (STORE_ROOM) must still fit
+                  (written, then removed under the key 'store.probe';
+                  only tried when this run made a copy it could take
+                  back). While it does not, the copy
+                  takes back copies THIS RUN made, group 4 first, then 3,
+                  then 2, largest first, and lists them as failed; never a
+                  group-1 key, never a key that was there before the run.
+                  RETRY: a marker with failed keys is tried again at every
+                  start, with the same headroom check. A failed key that
+                  2.0 has written itself by then moves to `kept` (never
+                  overwritten, never tried again); one whose source is
+                  gone is dropped; the marker is rewritten only when it
+                  changed. A marker with an empty failed list returns at
+                  once. START NOTICE: boot(), both apps, after the start
+                  tab is shown, App.toast at EVERY start while failed is
+                  not empty (8 s; joined with the other start notices when
+                  there are any): "Some of your 1.x data did not fit in
+                  this browser's storage (N items). soundLAB tries again
+                  each time it starts. Details: soundLAB › Settings ›
+                  Backup." ("data from the live app" on the beta when its
+                  copy came from the live 2.0 scope.) It is the only place
+                  boot() touches the copy.
+                  importInfo() = the marker or null (a normalised copy;
+                  from memory when the marker itself could not be
+                  stored); copyAgain() = the same copy (same order, same
+                  headroom) OVER what this scope has, then a fresh marker
+                  (Settings › Backup, #set-copy-again); it returns
+                  importInfo(). waiting(key) = true while the key is in
+                  `failed`, i.e. still waits for its copy: a page that
+                  fills an EMPTY key with a default asks first and keeps
+                  the default in memory (js/chordchart.js cc.charts,
+                  js/practiceplan.js pp.students + pp.sessions), because
+                  a stored default would be "2.0's own data" at the next
+                  start and end the retry. Blocked or full storage never
+                  stops the app from starting. Rules for everything else:
+                  Phase A section, A4. Suite tests/storage-import.test.js.
 js/midi.js        MIDI service (App.midi: in/out ports, note/bend/pressure
                   events on the bus). Backends: Web MIDI, or the NATIVE
                   bridge protocol (window.__glMIDI.onports/onmidi/onstatus +
@@ -232,10 +319,14 @@ js/audioin.js     SOUND INPUT (App.audioIn): the ONE shared live-input service.
                   queues again, so it takes over when the owner closes (a
                   grant from the queue with audio.monitor on = the launch
                   restore, permission check first). ONE 'storage' listener
-                  (key ending in audio.monitor, or null) keeps the 'other'
-                  hold and the views in step with a press made in the other
-                  window; it never routes, opens or steals (Chromium can
-                  deliver the lock news before the stored value). No Web
+                  (key === App.store.prefix + 'audio.monitor', or null = a
+                  cleared store) keeps the 'other' hold and the views in
+                  step with a press made in the other window; it never
+                  routes, opens or steals (Chromium can deliver the lock
+                  news before the stored value). Since 2.0 Phase A4 only
+                  THIS scope's key counts: the live 1.x app and the beta
+                  keep the same switch under their own prefix on the same
+                  origin, and a write there is not this app's. No Web
                   Locks, or a refused request (the claude.ai viewer, old
                   WebViews) = owner from the start, everything as before.
                   Nothing is stored. App.audioIn.mountSwitch(el) = "Hear
@@ -316,9 +407,12 @@ js/midirules.js   MIDI RULES (App.midiRules, 2.0 Phase A3a): the MIDI Hub's
                   is on, null while it is off (the ONE filter slot stays free;
                   tests/midihub.test.js asserts both). Runs at load, when the
                   tab becomes visible again and on a 'storage' event whose key
-                  ENDS in midihub.rulesIn (or is null = a cleared store): the
-                  box ticked in ANOTHER window of the origin; the window that
-                  ticks it calls install() itself (the Hub's installFilter).
+                  is App.store.prefix + 'midihub.rulesIn' (or null = a cleared
+                  store): the box ticked in ANOTHER window of this app; the
+                  window that ticks it calls install() itself (the Hub's
+                  installFilter). Since 2.0 Phase A4 only THIS scope's key
+                  counts (the live 1.x app and the beta keep the same box
+                  under their own prefix on the same origin).
                   active() -> {on, rules} (rules = enabled count; soundLAB's
                   Settings line #set-midi-rules shows it). Bus
                   'midirules:state' {on, rules} when the installed state
@@ -405,6 +499,9 @@ js/chordchart.js  │ CHORD CHART MAKER (2.0, page 'chart', Keys pill "Charts",
                   │  on open), Save MIDI, Practice with LUMI (-> Woodshed
                   │  importMidi/addScore), Print (chart only). Hook window.SLChart,
                   │  suite tests/chordchart.test.js, docs/CHORD-CHARTS.md.
+                  │  An empty cc.charts gets a blank "My first chart", stored at
+                  │  once, except while App.store.waiting('cc.charts') (2.0 Phase
+                  │  A4: the 1.x charts did not fit yet; then it stays in memory).
                   │  KEYS PAGE DOTS (2.0): pn.look 'dots' (default: one colored
                   │  .pn-sdot per scale key, tonic ringed, keys stay ivory) |
                   │  'keys' (the old whole-key paint); seg #pn-look.
@@ -540,6 +637,31 @@ js/settings.js    ┘ (settings: app-level prefs — theme dark/light/auto; MIDI
                      last use of the input ended in ANOTHER window (Off
                      pressed on Gear's Hub while Settings is open here), or
                      the meter would keep the device open.
+                     2.0 Phase A4 BACKUP CARD (all through App.store, no
+                     localStorage here): #set-backup-info = what the
+                     one-time copy did, from App.store.importInfo()
+                     ("Copied your 1.x data on <date>: N items." + the
+                     keys that did not fit and are tried again at each
+                     start + the keys left alone because 2.0 has its own
+                     data there; painted at init and on show).
+                     #set-copy-again "Copy my 1.x data again" (on the beta
+                     "Copy from the live app again"): TWO taps within 3 s,
+                     the second labelled "Tap again: this overwrites 2.0
+                     settings", then App.store.copyAgain() and a reload;
+                     no confirm() (the artifact frame refuses it). EXPORT
+                     = format 2: {app: 'soundLAB', format: 2, from:
+                     App.version, scope: App.store.prefix, keys:
+                     {'<prefix><key>': raw string}}, this scope's keys
+                     only, without the copy's marker. IMPORT takes keys
+                     that start with 'soundlab2.' or 'soundlab2-next.'
+                     (a beta file restores on live and the other way
+                     round) and old 'guitarlab.' keys (a 1.x file), strips
+                     the prefix and writes under THIS scope with setRaw:
+                     string values only, App.store.deny keys skipped,
+                     never a 'guitarlab.' key written; it reports "N
+                     settings restored, M from removed features skipped"
+                     and reloads. A1's `DEAD` regex is gone (the deny
+                     list replaced it).
 js/lights.js      LIGHTS & HELP control center (sheet 'lights', header
                   #lights-btn): Help level + key lights (on/off, LUMI colors,
                   brightness, keyboard type, status/range, test) — the same
@@ -627,7 +749,12 @@ js/practiceplan.js PRACTICE PLAN ('practiceplan', Learn group pill "Plan",
                   (module-gap metric, exportable). Stores pp.students /
                   pp.active / pp.sessions (90 days) / pp.history / pp.running
                   / pp.gaps. App.practicePlan test hook. Suite
-                  tests/practiceplan.test.js.
+                  tests/practiceplan.test.js. The two defaults (the starter
+                  student when pp.students is empty, today's empty session in
+                  pp.sessions) are stored at once, except while
+                  App.store.waiting(key) (2.0 Phase A4: the 1.x value did not
+                  fit yet; then they stay in memory until real progress is
+                  saved).
                   FREE PRACTICE (2.0 Phase A2, the former Trainer page):
                   <details class="pp-tools" id="pp-tools"> ("Free practice:
                   timer, prompts, one-minute chord changes", closed by
@@ -1105,13 +1232,15 @@ A1 (Studio space, sequencer/arranger, sampler, plug-in API removed):
   origin and still uses it): st.*, ideas.list, song.name, sd.*, plugins.list,
   app.space, app.tabStudio, app.click, pads.track have no reader and no
   writer; the IndexedDB 'guitarlab-daw' is never opened. Settings › Backup
-  import skips those keys (`DEAD` in js/settings.js), writes string values
-  only and says how many it skipped; the export is unchanged until A4.
+  import skips those keys, writes string values only and says how many it
+  skipped. Since A4 they are also never COPIED into the 2.0 store, the one
+  list of them is App.store.deny (A1's `DEAD` regex in js/settings.js is
+  gone) and the export is format 2 (see A4).
 - NO PLUG-IN API: js/plugins.js, plugins/, PLUGINS.md and the Settings card
   are gone, nothing runs stored code. `App.addPage(id, label, sp, mod)` stays
   as an INTERNAL test hook (tests/remote.test.js; `sp` is ignored).
-- sw.js: A1 set `CACHE` to 'soundlab2-v5' (A2 v6, A3a v7, A3b v8 = the
-  number now, A4 v9; v4 is skipped on purpose). The fetch handler looks ONLY in
+- sw.js: A1 set `CACHE` to 'soundlab2-v5' (A2 v6, A3a v7, A3b v8, A4 v9 =
+  the number now; v4 is skipped on purpose). The fetch handler looks ONLY in
   its own cache
   (`caches.open(CACHE)` then `match(req, {ignoreSearch: true})`), never the
   global `caches.match`: the live worker's cache on the same origin can hold
@@ -1121,7 +1250,10 @@ A1 (Studio space, sequencer/arranger, sampler, plug-in API removed):
   page, a stale stored space/tab boots to Exercises and App.switchTo('arrange')
   lands there with the toast, the kept sounds play, the Backup skip) and
   `assets` (pure Node: index.html scripts + stylesheets <-> disk <-> sw.js
-  ASSETS; since A3b gear.html too, see A3b).
+  ASSETS; since A3b gear.html too, see A3b; since A4 the storage check, see
+  A4). Since A4 `trim` seeds the removed features' keys where a 1.x profile
+  has them, in the 1.x store ('guitarlab.*'): they stay byte-identical
+  there and none of them arrives in the 2.0 store.
 - NEVER DELETE BY PREFIX: `st-` ids and classes are also the Synth tab's
   (js/synthtab.js, js/synthlive.js); "Studio" in Jam is a drum kit id
   (jam2.kit = 'studio'); `addPage` in js/synthdeck.js is the Deck's own.
@@ -1248,8 +1380,9 @@ controls and what it sends are as before):
   calls paint() on show).
 - THE INPUT FILTER FOLLOWS THE STORE: App.midiRules.install() runs at load,
   when the tab becomes visible again and on a 'storage' event for
-  midihub.rulesIn (the box ticked in another window; the key is matched by
-  suffix, so A4's prefix change does not break it). The filter slot is null
+  midihub.rulesIn (the box ticked in another window; since A4 the key must
+  be this scope's, App.store.prefix + 'midihub.rulesIn', see A4: A3a
+  matched it by suffix). The filter slot is null
   while the box is off: never install a filter that is always on. The Hub's
   box (#mh-rulesin) listens to 'midirules:state', so it shows what this
   window has installed and one click switches it off again.
@@ -1364,7 +1497,9 @@ today's look and behaviour on both sides):
   (midi.*, lights.*, remote.*, midihub.*, synthtab.*, hx.*, key, scale,
   tempo, theme, audio.*) is shared: a second window sees a change on its
   next read. TWO 'storage' listeners exist: js/midirules.js
-  (midihub.rulesIn) and js/audioin.js (audio.monitor). No migration.
+  (midihub.rulesIn) and js/audioin.js (audio.monitor). No migration. (A4:
+  both apps use the SAME prefix at one address, so all of this holds under
+  'soundlab2.*'; each listener takes only its key with that prefix.)
 - THE PLAYER IS IN BOTH APPS (js/scoreplayer.js, one mount per document):
   soundLAB = the Songs page, #sg-player under "Open a score" (js/songs.js
   entry above); Gear = the Hub's Player view, as before, without "Open as
@@ -1410,7 +1545,8 @@ today's look and behaviour on both sides):
   receive the keyboard.
 - ONE WORKER, ONE MANIFEST: gear.html registers the same sw.js and links
   the same manifest.webmanifest (no `shortcuts` entry, no separate install:
-  Phase H). sw.js: `CACHE` 'soundlab2-v8'; ASSETS gained 'gear.html'; the
+  Phase H). sw.js: A3b set `CACHE` to 'soundlab2-v8'; ASSETS gained
+  'gear.html'; the
   gear js files and data/ stay listed (one worker serves both pages). Both
   Pages workflows publish the whole tree, so gear.html needs no workflow
   edit. android/build.sh, android/build.ps1 and ios/sync-web.sh copy
@@ -1474,6 +1610,144 @@ today's look and behaviour on both sides):
   design, Gear as its own installable app, Settings inside Gear, whether
   Gear keeps the metronome and the context bar (H); gear.html in the
   release probe, the claude.ai artifact and the native bundles (I).
+
+A4 (storage: 2.0 has its own prefix and copies the 1.x data across once;
+nothing on screen changes except the Backup card and one start notice):
+
+- THE "READ FIRST" PARAGRAPH AT THE TOP IS OUT OF DATE ON THIS POINT: it
+  still says beta + live share `localStorage` and that the prefix "comes in
+  Phase A". It is left alone on purpose (PR #98 rewrites that paragraph);
+  this block is what is true. The cache caveat there still holds.
+- ONE PREFIX PER ADDRESS (js/app.js, App.store.prefix): 'soundlab2-next.'
+  when the path ends in /next/<file> (the beta: /GuitarPak/next/,
+  /next/index.html, /next/gear.html), 'soundlab2.' everywhere else (the
+  live address, the test server, file://, the claude.ai artifact).
+  'soundlab2-next.' does not start with 'soundlab2.', so a listing of the
+  live scope never picks up beta keys. Key NAMES are unchanged (fb.root,
+  met.bpm, kl.prog, ...): every store key named in this file lives under
+  that prefix. soundLAB and soundLAB Gear use the SAME prefix at one
+  address, so they are still one store (A3b), and the copy runs whichever
+  page is opened first. The beta and the live app no longer share settings
+  or progress: practice done in the beta does not flow into the live app,
+  and the live address copies the then-current 1.x data when 2.0 is
+  released there (Phase I).
+- 'guitarlab.*' IS THE 1.X STORE, READ-ONLY FOR 2.0: no 2.0 code writes,
+  removes or changes a 'guitarlab.*' key (removed feature or not), and none
+  opens or deletes the IndexedDB 'guitarlab-daw'. The live 1.x app on the
+  same origin still uses both. Deleting them is an explicit Settings action
+  in a release after 2.0, never a side effect.
+- EVERYTHING GOES THROUGH App.store: no file but js/app.js calls
+  localStorage, and no file spells a storage prefix to build a key. Raw
+  strings = App.store.raw(key) / setRaw(key, raw), a key listing =
+  App.store.keys(), the 1.x prefix = App.store.legacy, "is this a removed
+  feature's key" = App.store.deny.test(key), all with the key WITHOUT its
+  prefix. The two exceptions, both for reading a file or an event, never
+  for a write: the Backup card in js/settings.js names the two 2.0
+  prefixes to read a backup file, and the two 'storage' listeners compare
+  with App.store.prefix + '<key>'. A new store key needs nothing: it lives
+  under the prefix by itself and is copied, exported and imported like any
+  other.
+- THE ONE-TIME COPY (importOnce in js/app.js; the full contract is at the
+  js/app.js layout entry): once per scope, synchronously where the store is
+  defined, marker 'store.imported' {v, from, at, copied, skipped, failed,
+  kept}, copy-only, never over an existing key; source 'guitarlab.' (on the
+  beta 'soundlab2.' once the live scope has its own marker). Order: small
+  values (<= 4,096 characters) first, then large progress, then large
+  libraries, then any other large value. Headroom: 200,000 characters stay
+  free, kept by undoing this run's own lowest-priority copies. Keys that
+  did not fit are in `failed` and are tried again at every start; a key 2.0
+  wrote itself meanwhile moves to `kept` and is never overwritten. While
+  `failed` is not empty both apps say so at every start (App.toast, 8 s)
+  and Settings › Backup names the keys. A DEFAULT IS NOT "2.0's OWN DATA":
+  a page that fills an EMPTY key with a default (the Charts page's blank
+  first chart, the Plan page's starter student and today's empty session)
+  asks App.store.waiting(key) first and does not store the default while
+  the key still waits; otherwise the next start would move the key to
+  `kept`, the retry and the notice would stop and the user's 1.x charts or
+  plan would stay behind without a word. A new page that stores a default
+  under a key a 1.x profile can hold does the same. Not covered: Jam saves
+  its whole state on any change, so a change made in Jam while
+  jam2.sections waits stores the default song there (a user action; the
+  Settings line then names the key and Copy again brings the 1.x song
+  back). NEVER: move the call into boot() or
+  after another script; key it on a version number; let it overwrite; let
+  it delete or "tidy" the source; write the marker before the copy; add a
+  second migration beside it.
+- THE DENY LIST (STORE_DENY = App.store.deny) IS THE ONE LIST OF REMOVED
+  FEATURES' KEYS: st.*, ideas.*, song.*, sd.*, plugins.*, app.space,
+  app.tabStudio, app.click, pads.track, app.gtab.gstudio / gsketch / gpl-*,
+  tr.earBest, tr.earHarm. The copy and the Backup import both read it.
+  Everything else is copied, on purpose: tr.sessions / tr.ccA / tr.ccB /
+  tr.best.*, pn.synthPreset, midihub.*, synthtab.*, hx.*, the read-only
+  history (xp.*, ws.xp, ws.streak), remote.*, gear.*, and the five
+  migration markers (fb.migr24, midi.allIn.v1, midi.voiceAuto, lights.v1,
+  jam2.migr): without them the fret count, the MIDI input and the voice
+  mode would be reset by a 1.x migration running again. A large key (more
+  than 4,096 characters) that is progress or a library belongs in
+  STORE_PROGRESS or STORE_LIBS, or it is copied last and undone first
+  (lesson.* of js/xp.js is in STORE_PROGRESS for that reason; the plan's
+  list did not have it).
+- 'storage' EVENTS: js/midirules.js (midihub.rulesIn) and js/audioin.js
+  (audio.monitor) take a key only when it is App.store.prefix + that name
+  (or null = the store was cleared). A3a / A3b matched by suffix; with
+  three prefixes on one origin that would react to the live 1.x app's or
+  the beta's switch. A new 'storage' listener matches the same way.
+- BACKUP (js/settings.js, layout entry above): the EXPORT is format 2,
+  {app: 'soundLAB', format: 2, from: <app version>, scope: <prefix>, keys:
+  {'<prefix><key>': raw string}} with this scope's keys only and without
+  the marker. The IMPORT reads format 2 files of either 2.0 scope and old
+  1.x files (it goes by each key's prefix: 'soundlab2.', 'soundlab2-next.'
+  or 'guitarlab.'; a 1.x file has no format field), writes every key under
+  THIS scope, string values only, skips the deny list and
+  reports "N settings restored, M from removed features skipped". It never
+  writes a 'guitarlab.' key. #set-backup-info shows what the copy did
+  (copied / did not fit / left alone); #set-copy-again = "Copy my 1.x data
+  again" (beta: "Copy from the live app again"), two taps within 3 s, no
+  confirm(), then App.store.copyAgain() (overwrites 2.0's values) and a
+  reload. The other export files carry no prefix and are unchanged (the
+  Hub, the Deck library, Live profiles, chord charts, practice progress).
+- sw.js: A4 set `CACHE` to 'soundlab2-v9'; ASSETS unchanged (no file added
+  or removed). Cache names ('soundlab2-v9') and storage keys
+  ('soundlab2.fb.root') only look alike.
+- SUITES: every browser suite seeds and reads back 'soundlab2.*' (index.html
+  and gear.html on the test server are the live scope). Seed under the 2.0
+  prefix BEFORE the app starts (the copy never overwrites, so such a seed
+  survives); do not seed 'guitarlab.*' and lean on the copy: read-backs and
+  mid-test writes would hit keys the app no longer reads, and the suite
+  passes while testing nothing. NEW, in the one list in tests/run.sh:
+  `storage-import` (a fresh browser context per case: an empty browser; a
+  1.x profile copied byte for byte with the removed features' keys left
+  out and a stored plug-in never run; the migration markers; the 1.x store
+  untouched after a start, a key and tempo change, a visit to every page
+  and a reload, with no 'guitarlab.*' setItem / removeItem and no
+  indexedDB.open; runs once; never overwrites; the beta scope served under
+  /next/; refused writes and a full store incl. the copy order, headroom,
+  retry, `kept`, the start notice, a page's default under a key that still
+  waits, and a fully blocked store; Backup format 2, a 1.x
+  file, a beta file on live, Copy again; gear.html opened first). `assets`
+  gained the STATIC CHECK: the old prefix is spelled ('guitarlab + dot' at
+  the start of a string, or in a regular expression) on ONE line of code
+  in js/, the STORE_LEGACY line of js/app.js, and in tests/ only by the
+  suites on its OLD_STORE_SUITES list (`storage-import`, and `trim` for the
+  removed features' 1.x keys and its 1.x backup file). A new suite that
+  needs the 1.x store goes on that list with its reason.
+- OTHER ORIGINS (read from the code, not run): the claude.ai artifact and
+  a file:// copy have their own localStorage; the same code copies that
+  origin's 'guitarlab.*' at the first 2.0 start. The Android app loads the
+  live address, so its copy happens there at the flip, without a new APK.
+- NOT SOLVED IN PHASE A: localStorage has ONE budget per origin and nothing
+  here frees space ('guitarlab.*' is never deleted, the live 1.x app keeps
+  writing it). An origin that is already full keeps an incomplete copy
+  until the user frees space; the 1.x data is untouched throughout and the
+  notice and the Settings line say so. After the flip the origin holds
+  three copies of the kept data (1.x, beta, live). The sizes of a real 1.x
+  profile were NOT measured: on the owner's profile note the total size of
+  'guitarlab.*' once (DevTools › Application).
+- DEFERRED, do not build in Phase A (PLAN.md section 9): whether the live
+  copy may offer to remove the beta scope's data ('soundlab2-next.*') when
+  the origin is short of room, service-worker cache names by scope and the
+  removal of 'guitarlab-*' caches on the live scope (I); a Settings action
+  that deletes 'guitarlab.*' and the 'guitarlab-daw' database (after 2.0).
 
 ## Cross-module conventions
 
@@ -1663,7 +1937,11 @@ today's look and behaviour on both sides):
   (fake media device), btmidi (a fake Android MidiBridge), trim (2.0 Phase
   A: what left the app stays gone, 1.x data untouched), assets (pure Node:
   the scripts + stylesheets of index.html and gear.html <-> disk <-> sw.js
-  ASSETS, and the shell markup the two files share), gear (soundLAB Gear:
+  ASSETS, the shell markup the two files share, and since 2.0 Phase A4 that
+  the 1.x storage prefix is spelled on one line of js/ and only by the
+  listed suites), storage-import (2.0 Phase A4: the one-time copy of the
+  1.x store, the beta scope, a full store, Backup format 2),
+  gear (soundLAB Gear:
   boot, its four pages, the links and #page both ways, Hear input with both
   apps open), remote-gear (the remote on Live sets and the Deck, the
   two-window pedal cases). TEN SUITES RUN ON GEAR_URL since 2.0 Phase A3b:
@@ -1673,7 +1951,10 @@ today's look and behaviour on both sides):
   (App.switchTo('piano') would leave the document). A two-app case opens
   two pages in ONE browser context (same store, same Web Locks) and sets
   each page's visibility / focus itself: headless Chromium reports every
-  page visible and focused. Run them
+  page visible and focused. STORAGE IN A SUITE (2.0 Phase A4): seed and
+  read back 'soundlab2.<key>' (the test server is the live scope), written
+  before the app starts; 'guitarlab.<key>' is the 1.x store, which the app
+  only copies from once (Phase A section, A4). Run them
   before every release and add a suite or checks for new features.
   `SL_LOG_DIR` keeps concurrent baseline/feature test logs separate. The
   quiz-correction suite covers fresh corrections after a miss and held-note

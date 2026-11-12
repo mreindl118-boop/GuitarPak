@@ -151,7 +151,14 @@ themselves. To check on the owner's Windows PC with the LUMI and the MODX:
   - `remote.map`: `{next|back|stop: {midi: {t, n, ch, port, latch}|null, key: {code, key}|null}}`
   - `remote.pt`: the page-turner keys
   - `remote.dbl`: the double-tap key
-  - All three are included in Settings › Backup, and both apps read them.
+  - All three live in the 2.0 store, under its prefix: `soundlab2.remote.map` and so on
+    (`soundlab2-next.remote.map` on the beta under `/next/`). Both apps read them there.
+  - All three are included in Settings › Backup. A 2.0 backup file holds them under that prefix
+    (`"soundlab2.remote.map"`); an import puts them into the store of the app that reads the file,
+    whether the file came from the live address, the beta or an older build.
+  - Bindings learned in the beta before the 2.0 prefix existed were stored under `guitarlab.*`. They
+    are copied across once with the rest of that data, at the first start; the `guitarlab.*`
+    originals are left as they are.
 - **API:** `App.remote` exposes `learn`, `cancelLearn`, `clear`, `setLatch`, `setPageTurner`,
   `setDoubleTap`, `map`, `summary`, `bindingText`, `fire(action, via)`, `mount`, `paint` and
   `holdsMain` (this document holds the shared lock: a visible soundLAB window; always false in Gear).
