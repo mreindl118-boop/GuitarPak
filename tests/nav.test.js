@@ -36,7 +36,7 @@ const tabs = sel => [...document.querySelectorAll(sel + ' .tabbar-btn')].map(b =
   ok(d1.topShown && !d1.botShown && d1.noSelect && !d1.metTab, 'top tab bar on desktop, no drop-down, no metronome tab: ' + JSON.stringify(d1));
   const clickTab = async (label, sel) => { await page.click((sel || '#tabbar') + ' .tabbar-btn:has-text("' + label + '")'); await page.waitForTimeout(120); return page.evaluate(() => App.active); };
   ok(await clickTab('Keys') === 'piano', 'Keys tab opens the piano');
-  ok((await page.evaluate(() => [...document.querySelectorAll('#subnav .subtab')].map(b => b.textContent).join('|'))) === 'Piano|Synth|Pads|LUMI', 'Keys pills: Piano, Synth, Pads, LUMI (the MIDI Hub moved to the Synth tab)');
+  ok((await page.evaluate(() => [...document.querySelectorAll('#subnav .subtab')].map(b => b.textContent).join('|'))) === 'Piano|Charts|Synth|Pads|LUMI', 'Keys pills: Piano, Charts (2.0), Synth, Pads, LUMI (the MIDI Hub moved to the Synth tab)');
   ok(await clickTab('Synth') === 'deck' && (await page.evaluate(() => [...document.querySelectorAll('#subnav .subtab')].map(b => b.textContent).join('|'))) === 'Deck|Live|Hub' && (await page.evaluate(() => window.SLSynthTab && SLSynthTab.borrowed())), 'Synth tab opens the Deck with pills Deck|Live|Hub, borrowing the Hub Control view');
   ok((await page.evaluate(async () => { App.switchTo('midihub'); await new Promise(r => setTimeout(r, 150)); return [App.active, !!document.querySelector('#panel-midihub .mh-view[data-view="control"]'), SLSynthTab.borrowed()].join(); })) === 'midihub,true,false', 'leaving the Deck gives the Control view back to the Hub');
   await clickTab('Keys'); // back from the Synth tab to the Keys pills
