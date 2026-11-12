@@ -1,6 +1,6 @@
 // soundLAB 2.0, Phase A ("Trim"): what left the app is gone, what stays still
 // works, and the 1.x data on the same origin is never touched.
-// Plan: docs/plans/phase-a/PLAN.md (sections 4.5 and 5.7; A3b adds to this file).
+// Plan: docs/plans/phase-a/PLAN.md (sections 4.5, 5.7 and 7.5).
 //
 // A1 = the Studio space, the loop/song sequencer, the sampler and its
 // database, and the plug-in API are out:
@@ -24,17 +24,33 @@
 //     the first page of its tab
 //   - the interval ear trainer is Exercises now: #tr-ear-go starts the ear
 //     level, and says why it does not under a category without ear training
-// No hardware: no MIDI device, no microphone. Sound runs into a muted context.
+// A3b = the Deck, Live sets, the MIDI Hub and Helix are soundLAB Gear
+// (gear.html, plan section 7; tests/gear.test.js holds Gear to its side):
+//   - soundLAB loads none of the gear modules and has 14 pages in five tabs;
+//     no tab or pill reads Synth, Helix, Deck, Live or Hub
+//   - the Hub's "Apply rules to what soundLAB hears" still works here: a
+//     stored rule shapes what the Piano page receives, and Settings › MIDI
+//     keyboard says so with the rule count (hidden when the box is off or no
+//     rule is enabled); its button opens the Hub in Gear
+//   - a stored last page that is a Gear page boots to Exercises without
+//     leaving soundLAB and says once where those pages are; Thru left on is
+//     said once too
+//   - App.switchTo('midihub') leaves for gear.html#midihub
+// No hardware: no microphone; the one MIDI keyboard (A3b) is a fake Web MIDI
+// port. Sound runs into a muted context.
 const { chromium } = require('playwright');
 const env = require('./env');
 let fails = 0;
 function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console.log('  FAIL', msg); } }
 const J = JSON.stringify;
 
-// ---- what this app is (A2 edited these lists; A3b edits them again) ----
-// the page list of js/app.js (PAGES), in its order; Settings is an overlay page
-const PAGES = ['quiz', 'practiceplan', 'fretboard', 'tab', 'notation', 'helix', 'chords', 'piano', 'chart', 'pads',
-  'deck', 'liveset', 'midihub', 'songs', 'jam', 'shed', 'tuner', 'theory'];
+// ---- what this app is (A2 and A3b edited these lists) ----
+// soundLAB's page list (js/app.js APPS.main.pages), in its order; Settings is an overlay page
+const PAGES = ['quiz', 'practiceplan', 'fretboard', 'tab', 'notation', 'chords', 'piano', 'chart', 'pads',
+  'songs', 'jam', 'shed', 'tuner', 'theory'];
+// soundLAB Gear's pages (APPS.gear.pages): gear.html has them, index.html does not
+const GEAR_PAGES = ['deck', 'liveset', 'midihub', 'helix'];
+const TABS = 'Learn|Guitar|Keys|Play|Train';
 // pages that left the app (MOVED in js/app.js): App.switchTo(id) goes to the page that took the feature in,
 // or home, and says why. there = what the sentence names, on the page it lands on.
 const STUDIO = /Studio is not part of soundLAB 2\.0/;
@@ -47,8 +63,15 @@ const MOVED = {
 const NAMES = { quiz: 'Exercises', practiceplan: 'the Plan page', piano: 'the Piano page' };
 // a tab or pill with one of these names would be a way into a removed page ("Songs" is not "Song")
 const GONE_LABELS = /^(studio|sketch|timeline|editor|song|ideas)$/i;
-// A2: pills only. "Synth" is still a tab (Deck, Live, Hub) until A3b.
+// A2: three pills
 const GONE_PILLS = /^(trainer|synth|lumi)$/i;
+// A3b: the Synth tab (Deck | Live | Hub) and the Helix pill are soundLAB Gear
+const GONE_GEAR = /^(synth|helix|deck|live|hub)$/i;
+// its modules: none of them is loaded here
+const GEAR_GLOBALS = ['SLMidiHub', 'SLSynthTab', 'SLSynthLive', 'SLSynthDeck', 'SLSynthScope', 'SLHelix'];
+// the two notices soundLAB shows once (js/app.js boot), word for word
+const TOLD_GEAR = 'Deck, Live sets, the MIDI Hub and Helix are in soundLAB Gear now: the Gear button at the top.';
+const TOLD_THRU = 'MIDI Hub Thru runs in soundLAB Gear now. Keep Gear open in a second window to pass your keyboard to the synth while you practise.';
 // controls that went with the Studio, the capture, the sequencer and the plug-in API
 const GONE_IDS = ['space-btn', 'cx-rec', 'cx-rec-msg', 'wipe', 'set-click', 'set-retro', 'set-voice', 'set-plugin-file',
   'ws-track', 'pd-play', 'pd-rec', 'pd-click', 'pd-clear', 'pd-recinfo', 'pd-track', 'pd-mk',
@@ -77,9 +100,11 @@ const OLD = {
   'pads.track': '"t1"'
 };
 
-// raw = { key: exact stored string }; json = { key: value } (stored as JSON, like App.store)
-async function newPage(browser, raw, json) {
+// raw = { key: exact stored string }; json = { key: value } (stored as JSON, like App.store);
+// extra = async ctx => {...}, run before the page is made (more init scripts)
+async function newPage(browser, raw, json, extra) {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  if (extra) await extra(ctx);
   await ctx.addInitScript(([raw, json]) => {
     ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
     if (!sessionStorage.getItem('__seeded')) { // once: a reload must not put back what the app removed
@@ -159,6 +184,22 @@ const lines = a => a.length ? '\n    ' + a.join('\n    ') : '';
   ok(lostKept.length === 0, 'kept: the synth, its presets, the pitch guard, the drum kit and its eight lanes, App.addPage (window.DAW = ' + win.daw + ')' +
     (lostKept.length ? '\n    wrong: ' + J(lostKept.map(k => k + ' is ' + win.kept[k])) : ''));
 
+  console.log('# A3b soundLAB loads no soundLAB Gear module');
+  const apps = await page.evaluate(([globals, pages]) => ({
+    app: App.app, attr: document.documentElement.getAttribute('data-app'),
+    loaded: globals.filter(n => typeof window[n] !== 'undefined').concat(typeof App.synthDeck !== 'undefined' ? ['App.synthDeck'] : []),
+    panels: pages.filter(id => document.getElementById('panel-' + id)),
+    scripts: Array.from(document.scripts).map(x => x.getAttribute('src') || '').filter(src => /midihub|synthtab|synthlive|synthdeck|helix/.test(src)),
+    shared: { SLScorePlayer: typeof window.SLScorePlayer, 'App.midiRules': typeof App.midiRules, 'App.midi.synthOut': typeof (App.midi && App.midi.synthOut), 'App.goApp': typeof App.goApp }
+  }), [GEAR_GLOBALS, GEAR_PAGES]);
+  ok(apps.app === 'main' && apps.attr === null, 'this is soundLAB: App.app = "main", no data-app on <html>: ' + J([apps.app, apps.attr]));
+  ok(apps.loaded.length === 0, GEAR_GLOBALS.join(', ') + ' are undefined in soundLAB' + (apps.loaded.length ? '\n    loaded: ' + apps.loaded.join(', ') : ''));
+  ok(apps.panels.length === 0 && apps.scripts.length === 0, 'no panel and no script of a Gear page (' + GEAR_PAGES.join(', ') + ')' + lines(apps.panels.map(id => '#panel-' + id).concat(apps.scripts)));
+  const sharedWant = { SLScorePlayer: 'object', 'App.midiRules': 'object', 'App.midi.synthOut': 'object', 'App.goApp': 'function' };
+  const sharedLost = Object.keys(sharedWant).filter(k => apps.shared[k] !== sharedWant[k]);
+  ok(sharedLost.length === 0, 'what the Hub shared stays: the score player, the rule engine, the synth output, the way across (App.goApp)' +
+    (sharedLost.length ? '\n    wrong: ' + J(sharedLost.map(k => k + ' is ' + apps.shared[k])) : ''));
+
   // from here on, count what the kept sound library is asked to play (page:what)
   await page.evaluate(() => {
     window.__sound = { synths: 0, synthNotes: 0, drums: [] };
@@ -175,7 +216,8 @@ const lines = a => a.length ? '\n    ' + a.join('\n    ') : '';
     const read = () => document.querySelectorAll('.tabbar-btn, .subtab').forEach(b => { const t = (b.textContent || '').trim(); if (!t) return; labels[t] = 1; if (b.classList.contains('subtab')) pills[t] = 1; });
     read();
     for (const id of ids) { App.switchTo(id); await __wait(200); read(); seen.push({ id, active: App.active, shown: __shown(), seen: __seen(id) }); }
-    return { seen, labels: Object.keys(labels), pills: Object.keys(pills) };
+    const tabs = sel => Array.from(document.querySelectorAll(sel + ' .tabbar-btn')).map(b => (b.textContent || '').trim()).join('|');
+    return { seen, labels: Object.keys(labels), pills: Object.keys(pills), tabs: tabs('#tabbar'), tabsPhone: tabs('#tabbar-m') };
   }, PAGES.concat('settings'));
   const lost = tour.seen.filter(x => x.active !== x.id || x.shown !== x.id || !x.seen);
   ok(lost.length === 0, 'visited ' + tour.seen.length + ' pages, each one the active page with its own panel visible' + (lost.length ? '\n    not shown: ' + J(lost) : ''));
@@ -185,6 +227,9 @@ const lines = a => a.length ? '\n    ' + a.join('\n    ') : '';
   const badPills = tour.pills.filter(t => GONE_PILLS.test(t));
   ok(tour.pills.includes('Piano') && tour.pills.includes('Woodshed') && tour.pills.includes('Plan') && badPills.length === 0,
     'A2: no pill reads Trainer, Synth or LUMI (' + tour.pills.length + ' pills seen: ' + tour.pills.join(', ') + ')' + (badPills.length ? '\n    found: ' + badPills.join(', ') : ''));
+  const badGear = tour.labels.filter(t => GONE_GEAR.test(t));
+  ok(tour.tabs === TABS && tour.tabsPhone === TABS && badGear.length === 0, 'A3b: five tabs (' + tour.tabs + '), and no tab or pill reads Synth, Helix, Deck, Live or Hub' +
+    (badGear.length ? '\n    found: ' + badGear.join(', ') : '') + (tour.tabsPhone === TABS ? '' : '\n    the phone tab bar: ' + tour.tabsPhone));
   const gone = await page.evaluate((ids) => ({
     found: ids.filter(id => document.getElementById(id)),
     cards: Array.from(document.querySelectorAll('#panel-settings h2, #panel-settings h3')).map(h => h.textContent.trim()).filter(t => /^(studio|plug-?ins?)$/i.test(t)),
@@ -400,6 +445,138 @@ const lines = a => a.length ? '\n    ' + a.join('\n    ') : '';
     ok(after.root === 7 && after.plugins === null && after.ran === undefined, 'after the reload: the key is G, no plug-in list, no plug-in code ran: ' + J(after));
   }
   ok(errs.length === 0 && logs.length === 0, 'no page or console error (Backup import)' + lines(errs.concat(logs)));
+  await ctx.close();
+
+  // ---------------------------------------------------------------- A3b
+  console.log('# A3b stored MIDI Hub rules still shape what soundLAB hears');
+  // what the Hub stores (js/midihub.js newRule): notes +12 and aftertouch blocked are on, a CC remap is off
+  const rule = (name, on, m, a) => ({ id: 'r-' + name, on, name, m: Object.assign({ type: 'cc', ch: 0, lo: 0, hi: 127 }, m), a: Object.assign({ block: false, ch: 0, num: '', add: 0, scale: 100, to: 'same' }, a) });
+  const RULES = [rule('up', true, { type: 'note' }, { add: 12 }), rule('at', true, { type: 'at' }, { block: true }), rule('cc', false, { lo: 74, hi: 74 }, { num: 1 })];
+  // one keyboard on a fake Web MIDI port; midi.wanted connects it at the start, as for a returning user
+  const keyboard = c => c.addInitScript(() => {
+    const inp = { id: 'kb-in', name: 'Test keyboard', state: 'connected', type: 'input', onmidimessage: null };
+    const out = { id: 'kb-out', name: 'Test keyboard', state: 'connected', type: 'output', send() {} };
+    navigator.requestMIDIAccess = () => Promise.resolve({ inputs: new Map([[inp.id, inp]]), outputs: new Map([[out.id, out]]), sysexEnabled: true, onstatechange: null });
+    window.__recv = bytes => { if (inp.onmidimessage) inp.onmidimessage({ data: new Uint8Array(bytes) }); };
+    // what the app heard since the last call, and the Piano keys that are down
+    window.__heard = []; window.__listen = () => { App.on('midi:note', d => window.__heard.push(d.midi + ':' + (d.on ? 1 : 0))); App.on('midi:pressure', () => window.__heard.push('pressure')); };
+    window.__down = () => Array.from(document.querySelectorAll('#pn-svg .pn-key.pn-down')).map(k => k.getAttribute('data-midi')).join();
+    // press and release one key (and lean on it: channel aftertouch)
+    window.__playKey = async n => { const o = {}; window.__heard.length = 0; window.__recv([0x90, n, 100]); window.__recv([0xD0, 70]); await window.__wait(60); o.down = window.__down();
+      window.__recv([0x80, n, 0]); await window.__wait(60); o.up = window.__down(); o.heard = window.__heard.splice(0).join(); return o; };
+    // Settings › MIDI keyboard: the line about MIDI Hub rules
+    window.__rulesLine = () => { const el = document.getElementById('set-midi-rules'), btn = el && el.querySelector('button');
+      return { there: !!el, card: !!el && !!el.closest('#set-midi-card'), seen: !!el && !el.hidden && el.getClientRects().length > 0, text: el ? el.textContent.replace(/\s+/g, ' ').trim() : '', btn: btn ? btn.textContent.trim() : '' }; };
+    // what a soundLAB Gear window does when the Hub's box or rules change: it writes the store, this window gets the event
+    window.__fromGear = (key, value) => { localStorage.setItem('guitarlab.' + key, JSON.stringify(value));
+      window.dispatchEvent(new StorageEvent('storage', { key: 'guitarlab.' + key, url: location.href, storageArea: localStorage })); };
+  });
+  ({ ctx, page, errs, logs } = await newPage(browser, {}, { 'midi.wanted': true, 'lights.on': false, 'midihub.rulesIn': true, 'midihub.rules': RULES }, keyboard));
+  await page.waitForFunction(() => App.midi && App.midi.ready);
+  const shaped = await page.evaluate(async () => {
+    const o = { hub: typeof window.SLMidiHub, filter: !!App.midi.inputFilter, active: App.midiRules.active() };
+    __listen();
+    App.switchTo('piano'); await __wait(250);
+    const has = n => !!document.querySelector('#pn-svg .pn-key[data-midi="' + n + '"]');
+    o.note = [60, 48, 55, 64, 52].find(n => has(n) && has(n + 12)) || 0;
+    o.on = await __playKey(o.note);
+    App.switchTo('settings'); await __wait(200);
+    o.line = __rulesLine();
+    // the box is cleared in Gear: the filter goes, the line goes (Settings is open: it repaints on midirules:state)
+    __fromGear('midihub.rulesIn', false); await __wait(60);
+    o.offFilter = !!App.midi.inputFilter; o.offLine = __rulesLine();
+    App.switchTo('piano'); await __wait(200);
+    o.off = await __playKey(o.note);
+    // ticked again, but every rule is switched off: the filter is in, nothing changes, no line
+    App.switchTo('settings'); await __wait(200);
+    App.store.set('midihub.rules', App.store.get('midihub.rules', []).map(r => Object.assign({}, r, { on: false })));
+    __fromGear('midihub.rulesIn', true); await __wait(60);
+    o.noneFilter = !!App.midi.inputFilter; o.noneActive = App.midiRules.active(); o.noneLine = __rulesLine();
+    App.switchTo('piano'); await __wait(200);
+    o.none = await __playKey(o.note);
+    return o;
+  });
+  ok(shaped.hub === 'undefined' && shaped.filter && shaped.active.on === true && shaped.active.rules === 2,
+    'with no Hub in soundLAB, the stored box (midihub.rulesIn) installs the input filter at the start: 2 of 3 rules are enabled: ' + J([shaped.hub, shaped.filter, shaped.active]));
+  ok(shaped.note > 0 && shaped.on.heard === (shaped.note + 12) + ':1,' + (shaped.note + 12) + ':0', 'a key played into the Piano page arrives an octave up and its aftertouch is dropped (key ' + shaped.note + '): ' + shaped.on.heard);
+  ok(shaped.on.down === String(shaped.note + 12) && shaped.on.up === '', 'the Piano page shows the changed key going down and up: down ' + J(shaped.on.down) + ', then ' + J(shaped.on.up));
+  ok(shaped.line.there && shaped.line.card && shaped.line.seen, 'Settings › MIDI keyboard shows the line #set-midi-rules: ' + J([shaped.line.there, shaped.line.card, shaped.line.seen]));
+  ok(/^MIDI Hub rules are changing what soundLAB hears \(2 rules\)\. Edit them in soundLAB Gear\./.test(shaped.line.text) && shaped.line.btn === 'Open the Hub',
+    'it gives the rule count, says where to edit them and has a button for it: "' + shaped.line.text + '"');
+  ok(!shaped.offFilter && !shaped.offLine.seen && shaped.off.heard === shaped.note + ':1,pressure,' + shaped.note + ':0' && shaped.off.down === String(shaped.note),
+    'the box cleared in a Gear window: the line is hidden at once and the key arrives as played: ' + J([shaped.offFilter, shaped.offLine.seen, shaped.off.heard]));
+  ok(shaped.noneFilter && shaped.noneActive.rules === 0 && !shaped.noneLine.seen && shaped.none.heard === shaped.note + ':1,pressure,' + shaped.note + ':0',
+    'the box on with no rule enabled: nothing is changed and the line stays hidden: ' + J([shaped.noneActive, shaped.noneLine.seen, shaped.none.heard]));
+  // the rules come back on in Gear; Settings counts them again when it is opened, and its button goes to the Hub
+  let urls = [];
+  page.on('framenavigated', f => { if (f === page.mainFrame()) urls.push(f.url()); });
+  const again = await page.evaluate(async (rules) => { App.store.set('midihub.rules', rules); App.switchTo('settings'); await __wait(200); return __rulesLine(); }, RULES);
+  ok(again.seen && /\(2 rules\)/.test(again.text), 'rules enabled again: the line is back the next time Settings opens: "' + again.text + '"');
+  await page.locator('#set-midi-rules button').click();
+  let there = await page.waitForFunction(() => window.App && App.app === 'gear' && App.active === 'midihub', null, { timeout: 10000 }).then(() => true, () => false);
+  let hub = there ? await page.evaluate(() => ({ file: location.pathname.split('/').pop(), hash: location.hash, shown: __shown(), box: !!(document.getElementById('mh-rulesin') || {}).checked,
+    rules: App.midiRules.active().rules })) : null;
+  ok(there && hub.file === 'gear.html' && hub.shown === 'midihub' && urls.some(u => /\/gear\.html#midihub$/.test(u)),
+    '"Open the Hub" leaves for gear.html#midihub and the Hub page is showing there: ' + J([hub && hub.file, hub && hub.shown]) + (there ? '' : '\n    went to: ' + J(urls)));
+  if (there) ok(hub.box && hub.rules === 2 && hub.hash === '', 'the Hub there has its "Apply rules to what soundLAB hears" box ticked and the same 2 rules enabled; the #midihub is used up: ' + J(hub));
+  ok(errs.length === 0 && logs.length === 0, 'no page or console error (Hub rules in soundLAB, the way to the Hub)' + lines(errs.concat(logs)));
+  await ctx.close();
+
+  console.log('# A3b a stored last page that is a soundLAB Gear page');
+  ({ ctx, page, errs, logs } = await newPage(browser, {}, { 'app.tab': 'deck' }));
+  urls = [];
+  page.on('framenavigated', f => { if (f === page.mainFrame()) urls.push(f.url()); });
+  // how this start went: where it is, what it said, what it stored
+  const startOf = () => page.evaluate(() => {
+    const stored = k => { try { return JSON.parse(localStorage.getItem('guitarlab.' + k)); } catch (e) { return 'unreadable'; } };
+    const a = document.getElementById('app-switch');
+    return { app: App.app, file: location.pathname.split('/').pop(), active: App.active, shown: __shown(), seen: __seen('quiz'), toast: __toast(),
+      tab: stored('app.tab'), told: stored('gear.told'), thruTold: stored('gear.thruTold'), thru: localStorage.getItem('guitarlab.midihub.thru'),
+      link: !!a && a.getClientRects().length > 0 ? a.textContent.trim() + ' -> ' + a.getAttribute('href') : '' };
+  });
+  // the next start, with these keys stored first (null = removed)
+  const restart = async (keys) => {
+    await page.evaluate(keys => { for (const k in keys) { if (keys[k] === null) localStorage.removeItem('guitarlab.' + k); else localStorage.setItem('guitarlab.' + k, JSON.stringify(keys[k])); } }, keys || {});
+    await page.reload();
+    await page.waitForFunction(() => window.App && App.active);
+    await page.waitForTimeout(250);
+    return startOf();
+  };
+  const home = s => s.app === 'main' && s.file === 'index.html' && s.active === 'quiz' && s.shown === 'quiz' && s.seen;
+  let st = await startOf();
+  ok(home(st), 'app.tab = deck: soundLAB starts on Exercises with a visible panel and does not leave for Gear: ' + J([st.file, st.active, st.shown, st.seen]));
+  ok(st.toast === TOLD_GEAR, 'and says where those pages are now: "' + st.toast + '"');
+  ok(st.link === 'Gear -> gear.html', 'the Gear button the sentence names is at the top: ' + J(st.link));
+  ok(st.tab === 'quiz' && st.told === true, 'the stored last page is a soundLAB page again and the notice is marked as said (gear.told): ' + J([st.tab, st.told]));
+  st = await restart();
+  ok(home(st) && st.toast === '', 'the next start says nothing: the notice is shown once: ' + J(st.toast));
+  for (const id of GEAR_PAGES.slice(1)) {
+    st = await restart({ 'app.tab': id });
+    ok(home(st) && st.toast === '' && st.tab === 'quiz', 'app.tab = ' + id + ' (already told): Exercises, no notice, no way out of soundLAB: ' + J([st.file, st.active, st.toast]));
+  }
+  st = await restart({ 'app.tab': 'helix', 'gear.told': null });
+  ok(home(st) && st.toast === TOLD_GEAR, 'app.tab = helix in a profile that was not told yet: Exercises and the notice: "' + st.toast + '"');
+  // MIDI Hub Thru left on in 1.x: it only runs while Gear is open now, said once; the setting itself is Gear's
+  st = await restart({ 'midihub.thru': true });
+  ok(home(st) && st.toast === TOLD_THRU && st.thruTold === true, 'midihub.thru stored on: soundLAB says once that Thru runs in Gear: "' + st.toast + '"');
+  ok(st.thru === 'true', 'and leaves the setting as it is (Gear reads it): midihub.thru = ' + st.thru);
+  st = await restart();
+  ok(home(st) && st.toast === '', 'the next start says nothing about Thru either: ' + J(st.toast));
+  ok(urls.every(u => /\/index\.html$/.test(u)), 'none of these starts left index.html (' + urls.length + ' navigations seen)' + lines(urls.filter(u => !/\/index\.html$/.test(u))));
+
+  console.log('# A3b a Gear page asked for inside soundLAB opens in Gear');
+  await page.evaluate(async () => { App.switchTo('songs'); await __wait(150); __hideToast(); });
+  urls = [];
+  // App.switchTo('midihub') is a plain navigation: asked for from a timer, so this call returns before the page goes
+  await page.evaluate(() => { setTimeout(() => App.switchTo('midihub'), 0); });
+  there = await page.waitForFunction(() => window.App && App.app === 'gear' && App.active === 'midihub', null, { timeout: 10000 }).then(() => true, () => false);
+  ok(there && urls.some(u => /\/gear\.html#midihub$/.test(u)), 'App.switchTo("midihub") leaves for gear.html#midihub' + (there ? '' : '\n    went to: ' + J(urls)));
+  if (there) {
+    hub = await page.evaluate(() => ({ file: location.pathname.split('/').pop(), hash: location.hash, shown: __shown(), seen: __seen('midihub'), appTab: App.store.get('app.tab', null), gearTab: App.store.get('gear.tab', null) }));
+    ok(hub.file === 'gear.html' && hub.shown === 'midihub' && hub.seen && hub.hash === '', 'soundLAB Gear shows the Hub with a visible panel, the #midihub used up: ' + J([hub.file, hub.shown, hub.seen, hub.hash]));
+    ok(hub.appTab === 'songs' && hub.gearTab === 'midihub', 'soundLAB\u2019s last page is still Songs (a Gear page is never stored as app.tab); Gear keeps its own: ' + J([hub.appTab, hub.gearTab]));
+  }
+  ok(errs.length === 0 && logs.length === 0, 'no page or console error (stored Gear pages, the notices, the way across)' + lines(errs.concat(logs)));
   await ctx.close();
 
   await browser.close();

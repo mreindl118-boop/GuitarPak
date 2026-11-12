@@ -12,8 +12,10 @@
 //   - the Hub in Gear: the Hear input switch (#mh-hearin) where the App voice
 //     box was, the Thru hint, the input picker (All keyboards / one keyboard,
 //     moved here from multiin.test.js), a Player card without "Open as tab"
-//   - the Deck and Live in Gear: a preset's key restore writes fb.root to the
-//     store (there is no Fretboard page to do it), Go live holds the wake tag
+//   - the Deck and Live in Gear: the Now bar takes the factory sound names
+//     when they arrive after the page is up (the Deck is the first page here),
+//     a preset's key restore writes fb.root to the store (there is no
+//     Fretboard page to do it), Go live holds the wake tag
 //   - two apps, one store: #app-switch goes across both ways, each app keeps
 //     its own last page (app.tab / gear.tab), the key is shared, the gear
 //     icon opens Settings in soundLAB, #page deep links work in both
@@ -277,6 +279,20 @@ const noErrs = (errs, what) => ok(errs.length === 0, 'no page errors (' + what +
     ok(bad.length === 0, 'no file is missing with MIDI connected either' + (bad.length ? ': ' + bad.join(' | ') : ''));
   });
 
+  await section('the Deck is the first page: its Now bar names the sound once the names file is in', async () => {
+    // In soundLAB the Deck was never the first page shown, so the factory names (data/modx-performances.json,
+    // fetched on first use) were in before anyone looked. Here MIDI is off and the file is slow: nothing else
+    // would paint the Deck again after boot
+    const ctx = await newContext(browser, { seed: { 'midihub.profile': 'yamaha', 'lights.on': false }, ports: 'none' });
+    await ctx.route('**/data/modx-performances.json', async r => { await new Promise(x => setTimeout(x, 700)); await r.continue(); });
+    const { page, errs } = await open(ctx, env.GEAR_URL, gearUp);
+    const early = await page.evaluate(() => document.getElementById('st-nowname').textContent);
+    const named = await until(page, () => /CFX \+ FM EP/.test(document.getElementById('st-nowname').textContent), null, 6000);
+    const late = await page.evaluate(() => document.getElementById('st-nowname').textContent);
+    ok(named, 'the Now bar takes the factory name when the names file arrives after the page is up: "' + early + '" becomes "' + late + '"');
+    noErrs(errs, 'the Deck, names file late');
+  });
+
   await section('the Deck and Live sets in Gear: a preset\'s key, Go live', async () => {
     const ctx = await newContext(browser, { seed: { 'midi.wanted': true, 'lights.on': false, 'midihub.profile': 'yamaha' }, ports: 'two' });
     const { page, errs } = await open(ctx, env.GEAR_URL, gearMidi);
@@ -493,6 +509,20 @@ const noErrs = (errs, what) => ok(errs.length === 0, 'no page errors (' + what +
     const againA = await until(main.page, () => { const s = App.audioIn.state; return !App.audioIn._t().monOn && s.held && s.why === 'other'; });
     a = await hearing(main.page); g = await hearing(gear.page);
     ok(againG && againA && g.routed && !a.routed, 'On in Gear again: Gear plays, soundLAB waits: ' + J({ soundLAB: a.routed, gear: g.routed }));
+
+    // soundLAB's Settings is open: its level meter holds the input open (never on the speakers). Off pressed
+    // in Gear ends the last use of the input, so the meter lets it go, as after Off pressed in Settings itself
+    await main.page.evaluate(() => App.switchTo('settings'));
+    const metered = await until(main.page, () => { const t = App.audioIn._t(); return t.holds.indexOf('settings-meter') !== -1 && !!t.stream && !t.monOn; });
+    await pressHear(gear.page, 'Off');
+    const freed = await until(main.page, () => { const t = App.audioIn._t(); return App.audioIn.monitor === false && !t.stream && t.holds.length === 0; });
+    a = await hearing(main.page);
+    ok(metered && freed && !a.routed && !a.stream && !a.held, 'with soundLAB\'s Settings open, Off pressed in Gear also closes the input its meter held: ' + J(a));
+    await main.page.evaluate(() => App.switchTo('quiz'));
+    await pressHear(gear.page, 'On');
+    const backG = await until(gear.page, () => App.audioIn._t().monOn === true);
+    const backA = await until(main.page, () => { const s = App.audioIn.state; return !App.audioIn._t().monOn && s.held && s.why === 'other'; });
+    ok(backG && backA, 'and On in Gear plays there again, soundLAB waiting');
     noErrs(gear.errs, 'Gear, two windows');
     await gear.page.close();
     const took = await until(main.page, () => App.audioIn._t().monOn === true && !App.audioIn.state.held);

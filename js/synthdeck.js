@@ -593,7 +593,14 @@
         if (x.readyState !== 4) return;
         try {
           var o = JSON.parse(x.responseText);
-          if (isObj(o) && isObj(o.banks)) { factory = o; factoryState = 'ok'; if (mounted) { paintNow(); renderBankGrid(); renderTiles(); } return; }
+          if (isObj(o) && isObj(o.banks)) {
+            factory = o; factoryState = 'ok';
+            if (mounted) { paintNow(); renderBankGrid(); renderTiles(); }
+            // the names are in: whoever else shows a sound's name paints again. The Deck page's Now bar
+            // (js/synthtab.js) is the first thing on screen in soundLAB Gear, before this file has loaded
+            App.emit('deck:factorynames');
+            return;
+          }
         } catch (e) { /* fall through */ }
         factoryState = 'fail';
       };

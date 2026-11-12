@@ -55,6 +55,9 @@ async function newPage(browser, seed, viewport) {
   let { ctx, page, errs } = await newPage(browser);
 
   console.log('# the Synth tab and the Deck face');
+  // the Deck is Gear's first page: the factory names (data/modx-performances.json) come in after it is on
+  // screen, and the Now bar takes them when they do ('deck:factorynames'). Wait for that, however long the file took
+  await page.waitForFunction(() => /CFX \+ FM EP/.test((document.querySelector('#st-nowname') || {}).textContent || ''), null, { timeout: 8000 }).catch(() => { /* the check below says so */ });
   const nav = await page.evaluate(async () => {
     App.switchTo('deck'); await __wait(400);
     const o = { active: App.active, group: (__q('#tabbar .tabbar-btn.active') || {}).textContent, pills: __qa('#subnav .subtab').map(b => b.textContent).join('|'), mode: SLSynthTab.mode(), borrowed: SLSynthTab.borrowed() };

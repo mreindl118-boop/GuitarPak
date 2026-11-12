@@ -1201,6 +1201,8 @@
       '.mh-status{font-size:12.5px}.mh-status.ok{color:var(--green)}.mh-status.bad{color:var(--red)}' +
       '.mh-warn{color:var(--red);margin-top:6px}' +
       '.mh-chk{display:inline-flex;gap:6px;align-items:center;font-size:12.5px;color:var(--muted)}.mh-chk[hidden]{display:none}' +
+      // the Hear input switch (soundLAB Gear): On, but paused = outlined, not lit, as on the Settings card (#set-ain-mon)
+      '#mh-hearin button.held{background:transparent;color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);opacity:.8}' +
       '.mh-act{margin-top:6px;color:var(--muted)}.mh-act>span{display:inline-flex;align-items:center;gap:4px}' +
       '.mh-led{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--line);transition:background .08s}.mh-led.in.lit{background:var(--accent)}.mh-led.out.lit{background:var(--green)}' +
       '.mh-mono{font-family:ui-monospace,Consolas,Menlo,monospace;font-size:12px;color:var(--text)}' +
@@ -1259,11 +1261,13 @@
     // must ask first, the input looks like a microphone, the chosen input is
     // missing). Its card is in soundLAB's Settings; here the switch is in
     // this page's header, so say that once per start. Held because another
-    // soundLAB window plays it ('other') needs no word.
+    // soundLAB window plays it ('other') needs no word; nor does a hold seen
+    // on this page, where the line beside the switch already says why.
     if (inGear()) {
       var hearTold = false;
       App.on('audioin:state', function (d) {
         if (hearTold || !d || !d.want || !d.held || ['perm', 'mic', 'fell'].indexOf(d.why) === -1) return;
+        if (App.active === 'midihub') return;
         hearTold = true;
         App.toast((d.msg || 'Hear input is on, but it is waiting.') + ' The switch is on the Hub page.', 8000);
       });

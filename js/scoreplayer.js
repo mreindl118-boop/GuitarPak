@@ -28,9 +28,10 @@
  *   show     called by show(): bring the card on screen
  *   ports    true = a "Synth out" and a "Channel" select on the card, for a
  *            host with no Hub header (write midihub.outId / midihub.ch); the
- *            two texts that name the Hub ("the Part picked in Control", a
- *            tab "from the MIDI Hub Player") then name the card instead
- *   noOut    the line shown while there is no synth output
+ *            tip that names the Hub ("the Part picked in Control") then
+ *            names the card instead
+ *   noOut    the line shown while there is no synth output (also what Play
+ *            says then)
  *   connect  {label, run}: a button after that line
  * REPAINT: paint() is public (the Hub calls it when its ports, Part or
  * profile change) and the module calls it itself on 'midi:state' and
@@ -275,11 +276,11 @@
   }
   function plOpenAsTab() {
     if (!PL.song) { App.toast('Open a file first'); return false; }
-    if (!App.songs) { App.toast('The Songs page is not available'); return false; }
+    if (!App.songs) { App.toast('Open as tab is on the Songs page in soundLAB.'); return false; } // soundLAB Gear: no Songs page, and no button for this (cardHTML)
     var song = App.songs.fromMidi(songToMidi(PL.song), PL.song.title);
     if (!song) { App.toast('Nothing in this file fits a guitar'); return false; }
-    // opts.ports = a host with no Hub around the card (the Songs page, A3b)
-    song.from = 'from the ' + (opt.ports ? '' : 'MIDI Hub ') + 'Player' + (plShift().on || plTrans() ? ', in the chosen key' : '');
+    // only soundLAB gets here (App.songs), where the card sits on the Songs page itself
+    song.from = 'from the Player' + (plShift().on || plTrans() ? ', in the chosen key' : '');
     App.songs.load(song); App.switchTo('songs');
     return true;
   }
@@ -445,7 +446,7 @@
     if (!PL.song) { App.toast('Open a MIDI or MusicXML file first'); return false; }
     if (PL.playing) return true;
     var m = midi();
-    if (!App.midi.synthOut.has()) { App.toast('No synth output — connect MIDI and pick one above'); return false; }
+    if (!App.midi.synthOut.has()) { App.toast(opt.noOut || 'No synth output — connect MIDI and pick one above'); return false; } // the mount's own words: the Songs page has nothing "above"
     PL.sender = m.bindMusicalOutput ? m.bindMusicalOutput(App.midi.synthOut.id()) : function (b) { return sendOut(b); };
     if (!PL.sender) { App.toast('The synth output is not available'); return false; }
     if (PL.pos >= PL.song.duration) PL.pos = 0;
@@ -613,7 +614,8 @@
     '.mh-mono{font-family:ui-monospace,Consolas,Menlo,monospace;font-size:12px;color:var(--text)}' +
     '.mh-chk{display:inline-flex;gap:6px;align-items:center;font-size:12.5px;color:var(--muted)}' +
     '.mh-warn{color:var(--red);margin-top:6px}' +
-    '#mh-plports[hidden]{display:none}' // opts.ports: .row is display:flex, which beats the hidden attribute
+    '#mh-plports[hidden]{display:none}' + // opts.ports: .row is display:flex, which beats the hidden attribute
+    '#mh-plports .field{min-width:0;max-width:100%}#mh-plports select{max-width:100%}' // a long port name (a Bluetooth LUMI) must not push the card off a phone screen
   );
 
   // Renders the card into el and wires it. Idempotent: every listener sits on

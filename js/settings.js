@@ -554,10 +554,17 @@
       var v = AIN ? AIN.setGain(parseInt(this.value, 10)) : parseInt(this.value, 10);
       ainGainVal.textContent = v + '%';
     });
-    App.on('audioin:state', paintAin);
+    // The stored switch can also change in another window (soundLAB Gear's
+    // Hub has its own Off / On): the card repaints, and Off pressed over
+    // there lets the meter go, as Off pressed here does. Without this the
+    // meter would keep the device open after the last use of it ended.
+    App.on('audioin:state', function () {
+      paintAin();
+      if (meterHeld && App.active === 'settings' && !meterWanted()) meterStart();
+    });
 
     // live level meter (dBFS, -60..0): polled only while Settings is on screen
-    var meterTimer = null, pkHold = 0, pkAt = 0;
+    var meterTimer = null, meterHeld = false, pkHold = 0, pkAt = 0; // meterHeld: this card holds the input open for the meter
     function meterTick() {
       var l = AIN.level();
       var pct = l.peak > 0.001 ? Math.max(0, Math.min(100, (20 * Math.log(l.peak) / Math.LN10 + 60) / 60 * 100)) : 0;
@@ -579,6 +586,7 @@
     function meterStart() {
       if (!AIN || !AIN.supported) return;
       if (meterWanted()) {
+        meterHeld = true;
         AIN.hold('settings-meter');
         if (!meterTimer && !document.hidden) meterTimer = setInterval(meterTick, 50);
       } else {
@@ -588,6 +596,7 @@
     }
     function meterStop() {
       if (meterTimer) { clearInterval(meterTimer); meterTimer = null; }
+      meterHeld = false;
       if (AIN) AIN.release('settings-meter');
       meterBar.style.width = '0%';
       pkHold = 0;

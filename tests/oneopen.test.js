@@ -8,8 +8,9 @@
 // control: with no synth output the card's line names Settings › MIDI keyboard
 // and its button opens Settings. MIDI is off at the start (as on a first
 // visit) and is connected half way; the fake MODX is the only output.
-// Also the score player's per-mount options (its own ports row, the no-output
-// line, the connect button, the two texts that name the host).
+// Also the score player's per-mount options as the Songs page passes them (its
+// own ports row, the no-output line, the connect button, the two texts that
+// name the host). The Hub's mount of the same card: tests/midihub-player.test.js.
 const { chromium } = require('playwright');
 const env = require('./env');
 let fails = 0;
@@ -100,11 +101,12 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
   ok(errs.length === 0, 'no page errors' + (errs.length ? ': ' + errs.join(' | ') : ''));
   await ctx.close();
 
-  // The card's per-mount options (SLScorePlayer.mount(el, opts)): ports = its own "Synth out" and "Channel"
-  // selects for a host with no Hub header, noOut = the line while there is no synth output, connect = a button
-  // after it. The Hub passes none of them; the Songs page will (A3b), so they are checked here, on a card
-  // mounted the same way, with MIDI connected only after boot.
-  console.log('# the Player card mounted with its own ports row, MIDI connected after boot');
+  // The card's per-mount options (SLScorePlayer.mount(el, opts)) as the Songs page passes them (js/songs.js init):
+  // ports = its own "Synth out" and "Channel" selects (this page has no Hub header), noOut = the line while there is
+  // no synth output, connect = a button after it. Checked on that mount, in a profile where MIDI was never connected;
+  // the connecting is done with Settings' own Connect MIDI button, where the card's line sends the user.
+  // The Hub's mount in soundLAB Gear passes none of the options: tests/midihub-player.test.js.
+  console.log('# the Songs page’s Player card: its own ports row, MIDI connected after boot');
   const c2 = await browser.newContext({ viewport: { width: 1200, height: 900 } });
   await c2.addInitScript(() => {
     ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true')); // not midi.wanted: nothing connects at boot
@@ -112,42 +114,51 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
     const out = { id: 'modx1', name: 'MODX-1', state: 'connected', send: () => { } };
     const inp = { id: 'mi', name: 'MODX-1', state: 'connected', onmidimessage: null };
     navigator.requestMIDIAccess = () => Promise.resolve({ inputs: new Map([['mi', inp]]), outputs: new Map([['modx1', out]]), sysexEnabled: true, onstatechange: null });
+    window.__wait = (ms) => new Promise(r => setTimeout(r, ms));
     window.__card = () => {
-      const q = id => document.getElementById(id), row = q('mh-plports'), btn = q('mh-plconnect'), tips = document.querySelector('.mh-pl details p');
+      const q = id => document.getElementById(id), host = q('sg-player'), row = q('mh-plports'), btn = q('mh-plconnect'), tips = document.querySelector('.mh-pl details p');
       return {
-        cards: document.querySelectorAll('.mh-pl').length, out: q('mh-plout').textContent, tips: tips.textContent.slice(tips.textContent.indexOf('sends everything')),
+        cards: document.querySelectorAll('.mh-pl').length, inSongs: !!host.querySelector('.mh-pl'),
+        seen: !host.hidden && host.getBoundingClientRect().height > 0 && document.getElementById('panel-songs').classList.contains('active'),
+        out: q('mh-plout').textContent, tips: tips.textContent.slice(tips.textContent.indexOf('sends everything')),
         row: row ? { hidden: row.hidden, display: getComputedStyle(row).display, height: row.getBoundingClientRect().height, ports: [...q('mh-plsynth').options].map(x => x.value).join(), port: q('mh-plsynth').value, ch: q('mh-plch').value } : null,
-        btn: btn ? { hidden: btn.hidden, label: btn.textContent } : null
+        btn: btn ? { hidden: btn.hidden, seen: btn.getClientRects().length > 0, label: btn.textContent.trim() } : null
       };
     };
+    // a score sent to the card and shown, as "Play on synth" does it
+    window.__score = () => ({ title: 'Line', bpm: 120, len: 4, notes: [60, 62, 64, 65].map((m, i) => ({ t: i, d: 1, m, partId: 'p1', v: 100 })) });
     // the card's Open as tab, and what the Songs page then says the tab came from
-    window.__asTab = () => { SLScorePlayer.loadScore({ title: 'Line', bpm: 120, len: 4, notes: [60, 62, 64, 65].map((m, i) => ({ t: i, d: 1, m, partId: 'p1', v: 100 })) }); SLScorePlayer.openAsTab(); return App.songs.current && App.songs.current.from; };
+    window.__asTab = () => { SLScorePlayer.loadScore(window.__score()); SLScorePlayer.openAsTab(); return App.songs.current && App.songs.current.from; };
   });
   const p2 = await c2.newPage(), errs2 = [];
   p2.on('pageerror', e => errs2.push(e.message));
   await p2.goto(env.URL);
   await p2.waitForFunction(() => window.App && App.midi && window.SLScorePlayer && App.songs && App.active === 'quiz');
-  const NO_OUT = 'No synth output yet. Connect your keyboard in Settings \u203a MIDI keyboard.';
-  const hub = await p2.evaluate(() => ({ ready: App.midi.ready, card: __card(), from: __asTab() }));
-  ok(hub.ready === false && hub.card.cards === 1 && /connect MIDI above$/.test(hub.card.out) && hub.card.row === null && hub.card.btn === null,
-    'the Hub\u2019s mount passes no option: its own line while there is no output, no ports row, no button: ' + hub.card.out);
-  ok(hub.card.tips === 'sends everything to the Part picked in Control.' && hub.from === 'from the MIDI Hub Player', 'and its two texts name the Hub: ' + JSON.stringify([hub.card.tips, hub.from]));
-  const own = await p2.evaluate((noOut) => {
-    const host = document.createElement('div'); host.id = 'own-player'; document.body.appendChild(host);
-    SLScorePlayer.mount(host, { ports: true, noOut: noOut, connect: { label: 'Connect MIDI', run: () => { App.midi.enable(); } } });
-    return { card: __card(), hubHost: document.getElementById('mh-player').children.length, from: __asTab() };
-  }, NO_OUT);
-  ok(own.card.cards === 1 && own.hubHost === 0, 'one card per document: mounting it somewhere else empties the Hub\u2019s host');
-  ok(own.card.out === NO_OUT && own.card.btn && !own.card.btn.hidden && own.card.btn.label === 'Connect MIDI', 'no output yet: the mount\u2019s own line and its button: ' + own.card.out);
+  const NO_OUT = 'No synth output yet. Connect your keyboard in Settings › MIDI keyboard.';
+  const own = await p2.evaluate(async () => {
+    window.__sameDoc = true; // gone after a reload
+    const o = { ready: App.midi.ready, hubHost: !!document.getElementById('mh-player'), before: __card().seen };
+    SLScorePlayer.loadScore(__score()); SLScorePlayer.show(); await __wait(200);
+    o.active = App.active; o.card = __card(); o.from = __asTab();
+    return o;
+  });
+  ok(own.ready === false && !own.before && own.active === 'songs' && own.card.seen, 'MIDI is off; a score sent to the Player brings its card on screen on the Songs page: ' + JSON.stringify([own.ready, own.before, own.active, own.card.seen]));
+  ok(own.card.cards === 1 && own.card.inSongs && !own.hubHost, 'one card per document: here it is the Songs page’s (#sg-player); soundLAB has no Hub host for it');
+  ok(own.card.out === NO_OUT && own.card.btn && !own.card.btn.hidden && own.card.btn.seen && own.card.btn.label === 'Open Settings', 'no output yet: the mount’s own line and its button: ' + own.card.out + ' [' + (own.card.btn && own.card.btn.label) + ']');
   ok(own.card.row && own.card.row.hidden && own.card.row.display === 'none' && own.card.row.height === 0,
     'the ports row is not on screen before MIDI is connected (no empty Synth out select): ' + JSON.stringify(own.card.row));
-  ok(own.card.tips === 'sends everything to the Channel picked above.' && own.from === 'from the Player', 'with its own Channel select the two texts no longer name the Hub: ' + JSON.stringify([own.card.tips, own.from]));
+  ok(own.card.tips === 'sends everything to the Channel picked above.' && own.from === 'from the Player', 'with its own Channel select the two texts name the card, not the Hub: ' + JSON.stringify([own.card.tips, own.from]));
+  // the card's button opens Settings; Connect MIDI is pressed there
   await p2.evaluate(() => document.getElementById('mh-plconnect').click());
-  await p2.waitForFunction(() => App.midi.ready && !document.getElementById('mh-plports').hidden);
-  const live = await p2.evaluate(() => __card());
-  ok(/MODX-1/.test(live.out) && live.btn.hidden, 'the button connects; the card names the synth without a reload (repainted on midi:state): ' + live.out);
-  ok(!live.row.hidden && live.row.display === 'flex' && live.row.ports === 'shared,modx1' && live.row.port === 'modx1' && live.row.ch === '3',
-    'and the ports row is there: Synth out lists the ports, Channel shows the stored one (4): ' + JSON.stringify(live.row));
+  await p2.waitForFunction(() => App.active === 'settings');
+  await p2.evaluate(() => document.getElementById('set-midi-enable').click());
+  await p2.waitForFunction(() => App.midi.ready && App.midi.hasOutput && !document.getElementById('mh-plports').hidden);
+  const live = await p2.evaluate(async () => { const o = { active: App.active, sameDoc: window.__sameDoc === true, away: __card() }; App.switchTo('songs'); await __wait(150); o.back = __card(); return o; });
+  ok(live.active === 'settings' && live.sameDoc && /MODX-1/.test(live.away.out) && live.away.btn.hidden,
+    'Connect MIDI pressed in Settings: the card names the synth without a reload, before the Songs page is shown again (repainted on midi:state): ' + live.away.out);
+  ok(live.back.seen && /MODX-1/.test(live.back.out) && !live.back.row.hidden && live.back.row.display === 'flex' && live.back.row.height > 0 && live.back.row.ports === 'shared,modx1' && live.back.row.port === 'modx1' && live.back.row.ch === '3',
+    'back on the Songs page the ports row is there: Synth out lists the ports, Channel shows the stored one (4): ' + JSON.stringify(live.back.row));
+  ok(await p2.evaluate(() => typeof window.SLMidiHub) === 'undefined', 'and no Hub was loaded on the way (window.SLMidiHub is undefined)');
   ok(errs2.length === 0, 'no page errors (own ports row)' + (errs2.length ? ': ' + errs2.join(' | ') : ''));
   await c2.close(); await browser.close();
   console.log(fails ? 'FAILED ' + fails : 'ALL PASS');
