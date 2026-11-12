@@ -11,7 +11,7 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
   await ctx.addInitScript(() => {
     if (sessionStorage.getItem('__seeded')) return;
     sessionStorage.setItem('__seeded', '1');
-    ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
+    ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true'));
   });
   const page = await ctx.newPage(), errs = [];
   page.on('pageerror', e => errs.push(e.message));
@@ -49,7 +49,7 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
     const afterErase = c.chart().cards[0].notes.length;
     document.getElementById('cc-undo').click();
     const afterUndo = c.chart().cards[0].notes.length;
-    const stored = JSON.parse(localStorage.getItem('guitarlab.cc.charts'))[0].cards[0];
+    const stored = JSON.parse(localStorage.getItem('soundlab2.cc.charts'))[0].cards[0];
     return { dots, placeholder, f5, fingers, name, afterErase, afterUndo, stored: stored.notes.length, storedName: stored.name, fingText: document.querySelectorAll('#cc-sheet .cc-card[data-ci="0"] .cc-fing').length };
   });
   ok(b.dots === 3 && b.placeholder === 'Dm/F', 'three taps = three dots; the empty name shows the found chord ' + JSON.stringify(b));
@@ -96,9 +96,9 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
   ok(/\.chart\.json$/.test(dl.suggestedFilename()), 'Save file downloads ' + dl.suggestedFilename());
   const fpath = await dl.path();
   await page.evaluate(() => document.getElementById('cc-new').click());
-  const before = await page.evaluate(() => JSON.parse(localStorage.getItem('guitarlab.cc.charts')).length);
+  const before = await page.evaluate(() => JSON.parse(localStorage.getItem('soundlab2.cc.charts')).length);
   await page.setInputFiles('#cc-import', fpath);
-  await page.waitForFunction(n => JSON.parse(localStorage.getItem('guitarlab.cc.charts')).length === n + 1, before);
+  await page.waitForFunction(n => JSON.parse(localStorage.getItem('soundlab2.cc.charts')).length === n + 1, before);
   const imp = await page.evaluate(() => ({ title: SLChart.chart().title, name: SLChart.chart().cards[0].name, opts: document.querySelectorAll('#cc-pick option').length }));
   ok(imp.name === 'Dm/F' && imp.opts >= 3, 'Open file brings the chart back with names and fingers ' + JSON.stringify(imp));
 

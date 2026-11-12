@@ -11,11 +11,11 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
 async function newPage(browser, name, seed) {
   const ctx = await browser.newContext({ viewport: { width: 1200, height: 900 } });
   await ctx.addInitScript(([name, seed]) => {
-    ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
+    ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true'));
     // these checks pin the CLASSIC look (scale lit + white note to play);
     // LUMI Display (the v0.79 default) has its own suite: lumidisplay
-    localStorage.setItem('guitarlab.lights.display', 'false');
-    for (const k in seed) localStorage.setItem('guitarlab.' + k, JSON.stringify(seed[k]));
+    localStorage.setItem('soundlab2.lights.display', 'false');
+    for (const k in seed) localStorage.setItem('soundlab2.' + k, JSON.stringify(seed[k]));
     window.__sent = [];
     const inp = { id: 'in1', name, onmidimessage: null };
     const out = { id: 'out1', name, state: 'connected', send: b => window.__sent.push(Array.from(b)) };
@@ -153,7 +153,7 @@ const keys = o => Object.keys(o).map(Number).sort((a, b) => a - b);
     __play(70);                      // back up
     o.back = App.midi.range();
     o.handUp = App.keys.hand();
-    o.stored = JSON.parse(localStorage.getItem('guitarlab.midi.rangeLo'));
+    o.stored = JSON.parse(localStorage.getItem('soundlab2.midi.rangeLo'));
     App.store.set('lights.octHand', false); // 'Octave only': the hand stays put
     __play(30); o.handOff = App.keys.hand(); o.offLo = App.midi.range().lo;
     __play(70); App.store.set('lights.octHand', true);
@@ -249,7 +249,7 @@ const keys = o => Object.keys(o).map(Number).sort((a, b) => a - b);
     o.offActive = document.querySelector('#set-midi-bend .active').textContent;
     document.querySelector('#set-midi-bend [data-bend="12"]').click();
     bend(); o.on = got.slice(-1)[0];
-    o.stored = JSON.parse(localStorage.getItem('guitarlab.midi.bendOn'));
+    o.stored = JSON.parse(localStorage.getItem('soundlab2.midi.bendOn'));
     got.length = 0;
     document.querySelector('#set-midi-bend [data-bend="0"]').click();
     o.reset = got.length === 16 && got.every(d => d.semis === 0);
@@ -396,7 +396,7 @@ const keys = o => Object.keys(o).map(Number).sort((a, b) => a - b);
   {
     const ctx2 = await browser.newContext({ viewport: { width: 1200, height: 900 } });
     await ctx2.addInitScript(() => {
-      ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
+      ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true'));
       window.__posts = [];
       window.GuitarLabHost = { shellVersion: () => '0.75.0', setKeepScreenOn: () => {} };
       window.SoundLabMidi = { post: j => {

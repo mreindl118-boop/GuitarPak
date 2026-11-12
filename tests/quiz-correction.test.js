@@ -13,8 +13,8 @@ function ok(value, message) {
     args: ['--autoplay-policy=no-user-gesture-required'] });
   const context = await browser.newContext();
   await context.addInitScript(() => {
-    localStorage.setItem('guitarlab.help.seen', 'true');
-    localStorage.setItem('guitarlab.help.done', 'true');
+    localStorage.setItem('soundlab2.help.seen', 'true');
+    localStorage.setItem('soundlab2.help.done', 'true');
   });
   const page = await context.newPage();
   const errors = [];

@@ -6,8 +6,8 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
 async function open(browser, vp, seed, mobile) {
   const ctx = await browser.newContext({ viewport: vp, hasTouch: !!mobile, isMobile: !!mobile });
   await ctx.addInitScript((seed) => {
-    localStorage.setItem('guitarlab.help.seen', 'true'); localStorage.setItem('guitarlab.help.done', 'true'); localStorage.setItem('guitarlab.qz.landed', 'true');
-    for (const k in seed) localStorage.setItem('guitarlab.' + k, JSON.stringify(seed[k]));
+    localStorage.setItem('soundlab2.help.seen', 'true'); localStorage.setItem('soundlab2.help.done', 'true'); localStorage.setItem('soundlab2.qz.landed', 'true');
+    for (const k in seed) localStorage.setItem('soundlab2.' + k, JSON.stringify(seed[k]));
   }, seed || {});
   const page = await ctx.newPage(); const errs = [];
   page.on('pageerror', e => errs.push('pageerror: ' + e.message));
@@ -119,7 +119,7 @@ const tabs = sel => [...document.querySelectorAll(sel + ' .tabbar-btn')].map(b =
     const sel = document.getElementById('cx-scale');
     const groups = [...sel.querySelectorAll('optgroup')].map(g => g.label + ':' + g.children.length);
     sel.value = 'blues'; sel.dispatchEvent(new Event('change'));
-    return { groups, n: sel.options.length, first: sel.options[0].value, stored: JSON.parse(localStorage.getItem('guitarlab.fb.scale')) };
+    return { groups, n: sel.options.length, first: sel.options[0].value, stored: JSON.parse(localStorage.getItem('soundlab2.fb.scale')) };
   });
   ok(sc.groups.join(',') === 'Common:5,Minor family:2,Modes:5,Exotic:1' && sc.n === 13 && sc.first === 'major' && sc.stored === 'blues', 'scales grouped, all 13 kept, selection works: ' + JSON.stringify(sc));
   ok(errs.length === 0, 'no page errors (desktop)' + (errs.length ? '\n    ' + errs.join('\n    ') : ''));

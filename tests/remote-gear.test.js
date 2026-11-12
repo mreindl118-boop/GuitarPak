@@ -37,11 +37,11 @@ const LOADS = /^(?:(?:17[6-9]|18\d|19[01]) (?:0|32) |(?:19[2-9]|20[0-7]) )/;
 // what every page of a context starts with: the seeds, a fake LUMI and a fake
 // MODX (each page gets its own pair), and the helpers the checks use
 function INIT(seed) {
-  ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
-  localStorage.setItem('guitarlab.lights.on', 'false');
-  localStorage.setItem('guitarlab.midi.outputId', JSON.stringify('lumi'));
-  localStorage.setItem('guitarlab.midihub.profile', JSON.stringify('yamaha'));
-  for (const k in seed) localStorage.setItem('guitarlab.' + k, JSON.stringify(seed[k]));
+  ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true'));
+  localStorage.setItem('soundlab2.lights.on', 'false');
+  localStorage.setItem('soundlab2.midi.outputId', JSON.stringify('lumi'));
+  localStorage.setItem('soundlab2.midihub.profile', JSON.stringify('yamaha'));
+  for (const k in seed) localStorage.setItem('soundlab2.' + k, JSON.stringify(seed[k]));
   window.__wait = ms => new Promise(r => setTimeout(r, ms));
   window.__q = s => document.querySelector(s);
   window.__raw = []; window.__notes = []; window.__ev = []; window.__slots = 0;

@@ -6,7 +6,7 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
   const b = await chromium.launch({ executablePath: env.CHROMIUM, args: ['--autoplay-policy=no-user-gesture-required'] });
   const ctx = await b.newContext({ viewport: { width: 1280, height: 900 } });
   await ctx.addInitScript(() => {
-    localStorage.setItem('guitarlab.help.seen', 'true'); localStorage.setItem('guitarlab.help.done', 'true'); localStorage.setItem('guitarlab.qz.landed', 'true');
+    localStorage.setItem('soundlab2.help.seen', 'true'); localStorage.setItem('soundlab2.help.done', 'true'); localStorage.setItem('soundlab2.qz.landed', 'true');
     window.__midiLog = [];
     window.webkit = { messageHandlers: { midi: { postMessage: m => window.__midiLog.push(m) } } };
   });

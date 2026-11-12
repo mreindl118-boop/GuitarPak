@@ -18,12 +18,12 @@ const J = JSON.stringify;
   const browser = await chromium.launch({ executablePath: env.CHROMIUM, args: ['--autoplay-policy=no-user-gesture-required'] });
   const ctx = await browser.newContext({ viewport: { width: 1200, height: 900 } });
   await ctx.addInitScript(() => {
-    ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
-    localStorage.setItem('guitarlab.lights.on', 'false');
-    localStorage.setItem('guitarlab.midi.outputId', JSON.stringify('lumi'));
-    localStorage.setItem('guitarlab.midihub.profile', JSON.stringify('yamaha'));
-    localStorage.setItem('guitarlab.met.bpm', '120');
-    localStorage.setItem('guitarlab.met.sig', JSON.stringify('4/4'));
+    ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true'));
+    localStorage.setItem('soundlab2.lights.on', 'false');
+    localStorage.setItem('soundlab2.midi.outputId', JSON.stringify('lumi'));
+    localStorage.setItem('soundlab2.midihub.profile', JSON.stringify('yamaha'));
+    localStorage.setItem('soundlab2.met.bpm', '120');
+    localStorage.setItem('soundlab2.met.sig', JSON.stringify('4/4'));
     window.__by = { out1: [], lumi: [] };
     const mk = (id, name) => ({ id, name, state: 'connected', send: b => window.__by[id].push(Array.from(b)) });
     const inp = { id: 'in1', name: 'MODX-1', state: 'connected', onmidimessage: null };

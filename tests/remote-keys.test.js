@@ -35,12 +35,12 @@ const MAP = { next: { midi: { t: 'cc', n: 86, ch: null, port: '' }, key: null },
   const browser = await chromium.launch({ executablePath: env.CHROMIUM, args: ['--autoplay-policy=no-user-gesture-required'] });
   const ctx = await browser.newContext({ viewport: { width: 1200, height: 900 } });
   await ctx.addInitScript((MAP) => {
-    ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
-    localStorage.setItem('guitarlab.lights.on', 'false');
-    localStorage.setItem('guitarlab.remote.map', JSON.stringify(MAP));
-    localStorage.setItem('guitarlab.kl.prog', JSON.stringify({ 'c-r': { step: 9 } })); // 16ths at 72: a short run
-    localStorage.setItem('guitarlab.kl.sel', JSON.stringify('c-r'));
-    localStorage.setItem('guitarlab.kl.reps', JSON.stringify(1));
+    ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true'));
+    localStorage.setItem('soundlab2.lights.on', 'false');
+    localStorage.setItem('soundlab2.remote.map', JSON.stringify(MAP));
+    localStorage.setItem('soundlab2.kl.prog', JSON.stringify({ 'c-r': { step: 9 } })); // 16ths at 72: a short run
+    localStorage.setItem('soundlab2.kl.sel', JSON.stringify('c-r'));
+    localStorage.setItem('soundlab2.kl.reps', JSON.stringify(1));
     window.__wait = ms => new Promise(r => setTimeout(r, ms));
     window.__q = s => document.querySelector(s);
     window.__raw = []; window.__ev = []; window.__claims = [];

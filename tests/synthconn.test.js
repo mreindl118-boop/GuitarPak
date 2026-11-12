@@ -18,11 +18,11 @@ const LIVE = { sets: [{ id: 's1', name: 'Gig', pages: [[{ modx: { lsb: 0, pc: 3 
 async function newPage(browser, opts) {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true });
   await ctx.addInitScript((o) => {
-    ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
-    if (o.wanted !== false) localStorage.setItem('guitarlab.midi.wanted', 'true');
-    if (o.sel != null) localStorage.setItem('guitarlab.midi.outputId', JSON.stringify(o.sel));
-    if (o.hubOut != null) localStorage.setItem('guitarlab.midihub.outId', JSON.stringify(o.hubOut));
-    for (const k in (o.seed || {})) localStorage.setItem('guitarlab.' + k, JSON.stringify(o.seed[k]));
+    ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true'));
+    if (o.wanted !== false) localStorage.setItem('soundlab2.midi.wanted', 'true');
+    if (o.sel != null) localStorage.setItem('soundlab2.midi.outputId', JSON.stringify(o.sel));
+    if (o.hubOut != null) localStorage.setItem('soundlab2.midihub.outId', JSON.stringify(o.hubOut));
+    for (const k in (o.seed || {})) localStorage.setItem('soundlab2.' + k, JSON.stringify(o.seed[k]));
     window.__sent = []; window.__posts = [];
     window.__wait = (ms) => new Promise(r => setTimeout(r, ms));
     window.__q = (s) => document.querySelector(s);

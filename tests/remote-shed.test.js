@@ -28,10 +28,10 @@ const MAP = {
 async function newPage(browser, seed) {
   const ctx = await browser.newContext({ viewport: { width: 1200, height: 900 } });
   await ctx.addInitScript(([map, seed]) => {
-    ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
-    localStorage.setItem('guitarlab.lights.on', 'false');
-    localStorage.setItem('guitarlab.remote.map', JSON.stringify(map));
-    for (const k in seed) localStorage.setItem('guitarlab.' + k, JSON.stringify(seed[k]));
+    ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true'));
+    localStorage.setItem('soundlab2.lights.on', 'false');
+    localStorage.setItem('soundlab2.remote.map', JSON.stringify(map));
+    for (const k in seed) localStorage.setItem('soundlab2.' + k, JSON.stringify(seed[k]));
     const mkIn = (id, name) => ({ id, name, state: 'connected', onmidimessage: null });
     const modx = mkIn('in-modx', 'MODX-1'), lumi = mkIn('in-lumi', 'LUMI Keys BLOCK');
     const out = { id: 'out-modx', name: 'MODX-1', state: 'connected', send: () => {} };
@@ -386,7 +386,7 @@ async function newPage(browser, seed) {
   ({ ctx, page, errs } = await newPage(browser, { 'ws.performance.input': 'in-lumi' }));
   const pi = await page.evaluate(async () => {
     const o = {};
-    const stored = () => localStorage.getItem('guitarlab.midi.inputId');
+    const stored = () => localStorage.getItem('soundlab2.midi.inputId');
     const change = (id, v) => { const e = document.getElementById(id); e.value = v; e.dispatchEvent(new Event('change', { bubbles: true })); };
     // the app heard All inputs (the default): the player points it at its own
     // keyboard while it shows; the MODX remote still works (claimed on every port)

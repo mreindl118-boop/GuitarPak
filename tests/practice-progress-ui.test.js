@@ -15,7 +15,7 @@ const stat = key => '[data-pgu-stat="' + key + '"]';
   try {
     const context = await browser.newContext({ locale: 'en-US', viewport: { width: 1280, height: 900 }, acceptDownloads: true });
     await context.addInitScript(() => {
-      ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
+      ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true'));
     });
     const page = await context.newPage();
     page.on('pageerror', e => errors.push(e.message));
@@ -180,7 +180,7 @@ const stat = key => '[data-pgu-stat="' + key + '"]';
 
     console.log('# actual player engagement and XP');
     const playerContext = await browser.newContext({ viewport: { width: 1280, height: 900 } });
-    await playerContext.addInitScript(() => ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true')));
+    await playerContext.addInitScript(() => ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true')));
     const player = await playerContext.newPage(); player.on('pageerror', e => errors.push(e.message));
     await player.goto(env.URL);
     await player.waitForFunction(() => window.PracticeProgress && window.PerformancePlayer && window.Woodshed);

@@ -25,7 +25,23 @@
  *                                     now (audio-clock accurate).
  *                                     App.pluckSynth forces the synth voice;
  *                                     App.setPluckTone switches the tone.
- *   App.store.get(key, fallback) / App.store.set(key, value)   JSON localStorage
+ *   App.store.get(key, fallback) / App.store.set(key, value)   JSON localStorage,
+ *                                     under ONE prefix per address (.prefix:
+ *                                     'soundlab2.', on the beta under /next/
+ *                                     'soundlab2-next.'). .keys() = this scope's
+ *                                     keys without the prefix, .raw(key) /
+ *                                     .setRaw(key, raw) = the stored string as
+ *                                     it is. The 1.x store (.legacy) is copied
+ *                                     across once at the first start (minus
+ *                                     .deny, the keys of removed features) and
+ *                                     never written: .importInfo() = what that
+ *                                     copy did, .copyAgain() = do it again,
+ *                                     overwriting, .waiting(key) = this key
+ *                                     did not fit yet (do not store a
+ *                                     default under it). No other file touches
+ *                                     localStorage; the Backup card in
+ *                                     js/settings.js knows the two 2.0
+ *                                     prefixes, to read a backup file.
  *   App.injectCSS(id, cssText)        add module-specific styles once
  *   App.app                           which of the two apps this document is:
  *                                     'main' = soundLAB (index.html) | 'gear' =
@@ -544,10 +560,187 @@ window.App = (function () {
     osc.stop(t + dur + 0.05);
   }
 
+  // STORAGE (2.0). One prefix per address: 'soundlab2-next.' on the beta (…/next/), 'soundlab2.' everywhere else.
+  var STORE_BETA   = /\/next\/[^\/]*$/.test(location.pathname);
+  var STORE_LIVE   = 'soundlab2.';
+  var STORE_PREFIX = STORE_BETA ? 'soundlab2-next.' : STORE_LIVE;
+  var STORE_LEGACY = 'guitarlab.'; // the 1.x store: read once by importOnce(), never written, never deleted
+  var STORE_MARK   = 'store.imported';
+  // keys of features removed in Phase A: never copied (docs/ROADMAP-2.0.md)
+  var STORE_DENY = /^(st\.|ideas\.|song\.|sd\.|plugins\.|app\.space$|app\.tabStudio$|app\.click$|pads\.track$|app\.gtab\.(gstudio|gsketch|gpl-.*)$|tr\.ear(Best|Harm)$)/;
+  // the copy order for values longer than STORE_SMALL characters, and the room that must stay free (D46)
+  var STORE_SMALL    = 4096;
+  var STORE_PROGRESS = /^(practice\.progress\.|lesson\.|qz\.|kl\.|xp\.|pp\.|tr\.|ws\.(xp|streak|ach|weak|cal|ladder\.|performance\.results))/;
+  var STORE_LIBS     = /^(ws\.lib$|sg\.lib$|cc\.charts$|jam2\.sections$|midihub\.|synthtab\.|hx\.)/;
+  var STORE_ROOM     = 200000;
+  // the key the headroom check writes and removes again (never copied, never in a backup)
+  var STORE_PROBE    = 'store.probe';
+
+  // every raw localStorage call of the app is in this block. A full key is
+  // always STORE_PREFIX + key when it is written or removed; the 1.x prefix
+  // and the live scope (seen from the beta) are only ever READ, by the copy.
+  // the keys under one prefix, without it ([] = none, or no storage)
+  function storeKeys(prefix) {
+    var out = [];
+    try {
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (k && k.indexOf(prefix) === 0 && k.length > prefix.length) out.push(k.slice(prefix.length));
+      }
+    } catch (e) { /* no storage */ }
+    return out;
+  }
+  // one stored string of this scope, written and read back: true = it is there
+  function storePut(key, raw) {
+    try {
+      localStorage.setItem(STORE_PREFIX + key, raw);
+      return localStorage.getItem(STORE_PREFIX + key) === raw;
+    } catch (e) { return false; } // refused: storage is full or blocked
+  }
+  function storeDrop(key) {
+    try { localStorage.removeItem(STORE_PREFIX + key); } catch (e) { /* no storage */ }
+  }
+  // is there still room for STORE_ROOM characters? (written, then removed)
+  function storeRoom() {
+    var pad = new Array(STORE_ROOM + 1).join('x'), ok = storePut(STORE_PROBE, pad);
+    storeDrop(STORE_PROBE);
+    return ok;
+  }
+
+  // THE COPY: raw strings from another prefix into this scope (D46).
+  //   fromPrefix  the 1.x store, or on the beta the live 2.0 scope
+  //   overwrite   false = a key this scope already has is left alone
+  //   only        null = every key of the source, or a list of keys (a retry)
+  // Never copied: STORE_DENY (features that left the app) and the copy's own
+  // marker. ORDER: 1 every value of at most STORE_SMALL characters (settings,
+  // flags, the one-time migration markers, which must arrive with the
+  // settings they guard), 2 longer values of STORE_PROGRESS (what cannot be
+  // made again), 3 longer values of STORE_LIBS (what can be imported again
+  // from a file), 4 any other longer value; smallest first inside a group.
+  // Each write is on its own and is read back; a refused one is listed in
+  // `failed`, never thrown. HEADROOM: when the last write is done there must
+  // still be room for STORE_ROOM characters, or the origin ends up full and
+  // both apps drop later writes without a word. While there is not, the copy
+  // undoes copies THIS RUN created: group 4 first, then 3, then 2, the
+  // largest first, and lists them as failed. Never a group-1 key and never a
+  // key that was there before the run.
+  // -> { from, at, copied, skipped, failed: [keys], made: [keys] }: copied +
+  // skipped + failed = the source keys looked at (skipped = removed features,
+  // and keys left alone because this scope has them); made = the keys this
+  // run created and kept (for importOnce, not stored).
+  function copyStore(fromPrefix, overwrite, only) {
+    var res = { from: fromPrefix, at: Date.now(), copied: 0, skipped: 0, failed: [], made: [] };
+    if (fromPrefix === STORE_PREFIX) return res; // never onto itself
+    var names = only ? only.slice() : storeKeys(fromPrefix), todo = [], made = [], i, t;
+    for (i = 0; i < names.length; i++) {
+      var k = names[i], raw = null, had = false;
+      if (!k || k === STORE_MARK || k === STORE_PROBE) continue;
+      if (STORE_DENY.test(k)) { res.skipped++; continue; }
+      try {
+        raw = localStorage.getItem(fromPrefix + k);
+        had = localStorage.getItem(STORE_PREFIX + k) !== null;
+      } catch (e) { raw = null; }
+      if (raw === null) continue;                       // gone since it was listed
+      if (had && !overwrite) { res.skipped++; continue; }
+      todo.push({ k: k, raw: raw, n: raw.length, had: had,
+        g: raw.length <= STORE_SMALL ? 1 : STORE_PROGRESS.test(k) ? 2 : STORE_LIBS.test(k) ? 3 : 4 });
+    }
+    todo.sort(function (a, b) { return a.g - b.g || a.n - b.n || (a.k < b.k ? -1 : a.k > b.k ? 1 : 0); });
+    for (i = 0; i < todo.length; i++) {
+      t = todo[i];
+      if (storePut(t.k, t.raw)) { res.copied++; if (!t.had) made.push(t); }
+      else res.failed.push(t.k);
+    }
+    // headroom: only copies of this run in the groups 4, 3, 2 can be undone
+    var undo = made.filter(function (x) { return x.g > 1; });
+    undo.sort(function (a, b) { return b.g - a.g || b.n - a.n || (a.k < b.k ? -1 : a.k > b.k ? 1 : 0); });
+    while (undo.length && !storeRoom()) {
+      t = undo.shift();
+      storeDrop(t.k);
+      made.splice(made.indexOf(t), 1);
+      res.copied--;
+      res.failed.push(t.k);
+    }
+    res.made = made.map(function (x) { return x.k; });
+    return res;
+  }
+
+  // THE MARKER (STORE_MARK, one per scope): { v, from, at, copied, skipped,
+  // failed: [keys], kept: [keys] }. Its presence, never a version number, says
+  // that this scope had its copy. failed = keys that did not fit yet, tried
+  // again at each start; kept = keys that are not copied any more because 2.0
+  // has its own data there.
+  var storeInfo = null; // the last marker of this start, for when it could not be stored
+  function markOf(o) {
+    if (!o || typeof o !== 'object') return null;
+    function list(a) {
+      return Object.prototype.toString.call(a) === '[object Array]' ? a.filter(function (k) { return typeof k === 'string' && !!k; }) : [];
+    }
+    return { v: +o.v || 1, from: typeof o.from === 'string' ? o.from : STORE_LEGACY, at: +o.at || 0,
+      copied: +o.copied || 0, skipped: +o.skipped || 0, failed: list(o.failed), kept: list(o.kept) };
+  }
+  function saveMark(m) {
+    storeInfo = m;
+    return storePut(STORE_MARK, JSON.stringify(m));
+  }
+  // where a copy comes from: the 1.x store. On the beta it is the live 2.0
+  // scope once that scope had its own copy (the live address runs 2.0 by then)
+  function storeSource() {
+    var live = false;
+    try { live = STORE_BETA && localStorage.getItem(STORE_LIVE + STORE_MARK) !== null; } catch (e) { live = false; }
+    return live ? STORE_LIVE : STORE_LEGACY;
+  }
+  function copyAll(overwrite) {
+    var r = copyStore(storeSource(), overwrite, null);
+    saveMark({ v: 1, from: r.from, at: r.at, copied: r.copied, skipped: r.skipped, failed: r.failed, kept: [] });
+  }
+  // keys that did not fit at an earlier start
+  function retryFailed(m) {
+    var from = STORE_BETA && m.from === STORE_LIVE ? STORE_LIVE : STORE_LEGACY;
+    var again = [], kept = m.kept.slice(), changed = false;
+    m.failed.forEach(function (k) {
+      if (localStorage.getItem(STORE_PREFIX + k) !== null) {
+        // 2.0 wrote its own data there since: never overwritten, never tried again
+        if (kept.indexOf(k) === -1) kept.push(k);
+        changed = true;
+      } else if (localStorage.getItem(from + k) === null) {
+        changed = true; // the source key is gone: nothing left to copy
+      } else again.push(k);
+    });
+    var r = again.length ? copyStore(from, false, again) : { copied: 0, failed: [], made: [] };
+    storeInfo = m;
+    if (!changed && !r.copied) return; // as it was: the marker is not rewritten
+    var next = { v: m.v, from: m.from, at: m.at, copied: m.copied + r.copied, skipped: m.skipped, failed: r.failed, kept: kept };
+    if (!saveMark(next)) {
+      // the marker could not be stored: take this start's copies back, or the
+      // next start would read them as 2.0's own data
+      r.made.forEach(storeDrop);
+      storeInfo = m;
+    }
+  }
+  // THE ONE-TIME COPY, once per scope. Runs right here, while this file
+  // loads: js/midi.js writes to the store while IT loads (the "all keyboards"
+  // and voice-mode migrations), and a copy that came later would find those
+  // keys taken and leave the user's real values behind. Blocked or full
+  // storage never stops the app from starting.
+  function importOnce() {
+    try {
+      var raw = localStorage.getItem(STORE_PREFIX + STORE_MARK);
+      if (raw === null) { copyAll(false); return; }
+      var m = null;
+      try { m = markOf(JSON.parse(raw)); } catch (e) { m = null; }
+      if (!m || !m.failed.length) return;
+      retryFailed(m);
+    } catch (e) { /* no storage: the app starts with defaults */ }
+  }
+
   var store = {
+    prefix: STORE_PREFIX,   // this scope
+    legacy: STORE_LEGACY,   // the 1.x prefix (an old backup file names its keys with it)
+    deny: STORE_DENY,       // tested against a key WITHOUT its prefix: a feature that left the app
     get: function (key, fallback) {
       try {
-        var v = localStorage.getItem('guitarlab.' + key);
+        var v = localStorage.getItem(STORE_PREFIX + key);
         return v == null ? fallback : JSON.parse(v);
       } catch (e) {
         return fallback;
@@ -555,10 +748,37 @@ window.App = (function () {
     },
     set: function (key, value) {
       try {
-        localStorage.setItem('guitarlab.' + key, JSON.stringify(value));
+        localStorage.setItem(STORE_PREFIX + key, JSON.stringify(value));
       } catch (e) { /* storage unavailable — settings just won't persist */ }
+    },
+    // the keys of this scope, without the prefix
+    keys: function () { return storeKeys(STORE_PREFIX); },
+    // the stored string as it is; null = no such key (or no storage)
+    raw: function (key) {
+      try { return localStorage.getItem(STORE_PREFIX + key); } catch (e) { return null; }
+    },
+    // store a string as it is (a backup file's value); true = it is there now
+    setRaw: function (key, raw) { return storePut(key, String(raw)); },
+    // what the one-time copy did: the marker, or null when there is none
+    importInfo: function () {
+      var m = null;
+      try { m = markOf(JSON.parse(localStorage.getItem(STORE_PREFIX + STORE_MARK))); } catch (e) { m = null; }
+      if (!m && storeInfo) m = markOf(storeInfo);
+      return m;
+    },
+    // true while this key still waits for its copy: it did not fit, and the
+    // copy tries again at each start. A page that fills an EMPTY key with a
+    // default asks first and keeps that default in memory: once stored, the
+    // next start would take it for 2.0's own data and stop trying (`kept`)
+    waiting: function (key) { return !!storeInfo && storeInfo.failed.indexOf(key) !== -1; },
+    // Settings › Backup "Copy again": the same copy, but it replaces what
+    // this scope has; then a fresh marker
+    copyAgain: function () {
+      try { copyAll(true); } catch (e) { /* no storage */ }
+      return store.importInfo();
     }
   };
+  importOnce();
 
   // ---- tiny event bus (cross-module links, e.g. shared tempo) ----
   var busListeners = {};
@@ -1083,14 +1303,13 @@ window.App = (function () {
   function colWrite(key, value) {
     store.set(key, value);
     var kept = false;
-    try { kept = localStorage.getItem('guitarlab.' + key) === JSON.stringify(value); } catch (e) { /* no storage */ }
+    try { kept = store.raw(key) === JSON.stringify(value); } catch (e) { /* a value that cannot be stored */ }
     if (kept) delete colMem[key]; else colMem[key] = { v: value };
   }
   function colRead(key, parse) {
     var m = colMem[key];
     if (m) { if (!('p' in m)) m.p = parse(m.v); return m.p; }
-    var raw = null;
-    try { raw = localStorage.getItem('guitarlab.' + key); } catch (e) { /* no storage */ }
+    var raw = store.raw(key); // null without storage
     var c = colCache[key];
     if (c && c.raw === raw) return c.val;
     var v = null;
@@ -1697,11 +1916,21 @@ window.App = (function () {
       notes.push('MIDI Hub Thru runs in soundLAB Gear now. Keep Gear open in a second window to pass your keyboard to the synth while you practise.');
       store.set('gear.thruTold', true);
     }
+    // the one-time copy of the 1.x data left something behind (the browser's
+    // storage is full): said at each start, in both apps, until it fits. The
+    // only place boot() touches the copy (importOnce, at the store)
+    var copyInfo = store.importInfo(), copyNote = !!(copyInfo && copyInfo.failed.length);
+    if (copyNote) {
+      // on the beta the copy can come from the live 2.0 app instead of the 1.x store
+      notes.push('Some of your ' + (copyInfo.from === STORE_LEGACY ? '1.x data' : 'data from the live app') +
+        ' did not fit in this browser\'s storage (' + copyInfo.failed.length + (copyInfo.failed.length === 1 ? ' item' : ' items') +
+        '). soundLAB tries again each time it starts. Details: soundLAB › Settings › Backup.');
+    }
     if (notes.length) {
       var told = document.getElementById('app-toast');
       // the start may have said where a moved page went: keep that sentence
       if ((toast.n || 0) !== said && told && !told.hidden && told.textContent) notes.unshift(told.textContent);
-      toast(notes.join(' '), 5000 + 4000 * notes.length);
+      toast(notes.join(' '), copyNote && notes.length === 1 ? 8000 : 5000 + 4000 * notes.length);
     }
 
     var foot = document.querySelector('.foot');

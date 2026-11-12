@@ -6,6 +6,7 @@
 
   var audioUI = null; // the Sound input card's meter (set by init)
   var hubRules = null; // the MIDI keyboard card's "MIDI Hub rules" line (set by init)
+  var backup = null; // the Backup card's line about the one-time copy of the 1.x data (set by init)
 
   function init(rootEl) {
     App.injectCSS('settings',
@@ -113,10 +114,12 @@
         '<div class="muted small">Updates NEVER clear your settings &mdash; they live on this device and survive every version. ' +
           'If things ever look reset, you are probably in a different install (a Chrome tab vs the desktop app, or another browser profile). ' +
           'Export moves everything &mdash; preferences, palettes, jam songs, practice progress &mdash; between installs.</div>' +
+        '<div class="muted small set-theme-note" id="set-backup-info" hidden></div>' +
         '<div class="row tight" style="margin-top:12px">' +
           '<button type="button" class="btn sm" id="set-backup-out">Export settings</button>' +
           '<label class="btn sm" style="cursor:pointer">Import settings<input type="file" id="set-backup-in" accept=".json" style="display:none"></label>' +
-          '<span class="muted small" id="set-backup-msg"></span>' +
+          '<button type="button" class="btn sm" id="set-copy-again"></button>' +
+          '<span class="muted small" id="set-backup-msg" role="status"></span>' +
         '</div>' +
       '</div>' +
       '<div class="card">' +
@@ -875,44 +878,118 @@
     paintRules();
     hubRules = { paint: paintRules };
 
-    document.getElementById('set-backup-out').addEventListener('click', function () {
-      var out = {};
-      for (var i = 0; i < localStorage.length; i++) {
-        var k = localStorage.key(i);
-        if (k && k.indexOf('guitarlab.') === 0) out[k] = localStorage.getItem(k);
+    // ---- Backup ----
+    // 2.0 keeps its data under its own prefix (App.store.prefix; the beta
+    // under /next/ has a third one) and copied the 1.x data across once, at
+    // the first start (js/app.js importOnce). The 1.x data is never written:
+    // every write here goes through App.store, which only knows this scope.
+    var SCOPES = ['soundlab2.', 'soundlab2-next.']; // what a 2.0 backup file may name its keys with
+    var MARK = 'store.imported', PROBE = 'store.probe'; // the copy's own keys: per browser, never in a file
+    var onBeta = App.store.prefix === SCOPES[1];
+    var backupMsg = document.getElementById('set-backup-msg');
+    var infoEl = document.getElementById('set-backup-info');
+    var againBtn = document.getElementById('set-copy-again');
+    var AGAIN = onBeta ? 'Copy from the live app again' : 'Copy my 1.x data again';
+    function items(n) { return n + (n === 1 ? ' item' : ' items'); }
+    // a list of key names for a sentence; a long one is cut (a full store can fail hundreds)
+    function names(list) {
+      return list.slice(0, 12).join(', ') + (list.length > 12 ? ' and ' + (list.length - 12) + ' more' : '');
+    }
+    // what the one-time copy did, from its marker: copied / did not fit / left alone
+    function paintBackup() {
+      var info = App.store.importInfo();
+      infoEl.hidden = !info;
+      if (!info) { infoEl.textContent = ''; return; } // no copy yet in this browser (storage is blocked)
+      var old = info.from === App.store.legacy; // the 1.x store; on the beta it can be the live 2.0 app instead
+      var day = '';
+      try { day = info.at ? new Date(info.at).toLocaleDateString() : ''; } catch (e) { day = ''; }
+      var t = (old ? 'Copied your 1.x data' : 'Copied your data from the live app') + (day ? ' on ' + day : '') + ': ' + items(info.copied) + '.';
+      if (info.failed.length) {
+        t += ' ' + items(info.failed.length) + ' did not fit in this browser\'s storage and ' +
+          (info.failed.length === 1 ? 'is' : 'are') + ' tried again at each start: ' + names(info.failed) + '. ' +
+          (old ? 'Your 1.x data is untouched.' : 'The live app\'s data is untouched.');
       }
-      var blob = new Blob([JSON.stringify({ app: 'soundLAB', keys: out }, null, 1)], { type: 'application/json' });
+      if (info.kept.length) {
+        t += ' ' + items(info.kept.length) + (info.kept.length === 1 ? ' was' : ' were') +
+          ' not copied because 2.0 already has its own data there: ' + names(info.kept) + '. Copy again would replace it.';
+      }
+      if (infoEl.textContent !== t) infoEl.textContent = t;
+    }
+    backup = { paint: paintBackup };
+    paintBackup();
+
+    // Copy again: the same copy, but it overwrites what 2.0 has. Two taps
+    // within 3 s instead of a confirm() (the claude.ai frame refuses those)
+    var againT = null;
+    function againRest() {
+      if (againT) { clearTimeout(againT); againT = null; }
+      againBtn.textContent = AGAIN;
+      againBtn.classList.remove('primary');
+    }
+    againRest();
+    againBtn.addEventListener('click', function () {
+      if (!againT) {
+        againBtn.textContent = 'Tap again: this overwrites 2.0 settings';
+        againBtn.classList.add('primary');
+        againT = setTimeout(againRest, 3000);
+        return;
+      }
+      againRest();
+      againBtn.disabled = true;
+      var info = App.store.copyAgain();
+      paintBackup();
+      backupMsg.textContent = (info ? items(info.copied) + ' copied' +
+        (info.failed.length ? ', ' + items(info.failed.length) + ' did not fit' : '') : 'Nothing could be copied') + ' — reloading…';
+      setTimeout(function () { location.reload(); }, 900);
+    });
+
+    document.getElementById('set-backup-out').addEventListener('click', function () {
+      // this scope's keys, each under its full name; the copy's own marker stays out
+      var pre = App.store.prefix, out = {};
+      App.store.keys().forEach(function (k) {
+        if (k === MARK || k === PROBE) return;
+        var raw = App.store.raw(k);
+        if (raw !== null) out[pre + k] = raw;
+      });
+      var blob = new Blob([JSON.stringify({ app: 'soundLAB', format: 2, from: App.version, scope: pre, keys: out }, null, 1)], { type: 'application/json' });
       var a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = 'soundlab-settings.json';
       a.click();
       setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
     });
-    // Phase A (2.0): keys of features that left the app — the Studio and its
-    // prefs, ideas, the plug-in list, the workspace switch, the Pads drum
-    // track. The live 1.x app on this origin still owns them, so an import
-    // never writes them (a plug-in list is code the live app would run).
-    var DEAD = /^guitarlab\.(st\.|sd\.|ideas\.|song\.|plugins\.|app\.space$|app\.tabStudio$|app\.click$|pads\.track$)/;
+    // A file's keys carry the prefix of where they were exported: this scope
+    // or the other 2.0 scope (a beta file restores on live and the other way
+    // round), or the 1.x prefix (a file from before 2.0, or without a format).
+    // Whatever it was, a key is written under THIS scope, never under the 1.x
+    // prefix. Keys of features that left the app (App.store.deny: the Studio,
+    // ideas, the plug-in list, ...) are skipped and counted.
+    function fileKey(full) {
+      var pres = SCOPES.concat([App.store.legacy]);
+      for (var i = 0; i < pres.length; i++) if (full.indexOf(pres[i]) === 0) return full.slice(pres[i].length);
+      return '';
+    }
     document.getElementById('set-backup-in').addEventListener('change', function () {
       var f = this.files && this.files[0];
-      var msg = document.getElementById('set-backup-msg');
+      var msg = backupMsg;
       if (!f) return;
       var rd = new FileReader();
       rd.onload = function () {
         try {
           var d = JSON.parse(rd.result);
-          if (!d || d.app !== 'soundLAB' || !d.keys) throw new Error('not a soundLAB backup');
-          var n = 0, dead = 0;
-          Object.keys(d.keys).forEach(function (k) {
-            if (k.indexOf('guitarlab.') !== 0) return;
-            if (DEAD.test(k)) { dead++; return; }
+          if (!d || d.app !== 'soundLAB' || !d.keys || typeof d.keys !== 'object') throw new Error('not a soundLAB backup');
+          var n = 0, dead = 0, refused = 0;
+          Object.keys(d.keys).forEach(function (full) {
+            var k = fileKey(full);
+            if (!k || k === MARK || k === PROBE) return;
+            if (App.store.deny.test(k)) { dead++; return; }
             // an export holds strings only: anything else is not ours to write
-            if (typeof d.keys[k] !== 'string') return;
-            localStorage.setItem(k, d.keys[k]);
-            n++;
+            if (typeof d.keys[full] !== 'string') return;
+            if (App.store.setRaw(k, d.keys[full])) n++; else refused++; // refused: the browser's storage is full or blocked
           });
-          msg.textContent = n + ' settings restored' +
-            (dead ? ', ' + dead + ' from removed features skipped' : '') + ' — reloading…';
+          msg.textContent = n + (n === 1 ? ' setting' : ' settings') + ' restored' +
+            (dead ? ', ' + dead + ' from removed features skipped' : '') +
+            (refused ? ', ' + refused + ' did not fit in this browser\'s storage' : '') + ' — reloading…';
           setTimeout(function () { location.reload(); }, 900);
         } catch (e) {
           msg.textContent = 'Import failed: ' + e.message;
@@ -932,6 +1009,7 @@
       if (audioUI) audioUI.show();
       if (App.remote) App.remote.paint();
       if (hubRules) hubRules.paint(); // the rules are edited in soundLAB Gear: count them again
+      if (backup) backup.paint();
       // dynamic prefs may have changed elsewhere (wake from code, volume) —
       // re-read them when the page opens
       var w = document.getElementById('set-wake');

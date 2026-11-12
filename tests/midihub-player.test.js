@@ -17,10 +17,10 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
   const browser = await chromium.launch({ executablePath: env.CHROMIUM });
   const ctx = await browser.newContext({ viewport: { width: 1200, height: 800 } });
   await ctx.addInitScript(() => {
-    ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
-    localStorage.setItem('guitarlab.lights.on', 'false');
-    localStorage.setItem('guitarlab.midi.outputId', JSON.stringify('lumi'));
-    localStorage.setItem('guitarlab.midihub.profile', JSON.stringify('yamaha'));
+    ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true'));
+    localStorage.setItem('soundlab2.lights.on', 'false');
+    localStorage.setItem('soundlab2.midi.outputId', JSON.stringify('lumi'));
+    localStorage.setItem('soundlab2.midihub.profile', JSON.stringify('yamaha'));
     window.__by = { lumi: [], modx1: [] };
     const mk = (id, name) => ({ id, name, state: 'connected', send: b => window.__by[id].push(Array.from(b)) });
     const outs = new Map([['lumi', mk('lumi', 'LUMI Keys BLOCK')], ['modx1', mk('modx1', 'MODX-1')]]);
@@ -221,8 +221,8 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
   console.log('# the Hub\u2019s mount of the card, MIDI connected after boot');
   const c2 = await browser.newContext({ viewport: { width: 1200, height: 800 } });
   await c2.addInitScript(() => {
-    ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true')); // not midi.wanted: nothing connects at boot
-    localStorage.setItem('guitarlab.lights.on', 'false');
+    ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true')); // not midi.wanted: nothing connects at boot
+    localStorage.setItem('soundlab2.lights.on', 'false');
     const out = { id: 'modx1', name: 'MODX-1', state: 'connected', send: () => { } };
     const inp = { id: 'mi', name: 'MODX-1', state: 'connected', onmidimessage: null };
     navigator.requestMIDIAccess = () => Promise.resolve({ inputs: new Map([['mi', inp]]), outputs: new Map([['modx1', out]]), sysexEnabled: true, onstatechange: null });

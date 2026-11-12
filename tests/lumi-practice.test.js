@@ -188,10 +188,10 @@ async function guidedFixture(browser) {
 async function fullApp(browser) {
   const context = await browser.newContext({ viewport: { width: 1200, height: 950 }, serviceWorkers: 'block' });
   await context.addInitScript(() => {
-    ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
-    localStorage.setItem('guitarlab.fb.root', '0');
-    localStorage.setItem('guitarlab.fb.scale', '"major"');
-    localStorage.setItem('guitarlab.lights.displayEnabled', 'true');
+    ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true'));
+    localStorage.setItem('soundlab2.fb.root', '0');
+    localStorage.setItem('soundlab2.fb.scale', '"major"');
+    localStorage.setItem('soundlab2.lights.displayEnabled', 'true');
     window.__sent = []; window.__requests = 0;
     class Port extends EventTarget {
       constructor(id, name) { super(); this.id = id; this.name = name; this.state = 'connected'; this.onmidimessage = null; }

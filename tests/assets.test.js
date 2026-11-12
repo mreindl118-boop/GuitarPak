@@ -16,9 +16,14 @@
 //      panels, and loads the scripts both pages share in the same order
 //   5. the shell markup exists twice until Phase B builds it from JavaScript
 //      (plan D18): the two copies are the same, apart from the app's name
+//   6. storage (A4): the prefix of the 1.x store is spelled once in js/ (the
+//      STORE_LEGACY line of js/app.js) and in tests/ only by the suites listed
+//      in OLD_STORE_SUITES below. Everything else goes through App.store
+//      (js/) or names the 2.0 prefix (tests/)
 //
 // Phase A (docs/plans/phase-a/PLAN.md): A1 took out studio, arrange and
-// plugins. A3b added gear.html (sections 7.1 and 7.5).
+// plugins. A3b added gear.html (sections 7.1 and 7.5). A4 moved the store to
+// its own prefix (sections 8.4 and 8.5).
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const env = require('./env');
 let fails = 0;
@@ -183,6 +188,73 @@ ok(/^soundLAB Gear\b/.test(footText(GEAR)) && /^soundLAB\b/.test(footText(MAIN))
 const bootOf = n => { const at = html[n].lastIndexOf('<script>'); return at < 0 ? null : html[n].slice(at); };
 same('boot: the inline script (App.boot() and the service-worker registration) and the end of the file are the same text', bootOf(MAIN), bootOf(GEAR));
 ok(/App\.boot\(\);/.test(bootOf(GEAR) || '') && /serviceWorker\.register\('sw\.js'\)/.test(bootOf(GEAR) || ''), GEAR + ' boots the app and registers the one service worker (sw.js serves both pages)');
+
+// ---- storage: the 1.x prefix is spelled in one place (plan 8.4, risk 21) ----
+// 2.0 keeps its data under its own prefix (App.store.prefix) and reads the 1.x store once, at the first start.
+// The live 1.x app on the same origin still owns that store. So:
+//   js/     a line of code that spells the old prefix would read or write the live app's data past App.store.
+//           Allowed: the one line of js/app.js that defines STORE_LEGACY. Comments do not count.
+//   tests/  a suite that spells it seeds or reads keys the app no longer looks at, and passes while testing
+//           nothing. Allowed: the suites of OLD_STORE_SUITES, each for the reason given there.
+// "Spelled" = the word as the start of a string (a quote, the word, a dot) or inside a regular expression
+// (the word, a backslash, a dot). The word alone is fine: the sampler database and old file names carry it.
+console.log('# storage: the 1.x prefix is spelled once in js/, and only by two suites in tests/');
+const OLD_WORD = 'guitarlab';
+const spelled = new RegExp('[\'"`]' + OLD_WORD + '\\.|' + OLD_WORD + '\\\\\\.');
+// suites that name the 1.x store on purpose (file in tests/ -> why). Keep it exact: a suite that stops
+// needing the old prefix leaves this list.
+const OLD_STORE_SUITES = {
+  'storage-import.test.js': 'the one-time copy itself: it seeds the 1.x store, starts the app and compares the two stores',
+  'trim.test.js': 'keys of removed features are seeded in the 1.x store, where a 1.x profile has them (untouched there, not copied to 2.0, no 1.x key written), and its Backup case imports a 1.x file'
+};
+// every script under a folder (.js, and the runner's .sh and .py), as a path from the repository root
+function walk(dir) {
+  let out = [];
+  for (const e of fs.readdirSync(path.join(env.ROOT, dir), { withFileTypes: true })) {
+    const p = dir + '/' + e.name;
+    if (e.isDirectory()) out = out.concat(walk(p)); else if (e.isFile() && /\.(js|sh|py)$/.test(e.name)) out.push(p);
+  }
+  return out;
+}
+// the code of one line: nothing for a comment line, and a trailing // comment cut off (quotes are followed,
+// so the // of an address inside a string stays)
+function codeOf(line) {
+  const t = line.trim();
+  if (t.startsWith('//') || t.startsWith('/*') || t.startsWith('*')) return '';
+  let q = '';
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (q) { if (c === '\\') i++; else if (c === q) q = ''; }
+    else if (c === '\'' || c === '"' || c === '`') q = c;
+    else if (c === '/' && line[i + 1] === '/') return line.slice(0, i);
+  }
+  return line;
+}
+// "file:line: text" for every line of a file that spells the old prefix
+const spellings = (file, code) => read(file).split('\n').map((l, i) => ({ n: i + 1, l: code ? codeOf(l) : l }))
+  .filter(x => spelled.test(x.l)).map(x => ({ file, n: x.n, text: x.l.trim().slice(0, 140) }));
+const at = h => h.file + ':' + h.n + ': ' + h.text;
+
+const jsFiles = walk('js').filter(f => /\.js$/.test(f));
+const jsHits = [].concat(...jsFiles.map(f => spellings(f, true)));
+const isLegacyLine = h => h.file === 'js/app.js' && /\bSTORE_LEGACY\s*=/.test(h.text);
+const legacyLines = jsHits.filter(isLegacyLine), jsStray = jsHits.filter(h => !isLegacyLine(h));
+ok(jsFiles.length > 30 && legacyLines.length === 1, 'js/app.js names the 1.x store on one line of code, the one that defines STORE_LEGACY (' + jsFiles.length + ' files read)' +
+  (legacyLines.length === 1 ? '' : legacyLines.length ? list(legacyLines.map(at)) : '\n    no such line was found'));
+ok(jsStray.length === 0, 'no other line of code in js/ spells the old prefix: everything else goes through App.store' + list(jsStray.map(at)));
+// the prefix the suites seed and read back is the one js/app.js uses at the address they load
+// (index.html and gear.html on the test server are the live scope, not the beta under /next/)
+ok(/['"]soundlab2\.['"]/.test(read('js/app.js').split('\n').map(codeOf).join('\n')), 'js/app.js names the 2.0 prefix the suites seed (soundlab2 + dot)');
+
+const testFiles = walk('tests');
+const listed = f => path.posix.dirname(f) === 'tests' && Object.prototype.hasOwnProperty.call(OLD_STORE_SUITES, path.posix.basename(f));
+const testStray = [].concat(...testFiles.filter(f => !listed(f)).map(f => spellings(f, false)));
+ok(testFiles.length > 60 && testStray.length === 0, 'no file in tests/ spells the old prefix, comments included (' + testFiles.length + ' files read), apart from ' + Object.keys(OLD_STORE_SUITES).join(' and ') +
+  list(testStray.map(at)));
+// the list stays exact: a listed suite that is there really does name the 1.x store
+// (a listed suite that is missing shows up in tests/run.sh, which runs every suite by name)
+const idle = Object.keys(OLD_STORE_SUITES).filter(name => isFile('tests/' + name) && spellings('tests/' + name, false).length === 0);
+ok(idle.length === 0, 'each suite on that list still needs to be on it' + list(idle.map(name => name + ': ' + OLD_STORE_SUITES[name])));
 
 console.log(fails ? 'FAILED ' + fails : 'ALL PASS');
 process.exit(fails ? 1 : 0);

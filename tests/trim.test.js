@@ -1,6 +1,6 @@
 // soundLAB 2.0, Phase A ("Trim"): what left the app is gone, what stays still
 // works, and the 1.x data on the same origin is never touched.
-// Plan: docs/plans/phase-a/PLAN.md (sections 4.5, 5.7 and 7.5).
+// Plan: docs/plans/phase-a/PLAN.md (sections 4.5, 5.7, 7.5 and 8.5).
 //
 // A1 = the Studio space, the loop/song sequencer, the sampler and its
 // database, and the plug-in API are out:
@@ -12,6 +12,18 @@
 //     this origin still owns them)
 //   - a stale workspace or page id lands on Exercises, never on a blank page
 //   - Backup import skips the keys of removed features and says so
+// A4 = 2.0 keeps its data in its own store, 'soundlab2.*' at the address the
+// suites load; 'guitarlab.*' is the live 1.x app's store, copied across once
+// (plan section 8; tests/storage-import.test.js covers the copy itself).
+// This suite names BOTH stores, on purpose:
+//   - the keys of removed features are seeded in the 1.x store, where a 1.x
+//     profile has them. After the visit they are byte-identical there, and
+//     none of them was copied into the 2.0 store
+//   - 2.0 writes, removes or clears no 'guitarlab.*' key at all
+//   - everything the 2.0 app itself reads (first-run flags, last page, pills,
+//     Hub rules) is seeded and read back under 'soundlab2.*'
+//   - the Backup case imports a 1.x file, whose keys carry the old prefix:
+//     the kept key lands in the 2.0 store, nothing is written to the 1.x one
 // A2 = three pills are folded into the pages that took their features in
 // (plan section 5): the Trainer cards are on the Plan page (Free practice),
 // the Synth pill is the Sound picker on Piano, LUMI practice is a section
@@ -79,10 +91,11 @@ const GONE_IDS = ['space-btn', 'cx-rec', 'cx-rec-msg', 'wipe', 'set-click', 'set
   'tr-ear-play', 'tr-ear-replay', 'tr-ear-harm', 'tr-ear-grid', 'tr-ear-msg'];
 // help tours of removed pages (js/help.js)
 const GONE_TOURS = ['song', 'arrange', 'tracks', 'ideas', 'trainer'];
-// keys of removed features: no 2.0 code writes or deletes them (same pattern as the Backup skip in js/settings.js)
-const DEAD = '^guitarlab\\.(st\\.|sd\\.|ideas\\.|song\\.|plugins\\.|app\\.space$|app\\.tabStudio$|app\\.click$|pads\\.track$)';
+// keys of removed features, without a store prefix (js/app.js has them in its deny list, App.store.deny):
+// no 2.0 code copies, writes or deletes them, in the 1.x store or in its own
+const DEAD = '^(st\\.|sd\\.|ideas\\.|song\\.|plugins\\.|app\\.space$|app\\.tabStudio$|app\\.click$|pads\\.track$)';
 
-// what a 1.x profile holds. Raw strings, oddly spaced on purpose: a read-and-
+// what a 1.x profile holds in the 1.x store (guitarlab.*). Raw strings, oddly spaced on purpose: a read-and-
 // write-back of the JSON would change the bytes and show up below.
 const PLUGIN_CODE = 'window.__pluginRan = (window.__pluginRan || 0) + 1;';
 const OLD = {
@@ -100,24 +113,34 @@ const OLD = {
   'pads.track': '"t1"'
 };
 
-// raw = { key: exact stored string }; json = { key: value } (stored as JSON, like App.store);
+// raw = { key: exact stored string }, put into the 1.x store (guitarlab.*): what the live 1.x app left behind;
+// json = { key: value }, put into the 2.0 store (soundlab2.*, stored as JSON, like App.store): what this app reads;
 // extra = async ctx => {...}, run before the page is made (more init scripts)
 async function newPage(browser, raw, json, extra) {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   if (extra) await extra(ctx);
   await ctx.addInitScript(([raw, json]) => {
-    ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
+    ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true'));
     if (!sessionStorage.getItem('__seeded')) { // once: a reload must not put back what the app removed
       sessionStorage.setItem('__seeded', '1');
+      // the old prefix on purpose: removed-feature data only exists in the 1.x store, and 2.0 must leave it there
       for (const k in raw) localStorage.setItem('guitarlab.' + k, raw[k]);
-      for (const k in json) localStorage.setItem('guitarlab.' + k, JSON.stringify(json[k]));
+      for (const k in json) localStorage.setItem('soundlab2.' + k, JSON.stringify(json[k]));
     }
-    // every later write to localStorage: [what, key, value (kept for app.tab only)]
+    // every later write to localStorage, the one-time copy at the start included (this runs before js/app.js):
+    // [what, key, value (kept for app.tab only)]
     window.__writes = [];
     const set = Storage.prototype.setItem, remove = Storage.prototype.removeItem, clear = Storage.prototype.clear;
-    Storage.prototype.setItem = function (k, v) { if (this === window.localStorage) window.__writes.push(['set', String(k), String(k) === 'guitarlab.app.tab' ? String(v) : '']); return set.apply(this, arguments); };
+    Storage.prototype.setItem = function (k, v) { if (this === window.localStorage) window.__writes.push(['set', String(k), String(k) === 'soundlab2.app.tab' ? String(v) : '']); return set.apply(this, arguments); };
     Storage.prototype.removeItem = function (k) { if (this === window.localStorage) window.__writes.push(['remove', String(k), '']); return remove.apply(this, arguments); };
     Storage.prototype.clear = function () { if (this === window.localStorage) window.__writes.push(['clear', '*', '']); return clear.apply(this, arguments); };
+    // the live 1.x app's store as this page sees it. With the seed above, the only lines that name its prefix:
+    // its keys, one raw value by short key, and every recorded touch of it (a write or removal of one of its keys, a clear())
+    window.__old = {
+      keys: () => Object.keys(localStorage).filter(k => k.indexOf('guitarlab.') === 0).sort(),
+      raw: k => localStorage.getItem('guitarlab.' + k),
+      writes: () => window.__writes.filter(w => w[0] === 'clear' || w[1].indexOf('guitarlab.') === 0).map(w => w[0] + ' ' + w[1])
+    };
     // every database the page opens or deletes
     window.__idb = [];
     if (window.IDBFactory) {
@@ -297,7 +320,7 @@ const lines = a => a.length ? '\n    ' + a.join('\n    ') : '';
       App.switchTo('songs'); await __wait(120); // a page that is neither home nor a landing page
       __hideToast();
       App.switchTo(id); await __wait(120);
-      let stored; try { stored = JSON.parse(localStorage.getItem('guitarlab.app.tab')); } catch (e) { stored = 'unreadable'; }
+      let stored; try { stored = JSON.parse(localStorage.getItem('soundlab2.app.tab')); } catch (e) { stored = 'unreadable'; }
       out.push({ id, to, active: App.active, shown: __shown(), seen: __seen(to), toast: __toast(), stored, there: there ? !!document.querySelector(there) : null });
     }
     return out;
@@ -310,22 +333,36 @@ const lines = a => a.length ? '\n    ' + a.join('\n    ') : '';
     ok(m.stored === m.to, 'App.switchTo("' + m.id + '") is not stored as the last page (app.tab = ' + J(m.stored) + ')');
   }
 
-  console.log('# A1 the 1.x data on this origin is untouched');
+  console.log('# A1 + A4 the 1.x data on this origin is untouched, and removed features were not copied');
   const data = await page.evaluate(([keys, dead]) => {
     const re = new RegExp(dead), now = {};
-    keys.forEach(k => { now[k] = localStorage.getItem('guitarlab.' + k); });
-    return { now, ran: window.__pluginRan,
-      writes: __writes.filter(w => w[0] === 'clear' || re.test(w[1])).map(w => w[0] + ' ' + w[1]),
-      tabs: __writes.filter(w => w[1] === 'guitarlab.app.tab').map(w => w[2]),
+    // the 1.x store, where the keys were seeded
+    keys.forEach(k => { now[k] = __old.raw(k); });
+    return { now, count: __old.keys().length, ran: window.__pluginRan,
+      // the same keys in the 2.0 store: the one-time copy must have left every one of them out
+      copied: keys.filter(k => localStorage.getItem('soundlab2.' + k) !== null),
+      // what that copy says it did at this start (js/app.js importOnce), and where it read from
+      info: App.store.importInfo ? App.store.importInfo() : null, legacy: App.store.legacy,
+      // any touch of the 1.x store, whatever the key
+      old: __old.writes(),
+      // a removed-feature key under a 2.0 prefix
+      dead: __writes.filter(w => /^soundlab2(-next)?\./.test(w[1]) && re.test(w[1].replace(/^soundlab2(-next)?\./, ''))).map(w => w[0] + ' ' + w[1]),
+      tabs: __writes.filter(w => w[1] === 'soundlab2.app.tab').map(w => w[2]),
       all: __writes.length, idb: __idb.slice() };
   }, [Object.keys(OLD), DEAD]);
   ok(data.ran === undefined, 'a stored 1.x plug-in is never run (its code would set a global): ' + J(data.ran));
   const daw = data.idb.filter(x => /guitarlab-daw/.test(x));
   ok(daw.length === 0, 'the sampler database guitarlab-daw is never opened or deleted (databases touched: ' + (data.idb.join(', ') || 'none') + ')');
-  const changed = Object.keys(OLD).filter(k => data.now[k] !== OLD[k]);
-  ok(changed.length === 0, 'stored ' + Object.keys(OLD).join(', ') + ' are byte-identical after every page, the sounds and a pad hit' +
+  const changed = Object.keys(OLD).filter(k => data.now[k] !== OLD[k]), nOld = Object.keys(OLD).length;
+  ok(changed.length === 0 && data.count === nOld, 'the 1.x store still holds ' + Object.keys(OLD).join(', ') + ' byte for byte, and nothing else (' + data.count + ' keys), after every page, the sounds and a pad hit' +
     (changed.length ? '\n    changed: ' + J(changed.map(k => k + ' = ' + data.now[k])) : ''));
-  ok(data.all > 0 && data.writes.length === 0, 'no write, removal or clear of a removed-feature key (' + data.all + ' other writes seen)' + lines(data.writes));
+  // the copy did run here and looked at all of them: without that, "not copied" would say nothing
+  const info = data.info;
+  ok(!!info && info.from === data.legacy && info.copied === 0 && info.skipped === nOld && info.failed.length === 0,
+    'the one-time copy ran at this start, read the 1.x store and skipped all ' + nOld + ' as removed features: ' + J(info && { copied: info.copied, skipped: info.skipped, failed: info.failed }));
+  ok(data.copied.length === 0, 'none of them is in the 2.0 store (soundlab2.*)' + (data.copied.length ? '\n    copied: ' + data.copied.join(', ') : ''));
+  ok(data.all > 0 && data.old.length === 0, 'no write, removal or clear of any 1.x key (guitarlab.*), removed feature or not (' + data.all + ' other writes seen)' + lines(data.old));
+  ok(data.dead.length === 0, 'no removed-feature key is written or removed in the 2.0 store either' + lines(data.dead));
   const pageOf = v => { try { return JSON.parse(v); } catch (e) { return v; } };
   const badTabs = data.tabs.filter(v => !PAGES.includes(pageOf(v)));
   ok(data.tabs.length > 0 && badTabs.length === 0, 'app.tab only ever held a page of this app (' + data.tabs.length + ' writes)' + lines(badTabs));
@@ -336,7 +373,7 @@ const lines = a => a.length ? '\n    ' + a.join('\n    ') : '';
   console.log('# A1 a stored last page that is no longer a page');
   ({ ctx, page, errs, logs } = await newPage(browser, {}, { 'app.tab': 'arrange' }));
   const stale = await page.evaluate(() => {
-    let stored; try { stored = JSON.parse(localStorage.getItem('guitarlab.app.tab')); } catch (e) { stored = 'unreadable'; }
+    let stored; try { stored = JSON.parse(localStorage.getItem('soundlab2.app.tab')); } catch (e) { stored = 'unreadable'; }
     return { active: App.active, shown: __shown(), seen: __seen('quiz'), stored };
   });
   ok(stale.active === 'quiz' && stale.shown === 'quiz' && stale.seen, 'app.tab = arrange boots to Exercises with a visible panel: ' + J([stale.active, stale.shown, stale.seen]));
@@ -366,13 +403,13 @@ const lines = a => a.length ? '\n    ' + a.join('\n    ') : '';
     ok(mem.train.active === 'shed' && mem.train.shown === 'shed' && mem.train.seen, 'app.gtab.gprac = trainer: the Train tab opens the Woodshed with a visible panel: ' + J([mem.train.active, mem.train.shown, mem.train.seen]));
     ok(mem.train.pills === 'Woodshed|Tuner' && mem.train.stored === 'shed', 'Train is Woodshed | Tuner, and it remembers a real page again: ' + J([mem.train.pills, mem.train.stored]));
   }
-  // the same for the last page of a 1.x session: it comes back as the page that took the feature in
-  await page.evaluate(() => localStorage.setItem('guitarlab.app.tab', JSON.stringify('lumipractice')));
+  // the same for the last page of a 1.x session (app.tab is copied across): it comes back as the page that took the feature in
+  await page.evaluate(() => localStorage.setItem('soundlab2.app.tab', JSON.stringify('lumipractice')));
   await page.reload();
   await page.waitForFunction(() => window.App && App.active);
   await page.waitForTimeout(250);
   const last = await page.evaluate(() => {
-    let stored; try { stored = JSON.parse(localStorage.getItem('guitarlab.app.tab')); } catch (e) { stored = 'unreadable'; }
+    let stored; try { stored = JSON.parse(localStorage.getItem('soundlab2.app.tab')); } catch (e) { stored = 'unreadable'; }
     return { active: App.active, shown: __shown(), seen: __seen('piano'), toast: __toast(), stored };
   });
   ok(last.active === 'piano' && last.shown === 'piano' && last.seen && last.stored === 'piano', 'app.tab = lumipractice starts on the Piano page with a visible panel, stored as a real page: ' + J([last.active, last.shown, last.seen, last.stored]));
@@ -415,8 +452,9 @@ const lines = a => a.length ? '\n    ' + a.join('\n    ') : '';
   ok(errs.length === 0 && logs.length === 0, 'no page or console error (stored pills, stored last page, ear-training button)' + lines(errs.concat(logs)));
   await ctx.close();
 
-  console.log('# A1 Backup import skips removed features');
+  console.log('# A1 + A4 Backup import of a 1.x file: kept keys go into the 2.0 store, removed features are skipped');
   ({ ctx, page, errs, logs } = await newPage(browser));
+  // what the 1.x app exports: no format field, every key under the 1.x prefix (the old prefix on purpose: it is the file's)
   const file = J({ app: 'soundLAB', keys: {
     'guitarlab.fb.root': '7',
     'guitarlab.plugins.list': J([{ id: 'pnew', name: 'from-a-backup', code: PLUGIN_CODE, on: true, error: '' }])
@@ -425,24 +463,27 @@ const lines = a => a.length ? '\n    ' + a.join('\n    ') : '';
   const hasInput = await page.evaluate(() => !!document.getElementById('set-backup-in') && !!document.getElementById('set-backup-msg'));
   ok(hasInput, 'Settings › Backup has its Import control');
   if (hasInput) {
-    const before = await page.evaluate(() => ({ root: localStorage.getItem('guitarlab.fb.root'), plugins: localStorage.getItem('guitarlab.plugins.list') }));
+    // the 2.0 store (where the file's kept key must land) and the 1.x store (this profile has none: it must stay empty)
+    const before = await page.evaluate(() => ({ root: localStorage.getItem('soundlab2.fb.root'), plugins: localStorage.getItem('soundlab2.plugins.list'), old: __old.keys() }));
     const reloaded = page.waitForEvent('load', { timeout: 8000 }).then(() => true, () => false);
     await page.setInputFiles('#set-backup-in', { name: 'soundlab-settings.json', mimeType: 'application/json', buffer: Buffer.from(file) });
     // read at once: the page reloads about a second after it reports
     const imp = await page.evaluate(async () => {
       const msg = document.getElementById('set-backup-msg'), t0 = Date.now();
       while (!msg.textContent && Date.now() - t0 < 5000) await __wait(20);
-      return { msg: msg.textContent, root: localStorage.getItem('guitarlab.fb.root'), plugins: localStorage.getItem('guitarlab.plugins.list'),
-        wrote: __writes.filter(w => /^guitarlab\.plugins\./.test(w[1])).length };
+      return { msg: msg.textContent, root: localStorage.getItem('soundlab2.fb.root'), plugins: localStorage.getItem('soundlab2.plugins.list'),
+        wrote: __writes.filter(w => /^[^.]+\.plugins\./.test(w[1])).length, // under any prefix
+        old: __old.keys(), oldWrites: __old.writes() };
     });
-    ok(before.root !== '7' && imp.root === '7', 'Backup import: guitarlab.fb.root is restored (' + J(before.root) + ' -> ' + J(imp.root) + ')');
-    ok(before.plugins === null && imp.plugins === null && imp.wrote === 0, 'Backup import: guitarlab.plugins.list is not written: ' + J([imp.plugins, imp.wrote]));
-    ok(/\b1 settings? restored\b/.test(imp.msg) && /\b1 from removed features skipped\b/.test(imp.msg), 'Backup import: the message names one restored and one skipped item: "' + imp.msg + '"');
+    ok(before.root !== '7' && imp.root === '7', 'Backup import: fb.root from the 1.x file is restored into the 2.0 store (soundlab2.fb.root ' + J(before.root) + ' -> ' + J(imp.root) + ')');
+    ok(before.plugins === null && imp.plugins === null && imp.wrote === 0, 'Backup import: plugins.list is not written, under either prefix: ' + J([imp.plugins, imp.wrote]));
+    ok(before.old.length === 0 && imp.old.length === 0 && imp.oldWrites.length === 0, 'Backup import: no key of the 1.x store is written; that store is as empty as before' + lines(imp.old.concat(imp.oldWrites)));
+    ok(/\b1 setting restored\b/.test(imp.msg) && /\b1 from removed features skipped\b/.test(imp.msg), 'Backup import: the message names one restored and one skipped item: "' + imp.msg + '"');
     ok(await reloaded, 'Backup import: the page reloads with the restored settings');
     await page.waitForFunction(() => window.App && App.active);
     await page.waitForTimeout(250);
-    const after = await page.evaluate(() => ({ root: App.store.get('fb.root', null), plugins: localStorage.getItem('guitarlab.plugins.list'), ran: window.__pluginRan }));
-    ok(after.root === 7 && after.plugins === null && after.ran === undefined, 'after the reload: the key is G, no plug-in list, no plug-in code ran: ' + J(after));
+    const after = await page.evaluate(() => ({ root: App.store.get('fb.root', null), plugins: localStorage.getItem('soundlab2.plugins.list'), ran: window.__pluginRan, old: __old.keys().length }));
+    ok(after.root === 7 && after.plugins === null && after.ran === undefined && after.old === 0, 'after the reload: the key is G, no plug-in list, no plug-in code ran, the 1.x store still empty: ' + J(after));
   }
   ok(errs.length === 0 && logs.length === 0, 'no page or console error (Backup import)' + lines(errs.concat(logs)));
   await ctx.close();
@@ -467,9 +508,9 @@ const lines = a => a.length ? '\n    ' + a.join('\n    ') : '';
     // Settings › MIDI keyboard: the line about MIDI Hub rules
     window.__rulesLine = () => { const el = document.getElementById('set-midi-rules'), btn = el && el.querySelector('button');
       return { there: !!el, card: !!el && !!el.closest('#set-midi-card'), seen: !!el && !el.hidden && el.getClientRects().length > 0, text: el ? el.textContent.replace(/\s+/g, ' ').trim() : '', btn: btn ? btn.textContent.trim() : '' }; };
-    // what a soundLAB Gear window does when the Hub's box or rules change: it writes the store, this window gets the event
-    window.__fromGear = (key, value) => { localStorage.setItem('guitarlab.' + key, JSON.stringify(value));
-      window.dispatchEvent(new StorageEvent('storage', { key: 'guitarlab.' + key, url: location.href, storageArea: localStorage })); };
+    // what a soundLAB Gear window does when the Hub's box or rules change: it writes the (2.0) store, this window gets the event
+    window.__fromGear = (key, value) => { localStorage.setItem('soundlab2.' + key, JSON.stringify(value));
+      window.dispatchEvent(new StorageEvent('storage', { key: 'soundlab2.' + key, url: location.href, storageArea: localStorage })); };
   });
   ({ ctx, page, errs, logs } = await newPage(browser, {}, { 'midi.wanted': true, 'lights.on': false, 'midihub.rulesIn': true, 'midihub.rules': RULES }, keyboard));
   await page.waitForFunction(() => App.midi && App.midi.ready);
@@ -528,15 +569,15 @@ const lines = a => a.length ? '\n    ' + a.join('\n    ') : '';
   page.on('framenavigated', f => { if (f === page.mainFrame()) urls.push(f.url()); });
   // how this start went: where it is, what it said, what it stored
   const startOf = () => page.evaluate(() => {
-    const stored = k => { try { return JSON.parse(localStorage.getItem('guitarlab.' + k)); } catch (e) { return 'unreadable'; } };
+    const stored = k => { try { return JSON.parse(localStorage.getItem('soundlab2.' + k)); } catch (e) { return 'unreadable'; } };
     const a = document.getElementById('app-switch');
     return { app: App.app, file: location.pathname.split('/').pop(), active: App.active, shown: __shown(), seen: __seen('quiz'), toast: __toast(),
-      tab: stored('app.tab'), told: stored('gear.told'), thruTold: stored('gear.thruTold'), thru: localStorage.getItem('guitarlab.midihub.thru'),
+      tab: stored('app.tab'), told: stored('gear.told'), thruTold: stored('gear.thruTold'), thru: localStorage.getItem('soundlab2.midihub.thru'),
       link: !!a && a.getClientRects().length > 0 ? a.textContent.trim() + ' -> ' + a.getAttribute('href') : '' };
   });
   // the next start, with these keys stored first (null = removed)
   const restart = async (keys) => {
-    await page.evaluate(keys => { for (const k in keys) { if (keys[k] === null) localStorage.removeItem('guitarlab.' + k); else localStorage.setItem('guitarlab.' + k, JSON.stringify(keys[k])); } }, keys || {});
+    await page.evaluate(keys => { for (const k in keys) { if (keys[k] === null) localStorage.removeItem('soundlab2.' + k); else localStorage.setItem('soundlab2.' + k, JSON.stringify(keys[k])); } }, keys || {});
     await page.reload();
     await page.waitForFunction(() => window.App && App.active);
     await page.waitForTimeout(250);

@@ -11,7 +11,7 @@
  * per beat, optional click, bar-range looping (A/B), and a normalized tab
  * view with a moving highlight. Detected key can be applied to the whole app
  * (fb:set), so the fretboard / piano / chords pages light up in the song's
- * key. Songs save to a local library (guitarlab.sg.lib).
+ * key. Songs save to a local library (the store key sg.lib).
  * DOM ids / CSS classes are prefixed sg-.
  *
  * 2.0 Phase A3b: THE PLAYER LIVES HERE in soundLAB. The score player

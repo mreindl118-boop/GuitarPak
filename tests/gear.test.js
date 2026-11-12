@@ -58,8 +58,8 @@ async function newContext(browser, opts) {
     if (!/^https?:$/.test(location.protocol)) return; // about:blank between two deep links
     if (!localStorage.getItem('sl-test.seeded')) {
       localStorage.setItem('sl-test.seeded', '1');
-      if (!o.first) ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
-      for (const k in o.seed) localStorage.setItem('guitarlab.' + k, JSON.stringify(o.seed[k]));
+      if (!o.first) ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true'));
+      for (const k in o.seed) localStorage.setItem('soundlab2.' + k, JSON.stringify(o.seed[k]));
     }
     window.__wait = ms => new Promise(r => setTimeout(r, ms));
     window.__q = s => document.querySelector(s);

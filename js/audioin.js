@@ -755,11 +755,13 @@
     if (!waiting) askLock(false, tookOver);
   }
 
-  // audio.monitor changed in another window (key null = the store was
-  // cleared). Matched by suffix, so the storage prefix may change
+  // audio.monitor changed in another window of this app (key null = the
+  // store was cleared). Only this scope's key counts (App.store.prefix): the
+  // 1.x app and the beta share the origin and keep the same switch under
+  // their own prefix, and a write there is not this app's business
   function storeChanged(e) {
     var k = e ? e.key : null;
-    if (k != null && !/audio\.monitor$/.test(k)) return;
+    if (k != null && k !== App.store.prefix + 'audio.monitor') return;
     if (launched && !owner && !taking) {
       if (stream) { applyMonitor(); settle(); } // open for a meter: the hold follows the switch
       else if (!wantMonitor()) { if (st.why === 'other') { st.held = false; st.why = ''; st.msg = ''; } }

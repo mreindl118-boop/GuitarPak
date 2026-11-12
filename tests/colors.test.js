@@ -23,8 +23,8 @@ const NOTE_VEL = { 0: 6, 2: 25, 4: 50, 5: 59, 7: 82, 9: 101, 11: 124 }; // NOTE_
 async function newPage(browser) {
   const ctx = await browser.newContext({ viewport: { width: 1200, height: 900 } });
   await ctx.addInitScript(() => {
-    ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
-    localStorage.setItem('guitarlab.lights.display', 'false'); // classic look; LUMI Display: tests/lumidisplay
+    ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true'));
+    localStorage.setItem('soundlab2.lights.display', 'false'); // classic look; LUMI Display: tests/lumidisplay
     window.__sent = [];
     const inp = { id: 'in1', name: 'LUMI Keys BLOCK', onmidimessage: null };
     const out = { id: 'out1', name: 'LUMI Keys BLOCK', state: 'connected', send: b => window.__sent.push(Array.from(b)) };
@@ -127,7 +127,7 @@ const litMatches = (lit, vel) => {
     if (seg) seg.click();
     o.ev = ev;
     o.mode = App.colors.mode();
-    o.stored = JSON.parse(localStorage.getItem('guitarlab.fb.colorMode'));
+    o.stored = JSON.parse(localStorage.getItem('soundlab2.fb.colorMode'));
     const act = document.querySelector('[data-lccolmode].active');
     o.nowActive = act && act.textContent;
     o.pressed = act && act.getAttribute('aria-pressed');
@@ -227,7 +227,7 @@ const litMatches = (lit, vel) => {
     const e = document.querySelector('#fb-colors input[data-fbncol="4"]');
     e.value = '#2040ff';
     e.dispatchEvent(new Event('change', { bubbles: true }));
-    o.stored = JSON.parse(localStorage.getItem('guitarlab.fb.noteColors'));
+    o.stored = JSON.parse(localStorage.getItem('soundlab2.fb.noteColors'));
     o.notesE = App.colors.notes()[4];
     return o;
   });
@@ -297,7 +297,7 @@ const litMatches = (lit, vel) => {
     const o = {};
     document.getElementById('fb-col-reset').click();
     o.reset = App.colors.notes()[4];
-    o.storedReset = JSON.parse(localStorage.getItem('guitarlab.fb.noteColors'));
+    o.storedReset = JSON.parse(localStorage.getItem('soundlab2.fb.noteColors'));
     o.input = document.querySelector('#fb-colors input[data-fbncol="4"]').value;
     document.querySelector('#fb-colmode [data-fbcolmode="interval"]').click();
     o.mode = App.colors.mode();
@@ -330,11 +330,11 @@ const litMatches = (lit, vel) => {
   console.log('# storage that refuses writes (private window, full quota)');
   const nb = await page.evaluate(() => {
     const real = Storage.prototype.setItem, o = {};
-    Storage.prototype.setItem = function (k, v) { if (/^guitarlab\.fb\./.test(k)) throw new Error('QuotaExceededError'); return real.call(this, k, v); };
+    Storage.prototype.setItem = function (k, v) { if (/^soundlab2\.fb\./.test(k)) throw new Error('QuotaExceededError'); return real.call(this, k, v); };
     try {
       App.colors.setMode('note');
       o.mode = App.colors.mode();
-      o.stored = JSON.parse(localStorage.getItem('guitarlab.fb.colorMode'));
+      o.stored = JSON.parse(localStorage.getItem('soundlab2.fb.colorMode'));
       const c = Array.from(document.querySelectorAll('#fb-scroll circle[r="11.5"]')).find(x => x.nextElementSibling && x.nextElementSibling.textContent === 'E');
       o.fbE = c && c.getAttribute('fill');
       const n = App.colors.notes(); n[4] = '#2040ff'; App.colors.setNotes(n);

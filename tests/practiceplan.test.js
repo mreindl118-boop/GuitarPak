@@ -12,7 +12,7 @@ async function open(browser, viewport) {
   await ctx.addInitScript(() => {
     if (sessionStorage.getItem('__pp_seeded')) return;
     sessionStorage.setItem('__pp_seeded', '1');
-    ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
+    ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true'));
   });
   const page = await ctx.newPage(), errs = [];
   page.on('pageerror', e => errs.push(e.message));

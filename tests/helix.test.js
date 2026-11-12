@@ -22,9 +22,9 @@ async function newPage(browser, opts) {
   opts = opts || {};
   const ctx = await browser.newContext({ viewport: { width: 1200, height: 900 } });
   await ctx.addInitScript(([outs, ins, bridgeAuto]) => {
-    ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
-    localStorage.setItem('guitarlab.lights.on', 'false');
-    if (bridgeAuto) localStorage.setItem('guitarlab.hx.bridgeAuto', 'true');
+    ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true'));
+    localStorage.setItem('soundlab2.lights.on', 'false');
+    if (bridgeAuto) localStorage.setItem('soundlab2.hx.bridgeAuto', 'true');
     // ---- fake Web MIDI: every byte sent is recorded with the port it went to
     window.__sent = []; window.__sentTo = []; window.__failNext = false;
     const mkOut = (name, i) => ({ id: 'out' + i, name, state: 'connected', send: b => { if (window.__failNext) { window.__failNext = false; throw new Error('port gone'); } window.__sent.push(Array.from(b)); window.__sentTo.push(name); } });

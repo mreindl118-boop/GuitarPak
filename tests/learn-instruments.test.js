@@ -9,10 +9,10 @@ function ok(value, message) { if (!value) throw new Error(message); checks++; co
   try {
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     await context.addInitScript(() => {
-      ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
-      localStorage.setItem('guitarlab.qz.prog', JSON.stringify({ 'notes/nat/treble/1': { b: 9, s: 2 } }));
-      localStorage.setItem('guitarlab.xp.total', '77');
-      localStorage.setItem('guitarlab.xp.days', JSON.stringify({ '2026-01-01': { x: 77, s: 30, p: 0, q: 2, k: 1, l: 1, u: {} } }));
+      ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true'));
+      localStorage.setItem('soundlab2.qz.prog', JSON.stringify({ 'notes/nat/treble/1': { b: 9, s: 2 } }));
+      localStorage.setItem('soundlab2.xp.total', '77');
+      localStorage.setItem('soundlab2.xp.days', JSON.stringify({ '2026-01-01': { x: 77, s: 30, p: 0, q: 2, k: 1, l: 1, u: {} } }));
     });
     const page = await context.newPage(), errors = [];
     page.on('pageerror', error => errors.push(error.message));

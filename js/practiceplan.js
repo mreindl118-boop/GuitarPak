@@ -40,7 +40,12 @@
   function dayKey() { return App.practiceProgress ? App.practiceProgress.dayKey(Date.now()) : App.xp.dayKey(); }
   function students() {
     var all = arr('pp.students');
-    if (!all.length) { all = [{ id: 'self', name: 'My practice', docUrl: '', instrument: instrument(), plan: starter() }]; App.store.set('pp.students', all); }
+    if (!all.length) {
+      all = [{ id: 'self', name: 'My practice', docUrl: '', instrument: instrument(), plan: starter() }];
+      // not while the 1.x students still wait for their copy (they did not fit yet): a stored
+      // default would count as 2.0's own data, and the copy would stop trying (js/app.js)
+      if (!App.store.waiting('pp.students')) App.store.set('pp.students', all);
+    }
     return all;
   }
   function student() { var all = students(), id = App.store.get('pp.active', all[0].id); return all.filter(function (s) { return s.id === id; })[0] || all[0]; }
@@ -123,7 +128,11 @@
   function session(s, selected) {
     selected = selected || instrument();
     var all = obj('pp.sessions'), key = s.id + '/' + dayKey() + '/' + s.plan.id + '/' + selected;
-    if (!all[key]) { all[key] = { key: key, day: dayKey(), student: s.id, plan: s.plan.id, instrument: selected, items: {} }; App.store.set('pp.sessions', all); }
+    if (!all[key]) {
+      all[key] = { key: key, day: dayKey(), student: s.id, plan: s.plan.id, instrument: selected, items: {} };
+      // an empty session for today is a default too: saveSession stores it with the first real progress
+      if (!App.store.waiting('pp.sessions')) App.store.set('pp.sessions', all);
+    }
     return all[key];
   }
   function saveSession(sess) {

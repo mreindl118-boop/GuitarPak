@@ -110,10 +110,12 @@
 
   install();
   document.addEventListener('visibilitychange', function () { if (!document.hidden) install(); });
-  // another window of this origin ticked or cleared the box (or the store was
-  // cleared: key null). Matched by suffix, so the storage prefix may change
+  // another window of this app ticked or cleared the box (or the store was
+  // cleared: key null). Only this scope's key counts (App.store.prefix): the
+  // 1.x app and the beta share the origin and keep the same switch under
+  // their own prefix, and a write there is not this app's business
   window.addEventListener('storage', function (e) {
     var k = e ? e.key : null;
-    if (k == null || /midihub\.rulesIn$/.test(k)) install();
+    if (k == null || k === App.store.prefix + 'midihub.rulesIn') install();
   });
 })();

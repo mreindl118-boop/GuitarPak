@@ -6,7 +6,7 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
   const b = await chromium.launch({ executablePath: env.CHROMIUM });
   for (const [name, opts] of [['Pixel 7', devices['Pixel 7']], ['iPhone SE-ish 360', { viewport: { width: 360, height: 740 }, hasTouch: true, isMobile: true }], ['desktop', { viewport: { width: 1280, height: 800 } }]]) {
     const ctx = await b.newContext(opts);
-    await ctx.addInitScript(() => { localStorage.setItem('guitarlab.help.seen','true'); localStorage.setItem('guitarlab.help.done','true'); localStorage.setItem('guitarlab.qz.landed','true'); });
+    await ctx.addInitScript(() => { localStorage.setItem('soundlab2.help.seen','true'); localStorage.setItem('soundlab2.help.done','true'); localStorage.setItem('soundlab2.qz.landed','true'); });
     const p = await ctx.newPage();
     await p.goto(env.URL);
     await p.waitForFunction(() => window.SLQuiz && App.active === 'quiz');

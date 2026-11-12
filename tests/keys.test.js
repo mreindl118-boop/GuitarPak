@@ -17,7 +17,7 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
   await ctx.addInitScript(() => {
     if (sessionStorage.getItem('__seeded')) return;
     sessionStorage.setItem('__seeded', '1');
-    ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
+    ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true'));
   });
   const page = await ctx.newPage(), errs = [];
   page.on('pageerror', e => errs.push(e.message));
@@ -47,7 +47,7 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
     document.querySelector('#pn-look [data-pnlook="keys"]').click();
     o.keysDots = document.querySelectorAll('#pn-svg .pn-sdot').length;
     o.keysPainted = keys().filter(k => /fill:/.test(k.getAttribute('style') || '')).length;
-    o.stored = localStorage.getItem('guitarlab.pn.look');
+    o.stored = localStorage.getItem('soundlab2.pn.look');
     // D major puts dots on black keys too (F#, C#)
     App.emit('fb:set', { source: 't', root: 2, scale: 'major', mode: 1 });
     document.querySelector('#pn-look [data-pnlook="dots"]').click();
@@ -128,7 +128,7 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
   const clean = await page.evaluate(async (PLAY) => {
     const play = new Function('return ' + PLAY)();
     App.keys.setAssist(3);
-    localStorage.setItem('guitarlab.kl.prog', JSON.stringify({ 'g-r': { step: 9 } })); // 16ths at 72: a short run
+    localStorage.setItem('soundlab2.kl.prog', JSON.stringify({ 'g-r': { step: 9 } })); // 16ths at 72: a short run
     App.store.set('kl.sel', 'g-r'); App.store.set('kl.reps', 1);
     App.keysLessons.start(false);
     const R = App.keysLessons.run;
@@ -138,7 +138,7 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
     const L = App.keysLessons.last;
     o.view = App.keysLessons.view;
     o.st = L.st; o.stars = L.stars; o.up = L.up;
-    o.prog = JSON.parse(localStorage.getItem('guitarlab.kl.prog'))['g-r'];
+    o.prog = JSON.parse(localStorage.getItem('soundlab2.kl.prog'))['g-r'];
     o.today = SLXP.today().l;
     o.tiles = [...document.querySelectorAll('.kl-tile')].map(t => t.textContent);
     o.strip = document.querySelectorAll('#kl-strip .kl-dot').length;
@@ -154,12 +154,12 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
 
   const messy = await page.evaluate(async (PLAY) => {
     const play = new Function('return ' + PLAY)();
-    localStorage.setItem('guitarlab.kl.prog', JSON.stringify({ 'c-r': { step: 9 } }));
+    localStorage.setItem('soundlab2.kl.prog', JSON.stringify({ 'c-r': { step: 9 } }));
     App.store.set('kl.sel', 'c-r');
     App.keysLessons.start(false);
     await play({ wrong: [3], skip: [7], late: { 5: 90, 9: 90, 11: 90 } });
     const L = App.keysLessons.last;
-    return { st: L.st, up: L.up, pass: L.pass, step: JSON.parse(localStorage.getItem('guitarlab.kl.prog'))['c-r'].step,
+    return { st: L.st, up: L.up, pass: L.pass, step: JSON.parse(localStorage.getItem('soundlab2.kl.prog'))['c-r'].step,
       notes: [...document.querySelectorAll('.kl-notes li')].map(l => l.textContent) };
   }, PLAY.toString());
   ok(messy.st.wrong === 1 && messy.st.miss === 2 && messy.st.hits === 13, 'a wrong note and a skipped note are counted: ' + JSON.stringify(messy.st));
@@ -168,12 +168,12 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
 
   const up = await page.evaluate(async (PLAY) => {
     const play = new Function('return ' + PLAY)();
-    localStorage.setItem('guitarlab.kl.prog', JSON.stringify({ 'f-l': { step: 8 } }));   // 16ths at 60
+    localStorage.setItem('soundlab2.kl.prog', JSON.stringify({ 'f-l': { step: 8 } }));   // 16ths at 60
     App.store.set('kl.sel', 'f-l');
     App.keysLessons.start(false);
     const fingers = App.keysLessons.run.targets.slice(0, 8).map(t => t.f).join('');
     await play({});
-    return { up: App.keysLessons.last.up, step: JSON.parse(localStorage.getItem('guitarlab.kl.prog'))['f-l'].step, fingers,
+    return { up: App.keysLessons.last.up, step: JSON.parse(localStorage.getItem('soundlab2.kl.prog'))['f-l'].step, fingers,
       btn: document.getElementById('kl-start').textContent };
   }, PLAY.toString());
   ok(up.up && up.step === 9 && /Next level/.test(up.btn), 'a score of 85+ levels the lesson up: ' + JSON.stringify(up));
@@ -208,7 +208,7 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
     const L = App.keysLessons.last;
     o.view = App.keysLessons.view; o.run = !!App.keysLessons.run;
     o.inf = L.inf;
-    o.prog = JSON.parse(localStorage.getItem('guitarlab.kl.prog'))['g-r'];
+    o.prog = JSON.parse(localStorage.getItem('soundlab2.kl.prog'))['g-r'];
     o.big = (document.querySelector('.kl-big') || {}).textContent;
     o.verdict = (document.querySelector('.kl-verdict') || {}).textContent;
     o.tiles = [...document.querySelectorAll('.kl-tile')].map(t => t.textContent);
@@ -216,9 +216,9 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
   };
   const inf1 = await page.evaluate(async (INF) => {
     const play = new Function('return ' + INF)();
-    const all = JSON.parse(localStorage.getItem('guitarlab.kl.prog') || '{}');
+    const all = JSON.parse(localStorage.getItem('soundlab2.kl.prog') || '{}');
     all['g-r'] = { step: 9 };
-    localStorage.setItem('guitarlab.kl.prog', JSON.stringify(all));
+    localStorage.setItem('soundlab2.kl.prog', JSON.stringify(all));
     App.store.set('kl.sel', 'g-r'); App.store.set('kl.speedup', true);
     document.getElementById('kl-back').click();
     document.querySelector('[data-klreps="0"]').click();
@@ -258,7 +258,7 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
     App.switchTo('fretboard');
     await wait(50);
     a.leave = !App.keysLessons.run;
-    a.runs = JSON.parse(localStorage.getItem('guitarlab.kl.prog'))['f-l'].runs.length;
+    a.runs = JSON.parse(localStorage.getItem('soundlab2.kl.prog'))['f-l'].runs.length;
     a.wakeOn = wakeOn;
     App.switchTo('piano');
     return a;

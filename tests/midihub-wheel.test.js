@@ -11,8 +11,8 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
   const browser = await chromium.launch({ executablePath: env.CHROMIUM });
   const ctx = await browser.newContext({ viewport: { width: 1200, height: 700 } });
   await ctx.addInitScript(() => {
-    ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
-    localStorage.setItem('guitarlab.lights.on', 'false');
+    ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true'));
+    localStorage.setItem('soundlab2.lights.on', 'false');
     window.__sent = [];
     const inp = { id: 'in1', name: 'MODX-1', state: 'connected', onmidimessage: null };
     const out = { id: 'out1', name: 'MODX-1', state: 'connected', send: b => window.__sent.push(Array.from(b)) };

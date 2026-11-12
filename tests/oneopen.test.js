@@ -20,9 +20,9 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
   const browser = await chromium.launch({ executablePath: env.CHROMIUM });
   const ctx = await browser.newContext({ viewport: { width: 1200, height: 900 } });
   await ctx.addInitScript(() => {
-    ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true')); // no midi.wanted: MIDI stays off until the test connects it
-    localStorage.setItem('guitarlab.lights.on', 'false');
-    localStorage.setItem('guitarlab.midihub.profile', JSON.stringify('yamaha'));
+    ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true')); // no midi.wanted: MIDI stays off until the test connects it
+    localStorage.setItem('soundlab2.lights.on', 'false');
+    localStorage.setItem('soundlab2.midihub.profile', JSON.stringify('yamaha'));
     window.__sent = [];
     const out = { id: 'modx1', name: 'MODX-1', state: 'connected', send: b => window.__sent.push(Array.from(b)) };
     const inp = { id: 'mi', name: 'MODX-1', state: 'connected', onmidimessage: null };
@@ -109,8 +109,8 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
   console.log('# the Songs page’s Player card: its own ports row, MIDI connected after boot');
   const c2 = await browser.newContext({ viewport: { width: 1200, height: 900 } });
   await c2.addInitScript(() => {
-    ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true')); // not midi.wanted: nothing connects at boot
-    localStorage.setItem('guitarlab.midihub.ch', '3');
+    ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true')); // not midi.wanted: nothing connects at boot
+    localStorage.setItem('soundlab2.midihub.ch', '3');
     const out = { id: 'modx1', name: 'MODX-1', state: 'connected', send: () => { } };
     const inp = { id: 'mi', name: 'MODX-1', state: 'connected', onmidimessage: null };
     navigator.requestMIDIAccess = () => Promise.resolve({ inputs: new Map([['mi', inp]]), outputs: new Map([['modx1', out]]), sysexEnabled: true, onstatechange: null });

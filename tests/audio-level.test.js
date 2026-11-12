@@ -26,11 +26,11 @@ async function render(browser, origin, options) {
     return route.continue();
   });
   await context.addInitScript(opts => {
-    ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
-    localStorage.setItem('guitarlab.app.pianoTone', JSON.stringify(opts.tone));
-    localStorage.setItem('guitarlab.app.vol', JSON.stringify(opts.volume));
-    localStorage.setItem('guitarlab.pn.voice', '"piano"');
-    if (opts.smartChord) localStorage.setItem('guitarlab.pn.perf', JSON.stringify({ chords: '7th', bass: true }));
+    ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true'));
+    localStorage.setItem('soundlab2.app.pianoTone', JSON.stringify(opts.tone));
+    localStorage.setItem('soundlab2.app.vol', JSON.stringify(opts.volume));
+    localStorage.setItem('soundlab2.pn.voice', '"piano"');
+    if (opts.smartChord) localStorage.setItem('soundlab2.pn.perf', JSON.stringify({ chords: '7th', bass: true }));
     window.SL_ARTIFACT = true;
     const NativeOffline = window.OfflineAudioContext;
     window.__audioTest = { loaded: 0, pending: 0, sources: [], gains: [], shapers: [], oscillators: [] };

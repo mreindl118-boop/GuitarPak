@@ -11,8 +11,8 @@ const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   try {
     const context = await browser.newContext();
     await context.addInitScript(() => {
-      ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
-      localStorage.setItem('guitarlab.lights.on', 'false');
+      ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true'));
+      localStorage.setItem('soundlab2.lights.on', 'false');
       window.__sent = [];
       class Port extends EventTarget {
         constructor(id, name) { super(); this.id = id; this.name = name; this.state = 'connected'; this.onmidimessage = null; }

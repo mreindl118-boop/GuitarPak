@@ -19,11 +19,11 @@ const nonClean = a => a.filter(b => !CLEAN.test(b));
 async function newPage(browser, seed, viewport) {
   const ctx = await browser.newContext({ viewport: viewport || { width: 1200, height: 900 }, hasTouch: !!(viewport && viewport.width < 800) });
   await ctx.addInitScript((seed) => {
-    ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
-    localStorage.setItem('guitarlab.lights.on', 'false');
-    localStorage.setItem('guitarlab.midi.outputId', JSON.stringify('lumi'));
-    localStorage.setItem('guitarlab.midihub.profile', JSON.stringify('yamaha'));
-    for (const k in seed) localStorage.setItem('guitarlab.' + k, JSON.stringify(seed[k]));
+    ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true'));
+    localStorage.setItem('soundlab2.lights.on', 'false');
+    localStorage.setItem('soundlab2.midi.outputId', JSON.stringify('lumi'));
+    localStorage.setItem('soundlab2.midihub.profile', JSON.stringify('yamaha'));
+    for (const k in seed) localStorage.setItem('soundlab2.' + k, JSON.stringify(seed[k]));
     window.__by = { lumi: [], modx1: [] };
     const mk = (id, name) => ({ id, name, state: 'connected', send: b => { const a = Array.from(b); if (id !== 'lumi' || a[0] < 0xF0) window.__by[id].push(a); } });
     const outs = new Map([['lumi', mk('lumi', 'LUMI Keys BLOCK')], ['modx1', mk('modx1', 'MODX-1')]]);

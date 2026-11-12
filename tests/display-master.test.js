@@ -13,9 +13,9 @@ function ok(value, message) {
 async function openApp(browser) {
   const context = await browser.newContext({ viewport: { width: 1280, height: 1000 }, serviceWorkers: 'block' });
   await context.addInitScript(() => {
-    ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
-    if (localStorage.getItem('guitarlab.fb.root') == null) localStorage.setItem('guitarlab.fb.root', '0');
-    if (localStorage.getItem('guitarlab.fb.scale') == null) localStorage.setItem('guitarlab.fb.scale', '"major"');
+    ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true'));
+    if (localStorage.getItem('soundlab2.fb.root') == null) localStorage.setItem('soundlab2.fb.root', '0');
+    if (localStorage.getItem('soundlab2.fb.scale') == null) localStorage.setItem('soundlab2.fb.scale', '"major"');
     window.__sent = []; window.__requests = 0;
     class Port extends EventTarget {
       constructor(id, name) { super(); this.id = id; this.name = name; this.state = 'connected'; this.onmidimessage = null; }

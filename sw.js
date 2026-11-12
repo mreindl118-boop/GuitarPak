@@ -1,7 +1,7 @@
 /* GuitarLab service worker — cache-first so the app works fully offline once visited. */
 // 2.0 (branch v2): caches are 'soundlab2-*' so the beta at /next/ never touches the
 // live app's 'guitarlab-*' caches on the same origin (and only cleans up its own).
-var CACHE = 'soundlab2-v8';
+var CACHE = 'soundlab2-v9';
 var ASSETS = [
   '.',
   'index.html',

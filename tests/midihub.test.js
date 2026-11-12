@@ -25,8 +25,8 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
 async function newPage(browser, seed) {
   const ctx = await browser.newContext({ viewport: { width: 1200, height: 900 } });
   await ctx.addInitScript((seed) => {
-    ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
-    for (const k in seed) localStorage.setItem('guitarlab.' + k, JSON.stringify(seed[k]));
+    ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true'));
+    for (const k in seed) localStorage.setItem('soundlab2.' + k, JSON.stringify(seed[k]));
     window.__sent = [];
     const inp = { id: 'in1', name: 'Synth Port 1', onmidimessage: null };
     const out = { id: 'out1', name: 'Synth Port 1', state: 'connected', send: b => window.__sent.push(Array.from(b)) };
@@ -206,7 +206,7 @@ async function bothEngines(page, msgs) {
 
   console.log('# the same switch set in another window (a storage event)');
   const st = await page.evaluate(() => {
-    const K = 'guitarlab.midihub.rulesIn';
+    const K = 'soundlab2.midihub.rulesIn';
     // what another window of this origin does: it writes the key itself, this window only gets the event
     const write = v => { if (v === null) localStorage.removeItem(K); else localStorage.setItem(K, JSON.stringify(v)); };
     const tell = key => window.dispatchEvent(new StorageEvent('storage', { key: key, url: location.href, storageArea: localStorage }));
@@ -316,9 +316,9 @@ async function bothEngines(page, msgs) {
   ({ ctx, page, errs } = await (async () => {
     const c2 = await browser.newContext({ viewport: { width: 1200, height: 900 } });
     await c2.addInitScript(() => {
-      ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
-      localStorage.setItem('guitarlab.midi.outputId', JSON.stringify('lumi'));
-      localStorage.setItem('guitarlab.midihub.profile', JSON.stringify('yamaha'));
+      ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true'));
+      localStorage.setItem('soundlab2.midi.outputId', JSON.stringify('lumi'));
+      localStorage.setItem('soundlab2.midihub.profile', JSON.stringify('yamaha'));
       window.__by = { lumi: [], gs: [], modx1: [], modx2: [] };
       const mk = (id, name) => ({ id, name, state: 'connected', send: b => window.__by[id].push(Array.from(b)) });
       const outs = new Map([['gs', mk('gs', 'Microsoft GS Wavetable Synth')], ['lumi', mk('lumi', 'LUMI Keys BLOCK')], ['modx2', mk('modx2', 'MODX-2')], ['modx1', mk('modx1', 'MODX-1')]]);

@@ -46,7 +46,7 @@ async function contextSnapshot(page) {
       const phone = viewport.width === 390;
       const context = await browser.newContext({ viewport, hasTouch: phone, isMobile: phone, serviceWorkers: 'block' });
       await context.addInitScript(() => {
-        ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
+        ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true'));
         window.__midiRequests = 0;
         navigator.requestMIDIAccess = () => { __midiRequests++; return Promise.reject(new Error('No hardware in context UI test')); };
       });

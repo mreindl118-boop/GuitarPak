@@ -24,11 +24,11 @@ const nonClean = a => a.filter(b => !CLEAN.test(b));
 async function newPage(browser, seed) {
   const ctx = await browser.newContext({ viewport: { width: 1200, height: 900 } });
   await ctx.addInitScript((seed) => {
-    ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
-    localStorage.setItem('guitarlab.lights.on', 'false');
-    localStorage.setItem('guitarlab.midi.outputId', JSON.stringify('lumi'));
-    localStorage.setItem('guitarlab.midihub.profile', JSON.stringify('yamaha'));
-    for (const k in seed) localStorage.setItem('guitarlab.' + k, JSON.stringify(seed[k]));
+    ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true'));
+    localStorage.setItem('soundlab2.lights.on', 'false');
+    localStorage.setItem('soundlab2.midi.outputId', JSON.stringify('lumi'));
+    localStorage.setItem('soundlab2.midihub.profile', JSON.stringify('yamaha'));
+    for (const k in seed) localStorage.setItem('soundlab2.' + k, JSON.stringify(seed[k]));
     window.__by = { lumi: [], gs: [], modx1: [], modx2: [] };
     // the LUMI bucket keeps CHANNEL messages only: the shared lighting engine
     // sends its own SysEx to a LUMI (native-mode hand-back when the lights are

@@ -11,10 +11,10 @@ async function newPage(browser, seed, phone) {
   await ctx.addInitScript((seed) => {
     if (sessionStorage.getItem('__seeded')) return; // seed once, keep state across reloads
     sessionStorage.setItem('__seeded', '1');
-    localStorage.setItem('guitarlab.help.seen', 'true');
-    localStorage.setItem('guitarlab.help.done', 'true');
-    localStorage.setItem('guitarlab.qz.landed', 'true');
-    for (const k in seed) localStorage.setItem('guitarlab.' + k, JSON.stringify(seed[k]));
+    localStorage.setItem('soundlab2.help.seen', 'true');
+    localStorage.setItem('soundlab2.help.done', 'true');
+    localStorage.setItem('soundlab2.qz.landed', 'true');
+    for (const k in seed) localStorage.setItem('soundlab2.' + k, JSON.stringify(seed[k]));
   }, seed || {});
   const page = await ctx.newPage();
   const errs = [];
@@ -53,7 +53,7 @@ const PLAY = async (right) => {
     let tick = Date.parse('2026-10-23T12:00:00Z');
     App.practiceProgress = new PracticeProgress({ store: App.store, now: () => tick, timezone: () => 'UTC' });
     SLXP._now(() => new Date(tick));
-    const X = SLXP.forInstrument('piano'), o = { fresh: X.total(), oldKeys: Object.keys(localStorage).filter(k => /^guitarlab\.xp\./.test(k)) };
+    const X = SLXP.forInstrument('piano'), o = { fresh: X.total(), oldKeys: Object.keys(localStorage).filter(k => /^soundlab2\.xp\./.test(k)) };
     SLXP.beginSession({ id: 'game-canonical-rules', instrument: 'piano', source: 'knowledge' });
     const rows = [[true, 1500, 'choice'], [true, 5000, 'choice'], [true, 5000, 'choice'], [true, 5000, 'ear'], [false, 900, 'choice']];
     o.a = rows.map((r, i) => { tick += r[1]; return X.answer({ sessionId: 'game-canonical-rules', answerId: i, unit: 'nat', ok: r[0], ms: r[1], kind: r[2] }).xp; });
@@ -69,7 +69,7 @@ const PLAY = async (right) => {
     App.practiceInstrument.set('guitar'); o.selectedTotal = SLXP.total(); o.pianoTotal = X.total();
     SLXP.practice(600, 'Guitar'); SLXP._tick();
     o.noPassive = App.practiceProgress.summary('guitar').sessionCount;
-    o.legacyKeys = Object.keys(localStorage).filter(k => /^guitarlab\.xp\./.test(k));
+    o.legacyKeys = Object.keys(localStorage).filter(k => /^soundlab2\.xp\./.test(k));
     o.streak = X.streak();
     SLXP._now(null);
     return o;

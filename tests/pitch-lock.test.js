@@ -10,7 +10,7 @@ function ok(value, text) { console.log(value ? '  PASS' : '  FAIL', text); if (!
  try {
   await context.addInitScript(() => {
    window.SL_ARTIFACT=true;
-   for(const k of ['help.seen','help.done','qz.landed'])localStorage.setItem('guitarlab.'+k,'true');
+   for(const k of ['help.seen','help.done','qz.landed'])localStorage.setItem('soundlab2.'+k,'true');
    window.__pitchNodes=[];
    function SilentContext(){
     const c=new OfflineAudioContext(2,44100*4,44100);
