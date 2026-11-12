@@ -83,14 +83,18 @@ async function plan(page, text, opts) {
     o.row = { viewport: window.innerWidth, a: [Math.round(a.left), Math.round(a.top), Math.round(a.width)], b: [Math.round(b.left), Math.round(b.top), Math.round(b.width)] };
     o.oneRow = a.width > 0 && b.width > 0 && Math.abs(a.top - b.top) < 4 && a.right <= b.left;
     o.label = Math.round(box('tr-sess-label').width);
+    // the cards' own values: the app's select padding (css/style.css `select`, 13px left) and
+    // .tr-label-input {width:230px}. Under the plan's `.pp-wrap input, .pp-wrap select` rule they
+    // would be 10px and 181 px (both fixed CSS lengths, the same on every machine)
+    o.pad = getComputedStyle(document.getElementById('tr-cc-a')).paddingLeft;
     o.overflow = document.documentElement.scrollWidth > window.innerWidth;
     return o;
   });
   ok(tools.exists && tools.closed && /^Free practice/.test(tools.summary), 'the Plan page has a Free practice section, closed until it is opened: ' + JSON.stringify([tools.exists, tools.closed, tools.summary]));
   ok(tools.outside && tools.after, 'the section sits after the plan (.pp-wrap), not inside it and not as a card');
   ok(tools.cards && tools.ear, 'it holds the three Trainer cards (session log, random prompts, one-minute chord changes) and the button to ear training in Exercises; the interval trainer itself is gone');
-  ok(tools.row && tools.row.viewport === 1200 && tools.oneRow, 'at 1200 px chord A and chord B share one row: ' + JSON.stringify(tools.row));
-  ok(tools.label > 0 && tools.label <= 230 && !tools.overflow, 'and the session label is at most 230 px wide (the plan’s form rules did not reach the cards): ' + tools.label + ' px');
+  ok(tools.row && tools.row.viewport === 1200 && tools.oneRow && tools.pad === '13px', 'at 1200 px chord A and chord B share one row and keep the app’s own select padding (13px, not the plan’s 10px): ' + JSON.stringify([tools.row, tools.pad]));
+  ok(tools.label === 230 && !tools.overflow, 'and the session label is 230 px wide, its own width (the plan’s form rules did not reach the cards): ' + tools.label + ' px');
   if (tools.exists && tools.cards) { // without the cards the checks above have already failed
     // Space goes to the page while no field has the focus (a field keeps its own Space)
     await page.evaluate(() => {

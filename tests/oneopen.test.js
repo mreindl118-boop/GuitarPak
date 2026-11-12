@@ -8,6 +8,8 @@
 // control: with no synth output the card's line names Settings › MIDI keyboard
 // and its button opens Settings. MIDI is off at the start (as on a first
 // visit) and is connected half way; the fake MODX is the only output.
+// Also the score player's per-mount options (its own ports row, the no-output
+// line, the connect button, the two texts that name the host).
 const { chromium } = require('playwright');
 const env = require('./env');
 let fails = 0;
@@ -96,7 +98,58 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
   ok(t1.steps > 0 && t1.active === 'songs' && t1.seen && t1.player === 'riff' && /riff/.test(t1.info), 'a text tab parses as tab and can play on the synth as a score (the Player card on this page): ' + JSON.stringify(t1));
   ok(await page.evaluate(() => typeof window.SLMidiHub) === 'undefined', 'window.SLMidiHub is still undefined after all three destinations');
   ok(errs.length === 0, 'no page errors' + (errs.length ? ': ' + errs.join(' | ') : ''));
-  await ctx.close(); await browser.close();
+  await ctx.close();
+
+  // The card's per-mount options (SLScorePlayer.mount(el, opts)): ports = its own "Synth out" and "Channel"
+  // selects for a host with no Hub header, noOut = the line while there is no synth output, connect = a button
+  // after it. The Hub passes none of them; the Songs page will (A3b), so they are checked here, on a card
+  // mounted the same way, with MIDI connected only after boot.
+  console.log('# the Player card mounted with its own ports row, MIDI connected after boot');
+  const c2 = await browser.newContext({ viewport: { width: 1200, height: 900 } });
+  await c2.addInitScript(() => {
+    ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true')); // not midi.wanted: nothing connects at boot
+    localStorage.setItem('guitarlab.midihub.ch', '3');
+    const out = { id: 'modx1', name: 'MODX-1', state: 'connected', send: () => { } };
+    const inp = { id: 'mi', name: 'MODX-1', state: 'connected', onmidimessage: null };
+    navigator.requestMIDIAccess = () => Promise.resolve({ inputs: new Map([['mi', inp]]), outputs: new Map([['modx1', out]]), sysexEnabled: true, onstatechange: null });
+    window.__card = () => {
+      const q = id => document.getElementById(id), row = q('mh-plports'), btn = q('mh-plconnect'), tips = document.querySelector('.mh-pl details p');
+      return {
+        cards: document.querySelectorAll('.mh-pl').length, out: q('mh-plout').textContent, tips: tips.textContent.slice(tips.textContent.indexOf('sends everything')),
+        row: row ? { hidden: row.hidden, display: getComputedStyle(row).display, height: row.getBoundingClientRect().height, ports: [...q('mh-plsynth').options].map(x => x.value).join(), port: q('mh-plsynth').value, ch: q('mh-plch').value } : null,
+        btn: btn ? { hidden: btn.hidden, label: btn.textContent } : null
+      };
+    };
+    // the card's Open as tab, and what the Songs page then says the tab came from
+    window.__asTab = () => { SLScorePlayer.loadScore({ title: 'Line', bpm: 120, len: 4, notes: [60, 62, 64, 65].map((m, i) => ({ t: i, d: 1, m, partId: 'p1', v: 100 })) }); SLScorePlayer.openAsTab(); return App.songs.current && App.songs.current.from; };
+  });
+  const p2 = await c2.newPage(), errs2 = [];
+  p2.on('pageerror', e => errs2.push(e.message));
+  await p2.goto(env.URL);
+  await p2.waitForFunction(() => window.App && App.midi && window.SLScorePlayer && App.songs && App.active === 'quiz');
+  const NO_OUT = 'No synth output yet. Connect your keyboard in Settings \u203a MIDI keyboard.';
+  const hub = await p2.evaluate(() => ({ ready: App.midi.ready, card: __card(), from: __asTab() }));
+  ok(hub.ready === false && hub.card.cards === 1 && /connect MIDI above$/.test(hub.card.out) && hub.card.row === null && hub.card.btn === null,
+    'the Hub\u2019s mount passes no option: its own line while there is no output, no ports row, no button: ' + hub.card.out);
+  ok(hub.card.tips === 'sends everything to the Part picked in Control.' && hub.from === 'from the MIDI Hub Player', 'and its two texts name the Hub: ' + JSON.stringify([hub.card.tips, hub.from]));
+  const own = await p2.evaluate((noOut) => {
+    const host = document.createElement('div'); host.id = 'own-player'; document.body.appendChild(host);
+    SLScorePlayer.mount(host, { ports: true, noOut: noOut, connect: { label: 'Connect MIDI', run: () => { App.midi.enable(); } } });
+    return { card: __card(), hubHost: document.getElementById('mh-player').children.length, from: __asTab() };
+  }, NO_OUT);
+  ok(own.card.cards === 1 && own.hubHost === 0, 'one card per document: mounting it somewhere else empties the Hub\u2019s host');
+  ok(own.card.out === NO_OUT && own.card.btn && !own.card.btn.hidden && own.card.btn.label === 'Connect MIDI', 'no output yet: the mount\u2019s own line and its button: ' + own.card.out);
+  ok(own.card.row && own.card.row.hidden && own.card.row.display === 'none' && own.card.row.height === 0,
+    'the ports row is not on screen before MIDI is connected (no empty Synth out select): ' + JSON.stringify(own.card.row));
+  ok(own.card.tips === 'sends everything to the Channel picked above.' && own.from === 'from the Player', 'with its own Channel select the two texts no longer name the Hub: ' + JSON.stringify([own.card.tips, own.from]));
+  await p2.evaluate(() => document.getElementById('mh-plconnect').click());
+  await p2.waitForFunction(() => App.midi.ready && !document.getElementById('mh-plports').hidden);
+  const live = await p2.evaluate(() => __card());
+  ok(/MODX-1/.test(live.out) && live.btn.hidden, 'the button connects; the card names the synth without a reload (repainted on midi:state): ' + live.out);
+  ok(!live.row.hidden && live.row.display === 'flex' && live.row.ports === 'shared,modx1' && live.row.port === 'modx1' && live.row.ch === '3',
+    'and the ports row is there: Synth out lists the ports, Channel shows the stored one (4): ' + JSON.stringify(live.row));
+  ok(errs2.length === 0, 'no page errors (own ports row)' + (errs2.length ? ': ' + errs2.join(' | ') : ''));
+  await c2.close(); await browser.close();
   console.log(fails ? 'FAILED ' + fails : 'ALL PASS');
   process.exit(fails ? 1 : 0);
 })().catch(e => { console.log('FAIL (crash)', e); process.exit(1); });

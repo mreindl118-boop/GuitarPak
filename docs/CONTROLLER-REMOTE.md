@@ -43,7 +43,7 @@ Set it up in **Settings › Hands-free control**. The Lights & help sheet shows 
     on their own port, so the key isn't reserved then. With the section closed, the key plays and is
     graded as always.
   - The Keys page's scale lessons keep their own double-tap (`kl.dbltap`: start / stop) and are never
-    claimed. Their double-tap stands down while the LUMI section is open.
+    claimed. Their lowest-key double-tap stands down while the LUMI section is open.
 
 ## What each page does
 
@@ -58,7 +58,7 @@ The active page decides, through its module hook `onRemote(action, info)`:
 | Woodshed / Guided performance | Start · Again · Resume · in Phrases, the next phrase | Restart · in Phrases the phrase before | End the run (stays in the session) · with nothing running, back to the Library |
 | LUMI practice (on the Piano page, while its section is open) | Start · Check → next target · skip a target in guided flow | — | Stop |
 | Practice plan | Launch the next block not yet done | Relaunch the last block | — |
-| Plan page: one-minute chord changes (Free practice) | Count a chord change | — | End the chord run · with no run, pause the Free practice timer |
+| Plan page: one-minute chord changes (Free practice) | Count a chord change | Nothing during a chord run (the press is held, so the run goes on) · with no run, the Practice plan row | End the chord run · with no run, pause the Free practice timer |
 | Fretboard / Tab / Notation runner, Songs | Play / pause | Restart | Stop |
 | Live sets, the Deck | Next slot (or next program; never while the Deck's Map Learn listens) | Previous | — |
 
@@ -71,8 +71,10 @@ Two pages hold more than one thing a press could mean. Each has one rule:
   section closed, the lessons answer first, then the runner.
 - **Plan page: the Free practice cards are asked first.** During a one-minute chord run, Next counts a
   change. For 1.5 seconds after the minute ran out it answers "Time's up", so a late press doesn't
-  launch a plan block. Stop ends the run; with no run, it pauses the Free practice timer if that is
-  running. At any other time the Practice plan row applies. Back is always the plan's.
+  launch a plan block. Back does nothing during a run and answers "Chord changes running": the plan's
+  Back would relaunch the last block, which leaves the page and cancels the run. Stop ends the run;
+  with no run, it pauses the Free practice timer if that is running. Folding the section cancels a
+  run. At any other time the Practice plan row applies.
 
 The order of checks:
 1. A help tour takes the action first: Next and Back move through it, Stop closes it.

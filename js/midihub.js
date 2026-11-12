@@ -176,6 +176,10 @@
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function toast(msg) {
     if (!els.toast) return;
+    // one message at a time on the Hub page, as before the Player's messages
+    // moved to App.toast: on a phone the two boxes sit at the same place. Only
+    // while this toast is on screen (the Deck and Live pages call in here too)
+    var at = App.active === 'midihub' ? document.getElementById('app-toast') : null; if (at) at.hidden = true;
     els.toast.textContent = msg; els.toast.hidden = false;
     clearTimeout(els.toast._t); els.toast._t = setTimeout(function () { els.toast.hidden = true; }, 2200);
   }
@@ -1240,6 +1244,9 @@
     t0 = performance.now();
     render();
     installFilter();
+    // the filter also follows the store from another window (js/midirules.js: a
+    // 'storage' event, the return to this tab); the box shows what is installed
+    App.on('midirules:state', function (s) { if (els.rulesin) els.rulesin.checked = !!(s && s.on); });
     App.on('midi:raw', onRaw);
     App.on('midi:out', function (d) { if (d && d.bytes) logMsg('out', d.bytes); });
     App.on('midi:state', function () { flushHub('MIDI inventory changed'); paintPorts(); });

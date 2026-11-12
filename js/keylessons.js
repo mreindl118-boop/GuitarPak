@@ -49,8 +49,9 @@
  * owner. A lesson that starts (start) or is opened from the Learn bar or a
  * Plan block (releaseRunner) closes the section, which stops its session;
  * opening the section stops a run (halt, which keeps the credit instrument).
- * While it is open this card's double-tap stands down (onKeysPage) and
- * piano.js never asks remote().
+ * While it is open this card's lowest-key double-tap stands down
+ * (onKeysPage; a touch double-tap on the card still starts a lesson, which
+ * closes the section) and piano.js never asks remote().
  */
 (function () {
   'use strict';

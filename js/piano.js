@@ -311,7 +311,9 @@
     pnVoice = id;
     App.store.set('pn.voice', pnVoice);
     if (pnVoice !== 'piano') App.store.set('pn.synthPreset', pnVoice);
-    if (pnVoice === 'piano' && pnSyn) { try { pnSyn.allNotesOff(); } catch (e) { /* ok */ } }
+    // heldSynth is forgotten below, so the later note-offs never reach the
+    // synth: silence it for every change (also the same synth picked again)
+    if (pnSyn) { try { pnSyn.allNotesOff(); } catch (e) { /* ok */ } }
     heldSynth = {};
   }
 
@@ -1459,7 +1461,7 @@
       '<div id="pn-lessons"></div>' +
       // LUMI note and triad practice (js/lumi-practice.js), closed by default
       '<details class="card" id="pn-lumi"><summary>Notes and triads on the LUMI</summary>' +
-        '<p class="muted small">While this section is open, the pedal and the double-tap key work here. Close it to use them for the lessons above.</p>' +
+        '<p class="muted small">While this section is open, your pedal works here and the lessons&#39; Double-tap on the lowest key is paused. The double-tap key from Settings › Hands-free control, if it is on, works here in Simulated mode. Close the section to use the pedal and Double-tap for the lessons above.</p>' +
         '<div id="pn-lumi-body"></div></details>';
 
     els.title = document.getElementById('pn-title');

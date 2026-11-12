@@ -290,10 +290,13 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
     const sel = document.getElementById('pn-voice'), o = {};
     const stored = () => [App.store.get('pn.voice', null), App.store.get('pn.synthPreset', null)].join();
     // every note the synth voice is asked to play (the sampled grand never goes through it)
-    const synth = [], make = DAW.createSynth;
+    // …and every release it gets: one note (its pitch) or all of them ('all')
+    const synth = [], offs = [], make = DAW.createSynth;
     DAW.createSynth = function () {
-      const s = make.apply(this, arguments), on = s.noteOn;
+      const s = make.apply(this, arguments), on = s.noteOn, off = s.noteOff, all = s.allNotesOff;
       s.noteOn = function (pitch) { synth.push(pitch); return on.apply(this, arguments); };
+      s.noteOff = function (pitch) { offs.push(pitch); return off.apply(this, arguments); };
+      s.allNotesOff = function () { offs.push('all'); return all.apply(this, arguments); };
       return s;
     };
     const tap = n => { App.emit('midi:note', { on: true, midi: n, vel: 90 }); App.emit('midi:note', { on: false, midi: n }); return synth.splice(0); };
@@ -307,6 +310,18 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
     // chosen from outside the page
     o.toPiano = App.keys.setVoice('piano'); o.piano = sel.value + '|' + stored(); o.pianoNotes = tap(62);
     o.toSaw = App.keys.setVoice('saw'); o.saw = sel.value + '|' + stored(); o.sawNotes = tap(64);
+    // a key held while the SAME synth is picked again (the Learn bar's "Synth keyboard" entry does
+    // that): the held note is forgotten, so the synth must be silenced or the note drones on
+    App.emit('midi:note', { on: true, midi: 65, vel: 90 }); offs.length = 0;
+    o.again = App.keys.setVoice('saw');
+    App.emit('midi:note', { on: false, midi: 65 });
+    o.heldOff = offs.splice(0); synth.splice(0);
+    // …and while another synth is picked
+    App.emit('midi:note', { on: true, midi: 67, vel: 90 }); offs.length = 0;
+    App.keys.setVoice('pad');
+    App.emit('midi:note', { on: false, midi: 67 });
+    o.swapOff = offs.splice(0); synth.splice(0);
+    App.keys.setVoice('saw');
     o.unknown = App.keys.setVoice('theremin'); o.after = sel.value + '|' + stored();
     App.keys.setVoice('piano');
     DAW.createSynth = make;
@@ -318,6 +333,8 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
   ok(snd.picked === 'pad,pad' && snd.padNotes.includes(60), 'choosing a synth in #pn-voice stores pn.voice (and the last synth sound) and plays the synth: ' + JSON.stringify([snd.picked, snd.padNotes]));
   ok(snd.toPiano === true && snd.piano === 'piano|piano,pad' && snd.pianoNotes.length === 0, 'App.keys.setVoice(\'piano\') switches back to the grand; the last synth sound is kept: ' + snd.piano);
   ok(snd.toSaw === true && snd.saw === 'saw|saw,saw' && snd.sawNotes.includes(64), 'App.keys.setVoice(\'saw\') selects that synth, stores it and plays it: ' + snd.saw);
+  ok(snd.again === true && (snd.heldOff.includes('all') || snd.heldOff.includes(65)) && (snd.swapOff.includes('all') || snd.swapOff.includes(67)),
+    'a key held while a synth sound is picked (the same one again, or another) is released on the synth: nothing drones on: ' + JSON.stringify([snd.heldOff, snd.swapOff]));
   ok(snd.unknown === false && snd.after === 'saw|saw,saw', 'an unknown sound id returns false and changes nothing: ' + snd.after);
 
   console.log('# LUMI section under the lessons: open = owner');
@@ -339,8 +356,8 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
     o.session1 = S().running && S().mode === 'simulated' && lp.running;
     document.getElementById('kl-start').click();
     o.lesson1 = !!App.keysLessons.run && !box.open && !lp.open && !S().running && !S().visible && !lp.running;
-    o.said1 = said();
     await wait(80); // the fold's 'toggle' event has run: the lesson goes on
+    o.said1 = said(); // read after that event: its hide() must leave the reason standing
     o.goesOn1 = !!App.keysLessons.run && App.keysLessons.view === 'run';
     o.focus1 = getComputedStyle(box).display; // focus mode folds the section away with the other page controls
 
@@ -353,8 +370,8 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
     o.session2 = S().running;
     document.getElementById('pn-play').click();
     o.runner2 = !box.open && !lp.open && !S().running && !lp.running;
-    o.said2 = said();
     await wait(80);
+    o.said2 = said(); // after the fold's 'toggle' event, as above
     o.goesOn2 = App.keys.runnerBusy() && playing();
 
     // opening the section stops the runner

@@ -6,9 +6,11 @@
 // 'nothing here' returns false, and the reserved double-tap key is claimed
 // only where remoteKey allows it (the Plan page; the runners and Songs only
 // while the lowest key is not a lit target).
-// On the Plan page the cards are asked first: a chord-change run counts NEXT,
-// STOP cancels it or pauses the Free practice timer; with no run NEXT is the
-// Plan's own "Block: …" (tests/remote-plan.test.js covers the Plan itself).
+// On the Plan page the cards are asked first: a chord-change run counts NEXT
+// and holds BACK (the Plan's "Again: …" would leave the page and cancel the
+// run), STOP cancels it or pauses the Free practice timer, folding the
+// section cancels it; with no run NEXT / BACK are the Plan's own "Block: …" /
+// "Again: …" (tests/remote-plan.test.js covers the Plan itself).
 // Where nothing happens, a page that toasted its reason answers false (no
 // success HUD), so the remote adds neither its own note nor the sound hint.
 // 2.0 Phase A3b: Live sets and the Deck are soundLAB Gear (gear.html). Their
@@ -221,6 +223,19 @@ async function newPage(browser, seed) {
     o.cancelled = __ra('next'); o.cancelledAt = App.active;
     Date.now = real;
     await __wait(100);
+    // blocks were opened from here by now, so the Plan's own BACK is "Again: <block>" (it leaves the
+    // page, which cancels a run): during a run the cards hold BACK, the run goes on
+    await toPlan();
+    __q('#tr-cc-start').click(); await __wait(30);
+    __ra('next');
+    o.backRun = __ra('back'); await __wait(60);
+    o.backRunAt = App.active; o.backRunOn = [__q('#tr-cc-start').disabled, __txt('#tr-cc-num'), __txt('#tr-cc-result'), __ra('next')];
+    // folding the section cancels the run: a hidden run must not take the pedal or Space
+    __q('#pp-tools').open = false; await __wait(80);
+    o.fold = [!__q('#tr-cc-start').disabled, __txt('#tr-cc-result'), App.trainerCards.remote('next'), App.trainerCards.remote('back')];
+    // no run: BACK is the Plan's own again (the last block once more)
+    o.backIdle = __ra('back'); o.backIdleAt = App.active;
+    await __wait(100);
     App.emit('fb:set', { source: 'test', root: key0[0], scale: key0[1] });
     App.store.set('met.bpm', bpm0); App.emit('tempo', { bpm: bpm0, source: 'test' });
     await __wait(100);
@@ -234,6 +249,10 @@ async function newPage(browser, seed) {
   ok(tr.ccDone && tr.late === 'Time’s up' && tr.lateAt === 'practiceplan', 'a NEXT just after the minute ran out opens no plan block (Time’s up): ' + J([tr.late, tr.lateAt]));
   ok(/^Block: /.test(tr.after) && tr.afterAt !== 'practiceplan', 'once the 1.5 s after the run ran out have passed, NEXT is the Plan’s again (it opens the next block): ' + J([tr.after, tr.afterAt]));
   ok(/^Block: /.test(tr.cancelled) && tr.cancelledAt !== 'practiceplan', 'a run cancelled with Reset never "runs out": a minute after its start NEXT opens a plan block: ' + J([tr.cancelled, tr.cancelledAt]));
+  ok(tr.backRun === 'Chord changes running' && tr.backRunAt === 'practiceplan' && tr.backRunOn[0] === true && tr.backRunOn[1] === '1' && tr.backRunOn[2] === '' && tr.backRunOn[3] === 'Change 2',
+    'with a plan block opened earlier today, BACK during a chord-change run is held by the cards: the Plan page stays and the run goes on: ' + J([tr.backRun, tr.backRunAt, tr.backRunOn]));
+  ok(tr.fold[0] === true && /Run cancelled/.test(tr.fold[1]) && tr.fold[2] === false && tr.fold[3] === false, 'folding Free practice during a run cancels it: the hidden cards no longer answer the pedal: ' + J(tr.fold));
+  ok(/^Again: /.test(tr.backIdle) && tr.backIdleAt !== 'practiceplan', 'with no run BACK is the Plan’s own again (it opens the last block once more): ' + J([tr.backIdle, tr.backIdleAt]));
 
   console.log('# double-tap the lowest key on the runner pages (remoteKey: the runner while stopped or the key unlit, the Plan page)');
   const dt = await page.evaluate(async () => {
