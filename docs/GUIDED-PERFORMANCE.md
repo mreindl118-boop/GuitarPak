@@ -70,7 +70,8 @@ turning it on restores the current instruction. Structured targets override the
 base scale layout. Display notes never supply performance answers. Shared
 lighting folds pitches into the LUMI window, while grading still requires the
 score's exact synth octave. See [LUMI-PRACTICE.md](LUMI-PRACTICE.md) for display
-ownership and the separate Keys → LUMI practice workflow, and
+ownership and the separate LUMI practice workflow (the section *Notes and triads
+on the LUMI* on the Piano page), and
 [FEATURE-COVERAGE-2026-10-23.md](FEATURE-COVERAGE-2026-10-23.md) for context and
 routing coverage. The performance roll and keyboard use the shared pitch
 palette; its editor and color modes are documented in
@@ -136,5 +137,6 @@ latency calibration. Tests use synthetic
 MIDI files, simulated ports/clocks and browser rendering. Web MIDI hardware,
 native iOS/Android device behavior, real timing latency, physical color/octave
 response and audible external lockout remain unverified. The separate
-Keys → LUMI independent port leases are Web MIDI-only; native bridge support
-must not be inferred from the player sharing the app's raw event API.
+independent port leases of LUMI practice (the Piano page section) are Web
+MIDI-only; native bridge support must not be inferred from the player sharing
+the app's raw event API.

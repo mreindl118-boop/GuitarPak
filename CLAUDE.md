@@ -196,7 +196,7 @@ js/remote.js      CONTROLLER REMOTE (App.remote, 2.0 beta / v2; docs/CONTROLLER-
 js/metronome.js   ┐ feature modules; each registers (metronome = the corner
                   │  sheet, not a page — see OVERLAY SHEETS)
 js/fretboard.js   │ App.register(name, {init, onShow, onHide, onKey})
-js/chords.js      │ DOM ids/CSS prefixed met-/fb-/ch-/jam-/tun-/tr-
+js/chords.js      │ DOM ids/CSS prefixed met-/fb-/ch-/jam-/tun-
                   │ (chords: chord-explorer neck + theory panel + progression
                   │  player; the neck follows the sounding chord live)
                   │ (fretboard.js also registers the 'tab' and 'notation'
@@ -211,6 +211,17 @@ js/piano.js       │ (piano: keyboard twin of the fretboard — degree-colored
                   │  keys flash data-dc (their degree color) at every level;
                   │  key-aware fingering cycleFingers/fingering, 1-2 octaves;
                   │  App.keys = the API keylessons.js drives)
+                  │  SOUND PICKER (2.0 Phase A2; there is no 'synth' page any
+                  │  more): the select #pn-voice, labelled "Sound" = Grand
+                  │  piano or one DAW.SYNTH_PRESETS sound, stored in pn.voice;
+                  │  pn.synthPreset = the last synth sound. applyVoice(id) is
+                  │  the one place the sound changes; App.keys.setVoice(id)
+                  │  picks it from outside the page ('piano' or a preset id;
+                  │  false for an unknown id, nothing changes) — the Learn
+                  │  bar's "Synth keyboard" entry calls it. The sampled piano
+                  │  tones are not in this list (one merged list: Phase B/C).
+                  │  App.keys.stopRunner() stops the scale runner. The page
+                  │  also hosts the LUMI section #pn-lumi (lumi-practice.js).
 js/keylessons.js  │ SCALE LESSONS on the Keys page (mounted into #pn-lessons
                   │  by piano.js init): LESSONS (25, tiers start/build/
                   │  stretch) x STEPS (10 speed levels, quarters@60 ->
@@ -264,14 +275,41 @@ js/songs.js       │ (songs: user-imported ASCII tab / MIDI parsed on-device,
                   │  Practice (window.Woodshed.importMidi + addScore -> shed),
                   │  Open as tab (App.songs.fromMidi/load, text -> the paste
                   │  box). Suite tests/oneopen.test.js.
-js/lumi-practice.js LUMI note/triad practice under Keys (selectively recovered
-                  from b8ccb55; see docs/LUMI-PRACTICE.md). Session-only
-                  simulated answers by default; optional exact LUMI/MODX
-                  input and LUMI output through additive Web MIDI subscriptions.
-                  App.midi.leaseKeybedOutput pauses the shared LED painter
-                  on the same selected output during test/armed guidance;
-                  cleanup restores its current layout. Native independent
-                  routes unsupported. Tests: lumi-practice, midi-ports.
+js/lumi-practice.js LUMI note/triad practice (selectively recovered from
+                  b8ccb55; see docs/LUMI-PRACTICE.md). Since 2.0 Phase A2 a
+                  SECTION ON THE PIANO PAGE, not a page: piano.js init mounts
+                  it into <details class="card" id="pn-lumi"> ("Notes and
+                  triads on the LUMI", after #pn-lessons, closed by default;
+                  body #pn-lumi-body) and drives it through App.lumiPractice
+                  = {init, show, hide, close(msg), stop, remote, remoteKey,
+                  open (getter), running (getter)}. `open` = the fold state
+                  alone (true also while another page shows); the module's
+                  `visible` = Piano page shown AND section open.
+                  OPEN = OWNER, one owner at a time: opening the section or
+                  starting a session stops a lesson run (App.keysLessons.
+                  halt(): like stop, but keeps the entry instrument) and the
+                  runner (App.keys.stopRunner); a lesson starting, a lesson
+                  opened from the Plan or the Learn bar (keylessons start /
+                  releaseRunner) and the runner starting (ppStart) call
+                  close(msg) = fold the section + stop + disarm. While open
+                  the section ALONE answers the pedal (piano.js onRemote
+                  returns its answer, no fall-through to the lessons or the
+                  runner), the lessons' own double-tap stands down, and with
+                  remote.dbl in simulated mode the lowest key is reserved
+                  (the Piano module's remoteKey). Closed = nothing changes
+                  for lessons, runner, pedal and double-tap. Leaving the
+                  Piano page, folding the section, window blur and app hide
+                  stop + disarm a session. Unchanged: the 42 lp- ids, the
+                  window.SLLumiPractice hook, the lease owner tag
+                  'lumipractice', the LUMI display output choice (#lp-output,
+                  still only here). CSS scope #pn-lumi (css/lumi-practice.
+                  css). Session-only simulated answers by default; optional
+                  exact LUMI/MODX input and LUMI output through additive Web
+                  MIDI subscriptions. App.midi.leaseKeybedOutput pauses the
+                  shared LED painter on the same selected output during
+                  test/armed guidance; cleanup restores its current layout.
+                  Native independent routes unsupported. Tests:
+                  lumi-practice, midi-ports, remote-plan, remote-keys, keys.
 js/practice-router.js Scale-locked external synth sound for LUMI practice:
                   explicit synth input/sound output, separate display output;
                   reuses App.scaleLock.contains, blocks out-of-scale notes,
@@ -289,7 +327,16 @@ js/jam.js         │ (jam: auto-band — genre presets write an intro/A/B/endin
                   │  BANDS chips = kit+bass+comp combos, samples preload on
                   │  page show)
 js/tuner.js       │
-js/trainer.js     │
+js/trainer.js     │ (NOT a page since 2.0 Phase A2: a CARD LIBRARY mounted by
+                  │  the Plan page into #pp-tools-body, its "Free practice"
+                  │  section. App.trainerCards = {mount, show, hide, key,
+                  │  remote}. Cards: session log (tr.sessions), random
+                  │  prompts ("Go" emits fb:practice), one-minute chord
+                  │  changes (tr.ccA / tr.ccB / tr.best.<A>-<B>) and
+                  │  #tr-ear-go -> Exercises › Intervals › All intervals ›
+                  │  Ear. The interval ear trainer is gone: tr.earBest /
+                  │  tr.earHarm are never read or written. Ids keep tr-, CSS
+                  │  via App.injectCSS('trainer').)
 js/theorytab.js   │ (theory: circle of fifths + key guide + degree ear quiz)
 js/settings.js    ┘ (settings: app-level prefs — theme dark/light/auto; MIDI
                      ports + bend; lighting moved to Lights & help)
@@ -395,6 +442,19 @@ js/practiceplan.js PRACTICE PLAN ('practiceplan', Learn group pill "Plan",
                   pp.active / pp.sessions (90 days) / pp.history / pp.running
                   / pp.gaps. App.practicePlan test hook. Suite
                   tests/practiceplan.test.js.
+                  FREE PRACTICE (2.0 Phase A2, the former Trainer page):
+                  <details class="pp-tools" id="pp-tools"> ("Free practice:
+                  timer, prompts, one-minute chord changes", closed by
+                  default) is appended AFTER .pp-wrap — never inside it and
+                  never class card: the Plan's .pp-wrap form rules would
+                  restyle the cards. init calls App.trainerCards.mount
+                  (#pp-tools-body); onShow / onHide call .show() / .hide();
+                  onKey offers the key to .key(e) first (Space counts a
+                  chord change during a run); remote() asks .remote(action)
+                  first (NEXT = count a change, STOP = cancel the run or
+                  pause the timer), then launches blocks as before. The
+                  timer is self-timed (tr.sessions), pauses when the page is
+                  left and never enters the plan's measured minutes.
 js/help.js        (?) button + guided page tours (TOURS per page id, spotlight
                   ring + card overlay, first-run welcome; help.seen/help.done)
 js/helix.js       HELIX STADIUM page ('helix', Guitar group pill "Helix",
@@ -672,7 +732,7 @@ A1 (Studio space, sequencer/arranger, sampler, plug-in API removed):
   stored tab) goes to `MOVED[id].to`, else HOME, and `MOVED[id].say` is shown
   with App.toast — never a blank panel, never saved as the last tab. A page
   that leaves the app gets its MOVED row in the same commit (the four Studio
-  ids are in; A2 and A3b add rows).
+  ids and A2's three are in; A3b adds rows).
 - A PAGE IS THREE THINGS changed in ONE commit: its id in PAGES (+ GROUPS),
   its `<section class="panel" id="panel-…">` and its `<script>` tag in
   index.html (boot writes `Module "<id>" failed to load` into a panel that
@@ -698,8 +758,9 @@ A1 (Studio space, sequencer/arranger, sampler, plug-in API removed):
 - NO PLUG-IN API: js/plugins.js, plugins/, PLUGINS.md and the Settings card
   are gone, nothing runs stored code. `App.addPage(id, label, sp, mod)` stays
   as an INTERNAL test hook (tests/remote.test.js; `sp` is ignored).
-- sw.js: `CACHE` 'soundlab2-v5' (A2 v6, A3a v7, A3b v8, A4 v9; v4 is skipped
-  on purpose). The fetch handler looks ONLY in its own cache
+- sw.js: A1 set `CACHE` to 'soundlab2-v5' (A2 v6 = the number now, A3a v7,
+  A3b v8, A4 v9; v4 is skipped on purpose). The fetch handler looks ONLY in
+  its own cache
   (`caches.open(CACHE)` then `match(req, {ignoreSearch: true})`), never the
   global `caches.match`: the live worker's cache on the same origin can hold
   older copies of the same URLs (read from the code, not measured).
@@ -713,17 +774,86 @@ A1 (Studio space, sequencer/arranger, sampler, plug-in API removed):
   (js/synthtab.js, js/synthlive.js); "Studio" in Jam is a drum kit id
   (jam2.kit = 'studio'); `addPage` in js/synthdeck.js is the Deck's own.
 
+A2 (the three folds: the Trainer page, the Synth pill, the LUMI pill):
+
+- 18 PAGES: Learn (quiz, chords, theory, practiceplan) · Guitar (fretboard,
+  tab, notation, helix) · Keys (piano, chart, pads) · Synth (deck, liveset,
+  midihub) · Play (songs, jam) · Train (shed, tuner). The ids 'trainer',
+  'synth' and 'lumipractice' are in js/app.js ONLY as MOVED rows: no PAGES
+  entry, no label, no panel in index.html. No file was deleted or added:
+  js/trainer.js, js/lumi-practice.js, css/lumi-practice.css and
+  js/practice-router.js keep their paths, their tags in index.html and their
+  sw.js ASSETS rows.
+- THREE MOVED REDIRECTS: trainer -> 'practiceplan' ("The Trainer cards are on
+  the Plan page now, under Free practice."), synth -> 'piano' ("Synth sounds
+  are in the Sound picker on the Piano page."), lumipractice -> 'piano'
+  ("LUMI practice is on the Piano page now, under the lessons.").
+  App.switchTo(<old id>) or a stored app.tab lands there with the sentence;
+  a stored group member (app.gtab.gkeys = 'synth', app.gtab.gprac =
+  'trainer') falls back to the group's first page (Piano, Woodshed). No new
+  store keys, no migration.
+- SYNTH PILL = THE SOUND PICKER on Piano (js/piano.js): #pn-voice is labelled
+  "Sound"; App.keys.setVoice(id) ('piano' or a DAW.SYNTH_PRESETS id; false
+  for an unknown id). pn.voice is unchanged, pn.synthPreset = the last synth
+  sound. The Learn bar's "Synth keyboard" entry (js/learn-instruments.js,
+  `voice: 'synth'`) opens Piano and calls setVoice with pn.synthPreset
+  (default 'saw'). `synth` as a Learn instrument CATEGORY id stays; Keys
+  lessons are credited to the entry instrument, never to a page id.
+- TRAINER = FREE PRACTICE on the Plan page: js/trainer.js is a card library,
+  App.trainerCards = {mount, show, hide, key, remote}. js/practiceplan.js
+  appends <details class="pp-tools" id="pp-tools"> AFTER .pp-wrap, mounts
+  the cards into #pp-tools-body and forwards show / hide / key / remote.
+  Cards: session log, random prompts, one-minute chord changes; ids keep
+  tr-, stores tr.sessions / tr.ccA / tr.ccB / tr.best.<A>-<B>. The interval
+  ear trainer is GONE: #tr-ear-go opens Exercises › Intervals › All
+  intervals › Ear (SLQuiz.start('intervals/iall/ear/1')) and says why when
+  the selected Learn instrument has no ear mode (Drums). tr.earBest /
+  tr.earHarm are never read, written or turned into Exercises records
+  (xp.js forbids seeding history). Remote on the Plan page: the cards are
+  asked first (NEXT counts a change during a run and answers "Time's up" for
+  1.5 s after it; STOP cancels the run, else pauses the timer; BACK is
+  false), then the plan's own blocks.
+- LUMI PILL = A SECTION under the Keys lessons: <details id="pn-lumi">
+  ("Notes and triads on the LUMI", closed by default, body #pn-lumi-body),
+  driven through App.lumiPractice = {init, show, hide, close, stop, remote,
+  remoteKey, open, running}. OPEN = OWNER, ONE OWNER AT A TIME: opening the
+  section or starting a session stops a lesson run (App.keysLessons.halt(),
+  which keeps the entry instrument) and the runner (App.keys.stopRunner);
+  a lesson starting, App.keysLessons.open(id) from a Plan block or the Learn
+  bar, and the runner starting call App.lumiPractice.close(msg) (fold + stop
+  + disarm). While it is open the section ALONE answers the pedal (piano.js
+  onRemote: no fall-through to the lessons or the runner), the lessons' own
+  double-tap stands down, and with remote.dbl in simulated mode the lowest
+  key is reserved (the Piano module's remoteKey). Closed, nothing changes
+  for lessons, runner, pedal or double-tap. NEVER add a state in which the
+  section is open while a lesson run or the runner is active. Guard every
+  call across these modules (`if (App.lumiPractice) …`, `App.keysLessons &&
+  App.keysLessons.halt`): tests/lumi-practice.test.js loads the file alone
+  into a mock App. css/lumi-practice.css is scoped to #pn-lumi; the focus
+  mode html.kl-running hides the section.
+- TEXTS name the new places: the Settings hands-free list, the help welcome
+  and the Piano / Plan tours in js/help.js (the 'trainer' tour is gone), the
+  js/midi.js status "Choose a LUMI display output on the Piano page, under
+  Notes and triads on the LUMI".
+- sw.js: `CACHE` 'soundlab2-v6'; ASSETS unchanged.
+- No new suite. `trim` also checks the three redirects, that no pill reads
+  Trainer, Synth or LUMI, and #tr-ear-go (Piano and Drums); the fold checks
+  are in nav, smoke, context-global, keys, learn-instruments, practiceplan,
+  remote-keys, remote-runners, remote-plan, lumi-practice, display-master.
+- NOT THE TRAINER (PLAN.md Appendix C): the metronome's tempo trainer
+  (met.trainer) and the Circle page's degree ear quiz are other features.
+  DEFERRED, do not build in Phase A (PLAN.md section 9): one merged sound
+  list (piano tones + synths), LUMI targets as lesson types, the chord
+  changes as a real Exercises drill, a home for the LUMI display-output
+  choice in Lights & help.
+
 ## Cross-module conventions
 
-- BACK TO BASICS (v0.68.0): 'synth' is a page registered by piano.js: it
-  BORROWS the Keys page's DOM (children reparented on show/hide) with the
-  voice forced to a synth preset (pn.synthPreset) — one keyboard, two pills.
 - SECTION TAB BAR (v0.70.0; app.js GROUPS + populateNav): the main nav is a
   tab bar of GROUPS (icon + label), not a drop-down — Learn (quiz=Exercises
   HOME/chords/theory/practiceplan), Guitar (fretboard/tab/notation/helix),
-  Keys (piano/chart/synth/pads/lumipractice), SYNTH (1.3: deck/liveset/
-  midihub), Play (songs/jam), Train (shed/trainer/tuner; 1.3: the Practice
-  tab became Train).
+  Keys (piano/chart/pads), SYNTH (1.3: deck/liveset/midihub), Play
+  (songs/jam), Train (shed/tuner; 1.3: the Practice tab became Train).
   Rendered twice: #tabbar inside the top bar (> 900px) and #tabbar-m fixed
   along the bottom (<= 900px) — #tabbar-m sits OUTSIDE <header> because the
   header's backdrop-filter / auto-hide transform would trap a fixed child.
@@ -830,8 +960,9 @@ A1 (Studio space, sequencer/arranger, sampler, plug-in API removed):
   from anywhere), `met:state` {running}, `met:beat` {beat} (context-bar
   transport button + pulse). Events: `tempo` {bpm, source} (met.bpm is the ONE
   shared tempo — always guard against echo via `source`), `jam:chord`,
-  `jam:stopped`, `fb:practice` {root?, scale?, bpm?} (Trainer prompt "Go" —
-  fretboard applies it, switches tabs, starts the runner), `fb:scale`
+  `jam:stopped`, `fb:practice` {root?, scale?, bpm?} (a Practice plan block,
+  a Free practice prompt's "Go" — fretboard applies it, switches tabs, starts
+  the runner), `fb:scale`
   {root, scale} (fretboard scale changed — chords page follows 7-note scales),
   `fb:set` {source, root?, scale?, mode?, pattern?, dir?} (Tab page pushes
   linked practice state; fretboard applies without switching tabs). The

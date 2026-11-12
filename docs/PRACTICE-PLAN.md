@@ -132,6 +132,40 @@ days are shared across soundLAB on this browser/device; the displayed completed
 blocks belong to the selected student. They are different measures and should
 not be interpreted as isolated student practice minutes.
 
+## Free practice
+
+Below the plan is one collapsed section, **Free practice: timer, prompts,
+one-minute chord changes**. It holds the cards of the former Trainer page
+(soundLAB 2.0, Phase A). They are tools for practice outside the plan. None of
+them is a plan block and none of them completes one.
+
+| Card | What it does | Stored as |
+| --- | --- | --- |
+| Practice session log | A stopwatch with a label: Start, Pause, Finish. Finished sessions are listed, with the minutes of the last seven days. | `tr.sessions` |
+| Random practice prompts | A random key, mode, chord or challenge. **Go → Fretboard** shows when the fretboard can set the prompt up, and starts the scale runner (`fb:practice`). | nothing |
+| One-minute chord changes | Pick two chords and count your changes for 60 seconds, by button, Space or the pedal. Keeps the best count per pair. | `tr.ccA`, `tr.ccB`, `tr.best.<A>-<B>` |
+| Ear training | A button that opens Exercises › Intervals › All intervals › Ear. If the selected Learn instrument has no ear mode (Drums), it says so and stays on this page. | nothing |
+
+- **The timer is your own clock.** It pauses when you leave the Plan page. It
+  is separate from the plan's measured minutes: it never completes a block and
+  never adds to the recorded minutes of the week.
+- **Earlier Trainer data carries over.** Sessions, chord pairs and best counts
+  use the same keys as before. The old interval ear trainer is gone; its best
+  streak is not turned into Exercises records.
+- **Pedal and keys.** During a chord run, Next and Space count a change. Stop
+  ends the run; with no run it pauses the timer. At any other time the pedal
+  launches plan blocks as before. See [Hands-free control](CONTROLLER-REMOTE.md).
+- **If the app last closed on the Trainer page**, it opens the Plan page and
+  says where the cards went.
+
+For developers: `js/trainer.js` is a card library, not a page. The Plan page
+appends `<details class="pp-tools" id="pp-tools">` after its `.pp-wrap` block,
+calls `App.trainerCards.mount()` with `#pp-tools-body` at the end of `init`, and
+forwards page show and hide, the Space key and the remote (`show`, `hide`,
+`key`, `remote`). The section sits outside `.pp-wrap` on purpose: the Plan's
+form rules are scoped to `.pp-wrap` and would restyle the cards. Card ids keep
+the `tr-` prefix.
+
 ## Local plans, history, and gaps
 
 - `pp.students`: student IDs/names, saved Doc bookmarks, selected instrument,
