@@ -280,7 +280,9 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
 
 /* corner tools: help, settings, the clef, lights, metronome — the five
    icons are quiet borderless squares (one size, one icon size), so the
-   corner reads as one toolset instead of five equal-weight boxes */
+   corner reads as one toolset instead of five equal-weight boxes. In front
+   of them sits the one worded button: the link to the other app
+   (soundLAB <-> soundLAB Gear, #app-switch) */
 .tb-tools { margin-left: auto; display: flex; align-items: center; gap: 6px; }
 .tb-tools .btn { height: var(--h-ctl); padding-top: 0; padding-bottom: 0; }
 .icon-btn { display: inline-flex; align-items: center; justify-content: center; }
@@ -288,6 +290,10 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
 .tb-tools .icon-btn { background: transparent; border-color: transparent; box-shadow: none; color: var(--label); }
 @media (hover: hover) { .tb-tools .icon-btn:hover { background: var(--card2); border-color: var(--ctl-border); color: var(--text); } }
 .tb-tools .icon-btn .ic { width: 20px; height: 20px; } /* one icon size, whatever App.icon was asked for */
+/* the link across is an <a>: centre its word like a button does. Empty until
+   app.js fills it, hidden in the claude.ai preview */
+#app-switch { display: inline-flex; align-items: center; white-space: nowrap; }
+#app-switch:empty, #app-switch[hidden] { display: none; }
 #met-btn.on { color: var(--accent-ink); border-color: var(--accent-line); }
 #met-btn.tick { box-shadow: 0 0 14px var(--accent-glow), inset 0 0 6px var(--accent-glow); }
 #met-btn.active, #settings-btn.active, #lights-btn.active, #ctx-btn.active { color: var(--accent-ink); background: var(--accent-soft); border-color: var(--accent-line); }
@@ -620,6 +626,7 @@ details.tips > :not(summary) { margin-top: 4px; line-height: 1.55; }
    .btn (40) and .btn.big stay the larger tiers for primary actions */
 .btn.sm, .chip { min-height: var(--h-ctl); }
 .btn[disabled] { opacity: 0.4; cursor: default; }
+a.btn { text-decoration: none; } /* a link dressed as a button (the header's way to the other app) */
 
 /* ---------- form controls ---------- */
 
@@ -950,12 +957,17 @@ button .ic, .chip .ic { display: inline-block; }
   .brand .tag { display: none; }
   .brand { font-size: 21px; }
   .wordmark { height: 21px; }
-  /* logo + five icons on ONE row down to 360 px */
+  /* logo + the link across + five icons on ONE row down to 360 px */
   .tb-tools { gap: 2px; }
 }
-/* 360-380 px phones: five corner controls still share the logo's row */
+/* 360-380 px phones: the corner controls still share the logo's row */
 @media (max-width: 380px) {
   .tb-tools .icon-btn { width: 34px; height: 34px; }
+}
+/* soundLAB Gear on narrow phones: its link is the longer word ("soundLAB"),
+   so it is set tighter to stay on that row (soundLAB's "Gear" fits as it is) */
+@media (max-width: 420px) {
+  html[data-app="gear"] #app-switch { padding: 0 4px; font-size: 12px; letter-spacing: 0; }
 }
 @media (max-width: 640px) {
   /* the clef dropdown spans the screen: Key | Scale, then BPM | Time | ▶ */

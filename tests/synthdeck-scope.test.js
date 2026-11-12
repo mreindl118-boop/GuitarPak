@@ -5,6 +5,8 @@
 // (js/synthdeck.js) is present, else mounts SLSynthScope standalone into a box
 // under #panel-midihub with SLMidiHub.api — the same checks either way, none
 // of them waiting on rAF or the wall clock.
+// 2.0 Phase A3b: the scope is loaded by gear.html (soundLAB Gear, env.GEAR_URL), which boots on
+// the Deck page; "another page" is Gear's Helix page (a soundLAB page id would leave for index.html).
 const { chromium } = require('playwright');
 const path = require('path'), fs = require('fs');
 const env = require('./env');
@@ -30,13 +32,13 @@ const J = JSON.stringify;
     window.__recv = (bytes) => inp.onmidimessage({ data: new Uint8Array(bytes) });
     window.__sentAll = () => window.__by.out1.length + window.__by.lumi.length;
   });
-  // the module is normally loaded by index.html; inject it only when the page does not include it yet
-  const html = fs.readFileSync(path.join(env.ROOT, 'index.html'), 'utf8');
-  if (!/js\/synthdeck-scope\.js/.test(html)) { console.log('  (index.html lacks js/synthdeck-scope.js — injecting it)'); await ctx.addInitScript({ path: path.join(env.ROOT, 'js', 'synthdeck-scope.js') }); }
+  // the module is normally loaded by gear.html; inject it only when the page does not include it yet
+  const html = fs.readFileSync(path.join(env.ROOT, 'gear.html'), 'utf8');
+  if (!/js\/synthdeck-scope\.js/.test(html)) { console.log('  (gear.html lacks js/synthdeck-scope.js — injecting it)'); await ctx.addInitScript({ path: path.join(env.ROOT, 'js', 'synthdeck-scope.js') }); }
   const page = await ctx.newPage(), errs = [];
   page.on('pageerror', e => errs.push(e.message));
-  await page.goto(env.URL);
-  await page.waitForFunction(() => window.App && App.midi && App.midi.ready && App.midi.hasOutput && App.active === 'quiz');
+  await page.goto(env.GEAR_URL);
+  await page.waitForFunction(() => window.App && App.midi && App.midi.ready && App.midi.hasOutput && App.active === 'deck');
 
   console.log('# mount (deck or standalone) + silence');
   const m = await page.evaluate(() => {
@@ -187,7 +189,7 @@ const J = JSON.stringify;
     o.r3 = __sc.running();
     delete document.hidden; document.dispatchEvent(new Event('visibilitychange'));
     o.r4 = __sc.running();
-    App.switchTo('piano'); __sc.leave(); o.r5 = __sc.running();
+    App.switchTo('helix'); __sc.leave(); o.r5 = __sc.running(); // another page of soundLAB Gear
     App.switchTo('midihub'); __sc.back(); o.r6 = __sc.running();
     return o;
   });

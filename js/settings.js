@@ -5,6 +5,7 @@
   'use strict';
 
   var audioUI = null; // the Sound input card's meter (set by init)
+  var hubRules = null; // the MIDI keyboard card's "MIDI Hub rules" line (set by init)
 
   function init(rootEl) {
     App.injectCSS('settings',
@@ -132,6 +133,8 @@
           '<button type="button" class="btn sm primary" id="set-midi-enable">Connect MIDI</button>' +
           '<span class="muted small" id="set-midi-msg" role="status"></span>' +
         '</div>' +
+        // MIDI Hub rules that change what soundLAB hears (js/midirules.js; paintRules fills it)
+        '<div class="muted small set-theme-note" id="set-midi-rules" hidden></div>' +
         '<div id="set-midi-ports" style="display:none">' +
           '<div class="set-gear" id="set-midi-gear"></div>' +
           '<div class="row" style="margin-top:12px">' +
@@ -171,7 +174,8 @@
       // the controller remote (js/remote.js renders the rows)
       '<div class="card" id="set-remote-card">' +
         '<h2>Hands-free control</h2>' +
-        '<div class="muted small">Move practice on from the instrument: a pedal, a button on your synth or a page-turner pedal does Next, Back and Stop on Exercises, Keys lessons and LUMI practice on the Piano page, the Woodshed, the Practice plan and its one-minute chord changes, Songs, the fretboard runner, Live sets and the Deck.</div>' +
+        '<div class="muted small">Move practice on from the instrument: a pedal, a button on your synth or a page-turner pedal does Next, Back and Stop on Exercises, Keys lessons and LUMI practice on the Piano page, the Woodshed, the Practice plan and its one-minute chord changes, Songs and the fretboard runner, and on Live sets and the Deck in soundLAB Gear. ' +
+          'With soundLAB and Gear both on screen, a MIDI pedal or synth button works in soundLAB. Gear answers it when soundLAB is hidden or closed.</div>' +
         '<div id="set-remote"></div>' +
       '</div>' +
       '<div class="card" id="set-audio-card">' +
@@ -774,7 +778,7 @@
         var nm = p.name || 'MIDI device', role;
         if (App.midi.selfSounding(nm)) role = App.midi.voice === 'on' ? 'makes its own sound' : 'makes its own sound, so soundLAB stays quiet';
         else if (/lumi/i.test(nm)) role = 'key lights';
-        else if (/helix|stadium|line 6/i.test(nm)) role = 'Helix (use the Helix page)';
+        else if (/helix|stadium|line 6/i.test(nm)) role = 'Helix (in soundLAB Gear)';
         else role = App.midi.voice === 'off' ? 'notes only' : 'plays soundLAB';
         return '<span class="set-chip"><b>' + esc(nm.replace(/\s*MIDI\s*\d*$/i, '').slice(0, 28)) + '</b> ' + esc(role) + '</span>';
       });
@@ -837,6 +841,31 @@
 
     document.getElementById('set-open-lights').addEventListener('click', function () { App.switchTo('lights'); });
 
+    // ---- MIDI Hub rules (js/midirules.js) ----
+    // The Hub's "Apply to what soundLAB hears" box keeps working here, but the
+    // Hub and its Rules editor are in soundLAB Gear (gear.html). While the box
+    // is on and at least one rule is enabled, this line is the one sign in
+    // soundLAB that the incoming notes are being changed. Painted when
+    // Settings opens and on 'midirules:state' (the box was ticked or cleared,
+    // also from a Gear window).
+    var rulesEl = document.getElementById('set-midi-rules');
+    function paintRules() {
+      if (!rulesEl) return;
+      var a = App.midiRules && App.midiRules.active ? App.midiRules.active() : null;
+      var count = a && a.on ? a.rules : 0;
+      rulesEl.hidden = !count;
+      if (rulesEl.getAttribute('data-rules') === String(count)) return; // same line: leave the button alone
+      rulesEl.setAttribute('data-rules', String(count));
+      rulesEl.innerHTML = !count ? '' :
+        'MIDI Hub rules are changing what soundLAB hears (' + count + (count === 1 ? ' rule' : ' rules') + '). Edit them in soundLAB Gear. ' +
+        '<button type="button" class="btn sm" id="set-midi-rules-go">Open the Hub</button>';
+    }
+    // the button leaves for gear.html#midihub (App.goApp: a plain navigation)
+    rulesEl.addEventListener('click', function (e) { if (e.target.closest('#set-midi-rules-go')) App.goApp('gear', 'midihub'); });
+    App.on('midirules:state', paintRules);
+    paintRules();
+    hubRules = { paint: paintRules };
+
     document.getElementById('set-backup-out').addEventListener('click', function () {
       var out = {};
       for (var i = 0; i < localStorage.length; i++) {
@@ -893,6 +922,7 @@
     onShow: function () {
       if (audioUI) audioUI.show();
       if (App.remote) App.remote.paint();
+      if (hubRules) hubRules.paint(); // the rules are edited in soundLAB Gear: count them again
       // dynamic prefs may have changed elsewhere (wake from code, volume) —
       // re-read them when the page opens
       var w = document.getElementById('set-wake');

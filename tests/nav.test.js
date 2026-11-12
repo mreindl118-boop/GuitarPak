@@ -30,20 +30,20 @@ const tabs = sel => [...document.querySelectorAll(sel + ' .tabbar-btn')].map(b =
     botShown: getComputedStyle(document.getElementById('tabbar-m')).display !== 'none',
     active: (document.querySelector('#tabbar .tabbar-btn.active') || {}).textContent,
     noSelect: !document.getElementById('nav-select'),
-    metTab: [...document.querySelectorAll('.tabbar-btn, .subtab')].some(x => /metronome/i.test(x.textContent))
+    metTab: [...document.querySelectorAll('.tabbar-btn, .subtab')].some(x => /metronome/i.test(x.textContent)),
+    // the way across to soundLAB Gear: a real link in the header
+    gear: (a => a ? { tag: a.tagName, href: a.getAttribute('href'), text: a.textContent.trim(), label: a.getAttribute('aria-label'), shown: !a.hidden && a.getBoundingClientRect().width > 0 } : null)(document.getElementById('app-switch'))
   }));
-  ok(d1.tabs.join('|') === 'Learn|Guitar|Keys|Synth|Play|Train' && d1.active === 'Learn', 'sections (1.3: Synth is its own tab): ' + d1.tabs.join('|') + ' (active ' + d1.active + ')');
+  ok(d1.tabs.join('|') === 'Learn|Guitar|Keys|Play|Train' && d1.active === 'Learn', 'sections (2.0: five tabs; Synth and Helix are soundLAB Gear): ' + d1.tabs.join('|') + ' (active ' + d1.active + ')');
+  ok(d1.gear && d1.gear.tag === 'A' && d1.gear.href === 'gear.html' && d1.gear.text === 'Gear' && d1.gear.label === 'Open soundLAB Gear' && d1.gear.shown, 'the header has a "Gear" link to gear.html (#app-switch): ' + JSON.stringify(d1.gear));
   ok(d1.topShown && !d1.botShown && d1.noSelect && !d1.metTab, 'top tab bar on desktop, no drop-down, no metronome tab: ' + JSON.stringify(d1));
   const clickTab = async (label, sel) => { await page.click((sel || '#tabbar') + ' .tabbar-btn:has-text("' + label + '")'); await page.waitForTimeout(120); return page.evaluate(() => App.active); };
   ok(await clickTab('Keys') === 'piano', 'Keys tab opens the piano');
   ok((await page.evaluate(() => [...document.querySelectorAll('#subnav .subtab')].map(b => b.textContent).join('|'))) === 'Piano|Charts|Pads', 'Keys pills: Piano | Charts | Pads (2.0: synth sounds are the Sound picker on Piano, LUMI practice a section under its lessons)');
-  ok(await clickTab('Synth') === 'deck' && (await page.evaluate(() => [...document.querySelectorAll('#subnav .subtab')].map(b => b.textContent).join('|'))) === 'Deck|Live|Hub' && (await page.evaluate(() => window.SLSynthTab && SLSynthTab.borrowed())), 'Synth tab opens the Deck with pills Deck|Live|Hub, borrowing the Hub Control view');
-  ok((await page.evaluate(async () => { App.switchTo('midihub'); await new Promise(r => setTimeout(r, 150)); return [App.active, !!document.querySelector('#panel-midihub .mh-view[data-view="control"]'), SLSynthTab.borrowed()].join(); })) === 'midihub,true,false', 'leaving the Deck gives the Control view back to the Hub');
-  await clickTab('Keys'); // back from the Synth tab to the Keys pills
   await page.click('#subnav .subtab:has-text("Charts")'); await page.waitForTimeout(150);
   ok(await page.evaluate(() => App.active) === 'chart', 'Charts is a page under Keys');
   ok(await clickTab('Guitar') === 'fretboard', 'Guitar tab opens the neck');
-  ok((await page.evaluate(() => [...document.querySelectorAll('#subnav .subtab')].map(b => b.textContent).join('|'))) === 'Neck|Tab|Notation|Helix', 'Guitar pills: Neck | Tab | Notation | Helix');
+  ok((await page.evaluate(() => [...document.querySelectorAll('#subnav .subtab')].map(b => b.textContent).join('|'))) === 'Neck|Tab|Notation', 'Guitar pills: Neck | Tab | Notation (2.0: Helix is soundLAB Gear)');
   ok(await clickTab('Keys') === 'chart', 'Keys remembers the last page (Charts)');
   await page.click('#subnav .subtab:has-text("Piano")'); await page.waitForTimeout(150); // the scroll check below wants the tall Piano page
   ok(await clickTab('Train') === 'shed', 'Train opens the Woodshed');
@@ -135,7 +135,7 @@ const tabs = sel => [...document.querySelectorAll(sel + ' .tabbar-btn')].map(b =
       barBottom: Math.round(bar.bottom), vh: window.innerHeight, n: document.querySelectorAll('#tabbar-m .tabbar-btn').length,
       oneRow: Math.abs(met.top - brand.top) < 24, metRight: Math.round(window.innerWidth - met.right) };
   });
-  ok(m1.botShown && !m1.topShown && m1.barBottom === m1.vh && m1.n === 6 && m1.oneRow, 'phone: six tabs fixed along the bottom in one row: ' + JSON.stringify(m1));
+  ok(m1.botShown && !m1.topShown && m1.barBottom === m1.vh && m1.n === 5 && m1.oneRow, 'phone: five tabs fixed along the bottom in one row: ' + JSON.stringify(m1));
   ok(m1.oneRow && m1.metRight < 20, 'phone: logo and corner icons share one row, metronome in the corner: ' + JSON.stringify(m1));
   await page.evaluate(() => App.switchTo('fretboard')); await page.waitForTimeout(150);
   await page.tap('#ctx-btn'); await page.waitForTimeout(200);

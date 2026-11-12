@@ -7,6 +7,13 @@
  * gently until you've taken your first tour. First launch shows a welcome
  * card automatically. Nothing here blocks the app — tap anywhere outside the
  * card to leave.
+ *
+ * ONE FILE FOR BOTH APPS (2.0 Phase A3b): index.html (soundLAB) and gear.html
+ * (soundLAB Gear) load it. TOURS is keyed by page id, so each app shows the
+ * tours of its own pages (deck, liveset, midihub and helix are Gear pages)
+ * and the two sheets' tours in both. The welcome card is about soundLAB's
+ * pages: Gear never shows it and leaves help.seen alone, so soundLAB still
+ * says hello on its own first start.
  */
 (function () {
   'use strict';
@@ -50,7 +57,9 @@
       { sel: '#pn-lumi', t: 'Notes and triads on the LUMI', x: 'Under the lessons, closed until you open it. It shows a note or a triad to play and moves on when you play exactly those notes. It starts with on-screen answers; a connected LUMI or MODX can be the answer keyboard. While the section is open, the pedal and the double-tap key work here. Starting a lesson or the runner closes it.' }
     ],
     songs: [
-      { t: 'Songs', x: 'Bring your own music: paste an ASCII guitar tab (the six-line kind from any tab site) or import a MIDI file. soundLAB detects the key, and you can loop any bars at your own tempo to practice them.' }
+      { t: 'Songs', x: 'Bring your own music: paste an ASCII guitar tab (the six-line kind from any tab site) or import a MIDI file. soundLAB detects the key, and you can loop any bars at your own tempo to practice them.' },
+      // #sg-player is hidden until a file is sent to it: the step is then a centered card
+      { sel: '#sg-player', t: 'Player', x: 'Choose a file under Open a score, then Play on synth: the Player opens under that card and plays the file on your synth. Change the tempo, cap the loudest note, transpose, or use Change key to move the piece into another key or scale. Only notes and the sustain pedal are sent, so your synth’s sounds stay as they are. No synth listed? Open Settings on the card takes you to where you connect your keyboard.' }
     ],
     jam: [
       { t: 'Jam', x: 'Your backing band. Pick a genre and it writes a whole song — intro, verse, chorus, ending — in YOUR key. Change the key up top and the band re-harmonizes live, even mid-song.' },
@@ -90,18 +99,17 @@
       { sel: '.st-lvprof', t: 'Profiles', x: 'A profile is a whole setup: your sounds, sets and Deck settings. Make one per player or per gig, export it as a file, import it on another device.' }
     ],
     midihub: [
-      { sel: '#mh-views', t: 'Player', x: 'Open a MIDI or MusicXML file and play it on your synth: tempo, a loudest-note cap, transpose, and Change key to move a piece into any key or scale. Open as tab turns it into guitar tab on the Songs page.' },
+      { sel: '#mh-views', t: 'Player', x: 'Open a MIDI or MusicXML file and play it on your synth: tempo, a loudest-note cap, transpose, and Change key to move a piece into any key or scale. To see a file as guitar tab, open it on the Songs page in soundLAB.' },
       { sel: '#mh-views', t: 'Control your synth', x: 'Control is the Synth Deck: your current sound at the top, the big knobs (filter, envelope, effects, volume), buttons for scenes, arpeggiator and Motion Sequencer, sounds you save and load with one tap, and a Scope that draws what the synth is playing. Your synth’s own knobs move the ones here too.' },
       { sel: '#sdk-now', t: 'Your current sound', x: 'The name, Part and program the synth is on, and the port it goes to. Prev and Next step through programs, the star pins a sound up here, Save sound keeps the program plus the knobs and buttons as they are now. Nothing is sent until you tap a sound.' },
       { sel: '#sdk-tabs', t: 'Knobs · Buttons · Sounds · Scope · Map', x: 'Knobs adds pages of extra knobs. Buttons has scenes, arp and Motion Sequencer switches, Part mute and the pedals. Sounds is your library and the synth’s banks by name. Scope shows the arpeggiator and sequencer notes against the beat and the controller curves the synth sends. Map is where every number lives: a ? means it came from documentation, so tap Learn and move the control on the synth to make it yours.' },
       { t: 'MIDI Hub', x: 'Everything on the MIDI cable, for any device: a synth, a controller, a DAW port. Connect, pick In and Out, and the Monitor shows every message decoded as you play or turn knobs.' },
       { sel: '#mh-views', t: 'Eight views', x: 'Player plays a MIDI or MusicXML file on the synth. Play sends notes, bend, mod and program changes. Controls is a wall of CC sliders plus transport and clock. Rules reshape messages. SysEx talks to the deep settings. Monitor reads everything. Learn explains it all.' },
-      { sel: '#mh-hear', t: 'Only the device sounds', x: 'While this page is open soundLAB keeps its own piano quiet, so a synth is never doubled. Tick App voice to hear both. For every other page the same switch lives in Settings › MIDI keyboard.' },
-      { sel: '#mh-thru', t: 'Thru and Rules', x: 'Thru passes In to Out through your Rules — remap a knob, transpose, force a channel, block aftertouch. Rules can also change what soundLAB itself hears, on every page.' },
+      { sel: '#mh-thru', t: 'Thru and Rules', x: 'Thru passes In to Out through your Rules — remap a knob, transpose, force a channel, block aftertouch. Thru runs while soundLAB Gear is open: keep this window open to pass your keyboard to the synth. Rules can also change what soundLAB hears, on every page.' },
       { sel: '#mh-profile', t: 'Device profiles', x: 'Generic speaks plain MIDI to anything. A profile adds named knobs and ready-made SysEx builders for that maker (Yamaha MODX/MONTAGE, Roland…) — nothing else changes.' }
     ],
     helix: [
-      { t: 'Helix Stadium', x: 'Control a Line 6 Helix Stadium from soundLAB. Over USB MIDI: presets, snapshots, knobs, pedals, looper and the Matrix mixer. With the bridge on this computer (node tools/helix-bridge.js) it also reads and edits the loaded preset block by block.' },
+      { t: 'Helix Stadium', x: 'Control a Line 6 Helix Stadium from soundLAB Gear. Over USB MIDI: presets, snapshots, knobs, pedals, looper and the Matrix mixer. With the bridge on this computer (node tools/helix-bridge.js) it also reads and edits the loaded preset block by block.' },
       { sel: '#hx-armrow', t: 'Nothing sends until you arm', x: 'Output starts disarmed. Arm opens a 90-second window that every command renews; leaving the page, hiding the app or switching windows disarms it again. Reads never need arming.' },
       { sel: '#hx-views', t: 'Six views', x: 'Rig is the pedalboard: presets, favorites, snapshots, knobs. Blocks edits the loaded preset live (bridge). Presets browses and loads (bridge). Looper & Song, Mixer, and a Monitor of every message.' },
       { sel: '#hx-favs', t: 'Favorites', x: 'Name a preset address once, recall it with one tap. With the bridge running, the star next to a preset fills in its address for you. Saving a favorite never sends anything.' }
@@ -206,7 +214,8 @@
     if (App.showBar) App.showBar(); // tours point at the top bar too
     close();
     steps = extraSteps || TOURS[page] || [
-      { t: 'This page', x: 'Explore freely — nothing here can break anything. The clef at the top (key, scale, tempo) is shared by every page, and the gear holds app-wide settings.' }
+      { t: 'This page', x: 'Explore freely — nothing here can break anything. The clef at the top (key, scale, tempo) is shared by every page, and the gear ' +
+        (App.app === 'gear' ? 'opens Settings in soundLAB.' : 'holds app-wide settings.') }
     ];
     idx = 0;
     ov = document.createElement('div');
@@ -259,8 +268,9 @@
       });
     }
 
-    // fresh install: say hello once
-    if (!store().get('help.seen', false)) {
+    // fresh install: say hello once. Not in soundLAB Gear: the welcome is
+    // about soundLAB's pages, and help.seen stays unset there
+    if (App.app !== 'gear' && !store().get('help.seen', false)) {
       store().set('help.seen', true);
       setTimeout(welcome, 700);
     }

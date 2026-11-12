@@ -1412,8 +1412,16 @@
     var r = App.store.get('fb.root', 9), s = App.store.get('fb.scale', 'minorPent'), m = App.store.get('fb.mode', 0);
     return { root: typeof r === 'number' ? ((r % 12) + 12) % 12 : 9, scale: typeof s === 'string' ? s : 'minorPent', mode: typeof m === 'number' ? m : 0 };
   }
+  // The store first, then the event, as the context bar does (js/app.js
+  // pushMusic). In soundLAB the Fretboard page used to write the key when it
+  // heard fb:set; soundLAB Gear loads no Fretboard, and everything that
+  // follows the event there (the context bar, the key lights, Scale Lock,
+  // the Hub's scale boundary) reads the key back from the store.
   function applyApp(app) {
     if (!app || typeof app.root !== 'number') return;
+    if (isFinite(app.root) && app.root >= 0 && app.root < 12) App.store.set('fb.root', Math.floor(app.root));
+    if (typeof app.scale === 'string' && window.Theory && Theory.SCALES && Theory.SCALES[app.scale]) App.store.set('fb.scale', app.scale);
+    if (typeof app.mode === 'number' && app.mode >= 1 && app.mode <= 7) App.store.set('fb.mode', Math.floor(app.mode));
     App.emit('fb:set', { source: 'synthdeck', root: app.root, scale: app.scale, mode: app.mode });
   }
   function openSaveForm(id) {

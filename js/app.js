@@ -27,6 +27,12 @@
  *                                     App.setPluckTone switches the tone.
  *   App.store.get(key, fallback) / App.store.set(key, value)   JSON localStorage
  *   App.injectCSS(id, cssText)        add module-specific styles once
+ *   App.app                           which of the two apps this document is:
+ *                                     'main' = soundLAB (index.html) | 'gear' =
+ *                                     soundLAB Gear (gear.html)
+ *   App.goApp(owner, page)            open a page of the other app
+ *                                     (App.switchTo does it for you when the
+ *                                     page id belongs to the other app)
  */
 window.App = (function () {
   'use strict';
@@ -34,12 +40,49 @@ window.App = (function () {
   var modules = {};
   var active = null;
   var audioCtx = null;
-  // One app, one page set: every page shares the clock, the key and the MIDI
+  // TWO APPS FROM ONE CODEBASE (docs/ROADMAP-2.0.md): index.html = soundLAB,
+  // gear.html = soundLAB Gear. The document says which one it is
+  // (<html data-app="gear">, or window.SL_APP where the tag is stripped) and
+  // everything below takes its pages from this one table.
+  // Per app, one page set: every page shares the clock, the key and the MIDI
   // service, and the context bar stays put. The first page is the home.
-  // Settings is deliberately NOT in the list: it's an overlay page opened by
-  // the ever-present gear in the header, from any page.
-  var PAGES = ['quiz', 'practiceplan', 'fretboard', 'tab', 'notation', 'helix', 'chords', 'piano', 'chart', 'pads', 'deck', 'liveset', 'midihub', 'songs', 'jam', 'shed', 'tuner', 'theory'];
-  var HOME = PAGES[0];
+  // Settings is deliberately NOT in a list: in soundLAB it's an overlay page
+  // opened by the ever-present gear in the header, from any page; soundLAB
+  // Gear has no Settings page, its gear opens index.html#settings.
+  // Tab GROUPS: related pages share one entry in the page menu; the members
+  // show as a sub-tab strip under the context bar. Pages/modules are untouched
+  // — this is navigation only, so cross-links (fb:practice) keep addressing
+  // pages by id and the owning group follows along.
+  // tabKey = where the last page is kept, opened again at the next start
+  // (one key per app, or each would reset the other's last page).
+  var APP_ID = (window.SL_APP || document.documentElement.getAttribute('data-app')) === 'gear' ? 'gear' : 'main';
+  if (APP_ID === 'gear') document.documentElement.setAttribute('data-app', 'gear'); // css keys on it; SL_APP alone has no tag
+  var APPS = {
+    main: { url: 'index.html', name: 'soundLAB', tabKey: 'app.tab',
+      pages: ['quiz', 'practiceplan', 'fretboard', 'tab', 'notation', 'chords', 'piano', 'chart', 'pads', 'songs', 'jam', 'shed', 'tuner', 'theory'],
+      groups: [
+        { id: 'gtheory', label: 'Learn', icon: 'learn', pages: ['quiz', 'chords', 'theory', 'practiceplan'] }, // Exercises = the home
+        { id: 'ginst', label: 'Guitar', icon: 'guitar', pages: ['fretboard', 'tab', 'notation'] },
+        { id: 'gkeys', label: 'Keys', icon: 'keys', pages: ['piano', 'chart', 'pads'] }, // synth sounds = the Sound picker on Piano; LUMI practice = a section under its lessons
+        { id: 'gplay', label: 'Play', icon: 'note', pages: ['songs', 'jam'] },
+        { id: 'gprac', label: 'Train', icon: 'target', pages: ['shed', 'tuner'] } // 1.3 (primer A1): the tab is called 'Train' // the game first
+      ] },
+    gear: { url: 'gear.html', name: 'soundLAB Gear', tabKey: 'gear.tab',
+      pages: ['deck', 'liveset', 'midihub', 'helix'],
+      groups: [
+        { id: 'gsynth', label: 'Synth', icon: 'sliders', pages: ['deck', 'liveset', 'midihub'] }, // the Synth tab (js/synthtab.js) - Deck / Live / Hub (= the MIDI Hub, js/midihub.js)
+        { id: 'ghelix', label: 'Helix', icon: 'guitar', pages: ['helix'] } // Helix Stadium (js/helix.js)
+      ] }
+  };
+  var PAGES = APPS[APP_ID].pages, GROUPS = APPS[APP_ID].groups, TAB_KEY = APPS[APP_ID].tabKey, HOME = PAGES[0];
+  // the app a page id belongs to (Settings is a soundLAB page); null = not a page
+  function appOf(name) { for (var k in APPS) if (APPS[k].pages.indexOf(name) !== -1) return k; return name === 'settings' ? 'main' : null; }
+  // leave for a page of the other app: a plain navigation, the #page is read by its boot
+  function goApp(owner, page) {
+    if (!APPS[owner]) return;
+    if (window.SL_ARTIFACT) { toast(APPS[owner].name + ' is not part of this preview.'); return; }
+    location.href = APPS[owner].url + (page ? '#' + page : '');
+  }
   var SPACE_LABELS = {
     metronome: 'Metronome', fretboard: 'Fretboard', tab: 'Tab', notation: 'Notation',
     chords: 'Chords', piano: 'Piano', songs: 'Songs', jam: 'Jam', tuner: 'Tuner',
@@ -50,19 +93,8 @@ window.App = (function () {
   // overlays live outside the page list: the metronome opens as a SHEET over
   // whatever page you're on (corner icon), settings toggles in place (gear)
   var PANEL_ORDER = PAGES.concat(['metronome', 'lights', 'settings']);
-  // Tab GROUPS: related pages share one entry in the page menu; the members
-  // show as a sub-tab strip under the context bar. Pages/modules are untouched
-  // — this is navigation only, so cross-links (fb:practice) keep addressing
-  // pages by id and the owning group follows along.
-  var GROUPS = [
-    { id: 'gtheory', label: 'Learn', icon: 'learn', pages: ['quiz', 'chords', 'theory', 'practiceplan'] }, // Exercises = the home
-    { id: 'ginst', label: 'Guitar', icon: 'guitar', pages: ['fretboard', 'tab', 'notation', 'helix'] }, // helix = Helix Stadium (js/helix.js)
-    { id: 'gkeys', label: 'Keys', icon: 'keys', pages: ['piano', 'chart', 'pads'] }, // synth sounds = the Sound picker on Piano; LUMI practice = a section under its lessons
-    { id: 'gsynth', label: 'Synth', icon: 'sliders', pages: ['deck', 'liveset', 'midihub'] }, // 1.3: the Synth tab (js/synthtab.js) - Deck / Live / Hub (= the MIDI Hub, js/midihub.js)
-    { id: 'gplay', label: 'Play', icon: 'note', pages: ['songs', 'jam'] },
-    { id: 'gprac', label: 'Train', icon: 'target', pages: ['shed', 'tuner'] } // 1.3 (primer A1): the tab is called 'Train' // the game first
-  ];
-  // short member names for the strip (fall back to SPACE_LABELS)
+  // short member names for the strip (fall back to SPACE_LABELS); like
+  // SPACE_LABELS, one table for both apps
   var SUB_LABELS = {
     fretboard: 'Neck', tab: 'Tab', notation: 'Notation', piano: 'Piano',
     chords: 'Chords', theory: 'Circle', songs: 'Songs', jam: 'Jam',
@@ -675,8 +707,6 @@ window.App = (function () {
     get active() { return wakeCount > 0; }
   };
 
-  var TAB_KEY = 'app.tab'; // the last page, opened again at the next start
-
   // SECTION TAB BAR — the app's main navigation: one tab per group of
   // pages (icon + label). Rendered twice: in the top bar on wide
   // screens and fixed along the bottom on phones / portrait tablets (CSS
@@ -735,18 +765,46 @@ window.App = (function () {
     synth:   { to: 'piano', say: 'Synth sounds are in the Sound picker on the Piano page.' },
     lumipractice: { to: 'piano', say: 'LUMI practice is on the Piano page now, under the lessons.' }
   };
-  // an id that is not a page of this app (an old link, a stored tab) goes
-  // where MOVED says, and otherwise to the home page — never to a blank screen
+  // the OTHER app, when that is where an id lives: one of its pages, Settings
+  // seen from soundLAB Gear, or an old id whose new home is over there
+  // (Gear: 'synth' -> the Piano page). null = it belongs here, or nowhere.
+  function otherApp(name) {
+    var owner = appOf(name), mv = MOVED[name];
+    if (!owner && mv && mv.to) owner = appOf(mv.to);
+    return owner && owner !== APP_ID ? owner : null;
+  }
+  // an id that is not a page of this app (an old link, a stored tab): a page
+  // of the other app opens there (null: on its way, nothing to show here —
+  // an old id travels as it is, so the sentence is said where you land);
+  // anything else goes where MOVED says, and otherwise to the home page —
+  // never to a blank screen
   function resolvePage(name) {
-    if (name === 'settings' || SHEETS[name] || PAGES.indexOf(name) !== -1) return name;
+    if (SHEETS[name] || PAGES.indexOf(name) !== -1 || (name === 'settings' && APP_ID === 'main')) return name;
+    var owner = otherApp(name);
+    if (owner) { goApp(owner, name); return null; }
     var mv = MOVED[name];
     if (mv && mv.say) toast(mv.say);
     return (mv && mv.to) || HOME;
+  }
+  // #page in the address (gear.html#midihub, index.html#settings): how one
+  // app links to a page of the other (goApp), and a way to open one page
+  // from a bookmark. '' = no hash, or nothing that could be a page id.
+  function hashPage() {
+    var h = '';
+    try { h = decodeURIComponent(String(location.hash || '').slice(1)); } catch (e) { h = ''; }
+    return /^[a-z][a-z0-9_-]*$/.test(h) ? h : '';
+  }
+  // ...and can THIS app open it: Settings (soundLAB), one of its pages, or
+  // an old id that MOVED knows. Anything else is left in the address, unused.
+  function hashHere(h) {
+    return !!h && !otherApp(h) && ((h === 'settings' && APP_ID === 'main') || PAGES.indexOf(h) !== -1 ||
+      Object.prototype.hasOwnProperty.call(MOVED, h));
   }
 
   function switchTo(name) {
     if (sheet && !SHEETS[name]) closeSheet(); // going somewhere: the overlay steps aside
     name = resolvePage(name);
+    if (name == null) return; // a page of the other app: goApp has it
     if (name === active) return;
     // settings is not in the page list: overlay in place, no nav entry
     if (name === 'settings') {
@@ -1143,23 +1201,53 @@ window.App = (function () {
     try { return typeof m.remoteKey === 'function' ? !!m.remoteKey() : !!m.remoteKey; } catch (e) { return false; }
   }
   function dropBackHint() { if (backHint) { backHint.remove(); backHint = null; } }
-  function wireBack() {
-    try { history.replaceState({ sl: 'base' }, ''); } catch (e) { return; }
+  // cleanUrl: this address without the #page that boot has just used, so a
+  // reload does not apply it again
+  function wireBack(cleanUrl) {
+    try {
+      if (cleanUrl) history.replaceState({ sl: 'base' }, '', cleanUrl);
+      else history.replaceState({ sl: 'base' }, '');
+    } catch (e) { return; }
     backWired = true;
     guardUp();
-    window.addEventListener('popstate', function () {
+    window.addEventListener('popstate', function (e) {
+      // a #page typed into the address of the open app makes a history entry
+      // of its own (no state of ours) and fires this too: not a Back press,
+      // wireHash takes it
+      if (!e.state || !e.state.sl) return;
       guarded = false;
       dropBackHint();
       if (backStep()) { guardUp(); return; }
       backHint = document.createElement('div');
       backHint.id = 'back-hint';
       backHint.setAttribute('role', 'status');
-      backHint.textContent = 'Press Back again to leave soundLAB.';
+      backHint.textContent = 'Press Back again to leave ' + APPS[APP_ID].name + '.';
       document.body.appendChild(backHint);
       setTimeout(dropBackHint, 2500);
     });
     // any tap after that re-arms the guard, so Back works again in-app
     document.addEventListener('pointerdown', function () { if (!guarded) { dropBackHint(); guardUp(); } }, true);
+  }
+
+  // #page while the app is open (an address typed, a bookmark opened in this
+  // window): the page changes, the document stays. Boot handles the same
+  // hash at the start.
+  function wireHash() {
+    window.addEventListener('hashchange', function () {
+      var h = hashPage(), across = h ? otherApp(h) : null;
+      if (across) {
+        if (window.SL_ARTIFACT) goApp(across, h); // says it is not part of the preview
+        else location.replace(APPS[across].url + '#' + h);
+        return;
+      }
+      if (!hashHere(h)) return;
+      // the new entry takes over as the Back guard, with a clean address
+      try {
+        history.replaceState({ sl: 'top' }, '', location.href.replace(/#.*$/, ''));
+        if (backWired) guarded = true;
+      } catch (e) { /* a frame without history: the hash stays */ }
+      switchTo(h);
+    });
   }
 
   function wireSheets() {
@@ -1461,6 +1549,7 @@ window.App = (function () {
     }
     document.addEventListener('pointerdown', warm, true);
     document.addEventListener('keydown', warm, true);
+    if (APP_ID === 'gear') return; // no app voice there: a played key has nothing to turn on
     on('midi:note', function (d) {
       if (!d || !d.on || d.silent || d.mute || unlocked() || hint) return;
       hint = document.createElement('div');
@@ -1472,6 +1561,14 @@ window.App = (function () {
   }
 
   function boot() {
+    // #page (hashPage): a page of the other app is opened there, before
+    // anything starts here; Settings or a page of this app is opened below,
+    // once the stored page is known
+    var hash = hashPage(), across = hash ? otherApp(hash) : null;
+    if (across && !window.SL_ARTIFACT) { location.replace(APPS[across].url + '#' + hash); return; }
+    var hashSettings = hash === 'settings' && hashHere(hash);
+    var hashTab = !hashSettings && hashHere(hash) ? hash : null; // a page, or an old id (MOVED says where it went)
+
     PANEL_ORDER.forEach(function (name) {
       var el = document.getElementById('panel-' + name);
       var mod = modules[name];
@@ -1540,23 +1637,72 @@ window.App = (function () {
     wireAudioWarmup();
     wireAutoHideBar();
     wireSheets();
-    wireBack();
+    wireBack(hashSettings || hashTab ? location.href.replace(/#.*$/, '') : '');
+    wireHash();
 
     var gearBtn = document.getElementById('settings-btn');
     if (gearBtn) {
       gearBtn.innerHTML = icon('gear', 16);
+      if (APP_ID === 'gear') { // Settings is a soundLAB page: the gear goes across (resolvePage)
+        gearBtn.title = 'Settings (in soundLAB)';
+        gearBtn.setAttribute('aria-label', 'Settings, in soundLAB');
+      }
       gearBtn.addEventListener('click', function () {
         toggleSettings();
         this.blur();
       });
     }
 
+    // the way across: a real link, so it also opens in a second window for
+    // side-by-side use. Not in the claude.ai preview (soundLAB only, no MIDI).
+    var swLink = document.getElementById('app-switch');
+    if (swLink) {
+      var other = APPS[APP_ID === 'gear' ? 'main' : 'gear'];
+      if (window.SL_ARTIFACT) swLink.hidden = true;
+      else {
+        swLink.href = other.url;
+        swLink.textContent = APP_ID === 'gear' ? 'soundLAB' : 'Gear';
+        swLink.title = 'Open ' + other.name;
+        swLink.setAttribute('aria-label', 'Open ' + other.name);
+      }
+    }
+
     populateNav();
     // the last page comes back; a stored id that is no longer a page goes
-    // where MOVED says or home, and an overlay (a sheet) is never a start page
-    var startTab = resolvePage(store.get(TAB_KEY, HOME));
+    // where MOVED says or home, and an overlay (a sheet) is never a start
+    // page. A STORED page of the other app never leaves this one: home, and
+    // soundLAB says once where those pages are now. A #page wins over the
+    // stored page.
+    var notes = [], said = toast.n || 0;
+    var startTab = store.get(TAB_KEY, HOME);
+    if (otherApp(startTab)) {
+      if (APP_ID === 'main' && !store.get('gear.told', false)) {
+        notes.push('Deck, Live sets, the MIDI Hub and Helix are in soundLAB Gear now' +
+          (window.SL_ARTIFACT ? '. Gear is not part of this preview.' : ': the Gear button at the top.'));
+        store.set('gear.told', true);
+      }
+      startTab = HOME;
+    } else if (!hashTab) {
+      startTab = resolvePage(startTab);
+    }
+    if (hashTab) startTab = resolvePage(hashTab);
     if (PAGES.indexOf(startTab) === -1) startTab = HOME;
     switchTo(startTab);
+    if (hashSettings) switchTo('settings'); // after the start tab, so the gear toggles back to it
+    else if (across) goApp(across, hash); // only the claude.ai preview gets here: it says Gear is not part of it
+
+    // Hub Thru and key splits run only while soundLAB Gear is open: say it
+    // once to whoever left Thru on
+    if (APP_ID === 'main' && !window.SL_ARTIFACT && store.get('midihub.thru', false) === true && !store.get('gear.thruTold', false)) {
+      notes.push('MIDI Hub Thru runs in soundLAB Gear now. Keep Gear open in a second window to pass your keyboard to the synth while you practise.');
+      store.set('gear.thruTold', true);
+    }
+    if (notes.length) {
+      var told = document.getElementById('app-toast');
+      // the start may have said where a moved page went: keep that sentence
+      if ((toast.n || 0) !== said && told && !told.hidden && told.textContent) notes.unshift(told.textContent);
+      toast(notes.join(' '), 5000 + 4000 * notes.length);
+    }
 
     var foot = document.querySelector('.foot');
     if (foot) foot.textContent += ' · v' + APP_VERSION;
@@ -1574,8 +1720,10 @@ window.App = (function () {
       });
     }
 
-    prefetchPluck('steel');            // universal fallback / stand-in bank
-    prefetchPluck(pluckTonePref());    // the chosen tone (no-op if steel/synth)
+    if (APP_ID !== 'gear') {             // soundLAB Gear has no plucked voice
+      prefetchPluck('steel');            // universal fallback / stand-in bank
+      prefetchPluck(pluckTonePref());    // the chosen tone (no-op if steel/synth)
+    }
 
     // update checks: at every app start, when the network comes back, when the
     // app returns to the foreground (throttled), and during long sessions
@@ -1653,6 +1801,8 @@ window.App = (function () {
     setTheme: setTheme,
     get themePref() { return store.get('app.theme', 'dark'); },
     switchTo: switchTo,
+    get app() { return APP_ID; }, // 'main' = soundLAB (index.html) | 'gear' = soundLAB Gear (gear.html)
+    goApp: goApp, // App.goApp('gear', 'midihub'): open a page of the other app
     boot: boot,
     version: APP_VERSION,
     checkForUpdate: checkForUpdate,

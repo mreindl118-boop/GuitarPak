@@ -25,6 +25,13 @@
  * port, latch?}|null, key: {code, key}|null}}, remote.pt (page turner keys),
  * remote.dbl (double-tap key). Bus: 'remote' {action, via, handled},
  * 'remote:map' after any change. Docs: docs/CONTROLLER-REMOTE.md.
+ *
+ * TWO APPS (2.0): index.html (soundLAB) and gear.html (soundLAB Gear) both
+ * load this file, read the same bindings and both claim a bound message. The
+ * Settings card (mount) is in soundLAB only. With both open, ONE window acts
+ * on a MIDI press: soundLAB while one of its windows is visible, Gear when
+ * none is (Web Lock 'soundlab-remote-main' — see ONE WINDOW ACTS ON A PEDAL
+ * near the end; App.remote.holdsMain).
  */
 (function () {
   'use strict';
@@ -36,6 +43,10 @@
   var NOTHING = { next: 'Nothing to move on here', back: 'Nothing to go back to here', stop: 'Nothing to stop here' };
   var NOTE = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
   var DBL_MS = 350, DEBOUNCE_MS = 250, LEARN_MS = 20000, TRIGGER_GAP_MS = 400;
+  // which app this document is (js/app.js APPS): no App.app = soundLAB
+  var GEAR = App.app === 'gear';
+  var LOCK = 'soundlab-remote-main', LOCK_MS = 1000; // the Web Lock both apps ask; the longest a press waits for its answer
+  var MIDI_VIA = ['cc', 'pc', 'note', 'dbltap']; // a press that came from MIDI (every window hears it)
 
   function g(k, d) { return App.store.get('remote.' + k, d); }
   function set(k, v) { App.store.set('remote.' + k, v); }
@@ -155,9 +166,20 @@
   // ---- firing ----
   function fire(action, via) {
     if (document.hidden) return null;
-    var now = Date.now();
-    if (now - (lastFire[action] || 0) < DEBOUNCE_MS) return null;
+    var now = Date.now(), before = lastFire[action] || 0;
+    if (now - before < DEBOUNCE_MS) return null;
     lastFire[action] = now;
+    // soundLAB Gear, a press from MIDI: only while no soundLAB window is
+    // visible (ONE WINDOW ACTS ON A PEDAL, below). The lock answers a task
+    // later, so this returns null; a press that was not Gear's to take leaves
+    // the debounce as it found it
+    if (GEAR && MIDI_VIA.indexOf(via) >= 0) {
+      gearTurn(function () { act(action, via); }, function () { if (lastFire[action] === now) lastFire[action] = before; });
+      return null;
+    }
+    return act(action, via);
+  }
+  function act(action, via) {
     var r = false;
     if (App.active === 'settings' && !(window.Help && Help.isOpen && Help.isOpen())) {
       hud(NAMES[action] + ' works', action); flashRow(action);
@@ -179,6 +201,7 @@
   // device sleeps would stay silent — one tap wakes it
   var hinted = 0;
   function soundHint() {
+    if (GEAR) return; // no app voice there: a step sounds on the synth
     var ctx = null; try { ctx = App.getAudio ? App.getAudio() : null; } catch (e) { ctx = null; }
     if (!ctx || ctx.state === 'running' || Date.now() - hinted < 15000) return;
     hinted = Date.now();
@@ -379,6 +402,88 @@
   document.addEventListener('visibilitychange', function () { if (document.hidden) learnOff(); });
   App.on('midi:state', function () { paint(); });
 
+  // ---- ONE WINDOW ACTS ON A PEDAL (soundLAB + soundLAB Gear side by side) ----
+  // Both apps claim a bound MIDI message (claim() above is the same in both),
+  // so it never reaches Thru, the Deck or the Live page's foot switch as
+  // data. Without a rule one press would move the lesson on AND step the
+  // Live set (Bank Select + Program Change to the synth). The rule: the pedal
+  // belongs to soundLAB while a soundLAB window is visible; Gear answers it
+  // when none is. A Web Lock (LOCK) says which:
+  //  - soundLAB holds it in SHARED mode while its document is visible: asked
+  //    at load and on every return to visible, let go when hidden. fire() is
+  //    the same as ever there: visible = it acts, focused or not (it has to
+  //    keep answering while another program has the focus). Two soundLAB
+  //    windows share the lock and both act, as before.
+  //  - Gear takes it for an instant per MIDI press ({ifAvailable: true}): it
+  //    gets it only while no soundLAB window holds it, acts inside the
+  //    callback and lets go. Keys (a page turner types into the focused
+  //    window only) and direct calls stay synchronous.
+  //  - no Web Locks, or the request is refused (the claude.ai viewer frame):
+  //    Gear acts on a MIDI press only while it has the focus.
+  // Nothing is stored; a window that closes frees its lock.
+  function lockApi() { try { var l = navigator.locks; return l && typeof l.request === 'function' ? l : null; } catch (e) { return null; } }
+  function focused() { try { return !!document.hasFocus(); } catch (e) { return false; } }
+
+  // soundLAB: hold = the request this window made last, {held, free} —
+  // free() ends the promise that keeps the lock
+  var hold = null;
+  function holdMain() {
+    if (GEAR || hold || document.hidden) return;
+    var api = lockApi(); if (!api) return;
+    var h = hold = { held: false, free: null }, p = null;
+    function over() { if (hold === h) hold = null; }
+    try {
+      p = api.request(LOCK, { mode: 'shared' }, function () {
+        // hidden again while the request waited: never hold it there
+        if (hold !== h || document.hidden) { over(); return; }
+        h.held = true;
+        return new Promise(function (free) { h.free = free; });
+      });
+    } catch (e) { over(); return; }
+    if (p && typeof p.then === 'function') p.then(over, over); else over(); // refused, or the lock is gone: the next return to visible asks again
+  }
+  function dropMain() {
+    var h = hold; if (!h) return;
+    hold = null; // a request still waiting finds this and lets the lock go at once
+    if (h.free) h.free();
+  }
+  if (!GEAR) {
+    holdMain();
+    document.addEventListener('visibilitychange', function () { if (document.hidden) dropMain(); else holdMain(); });
+    // a page kept for Back / Forward is nobody's window: no lock there either
+    window.addEventListener('pagehide', dropMain);
+    window.addEventListener('pageshow', holdMain);
+  }
+
+  // Gear: ONE question to the lock at a time. turn = the presses waiting for
+  // its answer {t, list} — a second request made while the first is out
+  // would be refused by this window's own lock, and two bound presses in one
+  // MIDI packet must both act, in order. go() acts, no() puts the debounce
+  // back. A turn older than LOCK_MS never got its answer: the next press
+  // asks again instead of waiting with it.
+  var turn = null;
+  function gearTurn(go, no) {
+    var t = Date.now(), press = { go: go, no: no, t: t };
+    if (turn && t - turn.t < LOCK_MS) { turn.list.push(press); return; }
+    var mine = turn = { t: t, list: [press] }, api = lockApi(), p = null;
+    function answer(yes) {
+      var list = mine.list; if (!list) return; // answered once
+      yes = yes && !document.hidden; // hidden since the press: not this window's to take
+      while (list.length) {
+        var x = list.shift();
+        // never a press from long ago (an answer that hung); an error in one
+        // press must not keep the lock or stop the next
+        try { (yes && Date.now() - x.t < LOCK_MS ? x.go : x.no)(); } catch (e) { console.error('remote', e); }
+      }
+      mine.list = null;
+      if (turn === mine) turn = null;
+    }
+    function byFocus() { answer(focused()); }
+    if (!api) { byFocus(); return; }
+    try { p = api.request(LOCK, { ifAvailable: true }, function (lock) { answer(!!lock); }); } catch (e) { byFocus(); return; }
+    if (p && typeof p.then === 'function') p.then(null, byFocus); else byFocus();
+  }
+
   App.remote = {
     ACTIONS: ACTIONS, NAMES: NAMES,
     get map() { return map(); },
@@ -390,7 +495,9 @@
     bindingText: bindingText,
     // what the Lights & help sheet and page hints say: '' when nothing is set
     summary: function () { var m = map(), out = []; ACTIONS.forEach(function (a) { var t = bindingText(a, m); if (t) out.push(NAMES[a] + ': ' + t); }); return out.join(' · '); },
-    fire: fire, // (action, via) — tests and on-screen equivalents
+    fire: fire, // (action, via) — tests and on-screen equivalents. In Gear a MIDI via (cc / pc / note / dbltap) answers null and acts a task later
+    // does this document hold the shared lock (a visible soundLAB window)? Always false in Gear
+    get holdsMain() { return !!(hold && hold.held); },
     mount: mount, paint: paint,
     claim: claim, // the midi.js claim fn (tests)
     // is this message one of the remote's bound gestures? For a page that

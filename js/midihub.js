@@ -1,5 +1,7 @@
 /* soundLAB MIDI Hub — read, write and reshape everything on the MIDI cable.
- * Registers 'midihub' (Keys group, pill "MIDI"). Prefix mh-.
+ * A soundLAB Gear page (gear.html) since 2.0: registers 'midihub' (Synth
+ * group, pill "Hub"). soundLAB itself (index.html) does not load this file.
+ * Prefix mh-.
  *
  * Device-AGNOSTIC: it speaks plain MIDI to whatever is on App.midi's ports —
  * a hardware synth (Yamaha MODX, a Roland, a Korg…), a controller, a LUMI, a
@@ -21,8 +23,9 @@
  *   Monitor   every byte in ('midi:raw') and out ('midi:out'), decoded
  *   Learn     cheat sheet + the selected profile's own notes
  *
- * Ports come from the shared MIDI service (Settings / Lights & help pick
- * them too); the Hub adds quick pickers of its own. Sends go through
+ * Ports come from the shared MIDI service (soundLAB's Settings and the
+ * Lights & help sheet pick them too); the Hub adds quick pickers of its
+ * own. Sends go through
  * App.midi.send — the keybed lights share the same output, so a synth output
  * should keep key lights OFF (the Hub warns when they're on). Stores
  * midihub.* (ch, oct, vel, thru, rulesIn, rulesApp, profile, dev, model,
@@ -37,6 +40,22 @@
  *   the rule engine   js/midirules.js (App.midiRules.apply / install); the
  *                     Rules editor, Learn and the monitor's decode stay here
  *   the synth output  App.midi.synthOut in js/midi.js (still midihub.outId)
+ *
+ * 2.0 (Phase A3b): the Hub lives in soundLAB Gear, a second document over the
+ * same store. What that changes here:
+ *   Thru + key splits  run in this document only, so only while a Gear
+ *                      window is open; the Thru box and the line under the
+ *                      ports say so (soundLAB tells it once at its start)
+ *   Rules on input     still reach soundLAB: js/midirules.js is loaded there
+ *                      too and re-installs on a 'storage' event
+ *   App voice          Gear has no app voice (no Keys page, no App.keys): the
+ *                      box and its texts are hidden there; the mute calls
+ *                      stay, they are harmless
+ *   Hear input         Gear has no Settings page, so the one Off / On switch
+ *                      for audio.monitor sits in the header (#mh-hearin,
+ *                      filled by App.audioIn.mountSwitch); when Hear input
+ *                      was left on but has to wait, one toast per start says
+ *                      why and that the switch is here
  */
 (function () {
   'use strict';
@@ -640,7 +659,10 @@
 
   // the app's own piano stays quiet while the Hub is open (a synth already
   // sounds its notes) unless 'App voice' is ticked; other pages follow the
-  // Settings switch (midi.appSound)
+  // Settings switch (midi.appSound). soundLAB Gear has no app voice: the box
+  // is hidden there (hasVoice) and this mutes nothing, which does no harm
+  function hasVoice() { return !!App.keys; }          // the Keys page's piano = the app voice
+  function inGear() { return App.app === 'gear'; }    // gear.html: Thru runs only while it is open
   function applyMute() { if (midi() && midi().mute) midi().mute('midihub', App.active === 'midihub' && !g('hear', false)); }
 
   // ---- views ----
@@ -674,13 +696,20 @@
     paintCvOut();
     var warnLights = outN && m.lightsOn && !/lumi/i.test(outN.name || ''); // by the OUTPUT's name: a LUMI input + synth output must not paint the synth
     els.lightsWarn.hidden = !warnLights;
-    els.thruInfo.textContent = (g('thru', false) ? 'Thru on: In → Rules → Out. ' : '') + (g('hear', false) ? '' : 'soundLAB\u2019s voice is muted here: the device makes the sound.');
+    // Thru forwards from this document, so it stops when soundLAB Gear is
+    // closed; the app-voice line only where there is an app voice
+    var info = [];
+    if (g('thru', false)) info.push('Thru on: In → Rules → Out.');
+    if (inGear()) info.push('Thru runs while soundLAB Gear is open.');
+    if (hasVoice() && !g('hear', false)) info.push('soundLAB\u2019s voice is muted here: the device makes the sound.');
+    els.thruInfo.textContent = info.join(' ');
   }
 
   function render() {
     var p = profile();
     var profOpts = ''; for (var k in PROFILES) profOpts += '<option value="' + k + '"' + (profile() === PROFILES[k] ? ' selected' : '') + '>' + PROFILES[k].name + '</option>';
     var chOpts = ''; for (var c = 0; c < 16; c++) chOpts += '<option value="' + c + '"' + (c === ch() ? ' selected' : '') + '>' + (c + 1) + '</option>';
+    var voice = hasVoice(); // false in soundLAB Gear: App voice and its texts stay out of sight
     root.innerHTML =
       '<div class="card mh-top">' +
         '<h2>MIDI Hub <span class="muted small">read · write · reshape — any MIDI device</span></h2>' +
@@ -690,8 +719,9 @@
           '<label class="field" title="Where the Hub sends: your synth. The key lights keep their own output (Lights & help).">Synth out<select id="mh-out"></select></label>' +
           '<label class="field">Channel<select id="mh-ch">' + chOpts + '</select></label>' +
           '<label class="field">Device<select id="mh-profile">' + profOpts + '</select></label>' +
-          '<label class="mh-chk" title="Pass everything from In to Out, through the Rules"><input type="checkbox" id="mh-thru"' + (g('thru', false) ? ' checked' : '') + '> Thru</label>' +
-          '<label class="mh-chk" title="Also play soundLAB\u2019s own piano for the notes coming in. Off = only the device sounds (no doubled notes)."><input type="checkbox" id="mh-hear"' + (g('hear', false) ? ' checked' : '') + '> App voice</label>' +
+          '<label class="mh-chk" title="Pass everything from In to Out, through the Rules.' + (inGear() ? ' Thru runs while soundLAB Gear is open.' : '') + '"><input type="checkbox" id="mh-thru"' + (g('thru', false) ? ' checked' : '') + '> Thru</label>' +
+          '<label class="mh-chk" id="mh-hearlab"' + (voice ? '' : ' hidden') + ' title="Also play soundLAB\u2019s own piano for the notes coming in. Off = only the device sounds (no doubled notes)."><input type="checkbox" id="mh-hear"' + (g('hear', false) ? ' checked' : '') + (voice ? '' : ' hidden') + '> App voice</label>' +
+          '<span id="mh-hearin"></span>' + // soundLAB Gear: the Hear input switch (App.audioIn.mountSwitch, end of render)
           '<button type="button" class="btn sm danger" id="mh-panic" title="All notes off + all sound off on every channel">Panic</button>' +
         '</div>' +
         '<div class="row tight small" style="margin-top:8px"><span id="mh-status" class="mh-status"></span><span class="muted" id="mh-thruinfo"></span></div>' +
@@ -836,7 +866,9 @@
           '<li>Pick its port as <b>In</b> and <b>Out</b>. Many synths show one port per function; the one named after the device (often “-1” or “Port 1”) is the sound engine.</li>' +
           '<li>Open <b>Monitor</b>, play the device and turn its knobs: every message is decoded live. That is the fastest way to learn what anything sends.</li>' +
           '<li>Go to <b>Play</b> and send notes back. If nothing sounds, check the channel (the device listens on specific channels) and that Out is the right port.</li>' +
-          '<li>Hearing two sounds per note on other pages? Your synth plays itself AND soundLAB plays its piano. Here the app voice is muted unless you tick <b>App voice</b>; for every page, turn off \u201cPlay soundLAB\u2019s voice\u201d in Settings \u203a MIDI keyboard.</li>' +
+          (voice
+            ? '<li>Hearing two sounds per note on other pages? Your synth plays itself AND soundLAB plays its piano. Here the app voice is muted unless you tick <b>App voice</b>; for every page, turn off \u201cPlay soundLAB\u2019s voice\u201d in Settings \u203a MIDI keyboard.</li>'
+            : '<li>Hearing two sounds per note while you practise in soundLAB? Your synth plays itself and soundLAB plays its piano. In soundLAB, open Settings \u203a MIDI keyboard and set \u201csoundLAB plays my keys\u201d to Auto or Never.</li>') +
           '<li>Pick a <b>Device</b> profile for named knobs and ready-made SysEx builders; Generic works everywhere.</li>' +
         '</ol>' +
         '<h3>About this device</h3><ul id="mh-devnotes"></ul>' +
@@ -893,6 +925,12 @@
     // Import / Reset Hub, so this remount is what keeps it alive
     if (App.synthDeck) { try { App.synthDeck.init(els.deck, els.deck2, HUB_API); } catch (e) { console.error('synth deck', e); } }
     view(g('view', 'control'));
+    // soundLAB Gear has no Settings page: its one Hear input switch (Off / On
+    // and a status line, js/audioin.js) sits in the header, where App voice
+    // was. mountSwitch is idempotent: render() re-runs on Import / Reset Hub
+    if (inGear() && App.audioIn && App.audioIn.supported && typeof App.audioIn.mountSwitch === 'function') {
+      try { App.audioIn.mountSwitch(root.querySelector('#mh-hearin')); } catch (e) { console.error('hear input switch', e); }
+    }
   }
 
   function wire() {
@@ -1158,7 +1196,7 @@
       '.mh-top h2 .small{font-weight:400;margin-left:8px;letter-spacing:0}' +
       '.mh-status{font-size:12.5px}.mh-status.ok{color:var(--green)}.mh-status.bad{color:var(--red)}' +
       '.mh-warn{color:var(--red);margin-top:6px}' +
-      '.mh-chk{display:inline-flex;gap:6px;align-items:center;font-size:12.5px;color:var(--muted)}' +
+      '.mh-chk{display:inline-flex;gap:6px;align-items:center;font-size:12.5px;color:var(--muted)}.mh-chk[hidden]{display:none}' +
       '.mh-act{margin-top:6px;color:var(--muted)}.mh-act>span{display:inline-flex;align-items:center;gap:4px}' +
       '.mh-led{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--line);transition:background .08s}.mh-led.in.lit{background:var(--accent)}.mh-led.out.lit{background:var(--green)}' +
       '.mh-mono{font-family:ui-monospace,Consolas,Menlo,monospace;font-size:12px;color:var(--text)}' +
@@ -1210,6 +1248,19 @@
     ['scale:lock', 'scale:boundary', 'fb:set', 'fb:scale'].forEach(function (name) { App.on(name, scaleBoundary); });
     App.on('tempo', paintClock);
     App.on('lights', paintPorts);
+    // soundLAB Gear only: Hear input was left on but has to wait (the browser
+    // must ask first, the input looks like a microphone, the chosen input is
+    // missing). Its card is in soundLAB's Settings; here the switch is in
+    // this page's header, so say that once per start. Held because another
+    // soundLAB window plays it ('other') needs no word.
+    if (inGear()) {
+      var hearTold = false;
+      App.on('audioin:state', function (d) {
+        if (hearTold || !d || !d.want || !d.held || ['perm', 'mic', 'fell'].indexOf(d.why) === -1) return;
+        hearTold = true;
+        App.toast((d.msg || 'Hear input is on, but it is waiting.') + ' The switch is on the Hub page.', 8000);
+      });
+    }
     document.addEventListener('keyup', function (e) {
       if (App.active !== 'midihub') return;
       if (e.code in KB_KEYS) release(base() + KB_KEYS[e.code]);

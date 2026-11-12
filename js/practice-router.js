@@ -169,8 +169,10 @@
     stop('Preparing scale-locked synth sound.');
     var o = options || {}, m = midi();
     if (o.localControlOff !== true) { reason = 'Confirm synth Local Control OFF and external MIDI Thru disabled before starting.'; announce(); return false; }
+    // Hub Thru runs in soundLAB Gear since 2.0 (the same store): a Gear window
+    // open beside soundLAB with Thru on would double every note sent here
     if (App.store.get('midihub.thru', false) === true) {
-      reason = 'Turn MIDI Hub Thru off and release all keys/pedal before starting this route.'; announce(); return false;
+      reason = 'Turn MIDI Hub Thru off in soundLAB Gear and release all keys/pedal before starting this route.'; announce(); return false;
     }
     if (m.explicitPortsSupported !== true || typeof m.subscribeInput !== 'function' ||
         typeof m.sendToOutput !== 'function' || typeof m.leaseKeybedOutput !== 'function' ||

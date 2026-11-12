@@ -2,6 +2,8 @@
 // what is missing. Before, a first visit showed live-looking controls that silently refused
 // every tap (found on Matt's MODX8+ on 2026-10-26: the controls worked once connected, but
 // nothing on the Synth tab ever asked the browser for MIDI).
+// 2.0 Phase A3b: the Synth tab is soundLAB Gear (gear.html, env.GEAR_URL). It boots on the Deck,
+// so the Deck is already showing when a case starts (App.switchTo('deck') is then a no-op).
 const { chromium } = require('playwright');
 const env = require('./env');
 let fails = 0;
@@ -33,7 +35,7 @@ async function open(browser, opts, viewport) {
   }, opts);
   const page = await ctx.newPage(), errs = [];
   page.on('pageerror', e => errs.push(e.message));
-  await page.goto(env.URL);
+  await page.goto(env.GEAR_URL);
   await page.waitForFunction(() => window.App && App.midi && window.SLSynthTab && window.SLSynthLive);
   return { ctx, page, errs };
 }

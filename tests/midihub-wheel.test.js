@@ -1,6 +1,7 @@
 // MIDI Hub Control view: a mouse-wheel page scroll that passes over the big
 // knobs must not turn them (it sent CC7/CC74 down and the synth went quiet);
 // a knob that was clicked still turns with the wheel.
+// 2.0 Phase A3b: the Hub is a page of soundLAB Gear (gear.html), which boots on the Deck.
 const { chromium } = require('playwright');
 const env = require('./env');
 let fails = 0;
@@ -20,8 +21,8 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
   });
   const page = await ctx.newPage(), errs = [];
   page.on('pageerror', e => errs.push(e.message));
-  await page.goto(env.URL);
-  await page.waitForFunction(() => window.App && App.midi && App.midi.ready && App.midi.hasOutput && App.active === 'quiz');
+  await page.goto(env.GEAR_URL);
+  await page.waitForFunction(() => window.App && App.midi && App.midi.ready && App.midi.hasOutput && App.active === 'deck');
   await page.evaluate(() => { App.switchTo('midihub'); });
   await page.waitForSelector('.mh-knob[data-cc="7"]', { state: 'visible' });
   const vol = page.locator('.mh-knob[data-cc="7"]');

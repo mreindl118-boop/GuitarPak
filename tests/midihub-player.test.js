@@ -4,6 +4,8 @@
 // goes to the LUMI, velocity cap, tempo, channels as in file vs one Part,
 // pause/stop/Panic/leaving release everything, MusicXML chords/ties/rests/
 // voices/tempo, and .mxl (stored and deflated). Test material is synthetic.
+// 2.0 Phase A3b: the Hub (and this mount of the Player card, js/scoreplayer.js) is in soundLAB
+// Gear (gear.html, env.GEAR_URL), which boots on the Deck; "leaving" goes to the Deck.
 const { chromium } = require('playwright');
 const env = require('./env');
 let fails = 0;
@@ -25,8 +27,8 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
   });
   const page = await ctx.newPage(), errs = [];
   page.on('pageerror', e => errs.push(e.message));
-  await page.goto(env.URL);
-  await page.waitForFunction(() => window.App && App.midi && App.midi.ready && App.midi.hasOutput && App.active === 'quiz');
+  await page.goto(env.GEAR_URL);
+  await page.waitForFunction(() => window.App && App.midi && App.midi.ready && App.midi.hasOutput && App.active === 'deck');
 
   // ---- test material (built in the page) ----
   await page.evaluate(() => {
@@ -119,7 +121,7 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
     document.getElementById('mh-panic').click();
     const afterPanic = SLMidiHub.player.state;
     SLMidiHub.player.play(); await wait(120);
-    App.switchTo('piano');
+    App.switchTo('deck'); // another page of soundLAB Gear
     const afterLeave = SLMidiHub.player.state;
     App.switchTo('midihub');
     return { mid, afterPause, afterPanic, afterLeave };
@@ -128,7 +130,7 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
   ok(p.filter(b => (b[0] & 0xf0) === 0x90).every(b => b[0] === 0x92) && /All on Part 3/.test(m2.mid.label), 'All on one Part: every note on channel 3: ' + m2.mid.label);
   ok(m2.mid.held > 0 && m2.afterPause.held === 0 && !m2.afterPause.playing && pOff >= pOn && p.some(b => b[0] === 0xb2 && b[1] === 64 && b[2] === 0) && m2.afterPause.btn === 'Play', 'Pause releases every held note and lifts the pedal: ' + pOn + ' on / ' + pOff + ' off');
   ok(!m2.afterPanic.playing && m2.afterPanic.held === 0, 'Panic stops the player');
-  ok(!m2.afterLeave.playing && m2.afterLeave.held === 0, 'leaving the MIDI tab pauses it with nothing held');
+  ok(!m2.afterLeave.playing && m2.afterLeave.held === 0, 'leaving the Hub page (for the Deck) pauses it with nothing held');
 
   console.log('# MusicXML and .mxl');
   const x = await page.evaluate(async () => {

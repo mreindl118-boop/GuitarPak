@@ -298,7 +298,8 @@
   function setLive(on) {
     live = !!on; closePicker(); editing = false;
     document.documentElement.classList.toggle('st-live', live);
-    if (App.wake) { try { if (live) App.wake('synthlive'); else if (App.wake.release) App.wake.release('synthlive'); } catch (e) { /* no wake lock here */ } }
+    // keep-awake while live: App.wake is the ref-counted service, one tag per holder
+    if (App.wake) { try { if (live) App.wake.acquire('synthlive'); else App.wake.release('synthlive'); } catch (e) { /* no wake lock here */ } }
     if (live && App.showBar) { /* the bar is hidden by css while live */ }
     render();
   }

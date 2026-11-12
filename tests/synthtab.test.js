@@ -5,6 +5,10 @@
 // chips and Scenes through the deck's funnel, Prev/Next, Perform <-> Edit
 // (the borrowed Control view), Explain captions, Back, the phone layout.
 // Nothing may ever reach the LUMI bucket.
+// 2.0 Phase A3b: the Synth tab is soundLAB Gear (gear.html, env.GEAR_URL): it boots on the
+// Deck, the tab bar has two tabs (Synth, Helix), and there is no Fretboard page to write the
+// key when it hears fb:set. The key is set the way Gear's context bar does it (__key: the
+// store first, then the event) and a preset's key restore writes the store itself.
 const { chromium } = require('playwright');
 const env = require('./env');
 let fails = 0;
@@ -35,12 +39,14 @@ async function newPage(browser, seed, viewport) {
     window.__nonClean = (a) => a.filter(b => !/^(17[6-9]|18\d|19[01]) 64 0$/.test(b));
     window.__q = (s) => document.querySelector(s);
     window.__qa = (s) => Array.from(document.querySelectorAll(s));
+    // the app's key, as the context bar sets it (js/app.js pushMusic): the store first, then fb:set
+    window.__key = (root, scale) => { App.store.set('fb.root', root); App.store.set('fb.scale', scale); App.emit('fb:set', { source: 't', root, scale }); };
     window.__pt = (el, type, x, y) => { const r = el.getBoundingClientRect(); el.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, pointerId: 1, isPrimary: true, clientX: r.left + x, clientY: r.top + (y == null ? r.height / 2 : y), button: 0 })); };
   }, seed || {});
   const page = await ctx.newPage(), errs = [];
   page.on('pageerror', e => errs.push(e.message));
-  await page.goto(env.URL);
-  await page.waitForFunction(() => window.App && App.midi && App.midi.ready && App.midi.hasOutput && App.active === 'quiz');
+  await page.goto(env.GEAR_URL);
+  await page.waitForFunction(() => window.App && App.midi && App.midi.ready && App.midi.hasOutput && App.active === 'deck');
   return { ctx, page, errs };
 }
 
@@ -117,7 +123,7 @@ async function newPage(browser, seed, viewport) {
   console.log('# the preset builder: a full snapshot, a data-rich slot, and back');
   const pb = await page.evaluate(async () => {
     const o = {};
-    App.emit('fb:set', { source: 't', root: 2, scale: 'dorian', mode: 0 }); await __wait(30);
+    __key(2, 'dorian'); await __wait(30);
     __q('#panel-deck [data-chip="scene3"]').click(); await __wait(30);
     __q('#st-save').click(); await __wait(50);
     o.open = !__q('#st-sheet').hidden; o.defaultName = __q('#st-pname').value;
@@ -131,7 +137,7 @@ async function newPage(browser, seed, viewport) {
     const slot = __q('#st-pins [data-preset="' + (it && it.id) + '"]');
     o.slot = slot && { text: slot.textContent.replace(/\s+/g, ' ').trim(), border: slot.style.borderLeft };
     // the app moves on, then the slot brings everything back: synth bytes first, the key after the load
-    App.emit('fb:set', { source: 't', root: 7, scale: 'major', mode: 0 }); await __wait(30);
+    __key(7, 'major'); await __wait(30);
     __clear(); slot.click(); await __wait(900);
     o.loadBytes = __nonClean(__bytes()); o.rootAfter = App.store.get('fb.root'); o.scaleAfter = App.store.get('fb.scale');
     o.lumi = __by.lumi.length;
@@ -140,7 +146,7 @@ async function newPage(browser, seed, viewport) {
   ok(pb.open && /Sweep Pad|CFX \+ FM EP/.test(pb.defaultName) && pb.incs.length === 5 && /Scene 3/.test(pb.incs[2]) && /D dorian/.test(pb.incs[3]), 'Save preset opens the builder with the sound name and what it will remember: ' + pb.incs.join(' / '));
   ok(pb.sentOnSave === 0 && pb.closed && pb.item && pb.item.star && pb.item.colour === 'teal' && pb.item.app && pb.item.app.root === 2 && pb.item.app.scale === 'dorian' && pb.item.scene === 32 && pb.item.fav && pb.item.fav.length === 4, 'Save sends nothing, pins the preset and keeps colour, key/scale, Scene and the favourite strips: ' + JSON.stringify(pb.item));
   ok(pb.slot && /Dorian pad/.test(pb.slot.text) && /Scene 3/.test(pb.slot.text) && /D dorian/.test(pb.slot.text) && /47, 184, 160|2fb8a0/i.test(pb.slot.border), 'the slot shows its data (sound, Scene, key) and its colour: ' + pb.slot.text);
-  ok(pb.loadBytes.length >= 4 && /^176 0 /.test(pb.loadBytes[0]) && pb.loadBytes.some(b => /^192 /.test(b)) && pb.loadBytes.some(b => b === '176 92 32') && pb.rootAfter === 2 && pb.scaleAfter === 'dorian' && pb.lumi === 0, 'tapping the slot sends bank/program, waits, re-sends Scene 3, then restores D dorian in the app; nothing to the LUMI (' + pb.loadBytes.length + ' bytes)');
+  ok(pb.loadBytes.length >= 4 && /^176 0 /.test(pb.loadBytes[0]) && pb.loadBytes.some(b => /^192 /.test(b)) && pb.loadBytes.some(b => b === '176 92 32') && pb.rootAfter === 2 && pb.scaleAfter === 'dorian' && pb.lumi === 0, 'tapping the slot sends bank/program, waits, re-sends Scene 3, then restores D dorian in the app (fb.root / fb.scale in the store); nothing to the LUMI (' + pb.loadBytes.length + ' bytes)');
 
   console.log('# the key split: LUMI keys below the point play another Part');
   const sp = await page.evaluate(async () => {
@@ -314,7 +320,7 @@ async function newPage(browser, seed, viewport) {
     const small = vis.filter(b => b.getBoundingClientRect().height < 40).map(b => (b.textContent || b.className).trim().slice(0, 14) + ':' + Math.round(b.getBoundingClientRect().height));
     return { scrollW: document.documentElement.scrollWidth, w: innerWidth, small, caps: __qa('#panel-deck .st-cap').length, nowSize: parseFloat(getComputedStyle(__q('#st-nowname')).fontSize), tabs: __qa('#tabbar-m .tabbar-btn').length };
   });
-  ok(ph.scrollW <= ph.w && ph.small.length === 0 && ph.nowSize >= 30 && ph.caps >= 5 && ph.tabs === 6, 'no horizontal scroll, every target ≥ 40 px, the sound name ≥ 30 px, six bottom tabs: ' + JSON.stringify(ph.small));
+  ok(ph.scrollW <= ph.w && ph.small.length === 0 && ph.nowSize >= 30 && ph.caps >= 5 && ph.tabs === 2, 'no horizontal scroll, every target ≥ 40 px, the sound name ≥ 30 px, two bottom tabs (Synth, Helix): ' + JSON.stringify(ph.small));
   ok(errs.length === 0, 'no page errors on the phone' + (errs.length ? ': ' + errs.join(' | ') : ''));
   await ctx.close(); await browser.close();
   console.log(fails ? 'FAILED ' + fails : 'ALL PASS');

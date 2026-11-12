@@ -1,5 +1,5 @@
 // MIDI Hub (js/midihub.js) against a fake Web MIDI device that records every
-// byte sent: the page under Keys, the raw tap + monitor, on-screen keys and
+// byte sent: the Hub pill of the Synth tab, the raw tap + monitor, on-screen keys and
 // controls going OUT on the Hub channel, rules (remap / transpose / block /
 // channel) on Thru and on what soundLAB hears, device profiles + SysEx
 // builders, panic, and the service additions (App.midi.send / setInputFilter /
@@ -10,6 +10,10 @@
 // apply; the filter also follows midihub.rulesIn on a 'storage' event, the box
 // ticked in another window). "Which output is the synth" is App.midi.synthOut
 // in js/midi.js, the one copy the Hub header and the Player card name.
+// 2.0 Phase A3b: the Hub is a page of soundLAB Gear (gear.html, env.GEAR_URL),
+// which boots on the Deck. Gear has no app voice (no Keys page, no App.keys), so
+// the App voice box is hidden there, and "another page" is a Gear page (Helix):
+// App.switchTo(<a soundLAB page>) inside Gear leaves for index.html.
 const { chromium } = require('playwright');
 const env = require('./env');
 let fails = 0;
@@ -30,8 +34,8 @@ async function newPage(browser, seed) {
   }, seed || {});
   const page = await ctx.newPage(), errs = [];
   page.on('pageerror', e => errs.push(e.message));
-  await page.goto(env.URL);
-  await page.waitForFunction(() => window.App && App.midi && App.midi.ready && App.midi.hasOutput && App.active === 'quiz');
+  await page.goto(env.GEAR_URL);
+  await page.waitForFunction(() => window.App && App.midi && App.midi.ready && App.midi.hasOutput && App.active === 'deck');
   return { ctx, page, errs };
 }
 const J = JSON.stringify;
@@ -73,26 +77,22 @@ async function bothEngines(page, msgs) {
   ok(so1.id === 'out1' && so1.sel === 'out1' && so1.hub === 'out1' && so1.name === 'Synth Port 1' && so1.has === true && so1.status.includes('Synth out: ' + so1.name),
     'App.midi.synthOut is the port the header shows: ' + J({ id: so1.id, name: so1.name, has: so1.has }));
 
-  console.log('# app voice muted on the Hub');
+  console.log('# no app voice in soundLAB Gear: the App voice box is hidden');
+  // Gear loads no Keys page (no App.keys), so there is no app voice to switch: the box and its texts are out of sight
   const mu = await page.evaluate(() => {
-    const notes = []; App.on('midi:note', d => notes.push(!!d.mute));
+    const seen = el => !!el && el.getClientRects().length > 0;
+    const top = document.querySelector('#panel-midihub .mh-top'), box = document.getElementById('mh-hear');
+    const heard = []; App.on('midi:note', d => heard.push(d.midi + ':' + (d.on ? 1 : 0)));
     __recv([0x90, 50, 90]); __recv([0x80, 50, 0]);
-    const onHub = notes.slice();
-    document.getElementById('mh-hear').checked = true; document.getElementById('mh-hear').dispatchEvent(new Event('change'));
-    __recv([0x90, 50, 90]); __recv([0x80, 50, 0]);
-    const hear = notes.slice(2);
-    document.getElementById('mh-hear').checked = false; document.getElementById('mh-hear').dispatchEvent(new Event('change'));
-    App.switchTo('piano');
-    __recv([0x90, 50, 90]); __recv([0x80, 50, 0]);
-    const piano = notes.slice(4);
-    App.midi.setAppSound(false);
-    __recv([0x90, 50, 90]); __recv([0x80, 50, 0]);
-    const off = notes.slice(6);
-    App.midi.setAppSound(true); App.switchTo('midihub');
-    return { onHub, hear, piano, off, muted: App.midi.muted, info: document.getElementById('mh-thruinfo').textContent };
+    return {
+      keys: typeof App.keys, ports: seen(document.getElementById('mh-thru')), box: seen(box),
+      label: [...top.querySelectorAll('label, span, button')].filter(el => /^\s*App voice\s*$/.test(el.textContent) && seen(el)).length,
+      info: document.getElementById('mh-thruinfo').textContent, heard: heard.join()
+    };
   });
-  ok(mu.onHub.join() === 'true,true' && mu.hear.join() === 'false,false', 'Hub open: incoming notes carry mute, App voice ticked clears it: ' + J(mu));
-  ok(mu.piano.join() === 'false,false' && mu.off.join() === 'true,true' && mu.muted && /muted here/.test(mu.info), 'other pages follow the Settings switch; back on the Hub it is muted again');
+  ok(mu.keys === 'undefined' && mu.ports && !mu.box && mu.label === 0, 'the ports row is shown (Thru is there) and the App voice box is not: ' + J({ keys: mu.keys, box: mu.box, label: mu.label }));
+  ok(!/voice is muted/i.test(mu.info), 'the line under the ports says nothing about a muted app voice: ' + J(mu.info));
+  ok(mu.heard === '50:1,50:0', 'incoming notes still reach the bus (midi:note): ' + mu.heard);
 
   console.log('# out: keys, controls, program, panic');
   const out1 = await page.evaluate(() => {
@@ -280,7 +280,7 @@ async function bothEngines(page, msgs) {
       document.getElementById('mh-start').click(); document.getElementById('mh-stop').click();
       const tr = __since(from2).map(b => b[0]);
       document.querySelector('#mh-kb [data-note="60"]').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: 1, clientY: 1 }));
-      const from3 = __sent.length; App.switchTo('piano');
+      const from3 = __sent.length; App.switchTo('helix'); // another page of soundLAB Gear
       r({ n, label: document.getElementById('mh-clock').textContent, tr, left: __since(from3).map(b => b.join(' ')) });
     }, 520);
   }));
@@ -310,8 +310,8 @@ async function bothEngines(page, msgs) {
     });
     const pg = await c2.newPage(), er = [];
     pg.on('pageerror', e => er.push(e.message));
-    await pg.goto(env.URL);
-    await pg.waitForFunction(() => window.App && App.midi && App.midi.ready && App.midi.hasOutput && App.active === 'quiz');
+    await pg.goto(env.GEAR_URL);
+    await pg.waitForFunction(() => window.App && App.midi && App.midi.ready && App.midi.hasOutput && App.active === 'deck');
     return { ctx: c2, page: pg, errs: er };
   })());
   // before the Hub is opened: the service already knows which output is the synth (App.midi.synthOut)

@@ -9,6 +9,9 @@
 // from the Helix's numbering) and PORT ISOLATION (never a MODX / LUMI / loopMIDI
 // port), plus the built-in rules: nothing connects at boot, the bridge only
 // after Connect bridge was pressed once.
+// 2.0 Phase A3b: Helix is a page of soundLAB Gear (gear.html, env.GEAR_URL): its own tab,
+// no pill strip. Gear boots on the Deck, so the page is still closed at boot, and "leaving
+// the page" goes to the Deck.
 const { chromium } = require('playwright');
 const env = require('./env');
 let fails = 0;
@@ -61,8 +64,8 @@ async function newPage(browser, opts) {
   const page = await ctx.newPage(), errs = [];
   page.on('pageerror', e => errs.push(e.message));
   page.on('dialog', d => d.accept());
-  await page.goto(env.URL);
-  await page.waitForFunction(() => window.App && window.SLHelix && App.midi && App.midi.ready);
+  await page.goto(env.GEAR_URL);
+  await page.waitForFunction(() => window.App && window.SLHelix && App.midi && App.midi.ready && App.active === 'deck');
   return { ctx, page, errs };
 }
 const J = JSON.stringify;
@@ -87,9 +90,9 @@ const armState = (page) => page.evaluate(() => ({ st: document.getElementById('h
     return { active: App.active, tab: (document.querySelector('#tabbar .tabbar-btn.active') || {}).textContent, views: [...document.querySelectorAll('#hx-views button')].map(b => b.dataset.view).join(','),
       midi: document.getElementById('hx-midist').textContent, mode: SLHelix.midi.mode, bridge: document.getElementById('hx-brst').textContent, dev: document.getElementById('hx-devst').textContent,
       dest: document.getElementById('hx-dest').textContent, sent: window.__sent.length, writes: window.__net.filter(m => m.op === 'rpc').map(m => m.addr),
-      pills: [...document.querySelectorAll('#subnav .subtab')].map(b => b.textContent).join('|') };
+      pills: [...document.querySelectorAll('#subnav .subtab')].map(b => b.textContent).join('|'), strip: !document.getElementById('subnav').hidden };
   });
-  ok(nav.active === 'helix' && /Guitar/.test(nav.tab || '') && nav.pills === 'Neck|Tab|Notation|Helix', 'Helix is the fourth Guitar pill: ' + nav.tab + ' / ' + nav.pills);
+  ok(nav.active === 'helix' && /Helix/.test(nav.tab || '') && nav.pills === '' && !nav.strip, 'Helix is its own tab in soundLAB Gear, with no pill strip: ' + nav.tab + ' / ' + (nav.pills || 'no pills'));
   ok(nav.views === 'rig,blocks,presets,looper,mixer,monitor', 'six views: ' + nav.views);
   ok(nav.mode === 'web' && /Helix Stadium MIDI/.test(nav.midi), 'found the Helix MIDI port itself: ' + nav.midi);
   ok(/Helix at 10\.0\.0\.5/.test(nav.bridge), 'bridge says the Helix is reachable: ' + nav.bridge);
@@ -250,8 +253,8 @@ const armState = (page) => page.evaluate(() => ({ st: document.getElementById('h
   a = await armState(page);
   ok(!a.armed && /focus/i.test(a.msg), 'switching windows disarms: ' + a.msg);
   await page.evaluate(() => SLHelix.arm());
-  a = await page.evaluate(async () => { App.switchTo('quiz'); await new Promise(r => setTimeout(r, 100)); const off = !SLHelix.armed; App.switchTo('helix'); await new Promise(r => setTimeout(r, 300)); return { off, st: document.getElementById('hx-armst').textContent, msg: document.getElementById('hx-armmsg').textContent }; });
-  ok(a.off && a.st === 'DISARMED' && /Press Arm/.test(a.msg), 'leaving the page disarms, and coming back starts disarmed: ' + a.msg);
+  a = await page.evaluate(async () => { App.switchTo('deck'); await new Promise(r => setTimeout(r, 100)); const off = !SLHelix.armed; App.switchTo('helix'); await new Promise(r => setTimeout(r, 300)); return { off, st: document.getElementById('hx-armst').textContent, msg: document.getElementById('hx-armmsg').textContent }; });
+  ok(a.off && a.st === 'DISARMED' && /Press Arm/.test(a.msg), 'leaving the page (for the Deck) disarms, and coming back starts disarmed: ' + a.msg);
   r = await page.evaluate(async () => { SLHelix.arm(); const n = window.__sent.length; window.__failNext = true; document.getElementById('hx-tap').click(); const after = SLHelix.armed; return { sent: window.__since(n), after, msg: document.getElementById('hx-armmsg').textContent }; });
   ok(r.sent.length === 0 && !r.after && /send failed/i.test(r.msg), 'a failed send disarms: ' + r.msg);
   r = await page.evaluate(async () => { const s = document.getElementById('hx-safe'); s.checked = false; s.dispatchEvent(new Event('change')); const n = window.__sent.length; document.getElementById('hx-tap').click(); return { sent: window.__since(n), st: document.getElementById('hx-armst').textContent, armHidden: document.getElementById('hx-arm').hidden, stored: App.store.get('hx.safe') }; });
