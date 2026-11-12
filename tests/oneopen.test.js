@@ -1,7 +1,8 @@
 // One Open (js/songs.js, 1.3 / primer C2): one "Open a score" on the Play tab that
 // takes a MIDI file, a MusicXML score or a text tab and routes it to Play on
-// synth (the MIDI Hub Player), Practice (the Woodshed's own handle) or Open as
-// tab (the Songs page). A fake MODX records what the synth gets.
+// synth (the score player, js/scoreplayer.js = window.SLScorePlayer, which sits
+// in the MIDI Hub's Player view), Practice (the Woodshed's own handle) or Open
+// as tab (the Songs page). A fake MODX records what the synth gets.
 const { chromium } = require('playwright');
 const env = require('./env');
 let fails = 0;
@@ -23,10 +24,10 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
   const page = await ctx.newPage(), errs = [];
   page.on('pageerror', e => errs.push(e.message));
   await page.goto(env.URL);
-  await page.waitForFunction(() => window.App && App.midi && App.midi.ready && App.midi.hasOutput && window.SLMidiHub && App.songs && window.Woodshed);
+  await page.waitForFunction(() => window.App && App.midi && App.midi.ready && App.midi.hasOutput && window.SLScorePlayer && App.songs && window.Woodshed);
 
   // a tiny MIDI file made by the Player's own writer (C4 D4 E4 F4 at 120)
-  const midi = await page.evaluate(() => Array.from(SLMidiHub.scoreToMidi({ title: 'Four', bpm: 120, len: 4, notes: [60, 62, 64, 65].map((m, i) => ({ t: i, d: 1, m, partId: 'p1', v: 100 })) })));
+  const midi = await page.evaluate(() => Array.from(SLScorePlayer.scoreToMidi({ title: 'Four', bpm: 120, len: 4, notes: [60, 62, 64, 65].map((m, i) => ({ t: i, d: 1, m, partId: 'p1', v: 100 })) })));
   const xml = '<?xml version="1.0"?><score-partwise><work><work-title>Line</work-title></work><part-list><score-part id="P1"/></part-list><part id="P1"><measure><attributes><divisions>1</divisions></attributes><direction><sound tempo="120"/></direction>' +
     ['C', 'D', 'E', 'F'].map(s => '<note><pitch><step>' + s + '</step><octave>4</octave></pitch><duration>1</duration></note>').join('') + '</measure></part></score-partwise>';
   const tab = 'e|-----0-1-|\nB|-1-3-----|\nG|---------|\nD|---------|\nA|---------|\nE|---------|\n';

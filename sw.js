@@ -1,7 +1,7 @@
 /* GuitarLab service worker — cache-first so the app works fully offline once visited. */
 // 2.0 (branch v2): caches are 'soundlab2-*' so the beta at /next/ never touches the
 // live app's 'guitarlab-*' caches on the same origin (and only cleans up its own).
-var CACHE = 'soundlab2-v6';
+var CACHE = 'soundlab2-v7';
 var ASSETS = [
   '.',
   'index.html',
@@ -20,6 +20,7 @@ var ASSETS = [
   'js/note-palette.js',
   'js/midi.js',
   'js/remote.js',
+  'js/midirules.js',
   'js/practice-router.js',
   'js/tonein.js',
   'js/audioin.js',
@@ -46,6 +47,7 @@ var ASSETS = [
   'js/pitch-detector.js',
   'js/practice-input.js',
   'js/pads.js',
+  'js/scoreplayer.js',
   'js/midihub.js',
   'js/synthdeck-maps.js',
   'js/synthdeck-scope.js',
