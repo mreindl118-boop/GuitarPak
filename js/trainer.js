@@ -477,6 +477,11 @@
     renderSessions();
     updateBestChip();
     sessButtons();
+
+    // folding the Free practice section cancels a chord run: a hidden run
+    // must not take the pedal or Space (the session timer keeps running)
+    var fold = root.closest('details');
+    if (fold) fold.addEventListener('toggle', function () { if (!fold.open && ccRunning) ccReset(true); });
   }
 
   function onShow() {
@@ -495,9 +500,11 @@
   // the CONTROLLER REMOTE (js/remote.js): a foot for the hands-busy cards.
   // The Plan page asks here first (js/practiceplan.js remote) and acts itself
   // on false. NEXT = count a change while a chord-change run goes (like
-  // Space); BACK = nothing here; STOP = the run's Reset, else the session
-  // clock's Pause. Nothing here listens to MIDI notes, so the reserved
-  // double-tap key costs nothing.
+  // Space); BACK = held while a run goes (it does nothing but say so: the
+  // Plan's own BACK is "Again: <block>", which leaves the page and cancels
+  // the run, so a stray pedal press must not reach it), else nothing here;
+  // STOP = the run's Reset, else the session clock's Pause. Nothing here
+  // listens to MIDI notes, so the reserved double-tap key costs nothing.
   function remote(action) {
     if (action === 'next') {
       if (ccRunning) { ccCount(); return 'Change ' + ccN; }
@@ -505,7 +512,7 @@
       if (ccDoneAt && Date.now() - ccDoneAt < 1500) return 'Time’s up';
       return false;
     }
-    if (action === 'back') return false;
+    if (action === 'back') return ccRunning ? 'Chord changes running' : false;
     if (ccRunning) { ccReset(true); return 'Run cancelled'; }
     if (sessRunning) { sessPause(); return 'Session paused'; }
     return false;

@@ -38,8 +38,9 @@ Only one of them is active at a time.
   folds itself.
 - **While the section is open it owns the pedal.** Next and Stop act here (see
   [Hands-free control](CONTROLLER-REMOTE.md)). A press with nothing to do here
-  does nothing: it never starts a lesson or the runner. The lessons' own
-  double-tap stands down too.
+  does nothing: it never starts a lesson or the runner. The lessons'
+  lowest-key double-tap stands down too. A double-tap on the lesson card
+  itself starts the lesson like its Start button, so it closes the section.
 - **The double-tap key.** With the opt-in double-tap key on (Settings ›
   Hands-free control) and simulated answers, the keyboard's lowest key is
   reserved on the Piano page while the section is open: it is silent and not

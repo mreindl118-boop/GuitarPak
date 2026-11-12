@@ -152,9 +152,11 @@ them is a plan block and none of them completes one.
 - **Earlier Trainer data carries over.** Sessions, chord pairs and best counts
   use the same keys as before. The old interval ear trainer is gone; its best
   streak is not turned into Exercises records.
-- **Pedal and keys.** During a chord run, Next and Space count a change. Stop
-  ends the run; with no run it pauses the timer. At any other time the pedal
-  launches plan blocks as before. See [Hands-free control](CONTROLLER-REMOTE.md).
+- **Pedal and keys.** During a chord run, Next and Space count a change and
+  Back does nothing, so a stray press can't relaunch a plan block and lose the
+  run. Stop ends the run; with no run it pauses the timer. Folding the section
+  cancels a run. At any other time the pedal launches plan blocks as before.
+  See [Hands-free control](CONTROLLER-REMOTE.md).
 - **If the app last closed on the Trainer page**, it opens the Plan page and
   says where the cards went.
 

@@ -192,11 +192,12 @@
   // from here, else the first one (casual tools never complete, so 'the first
   // not done' alone would reopen the same Tuner block forever). BACK opens
   // the last block again. The Free practice cards (js/trainer.js) are asked
-  // first: while a one-minute chord run goes NEXT counts a change, and STOP
-  // cancels that run or else pauses the Free practice timer. The plan has no
-  // run of its own, so STOP does nothing else. Typed text a launch would
-  // wipe (paint() refills the fields on return) holds the pedal back: a foot
-  // bumped while writing lesson notes loses nothing.
+  // first: while a one-minute chord run goes NEXT counts a change and BACK is
+  // held (it must not relaunch a block: leaving the page cancels the run),
+  // and STOP cancels that run or else pauses the Free practice timer. The
+  // plan has no run of its own, so STOP does nothing else. Typed text a
+  // launch would wipe (paint() refills the fields on return) holds the pedal
+  // back: a foot bumped while writing lesson notes loses nothing.
   function unsaved(s) {
     if (el('pp-notes') && el('pp-notes').value !== (s.plan.source || '')) return (pending ? 'Accept' : 'Review') + ' or clear your lesson notes first';
     if (el('pp-link') && el('pp-link').value.trim() !== (s.student.docUrl || '')) return 'Review or clear the Google Doc link first';

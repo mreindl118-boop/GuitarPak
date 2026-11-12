@@ -2,8 +2,7 @@
  *   deck     PERFORM face (this file) over the Synth Deck's data, plus EDIT =
  *            the MIDI Hub's Control view (knob card + the deck's Knobs /
  *            Buttons / Sounds / Scope / Map), borrowed while this page is open
- *            and handed back on leave — one DOM, like the Keys page's 'synth'
- *            pill borrows the piano
+ *            and handed back on leave (one DOM)
  *   liveset  Live sets: pages of 16 presets (step 5)
  *   midihub  the MIDI Hub as it is (pill "Hub")
  * Plan: docs/SYNTH-TAB-PLAN.md. Decisions (Matt, 2026-10-25): STRIPS not

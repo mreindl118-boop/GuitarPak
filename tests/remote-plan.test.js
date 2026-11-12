@@ -84,8 +84,13 @@ async function newPage(browser, seed) {
   const lg = await page.evaluate(async () => {
     const o = {}, S = () => SLLumiPractice.snapshot();
     await __openLumi(); await __wait(150);
+    // every time the Piano page asks the lessons (js/piano.js onRemote reads App.keysLessons.remote
+    // at call time). In the lesson LIST their BACK and STOP answer false too, so the return value
+    // alone cannot show a fall-through: count the asks
+    let asked = 0; const klRemote = App.keysLessons.remote;
+    App.keysLessons.remote = function () { asked++; return klRemote.apply(this, arguments); };
     o.where = [App.active, App.lumiPractice.open, S().visible].join();
-    o.idle = J([__ra('back'), __ra('stop'), S().running]); o.idleLesson = !!App.keysLessons.run;
+    o.idle = J([__ra('back'), __ra('stop'), S().running]); o.idleLesson = !!App.keysLessons.run; o.idleAsked = asked;
     o.start = __ra('next'); o.s1 = S(); o.startBtn = __q('#lp-start').textContent;
     const t1 = S().target.join();
     o.skip = __ra('next'); o.s2 = S(); o.t2 = S().target.join(); o.t1 = t1;
@@ -101,22 +106,23 @@ async function newPage(browser, seed) {
     o.late = __ra('next'); o.s6 = S(); o.lateKept = S().target.join() === t5 && t5 !== o.t4;
     await __wait(950);
     o.later = __ra('next'); o.laterSkip = S().target.join() !== t5; o.s7 = S();
-    o.back = __ra('back'); o.backLesson = !!App.keysLessons.run; // the lessons' BACK would be a retry: never asked
+    o.back = __ra('back'); o.backLesson = !!App.keysLessons.run; o.backAsked = asked; // the lessons are never asked
     o.stop = __ra('stop'); o.s5 = S(); o.status = __q('#lp-status').textContent;
     o.stopAgain = __ra('stop');
     o.hw = __hw.slice();
+    App.keysLessons.remote = klRemote; // the later sections run unspied
     return o;
     function J(x) { return JSON.stringify(x); }
   });
   ok(lg.where === 'piano,true,true', 'LUMI practice is the open section on the Piano page: ' + lg.where);
-  ok(lg.idle === '[false,false,false]' && !lg.idleLesson, 'idle: Back and Stop are "nothing here" (false), nothing falls through to the lessons: ' + lg.idle);
+  ok(lg.idle === '[false,false,false]' && !lg.idleLesson && lg.idleAsked === 0, 'idle: Back and Stop are "nothing here" (false), nothing falls through to the lessons (they are never asked): ' + JSON.stringify([lg.idle, lg.idleAsked]));
   ok(lg.start === 'Start' && lg.s1.running && lg.s1.target.length === 1 && lg.s1.attempts === 0 && /Restart session/.test(lg.startBtn), 'NEXT not running = Start (the Start button path): ' + lg.start);
   ok(lg.skip === 'Skip' && lg.s2.running && lg.t2 !== lg.t1 && lg.s2.correct === 0 && lg.s2.attempts === 0, 'guided NEXT skips to the next target and counts nothing: ' + lg.t1 + ' -> ' + lg.t2);
   ok(lg.advancing && lg.race === 'Moving on…' && lg.raceTarget, 'a NEXT while the exact target is held does not skip it (the advance is on its way)');
   ok(lg.s4.correct === 1 && lg.s4.attempts === 1 && lg.t4 !== lg.t3, 'the pending advance still counts the answer once: ' + lg.s4.correct + '/' + lg.s4.attempts);
   ok(lg.late === 'Moving on…' && lg.lateKept && lg.s6.correct === 2 && lg.s6.attempts === 2, 'a NEXT just after the advance fired keeps the target it brought up (no second move): ' + lg.late + ' ' + lg.s6.correct + '/' + lg.s6.attempts);
   ok(lg.later === 'Skip' && lg.laterSkip && lg.s7.correct === 2 && lg.s7.attempts === 2, 'a NEXT well after the advance is a skip again, uncounted: ' + lg.later);
-  ok(lg.back === false && !lg.backLesson, 'BACK has nothing to do on LUMI practice (false) and starts no lesson');
+  ok(lg.back === false && !lg.backLesson && lg.backAsked === 0, 'BACK has nothing to do on LUMI practice (false), starts no lesson and never asks the lessons: ' + JSON.stringify([lg.back, lg.backAsked]));
   ok(lg.stop === 'Stopped' && !lg.s5.running && lg.status === 'Stopped. Start again when ready.' && lg.stopAgain === false, 'STOP = the Stop button (status text), a second Stop is "nothing here": ' + lg.status);
   ok(lg.hw.length === 0 && !lg.s5.armed && !lg.s5.tested && !lg.s5.leased, 'no device output, lease, port change or sound route was touched: ' + JSON.stringify(lg.hw));
 

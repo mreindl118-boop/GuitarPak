@@ -336,8 +336,8 @@ const MAP = { next: { midi: { t: 'cc', n: 86, ch: null, port: '' }, key: null },
     const R1 = __kl().run;
     o.run1 = !!R1 && R1.l.id === 'am-r' && !R1.demo && __kl().view === 'run';
     o.folded1 = !box.open && !lp.open; o.lumiOff1 = !S().running && !lp.running;
-    o.said1 = __q('#lp-status').textContent;
     await __wait(80); // the fold's 'toggle' event has run by now: it must leave the lesson alone
+    o.said1 = __q('#lp-status').textContent; // ...and the reason: its hide() must not replace close()'s message
     o.still1 = __kl().run === R1 && __kl().view === 'run';
     o.cin1 = __ra('next'); o.same1 = __kl().run === R1 && !S().running && !box.open;
     o.stop1 = __ra('stop');
@@ -378,8 +378,9 @@ const MAP = { next: { midi: { t: 'cc', n: 86, ch: null, port: '' }, key: null },
     // (4) a lesson opened from elsewhere (a Plan block, the Learn bar)
     __q('#lp-start').click(); o.lumiOn4 = S().running;
     App.keysLessons.open('dm-r', 'piano');
-    o.folded4 = !box.open && !lp.open && !S().running; o.said4 = __q('#lp-status').textContent;
+    o.folded4 = !box.open && !lp.open && !S().running;
     await __wait(80);
+    o.said4 = __q('#lp-status').textContent; // read after the fold's 'toggle' event, as in (1)
     o.next4 = __ra('next'); o.lesson4 = __kl().run && __kl().run.l.id; o.noLumi4 = !S().running;
     __ra('stop');
     // ... and a section left open on a page that is not showing is folded too
