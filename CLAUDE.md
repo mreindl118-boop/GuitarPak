@@ -294,8 +294,10 @@ js/lumi-practice.js LUMI note/triad practice (selectively recovered from
                   close(msg) = fold the section + stop + disarm. While open
                   the section ALONE answers the pedal (piano.js onRemote
                   returns its answer, no fall-through to the lessons or the
-                  runner), the lessons' own double-tap stands down, and with
-                  remote.dbl in simulated mode the lowest key is reserved
+                  runner), the lessons' lowest-key double-tap stands down (a
+                  touch double-tap on the lesson card still starts a lesson,
+                  which closes the section), and with remote.dbl in
+                  simulated mode the lowest key is reserved
                   (the Piano module's remoteKey). Closed = nothing changes
                   for lessons, runner, pedal and double-tap. Leaving the
                   Piano page, folding the section, window blur and app hide
@@ -452,10 +454,12 @@ js/practiceplan.js PRACTICE PLAN ('practiceplan', Learn group pill "Plan",
                   (#pp-tools-body); onShow / onHide call .show() / .hide();
                   onKey offers the key to .key(e) first (Space counts a
                   chord change during a run); remote() asks .remote(action)
-                  first (NEXT = count a change, STOP = cancel the run or
-                  pause the timer), then launches blocks as before. The
-                  timer is self-timed (tr.sessions), pauses when the page is
-                  left and never enters the plan's measured minutes.
+                  first (NEXT = count a change, BACK = held while a run goes,
+                  STOP = cancel the run or pause the timer), then launches
+                  blocks as before. Folding #pp-tools cancels a chord run
+                  (a 'toggle' listener in trainer.js). The timer is
+                  self-timed (tr.sessions), pauses when the page is left and
+                  never enters the plan's measured minutes.
 js/help.js        (?) button + guided page tours (TOURS per page id, spotlight
                   ring + card overlay, first-run welcome; help.seen/help.done)
 js/helix.js       HELIX STADIUM page ('helix', Guitar group pill "Helix",
@@ -799,8 +803,13 @@ A2 (the three folds: the Trainer page, the Synth pill, the LUMI pill):
   for an unknown id). pn.voice is unchanged, pn.synthPreset = the last synth
   sound. The Learn bar's "Synth keyboard" entry (js/learn-instruments.js,
   `voice: 'synth'`) opens Piano and calls setVoice with pn.synthPreset
-  (default 'saw'). `synth` as a Learn instrument CATEGORY id stays; Keys
-  lessons are credited to the entry instrument, never to a page id.
+  (default 'saw'). `synth` as a Learn instrument CATEGORY id stays. Keys
+  lessons are credited to the entry instrument, else to Piano, never to a
+  page id. The entry instrument is set only by the 'learn:lesson' event (the
+  Learn bar's "Keys scale lessons" entry, Exercises' "Open Keys lessons") or
+  App.keysLessons.open(id, instrument) (a Plan block), and is cleared on
+  leaving the Piano page or changing the Learn instrument. "Synth keyboard"
+  sets none: a lesson started after it is credited to Piano.
 - TRAINER = FREE PRACTICE on the Plan page: js/trainer.js is a card library,
   App.trainerCards = {mount, show, hide, key, remote}. js/practiceplan.js
   appends <details class="pp-tools" id="pp-tools"> AFTER .pp-wrap, mounts
@@ -813,26 +822,32 @@ A2 (the three folds: the Trainer page, the Synth pill, the LUMI pill):
   tr.earHarm are never read, written or turned into Exercises records
   (xp.js forbids seeding history). Remote on the Plan page: the cards are
   asked first (NEXT counts a change during a run and answers "Time's up" for
-  1.5 s after it; STOP cancels the run, else pauses the timer; BACK is
-  false), then the plan's own blocks.
+  1.5 s after it; STOP cancels the run, else pauses the timer; BACK is HELD
+  during a run, answering "Chord changes running", because the plan's BACK
+  is "Again: <block>", which leaves the page and cancels the run; with no
+  run BACK is false), then the plan's own blocks. Folding the section
+  cancels a run, so a hidden run never takes the pedal or Space.
 - LUMI PILL = A SECTION under the Keys lessons: <details id="pn-lumi">
   ("Notes and triads on the LUMI", closed by default, body #pn-lumi-body),
   driven through App.lumiPractice = {init, show, hide, close, stop, remote,
   remoteKey, open, running}. OPEN = OWNER, ONE OWNER AT A TIME: opening the
   section or starting a session stops a lesson run (App.keysLessons.halt(),
   which keeps the entry instrument) and the runner (App.keys.stopRunner);
-  a lesson starting, App.keysLessons.open(id) from a Plan block or the Learn
-  bar, and the runner starting call App.lumiPractice.close(msg) (fold + stop
-  + disarm). While it is open the section ALONE answers the pedal (piano.js
-  onRemote: no fall-through to the lessons or the runner), the lessons' own
-  double-tap stands down, and with remote.dbl in simulated mode the lowest
-  key is reserved (the Piano module's remoteKey). Closed, nothing changes
-  for lessons, runner, pedal or double-tap. NEVER add a state in which the
-  section is open while a lesson run or the runner is active. Guard every
-  call across these modules (`if (App.lumiPractice) …`, `App.keysLessons &&
-  App.keysLessons.halt`): tests/lumi-practice.test.js loads the file alone
-  into a mock App. css/lumi-practice.css is scoped to #pn-lumi; the focus
-  mode html.kl-running hides the section.
+  a lesson starting, a lesson opened from a Plan block or the Exercises
+  Progress tab (App.keysLessons.open(id)) or from the Learn bar (the
+  'learn:lesson' event; both go through keylessons releaseRunner), and the
+  runner starting call App.lumiPractice.close(msg) (fold + stop + disarm).
+  While it is open the section ALONE answers the pedal (piano.js onRemote:
+  no fall-through to the lessons or the runner), the lessons' lowest-key
+  double-tap stands down (a touch double-tap on the lesson card still starts
+  a lesson, which closes the section), and with remote.dbl in simulated mode
+  the lowest key is reserved (the Piano module's remoteKey). Closed, nothing
+  changes for lessons, runner, pedal or double-tap. NEVER add a state in
+  which the section is open while a lesson run or the runner is active.
+  Guard every call across these modules (`if (App.lumiPractice) …`,
+  `App.keysLessons && App.keysLessons.halt`): tests/lumi-practice.test.js
+  loads the file alone into a mock App. css/lumi-practice.css is scoped to
+  #pn-lumi; the focus mode html.kl-running hides the section.
 - TEXTS name the new places: the Settings hands-free list, the help welcome
   and the Piano / Plan tours in js/help.js (the 'trainer' tour is gone), the
   js/midi.js status "Choose a LUMI display output on the Piano page, under
