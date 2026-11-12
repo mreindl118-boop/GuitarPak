@@ -375,7 +375,8 @@ js/quiz.js        EXERCISES ('quiz', the practice HOME since v0.69.0): Musicca-
                   re-renders ONE card) / run (a fixed shell — #qz-runshell —
                   whose question area #qz-q is swapped with a fade; one footer
                   action #qz-act: Show answer -> Next) / done. onShow claims
-                  the transport (silences met/jam/loops).
+                  the transport (silences the metronome, Jam, a Keys lesson
+                  run and chart playback).
                   Stores qz.prog / qz.items (weak items picked more) /
                   qz.sound / qz.landed (one-time landing) / qz.home (home tab).
                   GAME LAYER (v0.71.0, Duolingo-style): home = stats strip
@@ -715,8 +716,9 @@ sequencer / sampler / plug-in API out, A2 the three folds, A3a + A3b
 `gear.html`, A4 storage prefix; its section 1 = the rules for every Phase A PR,
 Appendix C = words that look like a cut feature and are not). State per step:
 `docs/ROADMAP-2.0.md` "Phase A status". Phase A is NOT a release: never touch
-`APP_VERSION`, `version.json`, `android/` or `releases/`; in `sw.js` only the
-`CACHE` number, `ASSETS` and (A1) the fetch lookup. Today's look, no new
+`APP_VERSION`, `version.json`, `android/AndroidManifest.xml` or `releases/`; in
+`sw.js` only the `CACHE` number, `ASSETS` and (A1) the fetch lookup. Today's
+look, no new
 components.
 
 A1 (Studio space, sequencer/arranger, sampler, plug-in API removed):
