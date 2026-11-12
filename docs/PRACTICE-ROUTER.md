@@ -16,8 +16,10 @@ substitute note. With the switch off, original note pitches pass unchanged.
    sound output explicitly. Sound and display outputs must differ. Native
    Android/iOS bridges do not support these independent routes.
 2. Turn **Local Control OFF on the synth**, disable external MIDI Thru/echo
-   routing, turn soundLAB's MIDI Hub Thru off, and release keys and sustain
-   pedal. Acknowledge these prerequisites in the practice section. The app never
+   routing, turn MIDI Hub Thru off, and release keys and sustain pedal. Since
+   2.0 the Hub is in soundLAB Gear (`gear.html`): its Thru box is on the Hub
+   page there, and the switch is saved for both apps.
+   Acknowledge these prerequisites in the practice section. The app never
    changes the synth's Local Control setting. Without Local Control OFF the
    instrument's internal keyboard-to-voice path can still sound blocked keys.
 3. Start the practice session, then deliberately start the scale-locked sound
@@ -59,11 +61,21 @@ is sent. Failed/disconnected cleanup is reported as uncertain, retained across
 repeated Stop calls, and cleared on a fresh successful start. An unplugged
 device cannot receive note-offs; release any remaining voices on the instrument.
 
-The older MIDI Hub lacks a complete ledger of notes it forwarded before this
-route existed. Starting refuses while Hub Thru is enabled, and the explicit
+Since 2.0 the MIDI Hub and its Thru are in soundLAB Gear (`gear.html`), a
+second window over the same saved settings. Thru forwards only while a Gear
+window is open. The Hub lacks a complete ledger of notes it forwarded before
+this route existed. Starting refuses while the saved Thru switch is on,
+wherever it was switched on ("Turn MIDI Hub Thru off in soundLAB Gear and
+release all keys/pedal before starting this route."), and the explicit
 prerequisite to release keys/pedal prevents inheriting those unknown voices.
-While the route runs, the Hub's legacy raw Thru is suppressed even if its saved
-switch is changed. This does not rewrite that switch or claim prior hardware
+
+The switch is read at Start only, and the route in soundLAB cannot see a Gear
+window. (In 1.x the Hub was a page of the same app and kept its Thru quiet
+while the route ran; in Gear that test finds no route.) The two still do not
+run together: the route stops when its window loses focus or is hidden, which
+happens as soon as you click into a Gear window, so it is already stopped
+before the Thru box there can be ticked; and it does not start again while
+Thru is on. Nothing here rewrites the Thru switch or claims prior hardware
 voices can be inferred from software.
 
 ## Loop and hardware limits

@@ -1,3 +1,5 @@
+> 2.0: this page lives in soundLAB Gear (gear.html) since Phase A. Menu paths below are from 1.x.
+
 # Synth tab — Deck, Live, Hub (1.3)
 
 The Synth tab is soundLAB's control station for the synth on the cable (built around Matt's Yamaha

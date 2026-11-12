@@ -10,6 +10,12 @@ Move practice on from the instrument: no reaching for the iPad or the computer. 
 
 Set it up in **Settings › Hands-free control**. The Lights & help sheet shows what is set, with a *Set up* link.
 
+Since 2.0 there are two apps: soundLAB (`index.html`) and soundLAB Gear (`gear.html`: the Deck, Live sets,
+the Hub, Helix). The card is in **soundLAB › Settings**, and Gear users set the pedal up there too. Gear has
+no Settings page: its gear icon and the *Set up* link in its Lights & help sheet open soundLAB's Settings.
+Both apps read the same saved bindings, so a pedal learned in soundLAB works in Gear. [Two windows](#two-windows)
+says which app answers when both are open.
+
 ## What can press them
 
 - **A MIDI button or pedal.** Press *Learn* beside an action, then the button. The app takes the first
@@ -23,10 +29,10 @@ Set it up in **Settings › Hands-free control**. The Lights & help sheet shows 
     assigns to them.
   - A switch that latches sends on / off on alternate presses. Tick *Latching button* so that every
     press counts.
-  - A bound message is **claimed** in `js/midi.js` before any listener (`App.midi.setInputClaim`). It
-    never sustains, sounds, goes through the Hub's Thru, reaches the Woodshed's grading or answers a
-    question. It only advances. The Hub Monitor doesn't list it; it shows up as the `'midi:remote'`
-    event instead.
+  - A bound message is **claimed** in `js/midi.js` before any listener (`App.midi.setInputClaim`), in
+    soundLAB and in Gear alike. It never sustains, sounds, goes through the Hub's Thru, reaches the
+    Woodshed's grading or answers a question. It only advances. The Hub Monitor doesn't list it; it
+    shows up as the `'midi:remote'` event instead.
 - **A Bluetooth page turner.** These pedals type keys.
   - Tick *Page turner pedal* to map Page Down, Right or Down to Next, and Page Up, Left or Up to Back.
     Alternatively, *Learn* any key per action.
@@ -44,10 +50,14 @@ Set it up in **Settings › Hands-free control**. The Lights & help sheet shows 
     graded as always.
   - The Keys page's scale lessons keep their own double-tap (`kl.dbltap`: start / stop) and are never
     claimed. Their lowest-key double-tap stands down while the LUMI section is open.
+  - In soundLAB Gear the key is never reserved: on the Deck and Live sets the lowest key plays the
+    synth, and the Hub and Helix have nothing for it to do.
 
 ## What each page does
 
-The active page decides, through its module hook `onRemote(action, info)`:
+The active page decides, through its module hook `onRemote(action, info)`.
+
+### soundLAB (`index.html`)
 
 | Page | Next | Back | Stop |
 |---|---|---|---|
@@ -60,9 +70,22 @@ The active page decides, through its module hook `onRemote(action, info)`:
 | Practice plan | Launch the next block not yet done | Relaunch the last block | — |
 | Plan page: one-minute chord changes (Free practice) | Count a chord change | Nothing during a chord run (the press is held, so the run goes on) · with no run, the Practice plan row | End the chord run · with no run, pause the Free practice timer |
 | Fretboard / Tab / Notation runner, Songs | Play / pause | Restart | Stop |
-| Live sets, the Deck | Next slot (or next program; never while the Deck's Map Learn listens) | Previous | — |
 
-Two pages hold more than one thing a press could mean. Each has one rule:
+On the Songs page the pedal drives the bar-loop player. The score Player card under *Open a score* has
+its own Play and Stop buttons and does not answer the pedal.
+
+### soundLAB Gear (`gear.html`)
+
+| Page | Next | Back | Stop |
+|---|---|---|---|
+| Live sets | Next slot of the active set (not while slots are being edited or picked; while its foot-switch Learn listens, the press only says that this pedal is the remote's) | Previous slot | — |
+| The Deck | Next slot of the active Live set; with no set, the next program (never while the Deck's Map Learn listens or the preset builder is open) | Previous slot or program | — |
+| Hub, Helix | — | — | — |
+
+A step goes through the Deck's one send path, so a refused send (Synth out is the LUMI, no MIDI) moves
+nothing and the Deck says why. The Hub and Helix have nothing to move on; a toast says so.
+
+In soundLAB, two pages hold more than one thing a press could mean. Each has one rule:
 
 - **Piano page: the open LUMI section owns the pedal.** While *Notes and triads on the LUMI* is open, it
   alone answers. A press it has no use for does nothing: it never starts a lesson or the runner.
@@ -84,7 +107,43 @@ The order of checks:
 5. If the page has nothing to do, a toast says so.
 
 A big HUD (`#remote-hud`, `role=status`) confirms what happened, so you can read it from the bench.
-MIDI isn't a user gesture: if the sound is asleep, a toast asks for one tap on the screen.
+MIDI isn't a user gesture: if the sound is asleep, a toast asks for one tap on the screen (soundLAB
+only: in Gear a step sounds on the synth, so there is nothing to wake).
+
+## Two windows
+
+soundLAB and soundLAB Gear can be open at the same time: the link at the top of each opens the other,
+and it can be opened in a second window. Both windows hear the same pedal and both claim it, so a bound
+press never reaches the Hub's Thru, the Deck or the Live page as an ordinary message. One of them acts:
+
+- **The pedal belongs to soundLAB while a soundLAB window is visible**, focused or not. It keeps
+  answering while another program (FL Studio) has the focus. Two soundLAB windows both act, as before.
+- **Gear answers when no soundLAB window is visible**: soundLAB is minimised, on a hidden tab or closed.
+  While a soundLAB window is visible, Gear shows nothing for a bound press: no HUD, no toast, no step.
+- **Live sets have their own foot switch** (*Foot switch › Learn* on the Live page, stored as
+  `synthtab.fsCC`). The remote does not touch it. To step Live sets while soundLAB is visible, give that
+  foot switch a CC that is not bound to the remote. A CC that is bound to the remote cannot be learned
+  there.
+- **Keys** (a page-turner pedal, a learned key) go to the window that has the keyboard focus, as any
+  key does.
+
+How it works: soundLAB holds a Web Lock (`soundlab-remote-main`, shared) while its document is visible
+and lets it go when hidden. For each MIDI press Gear asks for that lock for an instant and acts only if
+it gets it, so in Gear a MIDI press acts a moment after the message. Nothing is stored. Where the
+browser has no Web Locks, Gear acts on a MIDI press only while its window has the focus; soundLAB is
+unchanged. A binding changed in soundLAB works in an open Gear window at once on the keyboard Gear
+listens to (or with *All keyboards*); a pedal on a port Gear has not opened is picked up when Gear next
+refreshes its ports (reload, reconnect, a device plugged in).
+
+**Not checked on real hardware.** The suites use fake MIDI ports and set each page's visibility
+themselves. To check on the owner's Windows PC with the LUMI and the MODX:
+
+- Gear in a second window keeps receiving and sending MIDI while soundLAB is open.
+- With both windows visible, one pedal press moves the lesson on and the MODX Performance does not
+  change.
+- With soundLAB minimised, the same pedal steps the Live set.
+- A MODX heard through Hear input sounds once, not twice, and keeps sounding when the window that
+  played it is closed (the other window takes over; see [PRACTICE-INPUTS.md](PRACTICE-INPUTS.md)).
 
 ## Store and API
 
@@ -92,10 +151,16 @@ MIDI isn't a user gesture: if the sound is asleep, a toast asks for one tap on t
   - `remote.map`: `{next|back|stop: {midi: {t, n, ch, port, latch}|null, key: {code, key}|null}}`
   - `remote.pt`: the page-turner keys
   - `remote.dbl`: the double-tap key
-  - All three are included in Settings › Backup.
+  - All three are included in Settings › Backup, and both apps read them.
 - **API:** `App.remote` exposes `learn`, `cancelLearn`, `clear`, `setLatch`, `setPageTurner`,
-  `setDoubleTap`, `map`, `summary`, `bindingText`, `fire(action, via)`, `mount` and `paint`.
+  `setDoubleTap`, `map`, `summary`, `bindingText`, `fire(action, via)`, `mount`, `paint` and
+  `holdsMain` (this document holds the shared lock: a visible soundLAB window; always false in Gear).
+  In Gear, `fire` with a MIDI `via` (`cc`, `pc`, `note`, `dbltap`) returns `null` and acts a task
+  later; `key`, `test` and no `via` stay synchronous. `mount` (the Settings card) is only called in
+  soundLAB.
 - **Routing:** `App.remoteAction(action, info)` and `App.remoteKeyPage()` live in app.js.
 - **Bus events:** `'remote'` `{action, via, handled}`, `'remote:map'` and `'midi:remote'`.
 - **Tests:** `tests/remote.test.js` covers the core: Learn, claiming, press edges, ports, page turner,
-  double-tap, routing and the Android bridge. `tests/remote-*.test.js` covers each page.
+  double-tap, routing, the Android bridge, and the two rules soundLAB keeps (a bound CC fires without
+  the focus; `holdsMain` follows visibility). `tests/remote-*.test.js` covers each page;
+  `tests/remote-gear.test.js` runs on `gear.html` (Live sets, the Deck) and holds the two-window cases.

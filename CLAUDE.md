@@ -32,7 +32,24 @@ roadmap before touching those areas.
 ## Layout
 
 ```
-index.html        tab shell; loads theory → app → modules → App.boot()
+index.html        soundLAB: tab shell; loads theory → app → modules →
+                  App.boot(). 14 pages + the Settings overlay; since 2.0
+                  Phase A3b it loads NONE of the seven soundLAB Gear files
+gear.html         soundLAB Gear (2.0 Phase A3b): the second app over the same
+                  scripts and the same store. <html data-app="gear">; the
+                  SAME shell markup as index.html from <body> to <main>
+                  (header, context bar, bottom tab bar, the two sheets; only
+                  the brand tag reads "gear" instead of "alpha") — a COPY
+                  until Phase B, so edit both files together
+                  (tests/assets.test.js compares them); its own <title> and
+                  footer; panels deck / liveset / midihub / helix, no Settings
+                  panel, no css/lumi-practice.css; 18 scripts in this order:
+                  theory, note-palette, app, midi, remote, midirules,
+                  audioin, metronome, scoreplayer, midihub, synthtab,
+                  synthlive, synthdeck-maps, synthdeck-scope, synthdeck,
+                  helix, help, lights; then App.boot() and the same sw.js
+                  registration; the same manifest.webmanifest. See the Phase
+                  A section (A3b) for what differs between the two apps.
 css/style.css     design system ("stage gear": #131114 ground, #ffab47 amber,
                   Bebas Neue display + Barlow body from fonts/; chord names
                   use --font-condensed — Bebas is caps-only)
@@ -40,7 +57,18 @@ js/theory.js      pure music-theory engine (scales, tunings, chords, diatonic
                   harmony, progressions) — no DOM
 js/app.js         shell: module registry, tab switching, shared AudioContext +
                   App.pluck, App.store (localStorage 'guitarlab.*'), App.on/emit
-                  event bus, APP_VERSION + auto-update checker
+                  event bus, APP_VERSION + auto-update checker. 2.0 Phase A3b
+                  TWO APPS FROM ONE FILE: APPS = {main, gear}, each {url,
+                  name, tabKey, pages, groups}; APP_ID ('gear' when <html
+                  data-app="gear"> or window.SL_APP says so, else 'main')
+                  picks PAGES / GROUPS / TAB_KEY / HOME. App.app = 'main'
+                  (soundLAB) | 'gear' (soundLAB Gear); App.goApp(owner, page)
+                  = leave for a page of the other app (location.href =
+                  <url>#<page>); App.switchTo does it by itself for an id of
+                  the other app (resolvePage's cross-app guard). #page in the
+                  address (gear.html#midihub, index.html#settings) is read at
+                  boot and on hashchange, then cleared. Details: Phase A
+                  section, A3b.
 js/midi.js        MIDI service (App.midi: in/out ports, note/bend/pressure
                   events on the bus). Backends: Web MIDI, or the NATIVE
                   bridge protocol (window.__glMIDI.onports/onmidi/onstatus +
@@ -101,10 +129,11 @@ js/midi.js        MIDI service (App.midi: in/out ports, note/bend/pressure
                   midi.appSound is false (Settings > MIDI keyboard switch,
                   App.midi.setAppSound) or any App.midi.mute(owner, on) is
                   held (the Hub holds 'midihub' while open unless midihub.
-                  hear) - only piano.js's voice honours it; pads, lessons,
-                  quiz, range learning and lights still react (unlike
-                  tone-in's silent:true). A synth that sounds itself is
-                  never doubled.
+                  hear; in soundLAB Gear that hold mutes nothing: there is
+                  no app voice there) - only piano.js's voice honours it;
+                  pads, lessons, quiz, range learning and lights still react
+                  (unlike tone-in's silent:true). A synth that sounds itself
+                  is never doubled.
                   v0.79.0 lights.display remains the legacy Guide focus style
                   (App.midi.display / setDisplay, 'lights:display'): target-only
                   versus scale-alongside-target, with steady current and
@@ -179,7 +208,44 @@ js/audioin.js     SOUND INPUT (App.audioIn): the ONE shared live-input service.
                   (audio.inPicked); a missing chosen input/output is kept, and
                   audio.outId is re-applied (setSinkId) when it is listed again.
                   Suite tests/audioin.test.js (Chromium fake media device).
-                  Loaded right after tonein.js.
+                  2.0 Phase A3b ONE WINDOW ROUTES HEAR INPUT: soundLAB and
+                  soundLAB Gear both load this file and read the same
+                  audio.monitor, so without a rule a synth on USB audio would
+                  play twice. Only the document that holds the Web Lock
+                  'soundlab-hear-input' (exclusive; every document asks at
+                  load and keeps it for its lifetime, Hear input on or off)
+                  connects the input to the speakers (`owner`; route() refuses
+                  without it). One window open = it has the lock 3-50 ms
+                  after load, long before the 500 ms launch restore, and every
+                  path is as before. Not the owner = a fourth HOLD, why
+                  'other' ("Your other soundLAB window has Hear input. Press
+                  On to hear it here instead."): nothing is opened for Hear
+                  input alone (applyMonitor, reopen, the return to visible,
+                  the launch restore, setDevice); a hold(tag) still opens the
+                  device, never routed. setMonitor(on) in a window that is
+                  not the owner writes the store, takes the lock ({steal:
+                  true}) and then does what it always did: On or Off pressed
+                  in a window makes THAT window the owner. The window it was
+                  taken from (its request rejects) drops consent + ack (a
+                  microphone waits for a press again), re-reads audio.monitor
+                  (still on = the 'other' hold, off = off there too) and
+                  queues again, so it takes over when the owner closes (a
+                  grant from the queue with audio.monitor on = the launch
+                  restore, permission check first). ONE 'storage' listener
+                  (key ending in audio.monitor, or null) keeps the 'other'
+                  hold and the views in step with a press made in the other
+                  window; it never routes, opens or steals (Chromium can
+                  deliver the lock news before the stored value). No Web
+                  Locks, or a refused request (the claude.ai viewer, old
+                  WebViews) = owner from the start, everything as before.
+                  Nothing is stored. App.audioIn.mountSwitch(el) = "Hear
+                  input" Off / On seg + a status line + a link to
+                  index.html#settings, for a page without the Settings card
+                  (Gear's Hub header, #mh-hearin); idempotent, repaints on
+                  'audioin:state'. _t().owner = test hook. The two-window
+                  cases are in tests/gear.test.js.
+                  Loaded right after tonein.js (soundLAB) / midirules.js
+                  (soundLAB Gear).
 js/remote.js      CONTROLLER REMOTE (App.remote, 2.0 beta / v2; docs/CONTROLLER-
                   REMOTE.md): practice moves on from the instrument. Actions
                   next / back / stop, each bound in Settings › Hands-free
@@ -202,6 +268,33 @@ js/remote.js      CONTROLLER REMOTE (App.remote, 2.0 beta / v2; docs/CONTROLLER-
                   Store remote.map / remote.pt / remote.dbl; bus 'remote',
                   'remote:map'. Loaded right after midi.js. Suites
                   tests/remote.test.js (core) + tests/remote-<area>.test.js.
+                  2.0 Phase A3b LOADED BY BOTH APPS: soundLAB and soundLAB
+                  Gear read the same bindings and both CLAIM a bound message
+                  (it never reaches Thru, the Deck or the Live page's foot
+                  switch as data). THE SETTINGS CARD IS IN SOUNDLAB (mount is
+                  only called there). WITH BOTH VISIBLE ONLY SOUNDLAB ACTS on
+                  a MIDI press (Web Lock 'soundlab-remote-main'): soundLAB
+                  holds it in shared mode while its document is visible
+                  (asked at load, on return to visible and on pageshow; let
+                  go on hide and pagehide) and fire() is unchanged there:
+                  visible = it acts, focused or not (FL Studio may have the
+                  focus). In Gear a press with a MIDI via (cc / pc / note /
+                  dbltap) runs only inside locks.request(LOCK, {ifAvailable:
+                  true}) = only while no soundLAB window is visible; ONE
+                  question at a time (presses that arrive meanwhile join it
+                  and act in order; one older than LOCK_MS 1000 never acts);
+                  a press Gear did not take puts the debounce back; fire()
+                  returns null for a MIDI via in Gear and acts a task later.
+                  Keys and direct calls ('key', 'test') stay synchronous. No
+                  Web Locks or a refused request: Gear acts on a MIDI press
+                  only while document.hasFocus(). No sound hint in Gear (a
+                  step sounds on the synth). App.remote.holdsMain (getter:
+                  this document holds the shared lock; always false in Gear).
+                  'remote:map' does not cross windows: Gear reads remote.map
+                  on every message, but a pedal on a port Gear has not opened
+                  is claimed only after its next port refresh. Suite
+                  tests/remote-gear.test.js (gear.html: Live sets, the Deck,
+                  the two-window cases).
                   ANSWER BY KEY (quiz.js keyAnswerable): a choice question with
                   no playable answer takes a WHITE key per choice (<= 7: C-B
                   any octave; more: white keys up from range().lo's C), badge
@@ -226,15 +319,23 @@ js/midirules.js   MIDI RULES (App.midiRules, 2.0 Phase A3a): the MIDI Hub's
                   ENDS in midihub.rulesIn (or is null = a cleared store): the
                   box ticked in ANOTHER window of the origin; the window that
                   ticks it calls install() itself (the Hub's installFilter).
-                  active() -> {on, rules} (rules = enabled count; for the
-                  Settings status line A3b adds). Bus 'midirules:state' {on,
-                  rules} when the installed state changed (the Hub's box
-                  #mh-rulesin listens, so it shows what THIS window has
-                  installed after another window switched it). Reads
-                  midihub.rules / midihub.rulesIn, never writes. Loaded right
-                  after remote.js. Checks live in tests/midihub.test.js.
+                  active() -> {on, rules} (rules = enabled count; soundLAB's
+                  Settings line #set-midi-rules shows it). Bus
+                  'midirules:state' {on, rules} when the installed state
+                  changed (the Hub's box #mh-rulesin and that Settings line
+                  listen, so each shows what THIS window has installed after
+                  another window switched it; it fires on an on/off flip, not
+                  when only the rule count changes). Reads midihub.rules /
+                  midihub.rulesIn, never writes. Loaded by BOTH apps, right
+                  after remote.js: since 2.0 Phase A3b the Hub and its Rules
+                  editor are in soundLAB Gear, and this file is what keeps
+                  "Apply to what soundLAB hears" working in soundLAB. Checks
+                  live in tests/midihub.test.js (gear.html) and tests/
+                  trim.test.js (a stored rule still shapes what the Piano
+                  page receives).
 js/metronome.js   ┐ feature modules; each registers (metronome = the corner
-                  │  sheet, not a page — see OVERLAY SHEETS)
+                  │  sheet, not a page — see OVERLAY SHEETS; loaded by both
+                  │  apps, the rest of this block by soundLAB only)
 js/fretboard.js   │ App.register(name, {init, onShow, onHide, onKey})
 js/chords.js      │ DOM ids/CSS prefixed met-/fb-/ch-/jam-/tun-
                   │ (chords: chord-explorer neck + theory panel + progression
@@ -318,6 +419,24 @@ js/songs.js       │ (songs: user-imported ASCII tab / MIDI parsed on-device,
                   │  Practice (window.Woodshed.importMidi + addScore -> shed),
                   │  Open as tab (App.songs.fromMidi/load, text -> the paste
                   │  box). Suite tests/oneopen.test.js.
+                  │  2.0 Phase A3b THE PLAYER CARD IS ON THIS PAGE (the Hub
+                  │  went to soundLAB Gear): <div id="sg-player" hidden>, a
+                  │  plain host right after the "Open a score" card (the
+                  │  module renders its own .card inside), SLScorePlayer.mount
+                  │  (el, {ports: true, noOut: 'No synth output yet. Connect
+                  │  your keyboard in Settings › MIDI keyboard.', connect:
+                  │  {label: 'Open Settings', run -> App.switchTo('settings')},
+                  │  show -> switch to songs + unhide + scrollIntoView}).
+                  │  Hidden until "Play on synth" sends it a file; #sg-openmsg
+                  │  then reads "In the Player below: <title>. Press Play
+                  │  there." onShow -> SLScorePlayer.paint() (the output and
+                  │  the Part are stored settings a Gear window can change);
+                  │  onHide and pagehide -> SLScorePlayer.pause(). "Open as
+                  │  tab" on the card (#mh-pltab) lands on this same page, so
+                  │  two click listeners scroll the tab card into view when
+                  │  the song changed. CSS '#sg-player #mh-plports[hidden]
+                  │  {display:none}' (.row's display:flex beats [hidden]).
+                  │  The pedal (plRemote) drives the bar-loop player only.
 js/lumi-practice.js LUMI note/triad practice (selectively recovered from
                   b8ccb55; see docs/LUMI-PRACTICE.md). Since 2.0 Phase A2 a
                   SECTION ON THE PIANO PAGE, not a page: piano.js init mounts
@@ -385,7 +504,10 @@ js/trainer.js     │ (NOT a page since 2.0 Phase A2: a CARD LIBRARY mounted by
 js/theorytab.js   │ (theory: circle of fifths + key guide + degree ear quiz)
 js/settings.js    ┘ (settings: app-level prefs — theme dark/light/auto; MIDI
                      ports + bend; lighting moved to Lights & help)
-                     1.4.0 GEAR CARDS (rebuilt, not patched): MIDI keyboard =
+                     SOUNDLAB ONLY (2.0 Phase A3b): gear.html has no Settings
+                     panel and does not load this file; the gear icon there
+                     opens index.html#settings.
+                     1.4.0 DEVICE CARDS (rebuilt, not patched): MIDI keyboard =
                      Connect -> "Found:" chips per device (what soundLAB does
                      with it) -> Keyboard / Key lights selects -> "soundLAB
                      plays my keys" Auto/Always/Never (#set-midi-voice ->
@@ -402,10 +524,28 @@ js/settings.js    ┘ (settings: app-level prefs — theme dark/light/auto; MIDI
                      it (audio.inDefault); the old audio.inPicked no longer
                      blocks it. Windows "Default"/"Communications" duplicates
                      are not listed.
+                     2.0 Phase A3b: #set-midi-rules (MIDI keyboard card,
+                     after the Connect row; hidden unless App.midiRules.
+                     active() reports the box on AND >= 1 enabled rule) reads
+                     "MIDI Hub rules are changing what soundLAB hears (N
+                     rules). Edit them in soundLAB Gear." + #set-midi-rules-go
+                     "Open the Hub" -> App.goApp('gear', 'midihub'); painted
+                     at init, on show and on 'midirules:state'. The device
+                     chip of a Helix reads "Helix (in soundLAB Gear)". The
+                     Hands-free card names Live sets and the Deck as Gear
+                     pages and says which app answers the pedal when both
+                     are on screen. The Sound card paints the 'other' hold of
+                     js/audioin.js like any hold; its 'audioin:state'
+                     listener also lets the meter go (meterHeld) when the
+                     last use of the input ended in ANOTHER window (Off
+                     pressed on Gear's Hub while Settings is open here), or
+                     the meter would keep the device open.
 js/lights.js      LIGHTS & HELP control center (sheet 'lights', header
                   #lights-btn): Help level + key lights (on/off, LUMI colors,
                   brightness, keyboard type, status/range, test) — the same
-                  settings every page reads.
+                  settings every page reads. Loaded by both apps; in soundLAB
+                  Gear its two ways into Settings (App.switchTo('settings'))
+                  leave for index.html#settings.
 js/quiz.js        EXERCISES ('quiz', the practice HOME since v0.69.0): Musicca-
                   style course — COURSE topic > unit > mode (treble/bass/staff,
                   piano, neck, ear, theory) > levels of 10 questions, 8 = pass,
@@ -505,7 +645,16 @@ js/practiceplan.js PRACTICE PLAN ('practiceplan', Learn group pill "Plan",
                   never enters the plan's measured minutes.
 js/help.js        (?) button + guided page tours (TOURS per page id, spotlight
                   ring + card overlay, first-run welcome; help.seen/help.done)
-js/helix.js       HELIX STADIUM page ('helix', Guitar group pill "Helix",
+                  ONE FILE FOR BOTH APPS (2.0 Phase A3b): TOURS is keyed by
+                  page id, so each app shows the tours of its own pages and
+                  the two sheets' tours in both. The welcome is about
+                  soundLAB's pages: soundLAB Gear never shows it and leaves
+                  help.seen alone. The Hub tour has no App voice step and
+                  says Thru runs while Gear is open; the Songs tour has a
+                  step on #sg-player.
+js/helix.js       soundLAB Gear — HELIX STADIUM page ('helix': Gear's own
+                  "Helix" tab, group ghelix, one page so no pill strip; in
+                  1.x the Guitar group's "Helix" pill;
                   0.82.0; prefix hx-, store hx.*; built in — it began as a
                   plug-in, before 2.0 removed the plug-in API).
                   NOTHING CONNECTS AT BOOT: init builds the
@@ -536,9 +685,11 @@ js/helix.js       HELIX STADIUM page ('helix', Guitar group pill "Helix",
                   shared output only when IT is the Helix); FAVORITES hx.favs
                   (CC32+PC+snapshot, byte preview, ★ fills from the bridge's
                   numbering); OBSERVED panel. Docs
-                  docs/HELIX-STADIUM.md, suite tests/helix.test.js (fake MIDI
-                  ports + fake bridge, incl. port isolation), hook
-                  window.SLHelix.
+                  docs/HELIX-STADIUM.md, suite tests/helix.test.js (on
+                  gear.html; fake MIDI ports + fake bridge, incl. port
+                  isolation), hook window.SLHelix. 2.0 Phase A3b: the
+                  footswitch-mode seg #hx-fsmode wraps like .hx-views (it
+                  made the page scroll sideways on a phone).
 js/scoreplayer.js SCORE PLAYER (window.SLScorePlayer, 2.0 Phase A3a): the
                   MIDI Hub's v1.1.0 Player, cut out of js/midihub.js so Songs'
                   "Open a score" needs no Hub. Logic MOVED, not rewritten:
@@ -551,8 +702,9 @@ js/scoreplayer.js SCORE PLAYER (window.SLScorePlayer, 2.0 Phase A3a): the
                   DecompressionStream). Plays through App.midi.
                   bindMusicalOutput(App.midi.synthOut.id()) - notes + CC64
                   only - so Pause / Stop, a host's pause() (the Hub: Panic,
-                  onHide, pagehide) and flushMusicalOutputs release
-                  everything; 8 ms ticker. midihub.plTempo (%), plVel (cap),
+                  onHide, pagehide; Songs: onHide, pagehide) and
+                  flushMusicalOutputs release everything; 8 ms ticker.
+                  midihub.plTempo (%), plVel (cap),
                   plRoute 'file' | 'part' (the Part = midihub.ch, its word
                   Part / Ch from midihub.profile, both read from the store),
                   plLoop, plTrans (-12..12), plShift {on, fr, fs, tr, ts} =
@@ -569,13 +721,15 @@ js/scoreplayer.js SCORE PLAYER (window.SLScorePlayer, 2.0 Phase A3a): the
                   DOM. opts {show = what show() calls; ports: true = own
                   "Synth out" + "Channel" selects writing midihub.outId /
                   midihub.ch, for a host with no Hub header (the row is
-                  display:none until MIDI is ready; with ports the two texts
-                  that name the Hub change too: the tips line says "the
-                  Channel picked above", Open as tab files the song as "from
-                  the Player"); noOut = the line
-                  while there is no synth output (default "No synth output
-                  yet — connect MIDI above"); connect {label, run} = a
-                  .btn.sm after it}; the Hub passes only show. paint() = the
+                  display:none until MIDI is ready, and its selects never
+                  grow wider than the card: a Bluetooth LUMI's long port
+                  name; with ports the tips line says "the Channel picked
+                  above" instead of "the Part picked in Control"); noOut =
+                  the line while there is no synth output (default "No synth
+                  output yet — connect MIDI above"), also what Play toasts
+                  then; connect {label, run} = a
+                  .btn.sm after it}; the Hub passes only show, the Songs page
+                  all four. paint() = the
                   REPAINT PATH: the host calls it when ports, Part or profile
                   change, the module calls it itself on 'midi:state' and
                   'lights' (what a mount without a Hub relies on); returns at
@@ -588,17 +742,23 @@ js/scoreplayer.js SCORE PLAYER (window.SLScorePlayer, 2.0 Phase A3a): the
                   song's own tempo, notes shifted as set) -> App.songs.
                   fromMidi -> load -> the Songs page (js/songs.js: App.songs
                   {fromMidi, load, toAscii, current} + an Export tab button);
-                  where App.songs is absent (Gear, A3b) one line stands in
-                  for the button. CSS App.injectCSS('scoreplayer') = the
+                  where App.songs is absent (soundLAB Gear) one line stands
+                  in for the button: "Open as tab is on the Songs page in
+                  soundLAB." CSS App.injectCSS('scoreplayer') = the
                   .mh-pl* rules + the Hub classes the card uses (.mh-cv-head,
                   .mh-mono, .mh-chk, .mh-warn), so the card is styled where
-                  the Hub's CSS is absent. In A3a the one mount is the Hub's
-                  Player view; A3b mounts it on the Songs page in soundLAB
-                  (the Hub's mount goes to Gear).
-                  Loaded before js/midihub.js. Suites tests/midihub-player.
-                  test.js (through the SLMidiHub aliases) + tests/oneopen.
-                  test.js (also the per-mount options, on a card mounted with
-                  ports / noOut / connect while MIDI connects after boot).
+                  the Hub's CSS is absent. TWO MOUNTS SINCE 2.0 Phase A3b,
+                  one per document: soundLAB = the Songs page's #sg-player
+                  (ports + noOut + connect + show; js/songs.js), soundLAB
+                  Gear = the Hub's Player view #mh-player (show only).
+                  Loaded after js/pads.js in index.html, before js/midihub.js
+                  in gear.html. Suites tests/midihub-player.test.js (on
+                  gear.html, through the SLMidiHub aliases; also the Hub's
+                  mount, which passes no per-mount option, with MIDI
+                  connected after boot) + tests/oneopen.test.js (on
+                  index.html: the three "Open a score" routes and the Songs
+                  mount with its per-mount options, MIDI connected after
+                  boot through Settings).
                   Neither proves the REPAINT PATH; tests/midihub.test.js does:
                   the Hub's hook (a Part button and the header's Synth out
                   select reach the card) and, with that hook stubbed, the
@@ -607,7 +767,9 @@ js/scoreplayer.js SCORE PLAYER (window.SLScorePlayer, 2.0 Phase A3a): the
                   synth.test.js) calls SLMidiHub.player / SLMidiHub.scoreToMidi
                   and must call SLScorePlayer / SLScorePlayer.scoreToMidi
                   instead.
-js/midihub.js     MIDI HUB page ('midihub', Keys group, pill "MIDI", v0.78.0;
+js/midihub.js     soundLAB Gear — MIDI HUB page ('midihub', the "Hub" pill of
+                  Gear's Synth tab; v0.78.0 as "MIDI" under Keys, 1.3 under
+                  Synth, 2.0 Phase A3b out of index.html;
                   prefix mh-): read / write / reshape plain MIDI for ANY
                   device on App.midi's ports — device-AGNOSTIC by design,
                   PROFILES (generic default / yamaha MODX-MONTAGE / roland)
@@ -639,7 +801,8 @@ js/midihub.js     MIDI HUB page ('midihub', Keys group, pill "MIDI", v0.78.0;
                   key lights are on for a non-LUMI output (a synth would
                   play the "lights"). Panic = 123/120/64/bend on 16 chans.
                   window.SLMidiHub = test hook (decode, applyRules,
-                  PROFILES, parseHex, hex, rules). Suite tests/midihub.test.js.
+                  PROFILES, parseHex, hex, rules). Suite tests/midihub.test.js
+                  (on gear.html, like midihub-lock / -wheel / -player).
                   v0.80.0 SYNTH CONTROL: the Hub sends through its OWN output
                   (midihub.outId: a port id | 'shared' = the key-light
                   output | unset = auto: a synth-named port, port 1 first,
@@ -666,8 +829,42 @@ js/midihub.js     MIDI HUB page ('midihub', Keys group, pill "MIDI", v0.78.0;
                   zone's Part); the Rules view has a Split row; Thru never
                   forwards to a LUMI-named output; views renamed Deck / Keys
                   / CCs (ids unchanged). The MIDI Hub is the 'Hub' pill of
-                  the SYNTH group (app.js GROUPS gsynth: deck, liveset,
-                  midihub), no longer under Keys.
+                  the SYNTH group (app.js APPS.gear.groups gsynth: deck,
+                  liveset, midihub), no longer under Keys.
+                  2.0 Phase A3b IN SOUNDLAB GEAR (a second document over the
+                  same store; index.html does not load this file): THRU +
+                  KEY SPLITS forward from THIS document only = only while a
+                  Gear window is open; the Thru box's tooltip and
+                  #mh-thruinfo say "Thru runs while soundLAB Gear is open."
+                  (inGear()), soundLAB says it once at its start
+                  (gear.thruTold). The Thru line still skips while
+                  App.practiceRouter.active, but that module is not loaded
+                  in Gear, so a practice route in a soundLAB window is not
+                  seen here. The two still never run together: the route
+                  refuses to start while midihub.thru is stored on, and it
+                  stops when its window loses focus (a click into a Gear
+                  window), before the Thru box can be ticked. RULES
+                  ON INPUT still reach soundLAB (js/midirules.js). APP VOICE:
+                  Gear has none (hasVoice() = !!App.keys), so #mh-hear and
+                  its label #mh-hearlab are hidden (`.mh-chk[hidden]
+                  {display:none}`: .mh-chk's inline-flex beats [hidden]), the
+                  "voice is muted here" text is left out and the Learn
+                  view's doubled-sound item points at soundLAB › Settings ›
+                  MIDI keyboard; the mute calls stay (harmless). HEAR INPUT:
+                  <span id="mh-hearin"> in the #mh-ports row, filled at the
+                  end of render() by App.audioIn.mountSwitch (Gear only:
+                  Gear has no Settings page); init (Gear only) shows ONE
+                  App.toast per start when 'audioin:state' reports want +
+                  held with why perm | mic | fell: "<msg> The switch is on
+                  the Hub page." (8 s; why 'other' needs no word, and nothing
+                  is said while the Hub page itself is open: the line beside
+                  the switch says why). On, but held = the Settings card's
+                  held look (`#mh-hearin button.held`). TRAP: #mh-ports is
+                  `hidden` until MIDI is ready, but `.row`'s display:flex
+                  beats the attribute, so the row (and the switch in it) is
+                  on screen from the start, as on main. Whoever adds a
+                  `.row[hidden]` rule must move #mh-hearin out of #mh-ports
+                  first, or the toast points at a switch nobody can see.
                   v1.1.0 PLAYER view ('player', after Control). Since 2.0
                   Phase A3a the Player is js/scoreplayer.js (the entry above):
                   the view is only its host #mh-player, and render() calls
@@ -682,8 +879,11 @@ js/midihub.js     MIDI HUB page ('midihub', Keys group, pill "MIDI", v0.78.0;
                   (getters) of SLScorePlayer / SLScorePlayer.scoreToMidi,
                   kept so tests/midihub-player.test.js runs unchanged; new
                   code calls SLScorePlayer. No reader, key shifter, transport
-                  or paint code of the Player is left in this file.
-js/synthdeck.js   SYNTH DECK (v1.2.0): the MIDI Hub's Control view as a real
+                  or paint code of the Player is left in this file. In Gear
+                  the card has no "Open as tab" button (no App.songs): one
+                  line names the Songs page in soundLAB.
+js/synthdeck.js   soundLAB Gear — SYNTH DECK (v1.2.0): the MIDI Hub's Control
+                  view as a real
                   control surface for the synth on the cable (built around the
                   owner's MODX8+, device-agnostic by design). Mounted by
                   midihub.js render() into #mh-deck (Now bar + sub-tabs) and
@@ -719,12 +919,27 @@ js/synthdeck.js   SYNTH DECK (v1.2.0): the MIDI Hub's Control view as a real
                   them, Reset Hub keeps decklib + names. hubKnobs(profile)
                   lets the map redefine the Hub card's own knobs (null =
                   built-ins). Docs docs/SYNTH-DECK.md; suites synthdeck +
-                  synthdeck-scope.
-data/             app data files: modx-performances.json (2,143 MODX factory
-                  Performance names by LSB/PC, parsed from a public Cakewalk
-                  .ins list; MSB 63 and 64 share the layout). In sw ASSETS,
-                  the artifact build and the APK asset copy.
-js/synthtab.js    SYNTH TAB (1.3, docs/SYNTH-TAB.md): pages 'deck' (the play face
+                  synthdeck-scope (both on gear.html).
+                  2.0 Phase A3b: a preset's key restore (applyApp) writes
+                  fb.root / fb.scale / fb.mode to the STORE before it emits
+                  fb:set (root 0-11, a Theory.SCALES id, mode 1-7; anything
+                  else is left alone): Gear loads no Fretboard to write them,
+                  and the context bar, the key lights, Scale Lock and the
+                  Hub's scale boundary read the key back from the store.
+                  The factory names (map.nameFile, an XHR on first use) emit
+                  'deck:factorynames' when they are in: js/synthtab.js
+                  repaints the Deck page's Now bar on it. The Deck is Gear's
+                  first page, on screen before the file has loaded; without
+                  the event it kept "Program 1 · Bank 63/0" until some MIDI
+                  arrived (in soundLAB the Deck was never the first page).
+data/             app data files, used by soundLAB Gear: modx-performances.
+                  json (2,143 MODX factory Performance names by LSB/PC, parsed
+                  from a public Cakewalk .ins list; MSB 63 and 64 share the
+                  layout) for the Deck's bank browser. In sw ASSETS, the
+                  artifact build's asset list, the APK asset copy and (since
+                  A3b) the iOS copy.
+js/synthtab.js    soundLAB Gear — SYNTH TAB (1.3, docs/SYNTH-TAB.md): pages
+                  'deck' (Gear's HOME; the play face
                   over the Synth Deck: Now bar, STRIPS not knobs with a row
                   picker that mirrors the MODX knob-function button, Assign
                   knobs named from the Performance dump, chips + Scenes,
@@ -743,13 +958,22 @@ js/synthtab.js    SYNTH TAB (1.3, docs/SYNTH-TAB.md): pages 'deck' (the play fac
                   attributes/text change) and midi:raw repaints only on CC /
                   Program Change / SysEx - the MODX's MIDI clock (~36/s) used
                   to rebuild the buttons under a finger and eat taps. Suite
-                  tests/synthconnect.test.js.
-js/synthlive.js   page 'liveset': Live sets in pages of 16 (presets or MODX
+                  tests/synthconnect.test.js (on gear.html, like synthtab and
+                  synthconn).
+js/synthlive.js   soundLAB Gear — page 'liveset': Live sets in pages of 16
+                  (presets or MODX
                   Live Set slots MSB 62), stepping (Next/Prev, foot switch CC
                   synthtab.fsCC, LUMI octave buttons option), GO LIVE (bars
                   fold away, keep-awake, Lock = press-and-hold, Panic),
                   PROFILES (whole setups: library + sets + settings; export /
                   import JSON). SLSynthLive hook; suite tests/synthtab.test.js.
+                  2.0 Phase A3b: Go live holds the wake tag through
+                  App.wake.acquire('synthlive') / release (before, it called
+                  App.wake as a function, which threw into its try/catch and
+                  never held anything). The foot switch (synthtab.fsCC, on
+                  'midi:raw') is NOT the remote: it steps while a soundLAB
+                  window is visible too, provided its CC is not bound to the
+                  remote (a bound CC is claimed before 'midi:raw').
 js/pads.js        drum pads page ('pads', Keys group pill "Pads"; prefix pd-).
                   PLAY-ONLY since 2.0 Phase A, until Phase C rebuilds it as
                   rhythm practice: Record, Play loop, Click, Clear and the
@@ -811,13 +1035,21 @@ android/          APK project — build.ps1 (no Gradle: javac→d8→aapt→zipa
                   version.json "version". The signing key soundlab.keystore
                   (passwordless PKCS12, SHA-256 5A:10:EC:B5:...:17:1A) is
                   NEVER in this repo; see APK NOTE below for where it lives.
+                  Both scripts copy index.html AND gear.html (2.0 Phase A3b)
+                  into the bundled offline assets; no APK was built for it
+                  and gear.html inside the WebView is untested (Phase I).
 ios/              WKWebView wrapper (XcodeGen project.yml + Swift; needs a Mac
-                  to build — the PWA is the primary iPad install)
+                  to build — the PWA is the primary iPad install).
+                  sync-web.sh copies index.html, gear.html, the manifest and
+                  css js icons fonts samples data (gear.html and data/ since
+                  A3b; data/ was missing before)
 releases/         built signed APK (committed; raw URL = download link)
-tools/helix-bridge.js  Helix Stadium bridge for the Helix page, js/helix.js (run
+tools/helix-bridge.js  Helix Stadium bridge for soundLAB Gear's Helix page,
+                  js/helix.js (run
                   `node tools/helix-bridge.js [host]`; finds p35x1.local / mDNS)
 tools/helix-defs.json  Stadium model + parameter id table the bridge serves
-tools/artifact_build.py  stages the multi-file claude.ai artifact (see below)
+tools/artifact_build.py  stages the multi-file claude.ai artifact: soundLAB
+                  only, never gear.html (see below)
 version.json      auto-update feed (source of truth for latest version)
 ```
 
@@ -836,8 +1068,11 @@ components.
 A1 (Studio space, sequencer/arranger, sampler, plug-in API removed):
 
 - ONE PAGE SET (js/app.js): `PAGES` = the one flat page list, `HOME =
-  PAGES[0]` ('quiz'), `GROUPS` = a plain array of the six tab groups, the last
-  page is stored in `app.tab` (`TAB_KEY`). Gone: SPACES, App.space,
+  PAGES[0]`, `GROUPS` = a plain array of tab groups, the last page is stored
+  under `TAB_KEY`. Since A3b there is one such set PER APP and all four come
+  from `APPS[APP_ID]`: soundLAB 14 pages / five groups / HOME 'quiz' /
+  `app.tab`, soundLAB Gear 4 pages / two groups / HOME 'deck' / `gear.tab`
+  (see A3b). Gone: SPACES, App.space,
   App.setSpace, the `space` event, #space-btn, #wipe, <html data-space>,
   #cx-rec, the pages 'arrange' / 'tracks' / 'song' / 'ideas', js/studio.js,
   js/arrange.js. SPACE_LABELS keeps its name (page labels).
@@ -845,13 +1080,16 @@ A1 (Studio space, sequencer/arranger, sampler, plug-in API removed):
   the boot start tab): an id that is not a page of this app (an old link, a
   stored tab) goes to `MOVED[id].to`, else HOME, and `MOVED[id].say` is shown
   with App.toast — never a blank panel, never saved as the last tab. A page
-  that leaves the app gets its MOVED row in the same commit (the four Studio
-  ids and A2's three are in; A3b adds rows).
-- A PAGE IS THREE THINGS changed in ONE commit: its id in PAGES (+ GROUPS),
-  its `<section class="panel" id="panel-…">` and its `<script>` tag in
-  index.html (boot writes `Module "<id>" failed to load` into a panel that
-  has no module). A deleted file leaves sw.js ASSETS in the same commit:
-  install is cache.addAll, one missing file fails the whole install.
+  that leaves BOTH apps gets its MOVED row in the same commit (the four
+  Studio ids and A2's three are in). A3b added no row: deck, liveset,
+  midihub and helix are pages of the OTHER app, and resolvePage's cross-app
+  guard carries such an id across before MOVED is looked at (see A3b).
+- A PAGE IS THREE THINGS changed in ONE commit: its id in its app's page
+  list in APPS (+ groups), its `<section class="panel" id="panel-…">` and
+  its `<script>` tag in that app's HTML file (index.html or gear.html; boot
+  writes `Module "<id>" failed to load` into a panel that has no module). A
+  deleted file leaves sw.js ASSETS in the same commit: install is
+  cache.addAll, one missing file fails the whole install.
 - SOUND LIBRARY: window.DAW is only js/daw/synth.js (createSynth,
   defaultSynth, SYNTH_PRESETS, guardPitched) + js/daw/engine.js (DRUM_LANES,
   createDrums), for Piano, Jam, the Woodshed, the guided performance player
@@ -872,8 +1110,8 @@ A1 (Studio space, sequencer/arranger, sampler, plug-in API removed):
 - NO PLUG-IN API: js/plugins.js, plugins/, PLUGINS.md and the Settings card
   are gone, nothing runs stored code. `App.addPage(id, label, sp, mod)` stays
   as an INTERNAL test hook (tests/remote.test.js; `sp` is ignored).
-- sw.js: A1 set `CACHE` to 'soundlab2-v5' (A2 v6, A3a v7 = the number now,
-  A3b v8, A4 v9; v4 is skipped on purpose). The fetch handler looks ONLY in
+- sw.js: A1 set `CACHE` to 'soundlab2-v5' (A2 v6, A3a v7, A3b v8 = the
+  number now, A4 v9; v4 is skipped on purpose). The fetch handler looks ONLY in
   its own cache
   (`caches.open(CACHE)` then `match(req, {ignoreSearch: true})`), never the
   global `caches.match`: the live worker's cache on the same origin can hold
@@ -883,16 +1121,17 @@ A1 (Studio space, sequencer/arranger, sampler, plug-in API removed):
   page, a stale stored space/tab boots to Exercises and App.switchTo('arrange')
   lands there with the toast, the kept sounds play, the Backup skip) and
   `assets` (pure Node: index.html scripts + stylesheets <-> disk <-> sw.js
-  ASSETS).
+  ASSETS; since A3b gear.html too, see A3b).
 - NEVER DELETE BY PREFIX: `st-` ids and classes are also the Synth tab's
   (js/synthtab.js, js/synthlive.js); "Studio" in Jam is a drum kit id
   (jam2.kit = 'studio'); `addPage` in js/synthdeck.js is the Deck's own.
 
 A2 (the three folds: the Trainer page, the Synth pill, the LUMI pill):
 
-- 18 PAGES: Learn (quiz, chords, theory, practiceplan) · Guitar (fretboard,
-  tab, notation, helix) · Keys (piano, chart, pads) · Synth (deck, liveset,
-  midihub) · Play (songs, jam) · Train (shed, tuner). The ids 'trainer',
+- 18 PAGES AFTER A2: Learn (quiz, chords, theory, practiceplan) · Guitar
+  (fretboard, tab, notation, helix) · Keys (piano, chart, pads) · Synth
+  (deck, liveset, midihub) · Play (songs, jam) · Train (shed, tuner). (A3b
+  moved helix and the Synth group to soundLAB Gear: 14 + 4.) The ids 'trainer',
   'synth' and 'lumipractice' are in js/app.js ONLY as MOVED rows: no PAGES
   entry, no label, no panel in index.html. No file was deleted or added:
   js/trainer.js, js/lumi-practice.js, css/lumi-practice.css and
@@ -960,7 +1199,7 @@ A2 (the three folds: the Trainer page, the Synth pill, the LUMI pill):
   and the Piano / Plan tours in js/help.js (the 'trainer' tour is gone), the
   js/midi.js status "Choose a LUMI display output on the Piano page, under
   Notes and triads on the LUMI".
-- sw.js: `CACHE` 'soundlab2-v6'; ASSETS unchanged.
+- sw.js: A2 set `CACHE` to 'soundlab2-v6'; ASSETS unchanged.
 - No new suite. `trim` also checks the three redirects, that no pill reads
   Trainer, Synth or LUMI, and #tr-ear-go (Piano and Drums); the fold checks
   are in nav, smoke, context-global, keys, learn-instruments, practiceplan,
@@ -979,9 +1218,10 @@ controls and what it sends are as before):
   js/synthtab.js, js/synthlive.js, js/synthdeck.js, js/synthdeck-maps.js,
   js/synthdeck-scope.js, js/helix.js) calls into js/midihub.js, or names
   SLMidiHub, SLSynthTab / Live / Deck / Scope, SLHelix or App.synthDeck (the
-  grep in PLAN.md 6.8 has no hits). Keep it so: it is what makes A3b a move
-  instead of a rewrite. Everything still loads in index.html, the 18 pages
-  are unchanged, and "Play on synth" still opens the Hub's Player view.
+  grep in PLAN.md 6.8 has no hits). Keep it so: it is what made A3b a move
+  instead of a rewrite, and soundLAB now runs without those files. At A3a
+  everything still loaded in index.html, the 18 pages were unchanged and
+  "Play on synth" still opened the Hub's Player view; A3b ended all three.
 - THREE PIECES OF THE HUB ARE SHARED (layout entries above): the Player =
   js/scoreplayer.js, window.SLScorePlayer {mount(el, opts), paint(),
   loadFile, loadScore, play, pause, stop, seek, shiftNote, openAsTab,
@@ -1002,8 +1242,10 @@ controls and what it sends are as before):
   that current: the Hub's paintCvOut calls SLScorePlayer.paint() (ports
   changed, Hub shown, Part or profile changed), and the module calls paint()
   itself on 'midi:state' and 'lights'. A new host must call paint() whenever
-  something the card names changes. ONE mount per document (in A3a the
-  Hub's #mh-player; render() remounts it on Import / Reset Hub).
+  something the card names changes. ONE mount per document (the Hub's
+  #mh-player, which render() remounts on Import / Reset Hub; since A3b that
+  is Gear's, and soundLAB's one mount is the Songs page's #sg-player, which
+  calls paint() on show).
 - THE INPUT FILTER FOLLOWS THE STORE: App.midiRules.install() runs at load,
   when the tab becomes visible again and on a 'storage' event for
   midihub.rulesIn (the box ticked in another window; the key is matched by
@@ -1024,8 +1266,9 @@ controls and what it sends are as before):
   card itself is pixel-identical (same markup, boxes and computed styles at
   1200 and 390 px, checked against the pre-A3a tree).
 - index.html: js/midirules.js right after js/remote.js, js/scoreplayer.js
-  right before js/midihub.js. sw.js: `CACHE` 'soundlab2-v7'; ASSETS gained
-  the two files.
+  right before js/midihub.js (since A3b: after js/pads.js there, and before
+  js/midihub.js in gear.html). sw.js: A3a set `CACHE` to 'soundlab2-v7';
+  ASSETS gained the two files.
 - No new suite. `midihub` also checks App.midiRules.apply against
   SLMidiHub.applyRules, the 'storage' install (and the Hub's box following
   it), the one-message-at-a-time toast rule, App.midi.synthOut, and that
@@ -1034,7 +1277,8 @@ controls and what it sends are as before):
   `oneopen` waits on SLScorePlayer and checks the per-mount options on a
   card mounted with ports / noOut / connect (the ports row is not on screen
   before MIDI is ready, the two texts that name the host, MIDI connected
-  after boot); `midihub-player` runs unchanged through the aliases. It is
+  after boot; since A3b that card is the Songs page's own mount);
+  `midihub-player` runs unchanged through the aliases. It is
   NOT the proof of the repaint path: its fake MIDI is ready before boot and
   its Part check clicks the Channels switch, which repaints the card itself.
   `midihub` proves it: #mh-plpartlab follows a Part button and #mh-plout the
@@ -1046,20 +1290,211 @@ controls and what it sends are as before):
   SLScorePlayer.scoreToMidi instead: after A3b the Hub is not loaded in
   soundLAB, so the aliases do not exist there.
 
+A3b (soundLAB Gear: the Deck, Live sets, the Hub and Helix leave index.html;
+today's look and behaviour on both sides):
+
+- TWO APPS FROM ONE CODEBASE, ONE STORE: index.html = soundLAB, 14 pages in
+  five groups: Learn (quiz, chords, theory, practiceplan) · Guitar
+  (fretboard, tab, notation) · Keys (piano, chart, pads) · Play (songs, jam)
+  · Train (shed, tuner), plus the Settings overlay. gear.html = soundLAB
+  Gear, 4 pages in two groups: Synth (deck, liveset, midihub; pills Deck |
+  Live | Hub) · Helix (helix; one page, so no pill strip); HOME = the Deck;
+  no Settings. Both have the context bar, the metronome sheet and the Lights
+  & help sheet. js/app.js `APPS` holds both sets; `APP_ID` comes from
+  `<html data-app="gear">` (or window.SL_APP, which also sets the attribute:
+  the css keys on it); `App.app` = 'main' | 'gear'. SPACE_LABELS / SUB_LABELS
+  stay one table for both. index.html loads NONE of the seven gear files;
+  gear.html loads the 18 scripts listed at its layout entry and nothing of
+  soundLAB's own (no SLQuiz, Woodshed, App.keys, App.keysLessons, SLXP,
+  App.songs, js/settings.js). Keep in gear.html: note-palette before app,
+  synthdeck-maps before synthdeck, synthdeck before App.boot(); deck,
+  liveset and midihub must share one document.
+- THE SHELL MARKUP EXISTS TWICE until Phase B builds it from JavaScript:
+  gear.html's block from <body> to <main> is index.html's with `<span
+  class="tag">gear</span>`. Change both files in the same commit;
+  tests/assets.test.js compares head, shell, footer and the inline boot
+  script.
+- THE WAY ACROSS: `<a class="btn sm" id="app-switch">`, first in .tb-tools
+  in both files, filled by boot: "Gear" -> gear.html in soundLAB, "soundLAB"
+  -> index.html in Gear (title + aria-label "Open <name>"). A real link, so
+  it also opens in a second window for side-by-side use; hidden when
+  window.SL_ARTIFACT. css/style.css: `a.btn { text-decoration: none }`, the
+  #app-switch rules (inline-flex; :empty and [hidden] = display none) and a
+  phone rule under `html[data-app="gear"]` (<= 420 px: the longer word set
+  tighter so the header stays on one row).
+- CROSS-APP GUARD (resolvePage -> otherApp -> goApp): an id that belongs to
+  the OTHER app (appOf: one of its pages; 'settings' counts as a soundLAB
+  page; an old MOVED id whose target is over there) is never shown here:
+  goApp(owner, id) sets location.href = <url>#<id>, resolvePage returns null
+  and switchTo returns. So App.switchTo('midihub') in soundLAB leaves for
+  gear.html#midihub, and in Gear App.switchTo('settings'), the gear icon
+  (title "Settings (in soundLAB)") and the Lights sheet's two Settings links
+  leave for index.html#settings. Never call App.switchTo with an id of the
+  other app unless leaving the document is what you want (in a suite it
+  destroys the test page). In the claude.ai preview goApp only toasts
+  "<name> is not part of this preview."
+- #PAGE (hashPage: [a-z][a-z0-9_-]*): AT BOOT a page of the other app ->
+  location.replace(<url>#<page>) at the very top of boot(), before anything
+  initialises; a page of this app or an old MOVED id = the start tab (it
+  wins over the stored tab); #settings (soundLAB) opens Settings after the
+  start tab, so the gear toggles back to it. A hash that was used is cleared
+  (wireBack's history.replaceState gets the clean URL); any other hash is
+  left in the address, unused. WHILE THE APP IS OPEN wireHash does the same
+  on 'hashchange' (across: location.replace; here: clean the address, then
+  switchTo). The popstate handler ignores an entry without our state ({sl}):
+  a typed #page makes such an entry and is not a Back press. #back-hint
+  names the app ("Press Back again to leave soundLAB Gear.").
+- MOVED IDS IN GEAR: an old id whose target is a soundLAB page travels AS
+  THE OLD ID (index.html#trainer / #synth / #lumipractice), so soundLAB says
+  the sentence where the user lands. The four Studio ids have no target:
+  Gear says the sentence and opens the Deck. There are no MOVED rows for
+  deck, liveset, midihub or helix.
+- STORED STATE, new keys: `gear.tab` = Gear's last page (`app.tab` stays
+  soundLAB's; neither app writes the other's), `gear.told`, `gear.thruTold`
+  = the two one-time notices, both soundLAB only. A STORED tab of the other
+  app never navigates: boot tests otherApp before resolvePage and falls back
+  to HOME; soundLAB then says once (gear.told) "Deck, Live sets, the MIDI
+  Hub and Helix are in soundLAB Gear now: the Gear button at the top." With
+  midihub.thru stored true it says once (gear.thruTold) "MIDI Hub Thru runs
+  in soundLAB Gear now. Keep Gear open in a second window to pass your
+  keyboard to the synth while you practise." Both go through App.toast,
+  joined with each other and with a MOVED sentence just said, and stay up
+  longer (5 s + 4 s per notice). app.gtab.gsynth is read by Gear (the group
+  id is kept); app.gtab.ginst = 'helix' falls back to Neck. Everything else
+  (midi.*, lights.*, remote.*, midihub.*, synthtab.*, hx.*, key, scale,
+  tempo, theme, audio.*) is shared: a second window sees a change on its
+  next read. TWO 'storage' listeners exist: js/midirules.js
+  (midihub.rulesIn) and js/audioin.js (audio.monitor). No migration.
+- THE PLAYER IS IN BOTH APPS (js/scoreplayer.js, one mount per document):
+  soundLAB = the Songs page, #sg-player under "Open a score" (js/songs.js
+  entry above); Gear = the Hub's Player view, as before, without "Open as
+  tab" ("Open as tab is on the Songs page in soundLAB.").
+- THRU RUNS ONLY WHILE GEAR IS OPEN: Hub Thru and the key splits forward
+  from the Hub's document. Said next to the Thru box, in the Hub tour and
+  once in soundLAB (gear.thruTold). Rules on INPUT still shape soundLAB
+  (js/midirules.js is loaded there; Settings shows #set-midi-rules). The
+  practice route (js/practice-router.js) still refuses to start while
+  midihub.thru is stored on ("Turn MIDI Hub Thru off in soundLAB Gear and
+  release all keys/pedal before starting this route."). The two can no
+  longer see each other while running (the Hub's App.practiceRouter.active
+  test finds no route in Gear), and do not need to: the route stops when its
+  window loses focus or is hidden, so it is over before the Thru box in a
+  Gear window can be ticked. Thru without Gear open and one routing owner
+  across windows are Phase E/F.
+- SETTINGS EXISTS ONLY IN SOUNDLAB (js/settings.js needs the Keys page).
+  Gear's gear icon opens index.html#settings; every Gear page has its own
+  Connect and port pickers; the one Settings switch Gear needs, Hear input,
+  is on its Hub page (#mh-hearin). Texts in Gear that say "Settings › MIDI"
+  still lead somewhere for that reason.
+- NO APP VOICE IN GEAR: the Hub's App voice box is hidden, app.js registers
+  no "tap to turn on sound" hint on midi:note and prefetches no guitar
+  samples, the remote shows no sound hint, help.js shows no welcome. The
+  first-gesture audio warm-up stays (the metronome and Hear input need the
+  AudioContext).
+- NOTHING NEW CONNECTS OR SENDS AT BOOT: the Hub and Helix build their DOM
+  only; the Deck (Gear's home) reconnects MIDI silently only for a returning
+  user (midi.wanted / a granted permission) and still sends nothing by
+  opening a page; the Deck's one send funnel with its LUMI guard and "Thru
+  never forwards to a LUMI-named output" are unchanged.
+- TWO-WINDOW RULES (Web Locks, nothing stored; details at the js/remote.js
+  and js/audioin.js entries): (1) ONE WINDOW ACTS ON A PEDAL: lock
+  'soundlab-remote-main'; both apps claim a bound message, soundLAB acts
+  while one of its windows is visible (focused or not), Gear only when none
+  is; without Web Locks Gear acts only while focused. With both visible the
+  remote cannot step Live sets: use the Live page's own foot switch
+  (synthtab.fsCC) with a CC that is not bound to the remote. (2) ONE WINDOW
+  PLAYS HEAR INPUT: lock 'soundlab-hear-input'; the first window opened has
+  it, On or Off pressed in another window moves it there, a waiting window
+  takes over when the owner closes; the other window holds with why 'other'.
+  NOT SETTLED (Phase E/F): two open windows both paint the LUMI and both
+  receive the keyboard.
+- ONE WORKER, ONE MANIFEST: gear.html registers the same sw.js and links
+  the same manifest.webmanifest (no `shortcuts` entry, no separate install:
+  Phase H). sw.js: `CACHE` 'soundlab2-v8'; ASSETS gained 'gear.html'; the
+  gear js files and data/ stay listed (one worker serves both pages). Both
+  Pages workflows publish the whole tree, so gear.html needs no workflow
+  edit. android/build.sh, android/build.ps1 and ios/sync-web.sh copy
+  gear.html too; no native build was run.
+- FIXES THAT CAME ALONG: a Deck preset's key restore writes fb.* to the
+  store before it emits (js/synthdeck.js applyApp); the App voice controls
+  are hidden where there is no app voice (js/midihub.js); Go live really
+  holds the wake tag 'synthlive' (js/synthlive.js); the Helix page no longer
+  scrolls sideways on a phone (#hx-fsmode wraps, js/helix.js: the `gear`
+  suite's phone check found it); the Deck's Now bar takes the factory sound
+  names when they arrive after the page is up ('deck:factorynames',
+  js/synthdeck.js -> js/synthtab.js: Gear opens on the Deck, so the names
+  file is still loading at the first paint; `synthtab` failed on it under
+  load). KNOWN AND LEFT (same on main): a port
+  select with a long name (#mh-out on the Hub, #set-midi-out in Settings; a
+  Bluetooth LUMI) is 3 px wider than a 360 px screen; the Player card's
+  From / To key selects show while "Change key" is unticked and the Hub's
+  Connect MIDI button shows while connected (`.row`'s display:flex beats the
+  hidden attribute).
+- SUITES: tests/env.js exports GEAR_URL (SL_GEAR_URL, else gear.html beside
+  SL_URL's index.html; plain string work, never `new URL()`: three suites
+  shadow the global URL). ON GEAR.HTML: midihub, midihub-wheel,
+  midihub-lock, midihub-player, synthdeck, synthdeck-scope, synthtab,
+  synthconn, synthconnect, helix (boot wait `App.active === 'deck'`;
+  "another page" is a Gear page; a suite that emits fb:set by hand writes
+  fb.* first, there is no Fretboard to do it). NEW, in the one list in
+  tests/run.sh: `gear` (boots on the Deck with no error and no 404, exactly
+  the four panels, tabs Synth | Helix, none of soundLAB's modules, no MIDI
+  prompt and no byte at boot, the Hub's Hear input switch / Thru hint /
+  input picker / Player without "Open as tab", the Deck's Now bar with a
+  late names file, the Deck's key restore, Go
+  live's wake tag, #app-switch and #page both ways, app.tab and gear.tab
+  kept apart, phone width, the context-bar matrix of the four pages, Hear
+  input with both apps open (one window plays, On moves it, Off in either
+  stops both and also frees an input soundLAB's Settings meter held, the
+  owner closing hands over), the one toast that names the Hub page) and
+  `remote-gear` (the Live sets and Deck halves of remote-runners, moved as
+  they were, plus the two-window pedal cases: both visible, soundLAB hidden,
+  no Web Locks; it sets each page's visibility and focus itself). CHANGED on
+  index.html: remote-runners (runner, Songs, Plan cards only), remote (a
+  bound CC fires without the focus; holdsMain follows visibility), oneopen
+  (the Songs mount of the Player), nav (five tabs), context-global (14
+  pages), multiin (the Hub picker moved to `gear`), trim (the six gear
+  globals are undefined, stored Hub rules still shape the Piano page and
+  show #set-midi-rules, stored app.tab = a Gear page boots to Exercises
+  with the notice, App.switchTo('midihub') leaves for gear.html#midihub),
+  smoke (a Gear pass over its four pages) and assets (both HTML files <->
+  disk <-> ASSETS, no gear module in index.html, the shell comparison).
+- NOT CHECKED ON HARDWARE (the owner's Windows PC with the LUMI and the
+  MODX; list in docs/CONTROLLER-REMOTE.md "Two windows"): Gear in a second
+  window keeps receiving and sending MIDI while soundLAB is open; one pedal
+  press with both visible moves the lesson on and leaves the MODX
+  Performance alone; with soundLAB minimised the pedal steps the Live set;
+  a MODX heard through Hear input sounds once and keeps sounding when the
+  window that played it closes. Also untested: gear.html inside the Android
+  WebView and the iOS bundle (Phase I).
+- DEFERRED, do not build in Phase A (PLAN.md section 9): the shell built
+  once from JavaScript (B); Hub Thru and key splits without Gear open, one
+  lighting owner across both windows, handing the pedal to Gear while
+  soundLAB is visible (E/F); the final home of the Player (G); the Gear
+  design, Gear as its own installable app, Settings inside Gear, whether
+  Gear keeps the metronome and the context bar (H); gear.html in the
+  release probe, the claude.ai artifact and the native bundles (I).
+
 ## Cross-module conventions
 
 - SECTION TAB BAR (v0.70.0; app.js GROUPS + populateNav): the main nav is a
-  tab bar of GROUPS (icon + label), not a drop-down — Learn (quiz=Exercises
-  HOME/chords/theory/practiceplan), Guitar (fretboard/tab/notation/helix),
-  Keys (piano/chart/pads), SYNTH (1.3: deck/liveset/midihub), Play
-  (songs/jam), Train (shed/tuner; 1.3: the Practice tab became Train).
+  tab bar of GROUPS (icon + label), not a drop-down. GROUPS =
+  APPS[APP_ID].groups since 2.0 Phase A3b. soundLAB (index.html): Learn
+  (quiz=Exercises HOME/chords/theory/practiceplan), Guitar
+  (fretboard/tab/notation), Keys (piano/chart/pads), Play (songs/jam), Train
+  (shed/tuner; 1.3: the Practice tab became Train). soundLAB Gear
+  (gear.html): Synth (deck=HOME/liveset/midihub; 1.3's SYNTH tab), Helix
+  (helix).
   Rendered twice: #tabbar inside the top bar (> 900px) and #tabbar-m fixed
   along the bottom (<= 900px) — #tabbar-m sits OUTSIDE <header> because the
   header's backdrop-filter / auto-hide transform would trap a fixed child.
   Tapping the open tab scrolls to top. Members show as the pill strip
   (#subnav, .subtab); single-page groups hide it; each group remembers its
   last member (app.gtab.<gid>). NAVIGATION ONLY — page ids unchanged, so
-  App.switchTo(pageId) and every bus cross-link still work.
+  App.switchTo(pageId) and every bus cross-link still work inside one app;
+  App.switchTo with an id of the OTHER app leaves the document for it
+  (location.href = <its url>#<id>; Phase A section, A3b), and bus events
+  never cross.
   App.addPage(id, label, sp, mod) = an INTERNAL test hook (tests/remote.test.js
   builds its test page with it; `sp` is ignored): the page gets its own
   gpl-<id> group (icon 'plus').
@@ -1076,7 +1511,9 @@ controls and what it sends are as before):
   after closing and #met-btn shows .on / pulses .tick. App.switchTo
   ('metronome') opens the sheet; switching to any page closes it; keys go to
   the sheet's module while open (App.sheet). PANEL_ORDER appends
-  ['metronome', 'settings'] so both still init. Bottom sheet on phones.
+  ['metronome', 'lights', 'settings'] so they still init (soundLAB Gear has
+  both sheets and no panel-settings: the init loop skips a panel that is not
+  in the document). Bottom sheet on phones.
 - QUIET CHROME (v0.69.1): the whole .topbar (nav + context bar + pill strip)
   auto-hides while the window scrolls DOWN and returns on any scroll up / at
   the top (app.js wireAutoHideBar; .bar-hidden; App.showBar() forces it back
@@ -1091,10 +1528,13 @@ controls and what it sends are as before):
   node card, tab), the page stack (cleared on reaching the home page),
   the home page (HOME). One {sl:'top'} history guard is re-pushed after each
   handled Back; at the very start it stays down, #back-hint says the next
-  Back leaves, and any pointerdown re-arms it. Pages with sub-views should
-  implement onBack.
-- Context bar (index.html #ctxbar, wired in app.js): the single home for key/
-  scale/mode/BPM/time signature. Since v0.78.0 it is a DROPDOWN behind the
+  Back leaves (it names the app: soundLAB / soundLAB Gear), and any
+  pointerdown re-arms it. Pages with sub-views should implement onBack.
+  A popstate WITHOUT our state ({sl}) is not a Back press: a #page typed
+  into the address makes such an entry, and wireHash handles it (A3b).
+- Context bar (#ctxbar in index.html and gear.html, wired in app.js): the
+  single home for key/scale/mode/BPM/time signature. Since v0.78.0 it is a
+  DROPDOWN behind the
   treble-clef header button #ctx-btn (Tabler icon, beside lights + metronome):
   html.ctx-open shows it; a tap outside, the clef again, Esc, Back, a page
   switch or the bar auto-hiding tuck it away (app.js setCtx/closeCtx,
@@ -1119,10 +1559,16 @@ controls and what it sends are as before):
   keys. The bar reads the
   shared stores (fb.root/fb.scale/fb.mode, met.bpm, met.sig) and pushes changes
   over the bus; pages must NOT grow their own duplicate selects for these.
+  WRITE THE STORE FIRST, THEN EMIT fb:set (the bar's pushMusic, the Deck's
+  applyApp): soundLAB Gear loads no Fretboard to write fb.* when it hears
+  the event, and everything that follows it reads the key from the store.
   Also hosts #cx-met (the metronome's start/stop).
-- Settings is an OVERLAY page outside PAGES: opened by #settings-btn (gear,
-  header, on every page), toggles back to the previous tab, never in the
-  nav. App-level prefs live there: theme, accent (App.setAccent —
+- Settings is an OVERLAY page outside PAGES, in soundLAB ONLY: opened by
+  #settings-btn (gear, header, on every page), toggles back to the previous
+  tab, never in the nav. In soundLAB Gear the same button leaves for
+  index.html#settings (resolvePage's cross-app guard; index.html#settings
+  opens Settings over the start tab). App-level prefs live there and are
+  stored for both apps: theme, accent (App.setAccent —
   inline --accent vars, amber default), master volume (App.setVolume — a
   master GainNode shadows ctx.destination so every module obeys), keep-awake
   (app.keepAwake gates App.wake).
@@ -1131,7 +1577,8 @@ controls and what it sends are as before):
   put a DynamicsCompressor on the master path (fixed ~6ms lookahead). Sample
   lead-in/peak analysis (App.sampleLead/sampleNorm) runs at DECODE time, never
   on the first hit. wireAudioWarmup starts the device on the first pointer/key
-  gesture and shows #snd-hint if MIDI plays into a locked context. Bus
+  gesture and shows #snd-hint if MIDI plays into a locked context (the hint
+  only in soundLAB: Gear has no app voice for a played key to wake). Bus
   listeners that make SOUND register with App.on(evt, fn, true) — the third
   arg puts them first, ahead of visual listeners. App.keys.play(midi, when,
   dur, gain) = the Keys page's sampled piano for other modules (quiz).
@@ -1141,6 +1588,10 @@ controls and what it sends are as before):
   (nothing here), true or a short HUD label; it must act exactly like the
   on-screen button and never prompt, change ports, or arm hardware.
   remoteKey (true / fn) only where losing the lowest key costs nothing.
+  In soundLAB Gear a press that came from MIDI reaches onRemote a task later
+  and only while no soundLAB window is visible (js/remote.js, ONE WINDOW
+  ACTS ON A PEDAL); a Gear page's onRemote must not assume it runs inside
+  the MIDI message.
 - App.toast(msg, ms?) (2.0 beta / v2, with the remote; main 1.3.1-1.4.1 only
   call it behind if (App.toast)): the ONE app-wide status toast (#app-toast,
   role=status) for a tap that did nothing visible elsewhere — use it instead of
@@ -1203,13 +1654,26 @@ controls and what it sends are as before):
   (all) or `tests/run.sh game quiz` — serves the repo on 4573 itself
   (tests/serve.py). Needs Node + playwright + Chromium (cloud: NODE_PATH=
   /opt/node22/lib/node_modules, Chromium at /opt/pw-browsers; env.js reads
-  SL_URL / CHROMIUM / AAPT). Suites: fingering (pure Node), lights (a fake
+  SL_URL / SL_GEAR_URL / CHROMIUM / AAPT and exports URL = soundLAB
+  (index.html) and GEAR_URL = soundLAB Gear (gear.html, by default the page
+  beside SL_URL's index.html). Suites: fingering (pure Node), lights (a fake
   LUMI via a stubbed requestMIDIAccess), keys, practice,
   game, quiz, nav, smoke, taps, update, midihub (a fake synth port: raw tap,
   rules on Thru / input filter, profiles + SysEx builders, clock), audioin
   (fake media device), btmidi (a fake Android MidiBridge), trim (2.0 Phase
   A: what left the app stays gone, 1.x data untouched), assets (pure Node:
-  index.html scripts <-> disk <-> sw.js ASSETS). Run them
+  the scripts + stylesheets of index.html and gear.html <-> disk <-> sw.js
+  ASSETS, and the shell markup the two files share), gear (soundLAB Gear:
+  boot, its four pages, the links and #page both ways, Hear input with both
+  apps open), remote-gear (the remote on Live sets and the Deck, the
+  two-window pedal cases). TEN SUITES RUN ON GEAR_URL since 2.0 Phase A3b:
+  midihub, midihub-wheel, midihub-lock, midihub-player, synthdeck,
+  synthdeck-scope, synthtab, synthconn, synthconnect, helix: they wait for
+  `App.active === 'deck'`, and "another page" there must be a Gear page
+  (App.switchTo('piano') would leave the document). A two-app case opens
+  two pages in ONE browser context (same store, same Web Locks) and sets
+  each page's visibility / focus itself: headless Chromium reports every
+  page visible and focused. Run them
   before every release and add a suite or checks for new features.
   `SL_LOG_DIR` keeps concurrent baseline/feature test logs separate. The
   quiz-correction suite covers fresh corrections after a miss and held-note
@@ -1275,6 +1739,18 @@ Inside the viewer: mic (tuner, tone-in, Woodshed audio), Web MIDI, file
 downloads (backup export), offline/service worker and confirm()
 dialogs are refused by the frame — everything else runs. `tools/bundle.py`
 (old single-file build) is superseded.
+
+SOUNDLAB ONLY (2.0 Phase A3b): the artifact is index.html. `tools/
+artifact_build.py` is unchanged and never stages gear.html: soundLAB Gear
+controls hardware over Web MIDI, which the viewer refuses. With
+`window.SL_ARTIFACT` set, js/app.js hides the #app-switch link, and anything
+that would cross to Gear (App.goApp, App.switchTo with a Gear page id, a
+#page of Gear) only toasts "soundLAB Gear is not part of this preview."; the
+one-time notice for a stored Gear tab ends "Gear is not part of this
+preview." and the Thru notice is not shown. The asset list the script prints
+still names the gear js files and data/ (it walks whole folders); the staged
+page loads none of them. Web Locks may be refused in the viewer frame: Hear
+input then behaves as before 2.0 (js/audioin.js).
 
 ## Cloud / mobile sessions (claude.ai/code, PC off)
 

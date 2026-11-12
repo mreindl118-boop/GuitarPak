@@ -1,3 +1,7 @@
+> 2.0: this page lives in soundLAB Gear (gear.html) since Phase A. Menu paths below are from 1.x.
+> Here that is the MIDI Hub: the "Hub" rows and `tests/midihub-lock.test.js`. The shared MIDI
+> service and Scale lock are the same in soundLAB and in Gear; the practice synth sound is in soundLAB.
+
 # External MIDI Scale lock coverage
 
 Scope: soundLAB's built-in MIDI ingress and send services, the MIDI Hub and

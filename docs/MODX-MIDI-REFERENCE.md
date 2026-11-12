@@ -1,3 +1,5 @@
+> 2.0: this page lives in soundLAB Gear (gear.html) since Phase A. Menu paths below are from 1.x.
+
 # Yamaha MODX / MODX+ / MONTAGE MIDI reference (research notes)
 
 Collected 2026-10-24 for the Synth Deck (js/synthdeck.js, js/synthdeck-maps.js) from public
