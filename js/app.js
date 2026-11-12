@@ -6,7 +6,15 @@
  *     onShow(),       // optional — tab became visible
  *     onHide(),       // optional — tab hidden: stop sound/mic/timers here
  *     onKey(e)        // optional — keydown while this tab is active and focus
- *   });               //            is not in a text input / select
+ *                     //            is not in a text input / select
+ *     onBack()        // optional — Back pressed: true = handled here
+ *     onRemote(action, info) // optional — the CONTROLLER REMOTE (js/remote.js):
+ *                     //   action 'next' | 'back' | 'stop', info {via: 'cc' | 'pc' |
+ *                     //   'note' | 'key' | 'dbltap' | 'test'}; return false = nothing
+ *                     //   to do here, true = done (the HUD says Next / Back / Stop),
+ *                     //   or a short string = done, the HUD says that ('Next level')
+ *     remoteKey       // optional — true / fn(): the reserved double-tap key may be
+ *   });               //   claimed on this page (losing one key costs nothing here)
  *
  * Shared services:
  *   App.getAudio()                    lazily-created shared AudioContext (resumed)
@@ -32,7 +40,7 @@ window.App = (function () {
   // Settings is deliberately in NEITHER list: it's an overlay page opened by
   // the ever-present gear in the header, from any page in either space.
   var SPACES = {
-    practice: ['quiz', 'practiceplan', 'fretboard', 'tab', 'notation', 'helix', 'chords', 'piano', 'synth', 'pads', 'deck', 'liveset', 'midihub', 'lumipractice', 'songs', 'jam', 'shed', 'tuner', 'trainer', 'theory'],
+    practice: ['quiz', 'practiceplan', 'fretboard', 'tab', 'notation', 'helix', 'chords', 'piano', 'chart', 'synth', 'pads', 'deck', 'liveset', 'midihub', 'lumipractice', 'songs', 'jam', 'shed', 'tuner', 'trainer', 'theory'],
     studio: ['arrange', 'tracks', 'song', 'ideas']
   };
   var SPACE_LABELS = {
@@ -40,7 +48,7 @@ window.App = (function () {
     chords: 'Chords', piano: 'Piano', songs: 'Songs', jam: 'Jam', tuner: 'Tuner',
     trainer: 'Trainer', theory: 'Theory', settings: 'Settings', shed: 'Shed', synth: 'Synth',
     song: 'Song', arrange: 'Arrange', tracks: 'Tracks', pads: 'Pads', ideas: 'Ideas',
-    quiz: 'Exercises', midihub: 'MIDI Hub', deck: 'Synth deck', liveset: 'Live sets', lumipractice: 'LUMI', practiceplan: 'Practice plan', helix: 'Helix Stadium'
+    quiz: 'Exercises', midihub: 'MIDI Hub', deck: 'Synth deck', liveset: 'Live sets', lumipractice: 'LUMI', practiceplan: 'Practice plan', helix: 'Helix Stadium', chart: 'Chord charts'
   };
   // overlays live outside both page sets: the metronome opens as a SHEET over
   // whatever page you're on (corner icon), settings toggles in place (gear)
@@ -53,7 +61,7 @@ window.App = (function () {
     practice: [
       { id: 'gtheory', label: 'Learn', icon: 'learn', pages: ['quiz', 'chords', 'theory', 'practiceplan'] }, // Exercises = the home
       { id: 'ginst', label: 'Guitar', icon: 'guitar', pages: ['fretboard', 'tab', 'notation', 'helix'] }, // helix = Helix Stadium (js/helix.js)
-      { id: 'gkeys', label: 'Keys', icon: 'keys', pages: ['piano', 'synth', 'pads', 'lumipractice'] },
+      { id: 'gkeys', label: 'Keys', icon: 'keys', pages: ['piano', 'chart', 'synth', 'pads', 'lumipractice'] },
       { id: 'gsynth', label: 'Synth', icon: 'sliders', pages: ['deck', 'liveset', 'midihub'] }, // 1.3: the Synth tab (js/synthtab.js) - Deck / Live / Hub (= the MIDI Hub, js/midihub.js)
       { id: 'gplay', label: 'Play', icon: 'note', pages: ['songs', 'jam'] },
       { id: 'gprac', label: 'Train', icon: 'target', pages: ['shed', 'trainer', 'tuner'] } // 1.3 (primer A1): 'Practice' is the space, 'Train' the tab // the game first
@@ -69,7 +77,7 @@ window.App = (function () {
     chords: 'Chords', theory: 'Circle', songs: 'Songs', jam: 'Jam',
     trainer: 'Trainer', shed: 'Woodshed', metronome: 'Metronome', tuner: 'Tuner',
     song: 'Song', ideas: 'Ideas', tracks: 'Editor', arrange: 'Timeline', pads: 'Pads', synth: 'Synth',
-    quiz: 'Exercises', midihub: 'Hub', deck: 'Deck', liveset: 'Live', lumipractice: 'LUMI', practiceplan: 'Plan', helix: 'Helix'
+    quiz: 'Exercises', midihub: 'Hub', deck: 'Deck', liveset: 'Live', lumipractice: 'LUMI', practiceplan: 'Plan', helix: 'Helix', chart: 'Charts'
   };
 
   function groupOf(name) {
@@ -90,7 +98,7 @@ window.App = (function () {
   //            when an APK is actually built. Older APKs read nothing else, so
   //            this must never run ahead of the real file: when it did, the
   //            Android app kept downloading the same old APK in a loop.
-  var APP_VERSION = '1.4.1';
+  var APP_VERSION = '2.0.0';
   var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
 
   function verNum(v) {
@@ -1100,6 +1108,37 @@ window.App = (function () {
     if (active !== SPACES.practice[0]) { goBackTo(SPACES.practice[0]); return true; }
     return false;
   }
+  // CONTROLLER REMOTE (js/remote.js): a pedal, a synth button or a page
+  // turner says next | back | stop. The help tour takes it first (Next /
+  // Back / close), the clef dropdown and any sheet fold away (a player at the
+  // instrument can't see what covers the page), then the page's onRemote.
+  // Returns false (nothing to do here), true or a short label for the HUD.
+  function remoteAction(action, info) {
+    info = info || {};
+    if (window.Help && Help.isOpen && Help.isOpen()) {
+      if (action === 'stop') { Help.close(); return 'Tour closed'; }
+      var hb = document.getElementById(action === 'back' ? 'hp-back' : 'hp-next');
+      if (!hb) return false;
+      hb.click(); return action === 'back' ? 'Back' : 'Next';
+    }
+    if (ctxIsOpen()) closeCtx();
+    if (sheet) {
+      var sm = modules[sheet], sr = false;
+      if (sm && sm.onRemote) { try { sr = sm.onRemote(action, info); } catch (e) { console.error(sheet + '.onRemote', e); } }
+      if (sr) return sr;
+      closeSheet();
+    }
+    if (active === 'settings') return false;
+    var m = modules[active];
+    if (!m || !m.onRemote) return false;
+    try { return m.onRemote(action, info) || false; } catch (e) { console.error(active + '.onRemote', e); return false; }
+  }
+  // may the reserved double-tap key be claimed on the page now showing?
+  function remoteKeyPage() {
+    var m = modules[active];
+    if (!m || !m.remoteKey || sheet || active === 'settings') return false;
+    try { return typeof m.remoteKey === 'function' ? !!m.remoteKey() : !!m.remoteKey; } catch (e) { return false; }
+  }
   function dropBackHint() { if (backHint) { backHint.remove(); backHint = null; } }
   function wireBack() {
     try { history.replaceState({ sl: 'base' }, ''); } catch (e) { return; }
@@ -1655,6 +1694,25 @@ window.App = (function () {
   }
   ['fb:set', 'fb:scale', 'scale:lock'].forEach(function (event) { on(event, checkLockBoundary); });
 
+  // one app-wide toast (#app-toast, a status line over every page): what a
+  // page says when a tap did nothing — a refused MIDI send, a capture
+  var toastT = null;
+  function toast(msg, ms) {
+    var el = document.getElementById('app-toast');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'app-toast';
+      el.setAttribute('role', 'status');
+      el.setAttribute('aria-live', 'polite');
+      document.body.appendChild(el);
+    }
+    el.textContent = String(msg == null ? '' : msg);
+    el.hidden = false;
+    toast.n = (toast.n || 0) + 1; // the remote checks whether a page already said why
+    if (toastT) clearTimeout(toastT);
+    toastT = setTimeout(function () { el.hidden = true; toastT = null; }, ms || 3200);
+  }
+
   return {
     register: register,
     icon: icon,
@@ -1668,6 +1726,9 @@ window.App = (function () {
     on: on,
     emit: emit,
     injectCSS: injectCSS,
+    toast: toast,
+    remoteAction: remoteAction,
+    remoteKeyPage: remoteKeyPage,
     showBar: showBar,
     help: help,
     colors: colors,

@@ -1,6 +1,6 @@
 {
   "version": "0.75.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/soundLAB-alpha.apk",
-  "web": "1.4.1",
-  "notes": "soundLAB 1.4.1: the LUMI's scale colors come back. Windows renumbers MIDI ports when another app (like FL Studio) lets go of a keyboard, and soundLAB was still sending the lights to the old spot. It now finds your LUMI by name every time, and always uses the LUMI's main port for the lights."
+  "web": "2.0.0",
+  "notes": "soundLAB 2.0 is here. Everything you used in 1.4 is still in place, plus: scale dots on the Keys page (one colored dot per key), the chord chart maker (Keys > Charts: draw, save, print and light up your chord sheets on the LUMI), and hands-free practice (start, stop and step through lessons from your keyboard or controller). Your progress and settings carry over."
 }

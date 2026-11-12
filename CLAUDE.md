@@ -16,16 +16,20 @@ black keys on amber) rendered to icons/icon-192/512.png.
 
 ## soundLAB 2.0 (branch `v2`) — read first
 
-2.0 is being built on branch `v2` and published to the BETA address
+2.0.0 WENT LIVE (2026-11-11): `main` = v2 at that point (1.4.1 + scale dots,
+Keys > Charts, the controller remote), served at /GuitarPak/. Work continues on
+branch `v2`, published to the BETA address
 https://mreindl118-boop.github.io/GuitarPak/next/ by
 `.github/workflows/pages-next.yml` (full suite first; replaces only `next/` on
-gh-pages; `pages.yml` carries `next/` over on live deploys). The live 1.x app
-stays on `main` until the 2.0 release. Plan: `docs/ROADMAP-2.0.md` (decisions +
-phases). Look: `docs/DESIGN-SYSTEM.md` ("E · Stage"), tokens in `css/tokens.css`
-(every new 2.0 component uses only `--sl-*`). Work = one phase per draft PR into
-`v2`; the owner merges. Known Phase 0 caveats: beta + live share `localStorage`
-(prefix `soundlab2.*` comes in Phase A) and the live service worker clears the
-beta's `soundlab2-*` caches when it updates. 2.0 cuts the Studio/DAW, sampler and
+gh-pages; `pages.yml` carries `next/` over on live deploys); a later live release
+= a PR v2 -> main. Plan: `docs/ROADMAP-2.0.md` (decisions + phases; Phase A and
+later not started at the flip). Look: `docs/DESIGN-SYSTEM.md` ("E · Stage"),
+tokens in `css/tokens.css` (every new 2.0 component uses only `--sl-*`). Work =
+one phase per draft PR into `v2`; the owner merges. Beta + live share
+`localStorage` (same `guitarlab.*` keys, so progress carries over; prefix
+`soundlab2.*` comes in Phase A). Service-worker caches are named by scope
+(`sl2-live-*` / `sl2-next-*`, sw.js) so live and beta never clear each other's.
+2.0 cuts the Studio/DAW, sampler and
 plug-in API and splits gear control into `gear.html` (soundLAB Gear) — see the
 roadmap before touching those areas.
 
@@ -166,6 +170,33 @@ js/audioin.js     SOUND INPUT (App.audioIn): the ONE shared live-input service.
                   audio.outId is re-applied (setSinkId) when it is listed again.
                   Suite tests/audioin.test.js (Chromium fake media device).
                   Loaded right after tonein.js.
+js/remote.js      CONTROLLER REMOTE (App.remote, 2.0 beta / v2; docs/CONTROLLER-
+                  REMOTE.md): practice moves on from the instrument. Actions
+                  next / back / stop, each bound in Settings › Hands-free
+                  control (#set-remote-card, rows rendered by remote.js
+                  mount) to a learned MIDI CC press / Program Change / note
+                  (port name kept, any channel; an unconnected learned port =
+                  any port; 'latching' = every change) and/or a learned key;
+                  remote.pt = page-turner keys (PageDown/Right/Down = next,
+                  PageUp/Left/Up = back; capture phase, preventDefault, never
+                  while typing); remote.dbl = double-tap the lowest key
+                  (range().lo; only the LUMI's when one is connected) = next,
+                  on pages whose module declares remoteKey (that key is then
+                  reserved: claimed, silent, never graded). Bound MIDI is
+                  CLAIMED by midi.js setInputClaim BEFORE 'midi:raw' (no Thru,
+                  no grading, no dispatch; 'midi:remote' instead; a release of
+                  a note the app already got is never claimed). Fires through
+                  App.remoteAction (app.js): help tour -> clef/sheets fold ->
+                  Settings = a 'works' test -> the page's onRemote -> else an
+                  App.toast 'Nothing to move on here'. #remote-hud confirms.
+                  Store remote.map / remote.pt / remote.dbl; bus 'remote',
+                  'remote:map'. Loaded right after midi.js. Suites
+                  tests/remote.test.js (core) + tests/remote-<area>.test.js.
+                  ANSWER BY KEY (quiz.js keyAnswerable): a choice question with
+                  no playable answer takes a WHITE key per choice (<= 7: C-B
+                  any octave; more: white keys up from range().lo's C), badge
+                  .kb on each choice while a keyboard is in; the right key
+                  after a miss moves on; remoteKey is false there.
 js/metronome.js   ┐ feature modules; each registers (metronome = the corner
                   │  sheet, not a page — see OVERLAY SHEETS)
 js/fretboard.js   │ App.register(name, {init, onShow, onHide, onKey})
@@ -213,6 +244,22 @@ js/keylessons.js  │ SCALE LESSONS on the Keys page (mounted into #pn-lessons
                   │  Stores kl.prog/kl.sel/kl.tier/kl.reps; wake tag kl-run
                   │  (ledger area Keys); stops on transport:claim, page
                   │  hide, app hide; summary() feeds Exercises Progress.
+js/chordchart.js  │ CHORD CHART MAKER (2.0, page 'chart', Keys pill "Charts",
+                  │  prefix cc-, store cc.charts / cc.active / cc.lumi): Matt's
+                  │  paper chord sheets in the app - rows of 2-3 octave keyboards,
+                  │  tap = dot (App.colors.forPitch = LUMI colors), finger tool
+                  │  1-5, Add fingers (teacher rules: 135 / 125 / 1245 / 1235,
+                  │  L hand mirrored), chord names found from the dots (slash
+                  │  chords), Chord or Line (bass line, in placed order), Undo,
+                  │  Play it in (midi:note drops dots), Light the LUMI (App.midi.
+                  │  guide now + next), Play all (1 bar per keyboard at met.bpm,
+                  │  transport:claim 'chart'), Save file (.chart.json v1, clean()
+                  │  on open), Save MIDI, Practice with LUMI (-> Woodshed
+                  │  importMidi/addScore), Print (chart only). Hook window.SLChart,
+                  │  suite tests/chordchart.test.js, docs/CHORD-CHARTS.md.
+                  │  KEYS PAGE DOTS (2.0): pn.look 'dots' (default: one colored
+                  │  .pn-sdot per scale key, tonic ringed, keys stay ivory) |
+                  │  'keys' (the old whole-key paint); seg #pn-look.
 js/songs.js       │ (songs: user-imported ASCII tab / MIDI parsed on-device,
                   │  bar-loop player at shared tempo, key detect → fb:set)
                   │  1.3 ONE OPEN: the "Open a score" card above Add a song
@@ -723,6 +770,17 @@ version.json      auto-update feed (source of truth for latest version)
   listeners that make SOUND register with App.on(evt, fn, true) — the third
   arg puts them first, ahead of visual listeners. App.keys.play(midi, when,
   dur, gain) = the Keys page's sampled piano for other modules (quiz).
+- onRemote(action, info) + remoteKey (2.0 beta / v2, js/remote.js): a page with
+  something to start / advance / retry / stop implements onRemote ('next' |
+  'back' | 'stop'; info.via cc|pc|note|key|dbltap|test) and returns false
+  (nothing here), true or a short HUD label; it must act exactly like the
+  on-screen button and never prompt, change ports, or arm hardware.
+  remoteKey (true / fn) only where losing the lowest key costs nothing.
+- App.toast(msg, ms?) (2.0 beta / v2, with the remote; main 1.3.1-1.4.1 only
+  call it behind if (App.toast)): the ONE app-wide status toast (#app-toast,
+  role=status) for a tap that did nothing visible elsewhere — use it instead of
+  a toast element inside a page that may be hidden (the Hub's #mh-toast only
+  shows on the Hub page; the Synth Deck routes its refusals here off it).
 - New bus events: `note:input` {on, midi, vel, src, dur?} — user played a note
   on an on-screen instrument (piano QWERTY/touch emit it; capture listens
   alongside midi:note), `space` {space} after a workspace switch.

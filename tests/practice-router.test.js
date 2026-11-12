@@ -150,6 +150,18 @@ console.log('# packed, fragmented and realtime-interrupted input');
   ok(!h.route.active && h.sent.some(s => same(s.bytes, [0x80, 60, 0])), 'oversized input disarms with original-voice cleanup instead of processing an unbounded chunk');
 }
 
+console.log('# a remote gesture (Settings › Hands-free control) is never routed to the synth');
+{
+  const h = harness(); h.start();
+  h.App.remote = { owns: (b, src) => src.port === 'Yamaha MODX' && (((b[0] & 0xF0) === 0xB0 && b[1] === 64) || ((b[0] & 0xF0) === 0x90 || (b[0] & 0xF0) === 0x80) && b[1] === 108) };
+  const before = h.sent.length;
+  h.recv([0xB0, 64, 127]); h.recv([0xB0, 64, 0]); h.recv([0x90, 108, 90]); h.recv([0x80, 108, 0]);
+  ok(h.sent.length === before, 'a bound sustain pedal and a bound key are skipped (press and release)');
+  h.recv([0x90, 60, 90]); h.recv([0x80, 60, 0]);
+  ok(h.sent.length === before + 2, 'other notes still reach the synth');
+  h.route.stop();
+}
+
 console.log('# root/scale changes and original-output cleanup');
 {
   const h = harness(); h.start(); h.recv([0x93, 60, 99]); h.recv([0xb3, 64, 127]);

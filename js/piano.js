@@ -21,6 +21,7 @@
 
   var els = {};
   var state = {
+    look: 'dots', // 2.0: 'dots' (one colored dot per scale key) | 'keys' (whole key painted)
     display: 'notes',  // notes | intervals | degrees  (pn.display)
     orient: 'h'        // h = landscape strip, v = portrait column (pn.orient)
   };
@@ -306,6 +307,7 @@
   function trackPianoSource(src, gain) {
     var v = { src: src, gain: gain }; pianoSources.push(v);
     src.onended = function () { var i = pianoSources.indexOf(v); if (i >= 0) pianoSources.splice(i, 1); };
+    return v;
   }
   function clearPianoSound() {
     arpStop();
@@ -566,9 +568,11 @@
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.06);
     src.connect(g);
     g.connect(ctx.destination);
-    trackPianoSource(src, g);
+    var v = trackPianoSource(src, g);
+    v.at = t;
     src.start(t, App.sampleLead(src.buffer));
     src.stop(t + dur + 0.1);
+    return v; // {src, gain, at}: a caller can hush a note still waiting to sound
   }
 
   // ---------------- keyboard rendering ----------------
@@ -626,7 +630,7 @@
       var kc = inScale ? App.colors.forNote(pc, step) : null;
       var keyStyle = '', dc = kc ? ' data-dc="' + kc + '"' : '';
       if (isRoot && assist > 0 && assist < 3) keyStyle = ' style="stroke:var(--accent);stroke-width:3.5"';
-      if (kc && assist >= 3) {
+      if (kc && assist >= 3 && state.look === 'keys') {
         var fillC = isWhite
           ? (outWin ? mixHex(kc, '#f7f3ea', 0.55) : kc)
           : (outWin ? mixHex(kc, '#221d20', 0.72) : mixHex(kc, '#221d20', 0.35));
@@ -668,13 +672,23 @@
         labels += '<text class="' + (isWhite ? 'pn-fing' : 'pn-fingb') + '" x="' + cx +
           '" y="' + (cy - 17) + '"' + up(cx, cy - 17, 11) + ' text-anchor="middle">' + fingerMap[midi] + '</text>';
       }
+      if (inScale && state.look === 'dots' && assist >= 3) {
+        // 2.0 DOTS (Matt, 2026-11-10): the keys stay ivory/ebony and ONE
+        // round dot per scale key carries the degree/note color (the same
+        // App.colors palette the LUMI lights use) - far easier to read than
+        // whole painted keys. The tonic dot gets a ring. Labels (Full) sit
+        // inside the dot; keys outside a mode window fade.
+        var dr = isWhite ? 12.5 : 10.5;
+        dots += '<circle class="pn-sdot' + (isRoot ? (isWhite ? ' pn-sroot pn-sroot-w' : ' pn-sroot') : '') + '" data-midi="' + midi + '" data-pc="' + pc + '" cx="' + cx +
+          '" cy="' + cy + '" r="' + dr + '" fill="' + kc + '"' + (outWin ? ' opacity="0.6"' : '') + '/>';
+      }
       if (inScale) {
         // the KEY is the color now — the old degree dot is gone; the label
         // sits straight on the painted key, contrast-picked per key type
         dots += '<g class="pn-dotg" data-midi="' + midi + '" data-pc="' + pc + '" data-cx="' + cx + '" data-cy="' + cy + '">' +
           '<circle class="pn-jamring" data-pc="' + pc + '" cx="' + cx + '" cy="' + cy + '" r="15.5" fill="none"/>' +
           (assist >= 4 ? '<text class="pn-dott" x="' + cx + '" y="' + (cy + 3.5) + '"' + up(cx, cy + 3.5, 11) + ' text-anchor="middle"' +
-          (isWhite ? '' : ' fill="#f2ede4"') + '>' + keyLabel(midi, info, pf) + '</text>' : '') + '</g>';
+          (isWhite || state.look === 'dots' ? '' : ' fill="#f2ede4"') + '>' + keyLabel(midi, info, pf) + '</text>' : '') + '</g>';
       }
     }
 
@@ -753,7 +767,7 @@
   function keyDown(k, down) {
     k.classList.toggle('pn-down', down);
     var dc = k.getAttribute('data-dc');
-    if (!dc || assist >= 3) return; // painted keys already show their color
+    if (!dc || (assist >= 3 && state.look === 'keys')) return; // painted keys already show their color
     k.style.fill = down ? dc : '';
   }
 
@@ -990,6 +1004,7 @@
   }
 
   function ppStart() {
+    ppHeld = false;
     if (pp.guide) { guideStart(); return; }
     pp.path = practicePath();
     if (!pp.path.length) { ledClear(); ppStatus('no notes'); return; }
@@ -1028,6 +1043,7 @@
 
   function ppStop() {
     ppPause();
+    ppHeld = false;
     pp.idx = 0;
     pp.pausedAtIdx = -1;
     var ring = document.getElementById('pn-now');
@@ -1038,6 +1054,45 @@
   }
 
   function ppToggle() { if (pp.running || pp.guiding) ppPause(); else ppStart(); }
+
+  // CONTROLLER REMOTE (js/remote.js): the scale lessons answer first
+  // (App.keysLessons.remote: a lesson run, else the lesson card unless this
+  // runner is busy), then the runner. The runner owns the remote while it
+  // plays or guides, and after the remote paused it (so its NEXT resumes; an
+  // on-screen pause, leaving the page or opening a lesson hands NEXT back to
+  // the lesson card). NEXT = skip a note in Guide / resume (a timed run just
+  // plays on); BACK = a note back in Guide, else restart from the first
+  // note; STOP = pause, keeping the place. The Synth page hides the lesson
+  // card, so there the remote drives this runner only.
+  var ppHeld = false;
+  function ppBusy() { return pp.running || pp.guiding || ppHeld; }
+  function ppRemote(action) {
+    if (!ppBusy()) return false;
+    var live = pp.running || pp.guiding;
+    if (action === 'stop') {
+      if (!live) return false;
+      ppPause();
+      ppHeld = true;
+      return 'Paused';
+    }
+    if (action === 'next') {
+      if (pp.guiding) { pp.idx++; guideTarget(); return 'Skip note'; }
+      if (pp.running) return 'Playing…';
+      ppStart();
+      return pp.running || pp.guiding ? 'Resume' : false;
+    }
+    if (action === 'back') {
+      if (pp.guiding) { pp.idx = Math.max(0, pp.idx - 1); guideTarget(); return 'Note back'; }
+      ppStop();
+      ppStart();
+      return pp.running || pp.guiding ? 'Restart' : false;
+    }
+    return false;
+  }
+  function onRemote(action, info) {
+    var kl = App.keysLessons, r = kl && kl.remote ? kl.remote(action, info) : false;
+    return r || ppRemote(action) || false;
+  }
 
   function ppRebuild() {
     pp.idx = 0;
@@ -1215,6 +1270,9 @@
         'stroke:#ffffff !important;stroke-width:3 !important}' +
       '.pn-dotg{pointer-events:none}' +
       '.pn-dott{font:700 11px var(--font-body);fill:#1c1206}' +
+      '.pn-sdot{stroke:rgba(0,0,0,.45);stroke-width:1;pointer-events:none}' +
+      '.pn-sdot.pn-sroot{stroke:#fff;stroke-width:2.5}.pn-sdot.pn-sroot-w{stroke:#1c1206}' +
+      '#pn-look[hidden]{display:none!important}' +
       '#pn-perf [hidden],#pn-display[hidden],#pn-legend[hidden]{display:none!important}' +
       '.pn-oct{font:600 11px var(--font-body);fill:var(--muted)}' +
       '.pn-jamring{opacity:0;stroke:rgba(0,0,0,0.65);stroke-width:2.5;transition:opacity 0.25s ease}' +
@@ -1263,6 +1321,10 @@
           '<span class="row tight">' +
             '<div class="seg" id="pn-assist" role="group" aria-label="Help level" title="How much the keyboard helps: Full shows colors, names, fingers and the next note; None is a plain keyboard">' +
               ASSIST_NAMES.map(function (nm, i) { return '<button type="button" data-pnassist="' + i + '">' + nm + '</button>'; }).reverse().join('') +
+            '</div>' +
+            '<div class="seg" id="pn-look" role="group" aria-label="How the scale shows" title="How the scale shows on the keys: one colored dot per key, or the whole key colored">' +
+              '<button type="button" data-pnlook="dots">Dots</button>' +
+              '<button type="button" data-pnlook="keys">Whole keys</button>' +
             '</div>' +
             '<div class="seg" id="pn-display">' +
               '<button type="button" data-pnmode="notes">Notes</button>' +
@@ -1373,6 +1435,24 @@
     state.display = String(App.store.get('pn.display', 'notes'));
     if (!/^(notes|intervals|degrees)$/.test(state.display)) state.display = 'notes';
     state.orient = App.store.get('pn.orient', 'h') === 'v' ? 'v' : 'h';
+    state.look = App.store.get('pn.look', 'dots') === 'keys' ? 'keys' : 'dots';
+    var lookSeg = document.getElementById('pn-look');
+    function paintLook() {
+      lookSeg.querySelectorAll('button').forEach(function (b) {
+        var on = b.getAttribute('data-pnlook') === state.look;
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-pressed', String(on));
+      });
+    }
+    paintLook();
+    lookSeg.addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-pnlook]');
+      if (!b) return;
+      state.look = b.getAttribute('data-pnlook') === 'keys' ? 'keys' : 'dots';
+      App.store.set('pn.look', state.look);
+      paintLook();
+      render();
+    });
     assist = App.help.level();
     document.getElementById('pn-assist').addEventListener('click', function (e) {
       var b = e.target.closest('button[data-pnassist]');
@@ -1741,6 +1821,8 @@
     });
     var disp = document.getElementById('pn-display');
     if (disp) disp.hidden = assist < 4; // labels only show at Full
+    var look = document.getElementById('pn-look');
+    if (look) look.hidden = assist < 3; // nothing colored below Colors
   }
 
   // one Help level for the whole app: set here or in Lights & help
@@ -1783,6 +1865,7 @@
 
   function onHide() {
     ppPause();      // exercise pauses (keeps its place) when leaving the tab
+    ppHeld = false; // leaving is not a remote pause: NEXT is the lessons' again
     if (App.keysLessons) App.keysLessons.stop(); // a lesson run ends (unscored)
     // release any computer-keyboard notes whose keyup we'll never see
     Object.keys(qw.held).forEach(function (c) {
@@ -1808,6 +1891,8 @@
     clearRing: function () { ppRing(null, null); ledClear(); },
     flash: flashKey,
     stopRunner: ppStop,
+    runnerBusy: ppBusy, // playing, guiding, or paused by the remote
+    releaseRemote: function () { ppHeld = false; }, // a lesson was opened: NEXT starts it
     scrollTo: function (alignLeft) { scrollToWindow(!!alignLeft); },
     render: function () { render(); },
     warm: function () { try { decodeAll(App.getAudio()); } catch (e) { /* no audio */ } },
@@ -1817,7 +1902,8 @@
   App.register('piano', {
     init: init,
     onShow: onShow,
-    onHide: onHide
+    onHide: onHide,
+    onRemote: onRemote // no remoteKey: the lessons keep their own lowest-key double-tap
   });
 
   // ---- the SYNTH page: the same playable keyboard, voice forced to the
@@ -1852,7 +1938,10 @@
         while (synthRoot.firstChild) pianoRoot.appendChild(synthRoot.firstChild);
       }
     },
-    onKey: modules_onKey_passthrough
+    onKey: modules_onKey_passthrough,
+    // the runner strip only: the lesson card is hidden on this page
+    // ('#panel-synth #pn-lessons'), so NEXT never starts a lesson nobody sees
+    onRemote: function (action) { return ppRemote(action) || false; }
   });
 
   function modules_onKey_passthrough(e) { /* QWERTY handled by document-level qw listeners */ }
