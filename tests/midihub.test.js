@@ -10,6 +10,9 @@
 // apply; the filter also follows midihub.rulesIn on a 'storage' event, the box
 // ticked in another window). "Which output is the synth" is App.midi.synthOut
 // in js/midi.js, the one copy the Hub header and the Player card name.
+// The Player card (js/scoreplayer.js) is checked here for its REPAINT PATH: the
+// Hub's hook (a Part button, the header's Synth out select) and, with that hook
+// stubbed, the module's own 'midi:state' / 'lights' listeners.
 const { chromium } = require('playwright');
 const env = require('./env');
 let fails = 0;
@@ -118,6 +121,21 @@ async function bothEngines(page, msgs) {
   ok(pan.length >= 64 && pan.filter(b => b[1] === 123).length === 16 && pan.filter(b => b[1] === 120).length === 16 &&
     pan.filter(b => (b[0] & 0xf0) === 0xe0 && b[1] === 0 && b[2] === 64).length === 16,
     'panic retains notes/sound off and bend centre on all 16 channels, plus scoped held-note/sustain cleanup');
+  // the Player's messages are the app-wide toast (#app-toast) since A3a, the Hub keeps #mh-toast: on a phone
+  // the two sit at the same place, so on the Hub page a Hub message takes an older app-wide one down
+  const tw = await page.evaluate(() => {
+    const shown = id => { const t = document.getElementById(id); return t && !t.hidden ? t.textContent : ''; };
+    App.toast('Ready: Four'); const o = { before: shown('app-toast') };
+    document.getElementById('mh-panic').click();
+    o.app = shown('app-toast'); o.hub = shown('mh-toast');
+    App.toast('Finished: Four'); o.newer = shown('app-toast'); // the other order: the app-wide toast is drawn above the Hub's
+    // off the Hub page its toast is not on screen (the Deck and Live pages call into the Hub): the app-wide one stays
+    App.switchTo('piano'); App.toast('On another page'); SLMidiHub.api.toast('Hub, off screen'); o.away = shown('app-toast');
+    App.switchTo('midihub');
+    return o;
+  });
+  ok(tw.before === 'Ready: Four' && tw.app === '' && /^Panic/.test(tw.hub), 'on the Hub page a Hub message replaces an older app-wide message (one at a time): ' + J(tw.hub));
+  ok(tw.newer === 'Finished: Four' && tw.away === 'On another page', 'a newer app-wide message shows; off the Hub page the Hub\u2019s toast leaves it alone: ' + J([tw.newer, tw.away]));
 
   console.log('# in: raw tap, monitor, decode');
   const inn = await page.evaluate(() => {
@@ -194,14 +212,15 @@ async function bothEngines(page, msgs) {
     const tell = key => window.dispatchEvent(new StorageEvent('storage', { key: key, url: location.href, storageArea: localStorage }));
     const notes = []; App.on('midi:note', d => notes.push(d.midi + ':' + (d.on ? 1 : 0)));
     const states = []; App.on('midirules:state', () => states.push(App.midiRules.active().on));
-    const o = { start: !!App.midi.inputFilter };
+    const box = () => document.getElementById('mh-rulesin').checked; // the Hub's "Apply to what soundLAB hears"
+    const o = { start: !!App.midi.inputFilter, box: [box()] };
     write(true);
     o.written = !!App.midi.inputFilter; // nothing has read the switch again yet
     tell(K);
-    o.on = { has: !!App.midi.inputFilter, active: App.midiRules.active() };
+    o.on = { has: !!App.midi.inputFilter, active: App.midiRules.active() }; o.box.push(box());
     __recv([0x90, 48, 80]); __recv([0x80, 48, 0]); o.on.notes = notes.splice(0).join();
     write(false); tell(K);
-    o.off = { has: !!App.midi.inputFilter, active: App.midiRules.active() };
+    o.off = { has: !!App.midi.inputFilter, active: App.midiRules.active() }; o.box.push(box());
     __recv([0x90, 48, 80]); __recv([0x80, 48, 0]); o.off.notes = notes.splice(0).join();
     // a cleared store arrives as an event with no key: the switch is read again as well
     write(true); tell(K); o.again = !!App.midi.inputFilter;
@@ -216,6 +235,7 @@ async function bothEngines(page, msgs) {
   ok(!st.off.has && st.off.notes === '48:1,48:0' && st.off.active.on === false, 'and removes it again the same way: plain notes, active() = ' + J(st.off.active));
   ok(st.again && !st.cleared, 'a cleared store (a storage event with no key) takes the filter off too');
   ok(st.states === 'true,false,true,false', 'midirules:state is sent each time the installed state changes: ' + st.states);
+  ok(st.box.join() === 'false,true,false', 'the Hub\u2019s box follows the filter this window has installed: ticked by the other window, then unticked: ' + st.box.join());
 
   console.log('# force channel + learn');
   const lr = await page.evaluate(() => {
@@ -340,7 +360,9 @@ async function bothEngines(page, msgs) {
     o.cut = SLMidiHub.knob(74); o.sk = SLMidiHub.knob(95); o.skLabel = sk.querySelector('.mh-kv').textContent;
     o.toModx = __by.modx1.map(b => b.join(' ')); o.toLumi = __by.lumi.length; o.toGs = __by.gs.length; o.toModx2 = __by.modx2.length;
     // part 3, then a knob there and the values are per part
+    o.plPart = [document.getElementById('mh-plpartlab').textContent];
     document.querySelector('#mh-parts [data-part="2"]').click();
+    o.plPart.push(document.getElementById('mh-plpartlab').textContent); // the Player card, with no click on it
     o.p3 = { ch: App.store.get('midihub.ch'), cut: SLMidiHub.knob(74), sel: document.getElementById('mh-ch').value, active: document.querySelector('#mh-parts .active').textContent };
     __by.modx1.length = 0;
     document.querySelector('.mh-knob[data-cc="17"]').dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
@@ -374,6 +396,7 @@ async function bothEngines(page, msgs) {
   ok(sc.cut === 65 && sc.sk > 0 && String(sc.sk) === sc.skLabel, 'arrow key and drag turn knobs: cutoff ' + sc.cut + ', Super Knob ' + sc.sk);
   ok(sc.toModx[0] === '176 74 65' && sc.toModx.some(b => b.startsWith('176 95 ')) && sc.toLumi === 0 && sc.toGs === 0 && sc.toModx2 === 0, 'knobs go to MODX-1 only, never the LUMI or the wavetable: ' + sc.toModx.slice(0, 3));
   ok(sc.p3.ch === 2 && sc.p3.cut === 64 && sc.p3.sel === '2' && sc.p3.active === '3' && sc.assign[0] === '178 17 127', 'Part 3 has its own knob values and sends on channel 3: ' + sc.assign);
+  ok(sc.plPart.join('|') === 'All on Part 1|All on Part 3', 'the Player card follows the Part button (the Hub\u2019s hook, SLScorePlayer.paint()): ' + sc.plPart.join(' -> '));
   ok(sc.two.cut === 20 && sc.two.label === '20' && sc.two.prog === '10' && sc.otherPart === 20, 'two-way: the MODX\u2019s own cutoff and program on Part 3 move the screen; other parts don\u2019t: ' + JSON.stringify(sc.two));
   ok(sc.next.join('|') === '178 0 63|178 32 0|194 10' && sc.pnum === '11', 'Next program: bank 63/0 then program 11 on Part 3: ' + sc.next.join('|'));
   ok(sc.sendAll === 17 && sc.reset === 64, 'Send all sends every knob (17); double-tap resets a knob to its start value');
@@ -394,6 +417,14 @@ async function bothEngines(page, msgs) {
     // set() without the header (what a Player card with its own selects does): the same store key, and the card's paint() reads it
     S.set('modx2'); SLScorePlayer.paint();
     o.set = { id: nn(S.id()), name: S.name(), has: S.has(), hub: nn(SLMidiHub.outId), stored: App.store.get('midihub.outId', null), plout: document.getElementById('mh-plout').textContent };
+    // the card's own listeners, with the Hub's hook taken away: the Hub calls SLScorePlayer.paint() through
+    // the property, the module's 'midi:state' and 'lights' listeners hold the function itself
+    const keep = SLScorePlayer.paint, plout = () => document.getElementById('mh-plout').textContent;
+    SLScorePlayer.paint = function () {};
+    sel.value = 'shared'; sel.dispatchEvent(new Event('change')); o.own = { hookGone: plout() }; // the header changed and could not tell the card
+    App.emit('midi:state', {}); o.own.state = plout();
+    S.set('modx2'); o.own.untold = plout(); App.emit('lights'); o.own.lights = plout();
+    SLScorePlayer.paint = keep;
     sel.value = 'modx1'; sel.dispatchEvent(new Event('change')); o.back = snap();
     return o;
   });
@@ -404,6 +435,8 @@ async function bothEngines(page, msgs) {
   ok(agrees(so.shared, null, 'LUMI Keys BLOCK'), 'Same as key lights: id() is null and name() is the key-light output: ' + so.shared.status);
   ok(so.set.id === 'modx2' && so.set.name === 'MODX-2' && so.set.has === true && so.set.hub === 'modx2' && so.set.stored === 'modx2' && so.set.plout.includes('MODX-2'),
     'synthOut.set(id) writes midihub.outId: the Hub reads the same port and SLScorePlayer.paint() names it: ' + so.set.plout);
+  ok(so.own.hookGone.includes('MODX-2') && so.own.state.includes('LUMI Keys BLOCK') && so.own.untold.includes('LUMI Keys BLOCK') && so.own.lights.includes('MODX-2'),
+    'with the Hub\u2019s hook stubbed the card repaints itself on midi:state and on lights (what a mount without a Hub relies on): ' + J(so.own));
   ok(agrees(so.back, 'modx1', 'MODX-1'), 'and MODX-1 picked in the header again is MODX-1 everywhere');
 
   console.log('# the Player card after a Hub re-render (Reset Hub mounts it again)');

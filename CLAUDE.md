@@ -228,9 +228,11 @@ js/midirules.js   MIDI RULES (App.midiRules, 2.0 Phase A3a): the MIDI Hub's
                   ticks it calls install() itself (the Hub's installFilter).
                   active() -> {on, rules} (rules = enabled count; for the
                   Settings status line A3b adds). Bus 'midirules:state' {on,
-                  rules} when the installed state changed. Reads midihub.rules
-                  / midihub.rulesIn, never writes. Loaded right after
-                  remote.js. Checks live in tests/midihub.test.js.
+                  rules} when the installed state changed (the Hub's box
+                  #mh-rulesin listens, so it shows what THIS window has
+                  installed after another window switched it). Reads
+                  midihub.rules / midihub.rulesIn, never writes. Loaded right
+                  after remote.js. Checks live in tests/midihub.test.js.
 js/metronome.js   ┐ feature modules; each registers (metronome = the corner
                   │  sheet, not a page — see OVERLAY SHEETS)
 js/fretboard.js   │ App.register(name, {init, onShow, onHide, onKey})
@@ -554,13 +556,19 @@ js/scoreplayer.js SCORE PLAYER (window.SLScorePlayer, 2.0 Phase A3a): the
                   (shiftMap; the source key is guessed by detectSongKey on
                   load); changing either while playing pauses/resumes so
                   every Note Off matches its Note On. Messages go to
-                  App.toast (the Hub's #mh-toast shows only on the Hub page).
+                  App.toast (the Hub's #mh-toast shows only on the Hub page;
+                  there a Hub message hides an older app-wide one, see the
+                  Hub's toast()).
                   API: mount(el, opts) = render + wire + paint the card into
                   el. ONE MOUNT PER DOCUMENT, idempotent: song, transport and
                   the one ticker are module state, a remount only swaps the
                   DOM. opts {show = what show() calls; ports: true = own
                   "Synth out" + "Channel" selects writing midihub.outId /
-                  midihub.ch, for a host with no Hub header; noOut = the line
+                  midihub.ch, for a host with no Hub header (the row is
+                  display:none until MIDI is ready; with ports the two texts
+                  that name the Hub change too: the tips line says "the
+                  Channel picked above", Open as tab files the song as "from
+                  the Player"); noOut = the line
                   while there is no synth output (default "No synth output
                   yet — connect MIDI above"); connect {label, run} = a
                   .btn.sm after it}; the Hub passes only show. paint() = the
@@ -584,11 +592,17 @@ js/scoreplayer.js SCORE PLAYER (window.SLScorePlayer, 2.0 Phase A3a): the
                   Player view; A3b mounts it on the Songs page in soundLAB
                   (the Hub's mount goes to Gear).
                   Loaded before js/midihub.js. Suites tests/midihub-player.
-                  test.js (through the SLMidiHub aliases; it proves the
-                  repaint path) + tests/oneopen.test.js. NOT LANDED YET:
-                  feat/review-to-synth (Score review, tests/review-to-synth.
-                  test.js) calls SLMidiHub.player / SLMidiHub.scoreToMidi and
-                  must call SLScorePlayer / SLScorePlayer.scoreToMidi instead.
+                  test.js (through the SLMidiHub aliases) + tests/oneopen.
+                  test.js (also the per-mount options, on a card mounted with
+                  ports / noOut / connect while MIDI connects after boot).
+                  Neither proves the REPAINT PATH; tests/midihub.test.js does:
+                  the Hub's hook (a Part button and the header's Synth out
+                  select reach the card) and, with that hook stubbed, the
+                  module's own 'midi:state' / 'lights' listeners. NOT LANDED
+                  YET: feat/review-to-synth (Score review, tests/review-to-
+                  synth.test.js) calls SLMidiHub.player / SLMidiHub.scoreToMidi
+                  and must call SLScorePlayer / SLScorePlayer.scoreToMidi
+                  instead.
 js/midihub.js     MIDI HUB page ('midihub', Keys group, pill "MIDI", v0.78.0;
                   prefix mh-): read / write / reshape plain MIDI for ANY
                   device on App.midi's ports — device-AGNOSTIC by design,
@@ -609,7 +623,8 @@ js/midihub.js     MIDI HUB page ('midihub', Keys group, pill "MIDI", v0.78.0;
                   is js/midirules.js (applyRules(bytes) = App.midiRules.apply
                   (bytes, rulePort), installFilter() = App.midiRules.install(),
                   which also runs at load, on return to the tab and on a
-                  'storage' event for midihub.rulesIn)),
+                  'storage' event for midihub.rulesIn; the box #mh-rulesin
+                  follows 'midirules:state')),
                   SysEx (identity request + reply decode, profile builders:
                   Yamaha F0 43 1n 7F 1C mm addr(3) data F7 / 2n bulk,
                   Roland DT1/RQ1 with checksum; raw hex; last received),
@@ -978,25 +993,39 @@ controls and what it sends are as before):
   when the tab becomes visible again and on a 'storage' event for
   midihub.rulesIn (the box ticked in another window; the key is matched by
   suffix, so A4's prefix change does not break it). The filter slot is null
-  while the box is off: never install a filter that is always on.
+  while the box is off: never install a filter that is always on. The Hub's
+  box (#mh-rulesin) listens to 'midirules:state', so it shows what this
+  window has installed and one click switches it off again.
 - SONGS "Open a score" (js/songs.js) calls SLScorePlayer only; its missing-
   module text is "The score player is not loaded".
 - ON SCREEN, THE TWO PLANNED DIFFERENCES: the Player's messages ("Ready:",
   "Finished:", "No synth output ...") show in the app-wide #app-toast, not in
-  the Hub's #mh-toast (so a Hub message and a Player message can be up at the
-  same time), and the "Play on synth" tooltip on Songs no longer names the
-  Hub. The Player card itself is pixel-identical (same markup, boxes and
-  computed styles at 1200 and 390 px, checked against the pre-A3a tree).
+  the Hub's #mh-toast, and the "Play on synth" tooltip on Songs no longer
+  names the Hub. At 900 px and below the two toasts sit at the same place,
+  so the Hub's toast() hides #app-toast first while the Hub page is on screen
+  (one message at a time there, as before; never off the Hub page, where the
+  Deck and Live pages call into the Hub and its toast is not shown). The
+  other order needs nothing: #app-toast is drawn above #mh-toast. The Player
+  card itself is pixel-identical (same markup, boxes and computed styles at
+  1200 and 390 px, checked against the pre-A3a tree).
 - index.html: js/midirules.js right after js/remote.js, js/scoreplayer.js
   right before js/midihub.js. sw.js: `CACHE` 'soundlab2-v7'; ASSETS gained
   the two files.
 - No new suite. `midihub` also checks App.midiRules.apply against
-  SLMidiHub.applyRules, the 'storage' install, App.midi.synthOut, and that
+  SLMidiHub.applyRules, the 'storage' install (and the Hub's box following
+  it), the one-message-at-a-time toast rule, App.midi.synthOut, and that
   Reset Hub (render() again = a second mount) leaves ONE Player card wired
   once (one click = one action);
-  `oneopen` waits on SLScorePlayer; `midihub-player` runs unchanged through
-  the aliases and is the proof of the repaint path (#mh-plout names the
-  synth port, #mh-plpartlab follows a Part change).
+  `oneopen` waits on SLScorePlayer and checks the per-mount options on a
+  card mounted with ports / noOut / connect (the ports row is not on screen
+  before MIDI is ready, the two texts that name the host, MIDI connected
+  after boot); `midihub-player` runs unchanged through the aliases. It is
+  NOT the proof of the repaint path: its fake MIDI is ready before boot and
+  its Part check clicks the Channels switch, which repaints the card itself.
+  `midihub` proves it: #mh-plpartlab follows a Part button and #mh-plout the
+  header's Synth out select (the Hub's hook), and with SLScorePlayer.paint
+  stubbed the card still repaints on 'midi:state' and on 'lights' (the
+  module's own listeners).
 - LANDING feat/review-to-synth LATER: that branch calls SLMidiHub.player and
   SLMidiHub.scoreToMidi from Score review. It must call SLScorePlayer and
   SLScorePlayer.scoreToMidi instead: after A3b the Hub is not loaded in

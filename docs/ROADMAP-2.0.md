@@ -74,7 +74,7 @@ The step-by-step plan is `docs/plans/phase-a/PLAN.md`.
 |---|---|---|---|
 | A1 | Studio space, sequencer/arranger, sampler and plug-in API removed; synth and drum sounds kept as a library; Pads is play-only | in review (draft pull request) | #99 |
 | A2 | Trainer cards on the Plan page; Synth pill = the Sound picker on Piano; LUMI practice = a section under the Keys lessons | in review (draft pull request) | — |
-| A3a | Score player, synth-out and rule engine are shared files; the main app no longer calls the Hub | in review (draft pull request) | — |
+| A3a | Score player, synth-out and rule engine are shared files; the main app no longer calls the Hub | in review (draft pull request) | #101 |
 | A3b | soundLAB Gear (`gear.html`): Deck, Live sets, MIDI Hub, Helix leave the main app | planned | — |
 | A4 | Storage prefix `soundlab2.*` (beta: `soundlab2-next.*`) with the one-time copy from `guitarlab.*` | planned | — |
 

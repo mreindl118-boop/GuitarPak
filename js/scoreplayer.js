@@ -27,7 +27,9 @@
  * a running song is neither stopped nor doubled. opts:
  *   show     called by show(): bring the card on screen
  *   ports    true = a "Synth out" and a "Channel" select on the card, for a
- *            host with no Hub header (write midihub.outId / midihub.ch)
+ *            host with no Hub header (write midihub.outId / midihub.ch); the
+ *            two texts that name the Hub ("the Part picked in Control", a
+ *            tab "from the MIDI Hub Player") then name the card instead
  *   noOut    the line shown while there is no synth output
  *   connect  {label, run}: a button after that line
  * REPAINT: paint() is public (the Hub calls it when its ports, Part or
@@ -276,7 +278,8 @@
     if (!App.songs) { App.toast('The Songs page is not available'); return false; }
     var song = App.songs.fromMidi(songToMidi(PL.song), PL.song.title);
     if (!song) { App.toast('Nothing in this file fits a guitar'); return false; }
-    song.from = 'from the MIDI Hub Player' + (plShift().on || plTrans() ? ', in the chosen key' : '');
+    // opts.ports = a host with no Hub around the card (the Songs page, A3b)
+    song.from = 'from the ' + (opt.ports ? '' : 'MIDI Hub ') + 'Player' + (plShift().on || plTrans() ? ', in the chosen key' : '');
     App.songs.load(song); App.switchTo('songs');
     return true;
   }
@@ -592,7 +595,7 @@
         '</div>' +
         '<p class="muted small" id="mh-plkeyinfo"></p>' +
         '<p class="mh-warn small" id="mh-plwarn" hidden></p>' +
-        '<details class="tips"><summary>Sheet music as a PDF?</summary><p class="muted small">A notation app turns a score into a file this player opens: if it came from MuseScore, open the original score there and choose <b>Export \u203a MIDI</b> or <b>MusicXML</b>. For a printed or PDF score, a free recognizer such as Audiveris reads it into MusicXML; check its result against the page before you rely on it. \u201cChannels as in file\u201d plays each part or track on its own channel (Part 1 = channel 1 on a MODX in Multi mode); \u201cAll on one Part\u201d sends everything to the Part picked in Control.</p></details>' +
+        '<details class="tips"><summary>Sheet music as a PDF?</summary><p class="muted small">A notation app turns a score into a file this player opens: if it came from MuseScore, open the original score there and choose <b>Export \u203a MIDI</b> or <b>MusicXML</b>. For a printed or PDF score, a free recognizer such as Audiveris reads it into MusicXML; check its result against the page before you rely on it. \u201cChannels as in file\u201d plays each part or track on its own channel (Part 1 = channel 1 on a MODX in Multi mode); \u201cAll on one Part\u201d sends everything to ' + (opt.ports ? 'the Channel picked above' : 'the Part picked in Control') + '.</p></details>' +
       '</div>'
     );
   }
@@ -609,7 +612,8 @@
     '.mh-cv-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}.mh-cv-head h2{margin:0}' +
     '.mh-mono{font-family:ui-monospace,Consolas,Menlo,monospace;font-size:12px;color:var(--text)}' +
     '.mh-chk{display:inline-flex;gap:6px;align-items:center;font-size:12.5px;color:var(--muted)}' +
-    '.mh-warn{color:var(--red);margin-top:6px}'
+    '.mh-warn{color:var(--red);margin-top:6px}' +
+    '#mh-plports[hidden]{display:none}' // opts.ports: .row is display:flex, which beats the hidden attribute
   );
 
   // Renders the card into el and wires it. Idempotent: every listener sits on
