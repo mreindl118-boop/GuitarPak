@@ -1,12 +1,16 @@
-// CONTROLLER REMOTE on LUMI practice (js/lumi-practice.js) and the Practice
-// plan (js/practiceplan.js): onRemote next / back / stop does what the
+// CONTROLLER REMOTE on LUMI practice (js/lumi-practice.js: the folded section
+// #pn-lumi under the Keys lessons on the Piano page — every LUMI part opens
+// it first, and while it is open it alone answers the pedal: nothing falls
+// through to the lessons or the runner) and the Practice plan
+// (js/practiceplan.js): onRemote next / back / stop does what the
 // on-screen buttons do (Start, Check answer, Next target, a guided skip that
 // counts nothing, Stop; launch the next unfinished block, open the last one
 // again), never tests / arms / routes a device, 'nothing here' returns false,
 // a learned CC works end to end (claimed: never reaches 'midi:raw'), and the
 // reserved double-tap key is claimed only where remoteKey allows it (LUMI
-// practice in simulated mode, the plan page) — in hardware mode the key is
-// an answer like any other.
+// practice in simulated mode while its section is open, the plan page) — in
+// hardware mode the key is an answer like any other (and the lessons' own
+// double-tap stands down while the section is open).
 const { chromium } = require('playwright');
 const env = require('./env');
 let fails = 0;
@@ -42,6 +46,15 @@ async function newPage(browser, seed) {
     window.__hud = () => { const h = document.getElementById('remote-hud'); return h && h.classList.contains('show') ? h.textContent : ''; };
     window.__clearToast = () => { const t = document.getElementById('app-toast'); if (t) t.hidden = true; };
     window.__ra = a => App.remoteAction(a, { via: 'test' });
+    // LUMI practice has no page of its own: go to the Piano page, open the
+    // section and let its 'toggle' event run (it is async; piano.js shows the
+    // module from it). The 1 s fallback only keeps a missing event from
+    // hanging the run
+    window.__openLumi = async () => {
+      App.switchTo('piano');
+      const box = document.getElementById('pn-lumi');
+      if (!box.open) await new Promise(done => { box.addEventListener('toggle', () => done(), { once: true }); box.open = true; setTimeout(done, 1000); });
+    };
     window.addEventListener('DOMContentLoaded', () => {
       App.on('midi:raw', d => __raw.push(d.bytes.join(' ')));
       App.on('midi:note', d => __notes.push((d.on ? 'on ' : 'off ') + d.midi));
@@ -70,8 +83,9 @@ async function newPage(browser, seed) {
   let { ctx, page, errs } = await newPage(browser);
   const lg = await page.evaluate(async () => {
     const o = {}, S = () => SLLumiPractice.snapshot();
-    App.switchTo('lumipractice'); await __wait(150);
-    o.idle = J([__ra('back'), __ra('stop'), S().running]);
+    await __openLumi(); await __wait(150);
+    o.where = [App.active, App.lumiPractice.open, S().visible].join();
+    o.idle = J([__ra('back'), __ra('stop'), S().running]); o.idleLesson = !!App.keysLessons.run;
     o.start = __ra('next'); o.s1 = S(); o.startBtn = __q('#lp-start').textContent;
     const t1 = S().target.join();
     o.skip = __ra('next'); o.s2 = S(); o.t2 = S().target.join(); o.t1 = t1;
@@ -87,21 +101,22 @@ async function newPage(browser, seed) {
     o.late = __ra('next'); o.s6 = S(); o.lateKept = S().target.join() === t5 && t5 !== o.t4;
     await __wait(950);
     o.later = __ra('next'); o.laterSkip = S().target.join() !== t5; o.s7 = S();
-    o.back = __ra('back');
+    o.back = __ra('back'); o.backLesson = !!App.keysLessons.run; // the lessons' BACK would be a retry: never asked
     o.stop = __ra('stop'); o.s5 = S(); o.status = __q('#lp-status').textContent;
     o.stopAgain = __ra('stop');
     o.hw = __hw.slice();
     return o;
     function J(x) { return JSON.stringify(x); }
   });
-  ok(lg.idle === '[false,false,false]', 'idle: Back and Stop are "nothing here" (false): ' + lg.idle);
+  ok(lg.where === 'piano,true,true', 'LUMI practice is the open section on the Piano page: ' + lg.where);
+  ok(lg.idle === '[false,false,false]' && !lg.idleLesson, 'idle: Back and Stop are "nothing here" (false), nothing falls through to the lessons: ' + lg.idle);
   ok(lg.start === 'Start' && lg.s1.running && lg.s1.target.length === 1 && lg.s1.attempts === 0 && /Restart session/.test(lg.startBtn), 'NEXT not running = Start (the Start button path): ' + lg.start);
   ok(lg.skip === 'Skip' && lg.s2.running && lg.t2 !== lg.t1 && lg.s2.correct === 0 && lg.s2.attempts === 0, 'guided NEXT skips to the next target and counts nothing: ' + lg.t1 + ' -> ' + lg.t2);
   ok(lg.advancing && lg.race === 'Moving on…' && lg.raceTarget, 'a NEXT while the exact target is held does not skip it (the advance is on its way)');
   ok(lg.s4.correct === 1 && lg.s4.attempts === 1 && lg.t4 !== lg.t3, 'the pending advance still counts the answer once: ' + lg.s4.correct + '/' + lg.s4.attempts);
   ok(lg.late === 'Moving on…' && lg.lateKept && lg.s6.correct === 2 && lg.s6.attempts === 2, 'a NEXT just after the advance fired keeps the target it brought up (no second move): ' + lg.late + ' ' + lg.s6.correct + '/' + lg.s6.attempts);
   ok(lg.later === 'Skip' && lg.laterSkip && lg.s7.correct === 2 && lg.s7.attempts === 2, 'a NEXT well after the advance is a skip again, uncounted: ' + lg.later);
-  ok(lg.back === false, 'BACK has nothing to do on LUMI practice (false)');
+  ok(lg.back === false && !lg.backLesson, 'BACK has nothing to do on LUMI practice (false) and starts no lesson');
   ok(lg.stop === 'Stopped' && !lg.s5.running && lg.status === 'Stopped. Start again when ready.' && lg.stopAgain === false, 'STOP = the Stop button (status text), a second Stop is "nothing here": ' + lg.status);
   ok(lg.hw.length === 0 && !lg.s5.armed && !lg.s5.tested && !lg.s5.leased, 'no device output, lease, port change or sound route was touched: ' + JSON.stringify(lg.hw));
 
@@ -143,7 +158,7 @@ async function newPage(browser, seed) {
   ({ ctx, page, errs } = await newPage(browser, { 'remote.map': MAP, 'remote.dbl': true }));
   const le = await page.evaluate(async () => {
     const o = {}, S = () => SLLumiPractice.snapshot();
-    App.switchTo('lumipractice'); await __wait(150);
+    await __openLumi(); await __wait(150);
     __raw.length = 0;
     __press(86); await __wait(40);
     o.cc = S().running; o.hud = __hud(); o.raw = __raw.filter(b => /^176 8[567] /.test(b)).length;
@@ -167,6 +182,7 @@ async function newPage(browser, seed) {
     __notes.length = 0; __ev.length = 0;
     __send([0x90, o.lo, 90], 'li'); await __wait(60); __send([0x80, o.lo, 0], 'li'); __send([0x90, o.lo, 90], 'li'); await __wait(40);
     o.hwHeld = S().held.join(); o.hwNotes = __notes.join(); o.hwEv = __ev.join(); o.hwStill = S().running;
+    o.hwLesson = !!App.keysLessons.run; // two strikes of the lowest key are the lessons' own double-tap on this page: it stands down
     __send([0x80, o.lo, 0], 'li');
     return o;
   });
@@ -174,14 +190,14 @@ async function newPage(browser, seed) {
   ok(le.stop === 'true|' + 'Stopped', 'CC 85 stops it, the HUD says Stopped: ' + le.stop);
   ok(le.one === 'false|0|0', 'one strike of the lowest key alone: no note, no action: ' + le.one);
   ok(/^true\|0\|next:dbltap:1\|.*Start/.test(le.two), 'two strikes within 350 ms = NEXT (Start), silent: ' + le.two);
-  ok(le.hwRunning && le.hwHeld === String(le.lo) && /on 48/.test(le.hwNotes) && le.hwEv === '' && le.hwStill, 'hardware mode: the lowest key plays and is held as an answer, no remote gesture: ' + J(le));
+  ok(le.hwRunning && le.hwHeld === String(le.lo) && /on 48/.test(le.hwNotes) && le.hwEv === '' && le.hwStill && !le.hwLesson, 'hardware mode: the lowest key plays and is held as an answer, no remote gesture, no lesson started by the lessons\u2019 own double-tap: ' + J(le));
   ok(!errs.length, 'no page errors: ' + J(errs)); await ctx.close();
 
   console.log('# LUMI practice, hardware: a NEXT learned on the answer keyboard\'s top key');
   ({ ctx, page, errs } = await newPage(browser, { 'remote.map': Object.assign({}, MAP, { next: { midi: { t: 'note', n: 108, ch: null, port: 'MODX-1' }, key: null } }) }));
   const ln = await page.evaluate(async () => {
     const o = {}, S = () => SLLumiPractice.snapshot();
-    App.switchTo('lumipractice'); await __wait(150);
+    await __openLumi(); await __wait(150);
     const m = __q('#lp-mode'); m.value = 'hardware'; m.dispatchEvent(new Event('change')); await __wait(20);
     const i = __q('#lp-input'); i.value = 'mi'; i.dispatchEvent(new Event('change')); await __wait(20);
     __q('#lp-start').click(); await __wait(20);

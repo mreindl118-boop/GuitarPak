@@ -15,7 +15,8 @@
     practiceplan: [
       { t: 'Practice plan', x: 'A short session built from your teacher’s notes. Open Teacher’s lesson notes, paste or import the text, review the mapping and accept it. Each student keeps a separate plan on this device.' },
       { sel: '#pp-today', t: 'One block at a time', x: 'Start opens the linked tool with its supported settings. New lesson runs and recorded playing or answering time measure completion. Old scores and idle page time do not finish today’s blocks. A Next pedal or synth button (Settings › Hands-free control) opens the next unfinished block from here, and Back opens the last one again.' },
-      { sel: '#pp-gaps', t: 'What to build next', x: 'Unmatched assignments and missing setup hooks become module gaps with their original text. Export them to choose future improvements. Google Doc links are bookmarks; no account connection is required.' }
+      { sel: '#pp-gaps', t: 'What to build next', x: 'Unmatched assignments and missing setup hooks become module gaps with their original text. Export them to choose future improvements. Google Doc links are bookmarks; no account connection is required.' },
+      { sel: '#pp-tools', t: 'Free practice', x: 'Under the plan, closed until you open it: a session timer with its log, random practice prompts (Go sets up the Fretboard for the prompt) and one-minute chord changes. In a chord-change minute, Space or a Next pedal counts a change. This timer is separate from the plan’s measured minutes.' }
     ],
     metronome: [
       { t: 'Metronome', x: 'It opens over whatever page you’re on and keeps clicking after you close it — the icon in the top corner glows and pulses on the beat while it runs. Its tempo is the ONE shared tempo: the Jam band and the practice runners follow it.' },
@@ -40,11 +41,13 @@
     ],
     piano: [
       { t: 'Piano', x: 'The keyboard twin of the fretboard — same key, same note colors. Play it by touch, with your computer keyboard (A W S E D… Z/X shifts octave), or a MIDI keyboard like a ROLI.' },
+      { sel: '#pn-voice', t: 'Sound', x: 'The grand piano or a synth: pick what this keyboard plays. The synth sounds follow pitch bend and pressure from a keyboard like a ROLI.' },
       { sel: '#pn-chseg', t: 'Perform', x: 'Triads or 7ths turn every in-scale key into its chord (+Bass and Strum appear then). Arp plays what you hold as an arpeggio — its speed, direction, range and Hold appear once it’s on.' },
       { sel: '#pn-play', t: 'Practice runner', x: 'Runs scale exercises on the keys with fingering numbers — pick right or left hand and it moves to where that hand plays.' },
       { sel: '#pn-guide', t: 'Guide mode', x: 'Instead of playing FOR you, Guide waits for you to play each lit note — on screen, or lit up on a LUMI’s own keys.' },
       { sel: '#pn-assist', t: 'Help level', x: 'How much the keyboard tells you. Full shows the scale colors, note names, fingers and the next note; Colors drops the names; Target only rings the note to play; Tonic marks home; None is a bare keyboard. Pressed keys always flash their color.' },
-      { sel: '.kl-card', t: 'Scale lessons', x: 'Graded scale lessons played with the click. Every note is checked for the right key and how close it lands to the beat. Score 85 to level up to a faster tempo. Pick ∞ to loop the scale until you stop and go for your longest streak of clean notes. Runs, best scores and streaks are saved here and on the Exercises Progress tab. A Next pedal or synth button (Settings › Hands-free control) starts the lesson and moves on to the next level without touching the screen.' }
+      { sel: '.kl-card', t: 'Scale lessons', x: 'Graded scale lessons played with the click. Every note is checked for the right key and how close it lands to the beat. Score 85 to level up to a faster tempo. Pick ∞ to loop the scale until you stop and go for your longest streak of clean notes. Runs, best scores and streaks are saved here and on the Exercises Progress tab. A Next pedal or synth button (Settings › Hands-free control) starts the lesson and moves on to the next level without touching the screen.' },
+      { sel: '#pn-lumi', t: 'Notes and triads on the LUMI', x: 'Under the lessons, closed until you open it. It shows a note or a triad to play and moves on when you play exactly those notes. It starts with on-screen answers; a connected LUMI or MODX can be the answer keyboard. While the section is open, the pedal and the double-tap key work here. Starting a lesson or the runner closes it.' }
     ],
     songs: [
       { t: 'Songs', x: 'Bring your own music: paste an ASCII guitar tab (the six-line kind from any tab site) or import a MIDI file. soundLAB detects the key, and you can loop any bars at your own tempo to practice them.' }
@@ -62,9 +65,6 @@
     ],
     tuner: [
       { t: 'Tuner', x: 'A chromatic tuner using your microphone. Press Start, allow mic access, and play one string at a time — the needle shows how far off you are; green means in tune.' }
-    ],
-    trainer: [
-      { t: 'Trainer', x: 'Practice prompts: it deals you a key, scale and tempo to work on. Hit Go and it sets up the Fretboard for that exact drill — a fresh challenge every time.' }
     ],
     quiz: [
       { t: 'Exercises', x: 'A course in short levels of 10 questions: Notes, Intervals, Chords, Scales and Key signatures. Every right answer earns XP; quick answers and runs of 5 earn more.' },
@@ -227,7 +227,7 @@
     openTour(null, [
       { t: 'Welcome to soundLAB', x: 'Start with Exercises: a short theory and ear-training course you answer by playing. Around it: guitar, keys, songs, the jam band and the tuner.' },
       { t: 'One musical brain', x: 'The clef button at the top opens key, scale and tempo, shared by EVERYTHING. Change it once and the fretboard re-colors and the jam re-harmonizes. Its metronome ▶ starts the click from any page.' },
-      { t: 'Sections', x: 'The tabs — Learn, Guitar, Keys, Play, Practice (along the bottom on phones) — are the app’s sections. The pills at the top of the page switch pages inside a section (Neck / Tab / Notation, Piano / Synth / Pads…).' },
+      { t: 'Sections', x: 'The tabs — Learn, Guitar, Keys, Play, Train (along the bottom on phones) — are the app’s sections. The pills at the top of the page switch pages inside a section (Neck / Tab / Notation, Piano / Charts / Pads…).' },
       { sel: '#met-btn', t: 'The metronome', x: 'Always one tap away in the top corner: it opens over any page and keeps playing when you close it.' },
       { t: 'Whenever you’re lost', x: 'Tap the ? in the top bar — it explains whichever page you’re on, step by step. Try it on every page once.' }
     ]);

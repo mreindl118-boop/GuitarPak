@@ -19,7 +19,7 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
   await p.mouse.click(640, 860);
   const pages = await p.evaluate(async () => {
     const wait = ms => new Promise(r => setTimeout(r, ms));
-    const ids = ['quiz', 'chords', 'theory', 'fretboard', 'tab', 'notation', 'piano', 'synth', 'pads', 'songs', 'jam', 'shed', 'trainer', 'tuner', 'quiz'];
+    const ids = ['quiz', 'chords', 'theory', 'fretboard', 'tab', 'notation', 'piano', 'pads', 'songs', 'jam', 'shed', 'tuner', 'quiz'];
     const seen = [];
     for (const id of ids) {
       App.switchTo(id); await wait(250);

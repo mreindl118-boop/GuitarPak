@@ -38,14 +38,14 @@ window.App = (function () {
   // service, and the context bar stays put. The first page is the home.
   // Settings is deliberately NOT in the list: it's an overlay page opened by
   // the ever-present gear in the header, from any page.
-  var PAGES = ['quiz', 'practiceplan', 'fretboard', 'tab', 'notation', 'helix', 'chords', 'piano', 'chart', 'synth', 'pads', 'deck', 'liveset', 'midihub', 'lumipractice', 'songs', 'jam', 'shed', 'tuner', 'trainer', 'theory'];
+  var PAGES = ['quiz', 'practiceplan', 'fretboard', 'tab', 'notation', 'helix', 'chords', 'piano', 'chart', 'pads', 'deck', 'liveset', 'midihub', 'songs', 'jam', 'shed', 'tuner', 'theory'];
   var HOME = PAGES[0];
   var SPACE_LABELS = {
     metronome: 'Metronome', fretboard: 'Fretboard', tab: 'Tab', notation: 'Notation',
     chords: 'Chords', piano: 'Piano', songs: 'Songs', jam: 'Jam', tuner: 'Tuner',
-    trainer: 'Trainer', theory: 'Theory', settings: 'Settings', shed: 'Shed', synth: 'Synth',
+    theory: 'Theory', settings: 'Settings', shed: 'Shed',
     pads: 'Pads',
-    quiz: 'Exercises', midihub: 'MIDI Hub', deck: 'Synth deck', liveset: 'Live sets', lumipractice: 'LUMI', practiceplan: 'Practice plan', helix: 'Helix Stadium', chart: 'Chord charts'
+    quiz: 'Exercises', midihub: 'MIDI Hub', deck: 'Synth deck', liveset: 'Live sets', practiceplan: 'Practice plan', helix: 'Helix Stadium', chart: 'Chord charts'
   };
   // overlays live outside the page list: the metronome opens as a SHEET over
   // whatever page you're on (corner icon), settings toggles in place (gear)
@@ -57,18 +57,18 @@ window.App = (function () {
   var GROUPS = [
     { id: 'gtheory', label: 'Learn', icon: 'learn', pages: ['quiz', 'chords', 'theory', 'practiceplan'] }, // Exercises = the home
     { id: 'ginst', label: 'Guitar', icon: 'guitar', pages: ['fretboard', 'tab', 'notation', 'helix'] }, // helix = Helix Stadium (js/helix.js)
-    { id: 'gkeys', label: 'Keys', icon: 'keys', pages: ['piano', 'chart', 'synth', 'pads', 'lumipractice'] },
+    { id: 'gkeys', label: 'Keys', icon: 'keys', pages: ['piano', 'chart', 'pads'] }, // synth sounds = the Sound picker on Piano; LUMI practice = a section under its lessons
     { id: 'gsynth', label: 'Synth', icon: 'sliders', pages: ['deck', 'liveset', 'midihub'] }, // 1.3: the Synth tab (js/synthtab.js) - Deck / Live / Hub (= the MIDI Hub, js/midihub.js)
     { id: 'gplay', label: 'Play', icon: 'note', pages: ['songs', 'jam'] },
-    { id: 'gprac', label: 'Train', icon: 'target', pages: ['shed', 'trainer', 'tuner'] } // 1.3 (primer A1): the tab is called 'Train' // the game first
+    { id: 'gprac', label: 'Train', icon: 'target', pages: ['shed', 'tuner'] } // 1.3 (primer A1): the tab is called 'Train' // the game first
   ];
   // short member names for the strip (fall back to SPACE_LABELS)
   var SUB_LABELS = {
     fretboard: 'Neck', tab: 'Tab', notation: 'Notation', piano: 'Piano',
     chords: 'Chords', theory: 'Circle', songs: 'Songs', jam: 'Jam',
-    trainer: 'Trainer', shed: 'Woodshed', metronome: 'Metronome', tuner: 'Tuner',
-    pads: 'Pads', synth: 'Synth',
-    quiz: 'Exercises', midihub: 'Hub', deck: 'Deck', liveset: 'Live', lumipractice: 'LUMI', practiceplan: 'Plan', helix: 'Helix', chart: 'Charts'
+    shed: 'Woodshed', metronome: 'Metronome', tuner: 'Tuner',
+    pads: 'Pads',
+    quiz: 'Exercises', midihub: 'Hub', deck: 'Deck', liveset: 'Live', practiceplan: 'Plan', helix: 'Helix', chart: 'Charts'
   };
 
   function groupOf(name) {
@@ -422,7 +422,8 @@ window.App = (function () {
     });
   }
 
-  // Plucked-string voice shared by fretboard / chords / jam / trainer:
+  // Plucked-string voice shared by fretboard / chords / jam / the Free
+  // practice cards on the Plan page (js/trainer.js):
   // the chosen sampled tone when its bank is decoded, synth twin otherwise.
   var pluckVoices = [];
   function trackPluck(node, gain) {
@@ -729,7 +730,10 @@ window.App = (function () {
     arrange: { say: 'The Studio is not part of soundLAB 2.0.' },
     tracks:  { say: 'The Studio is not part of soundLAB 2.0.' },
     song:    { say: 'The Studio is not part of soundLAB 2.0.' },
-    ideas:   { say: 'The Studio is not part of soundLAB 2.0.' }
+    ideas:   { say: 'The Studio is not part of soundLAB 2.0.' },
+    trainer: { to: 'practiceplan', say: 'The Trainer cards are on the Plan page now, under Free practice.' },
+    synth:   { to: 'piano', say: 'Synth sounds are in the Sound picker on the Piano page.' },
+    lumipractice: { to: 'piano', say: 'LUMI practice is on the Piano page now, under the lessons.' }
   };
   // an id that is not a page of this app (an old link, a stored tab) goes
   // where MOVED says, and otherwise to the home page — never to a blank screen

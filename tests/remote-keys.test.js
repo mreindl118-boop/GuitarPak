@@ -9,13 +9,16 @@
 // a true retry of the level just played that never lowers the saved level;
 // STOP = Lessons; a NEXT right after the run ends only shows the score),
 // the Keys runner taking the remote while it plays / guides / was paused by
-// it (and letting go when the page is left or a lesson is opened), the Synth
-// page (the lesson card is hidden there: the runner only, no hidden lesson
-// from NEXT or the lowest-key double-tap), the pedal hints, the help tour, a
-// MODX CC end to end (claimed: no 'midi:raw'), the lessons' own lowest-key
-// double-tap firing ONCE with the remote's double-tap option on (no
-// remoteKey here), Listen first leaving nothing of the old demo on the
-// audio clock, BACK scoring a finished / infinite run before it retries,
+// it (and letting go when the page is left or a lesson is opened), the LUMI
+// section under the lessons (#pn-lumi, OPEN = OWNER: a lesson started from
+// its Start button or opened from elsewhere folds the section and stops its
+// session, so the pedal and the lowest key are the lesson's again; open over
+// the results it keeps the pedal and BACK starts no lesson), the pedal
+// hints, the help tour, a MODX CC end to end (claimed: no 'midi:raw'), the
+// lessons' own lowest-key double-tap firing ONCE with the remote's
+// double-tap option on (the LUMI section is closed: nothing reserved),
+// Listen first leaving nothing of the old demo on the audio clock, BACK
+// scoring a finished / infinite run before it retries,
 // STOP = the Stop button even with every note judged, and Easier after a
 // BACK retry being relative to the level just played.
 const { chromium } = require('playwright');
@@ -51,6 +54,14 @@ const MAP = { next: { midi: { t: 'cc', n: 86, ch: null, port: '' }, key: null },
     window.__hud = () => { const h = document.getElementById('remote-hud'); return h && h.classList.contains('show') ? h.textContent : ''; };
     window.__toast = () => { const t = document.getElementById('app-toast'); return t && !t.hidden ? t.textContent : ''; };
     window.__ra = a => App.remoteAction(a, { via: 'test' });
+    // the LUMI section under the lessons (#pn-lumi): open or fold it and let
+    // its 'toggle' event run (the event is async; piano.js acts on it). The
+    // 1 s fallback only keeps a missing event from hanging the run
+    window.__lumi = open => {
+      const box = __q('#pn-lumi');
+      if (box.open === open) return __wait(0);
+      return new Promise(done => { box.addEventListener('toggle', () => done(), { once: true }); box.open = open; setTimeout(done, 1000); });
+    };
     // every scheduled source node: its start time, its earliest stop, the lesson run it belongs to
     window.__srcs = [];
     [window.AudioScheduledSourceNode && AudioScheduledSourceNode.prototype, AudioBufferSourceNode.prototype, OscillatorNode.prototype].forEach(S => {
@@ -310,34 +321,98 @@ const MAP = { next: { midi: { t: 'cc', n: 86, ch: null, port: '' }, key: null },
   ok(rn.gRestart === 'Restart' && rn.gFrom === 1, 'Guide paused by the remote: BACK restarts from the first note');
   ok(rn.idleBack === false && rn.idleStop === false, 'a reset runner and the list: BACK / STOP have nothing to do');
 
-  console.log('# the Synth page: the lesson card is hidden there, so the remote drives the runner only');
-  const sy = await page.evaluate(async () => {
-    const playing = () => /Pause/.test(__q('#pn-play').textContent);
-    const metOn = () => __q('#met-btn').classList.contains('on');
-    App.switchTo('synth'); await __wait(120);
-    App.emit('met:toggle'); await __wait(150);
-    const o = { hidden: !__q('#pn-lessons').offsetParent, met0: metOn() };
-    __claims.length = 0;
-    o.next = __ra('next'); o.noRun = !__kl().run; o.met1 = metOn(); o.focus = document.documentElement.classList.contains('kl-running');
-    o.claims = __claims.slice();
-    o.back = __ra('back'); o.stop = __ra('stop');
-    App.emit('met:toggle'); await __wait(60);
-    // the runner strip is on this page: NEXT / STOP / BACK drive it
-    __q('#pn-play').click(); await __wait(60);
-    o.rNext = __ra('next'); o.rStop = __ra('stop'); o.rPaused = !playing();
-    o.rResume = __ra('next'); o.rPlaying = playing(); o.rNoRun = !__kl().run;
-    __q('#pn-reset').click();
-    // the lessons' lowest-key double-tap does not start a hidden run here either
-    const ck = __kl().controlKey;
-    __tapKey(ck); await __wait(60); __tapKey(ck); await __wait(80);
-    o.dbl = !__kl().run;
+  console.log('# the LUMI section under the lessons: open = owner');
+  const lo = await page.evaluate(async () => {
+    const S = () => SLLumiPractice.snapshot(), box = __q('#pn-lumi'), lp = App.lumiPractice;
+    const o = { closed0: !box.open && !lp.open, key0: App.remoteKeyPage() };
+    __setProg('am-r', { step: 7 }); App.store.set('kl.reps', 1); // 8ths at 100: a short count-in
+    App.keysLessons.open('am-r');
+
+    // (1) the section open with a session running, then the lesson's own Start button
+    await __lumi(true);
+    o.open1 = box.open && lp.open && S().visible;
+    o.lumiStart = __ra('next'); o.lumiOn1 = S().running && lp.running; o.noLesson1 = !__kl().run; // the pedal is the section's
+    __q('#kl-start').click();
+    const R1 = __kl().run;
+    o.run1 = !!R1 && R1.l.id === 'am-r' && !R1.demo && __kl().view === 'run';
+    o.folded1 = !box.open && !lp.open; o.lumiOff1 = !S().running && !lp.running;
+    o.said1 = __q('#lp-status').textContent;
+    await __wait(80); // the fold's 'toggle' event has run by now: it must leave the lesson alone
+    o.still1 = __kl().run === R1 && __kl().view === 'run';
+    o.cin1 = __ra('next'); o.same1 = __kl().run === R1 && !S().running && !box.open;
+    o.stop1 = __ra('stop');
+
+    // (2) the same with the remote's double-tap key on: the lowest key is
+    // reserved while the section is open, and the lesson's during a lesson
+    App.remote.setDoubleTap(true);
+    await __lumi(true);
+    o.key1 = App.remoteKeyPage();
+    __q('#lp-start').click(); o.lumiOn2 = S().running;
+    __q('#kl-start').click();
+    const R2 = __kl().run;
+    o.folded2 = !!R2 && !box.open && !lp.open && !S().running;
+    o.key2 = App.remoteKeyPage();
+    await __wait(80);
+    o.cin2 = __ra('next'); o.same2 = __kl().run === R2;
+    await __pastCountIn();
+    o.key3 = App.remoteKeyPage();
+    const ck = __kl().controlKey, hit0 = R2.lastHit;
+    __ev.length = 0;
+    __tapKey(ck); await __wait(40);
+    o.ck = ck; o.judged = __kl().run === R2 && !!R2.lastHit && R2.lastHit !== hit0; o.gestures = __ev.slice();
+    __ra('stop');
+    App.remote.setDoubleTap(false);
+
+    // (3) a finished lesson, then the section opened while the results show
+    o.done3 = __fakeDone('am-l', 9);
+    await __wait(650);
+    await __lumi(true);
+    o.view3 = __kl().view;
+    __q('#lp-start').click(); o.lumiOn3 = S().running;
+    o.back3 = __ra('back');
+    o.noRun3 = !__kl().run && __kl().view === 'done';
+    o.lumiStill3 = S().running && box.open && lp.open;
+    o.stop3 = __ra('stop'); o.lumiOff3 = !S().running; o.view3b = __kl().view;
+    o.stop3b = __ra('stop'); o.view3c = __kl().view; // nothing left to stop: no fall-through to the card's 'Lessons'
+
+    // (4) a lesson opened from elsewhere (a Plan block, the Learn bar)
+    __q('#lp-start').click(); o.lumiOn4 = S().running;
+    App.keysLessons.open('dm-r', 'piano');
+    o.folded4 = !box.open && !lp.open && !S().running; o.said4 = __q('#lp-status').textContent;
+    await __wait(80);
+    o.next4 = __ra('next'); o.lesson4 = __kl().run && __kl().run.l.id; o.noLumi4 = !S().running;
+    __ra('stop');
+    // ... and a section left open on a page that is not showing is folded too
+    await __lumi(true);
+    App.switchTo('quiz'); await __wait(80);
+    o.openAway = lp.open && !S().visible;
+    App.keysLessons.open('dm-r', 'piano');
+    o.foldedAway = !box.open && !lp.open;
     App.switchTo('piano'); await __wait(120);
+    o.next5 = __ra('next'); o.lesson5 = __kl().run && __kl().run.l.id; o.noLumi5 = !S().running && !S().visible;
+    __ra('stop');
+
+    App.keysLessons.open('c-r'); // the selection the rest of the suite expects
+    o.end = !box.open && !lp.open && !__kl().run && __kl().view === 'list' && !App.keys.runnerBusy() && App.remoteKeyPage() === false;
     return o;
   });
-  ok(sy.hidden && sy.met0 && sy.next === false && sy.noRun && sy.met1 && !sy.focus && !sy.claims.length && sy.back === false && sy.stop === false,
-    'Synth page, idle runner: NEXT / BACK / STOP have nothing to do (false), no hidden lesson, the metronome keeps going: ' + J(sy));
-  ok(sy.rNext === 'Playing…' && sy.rStop === 'Paused' && sy.rPaused && sy.rResume === 'Resume' && sy.rPlaying && sy.rNoRun, 'Synth page: the runner takes NEXT / STOP');
-  ok(sy.dbl, 'Synth page: a double-tap of the lowest key starts no hidden lesson');
+  ok(lo.closed0 && lo.key0 === false, 'the section is closed by default and reserves nothing: ' + J(lo));
+  ok(lo.open1 && lo.lumiStart === 'Start' && lo.lumiOn1 && lo.noLesson1, 'open, the section has the pedal: NEXT starts its session, not the lesson');
+  ok(lo.run1 && lo.folded1 && lo.lumiOff1 && lo.said1 === 'A lesson started. LUMI session stopped.',
+    '(1) the lesson\u2019s Start button: the section is closed, no LUMI session is running, and it says why: ' + lo.said1);
+  ok(lo.still1 && lo.cin1 === 'Starting…' && lo.same1 && lo.stop1 === 'Stopped', '(1) NEXT during the count-in answers "Starting…" and the lesson run is still there: ' + J({ cin: lo.cin1, stop: lo.stop1 }));
+  ok(lo.key1 === true && lo.lumiOn2 && lo.folded2 && lo.key2 === false && lo.cin2 === 'Starting…' && lo.same2,
+    '(2) with the double-tap key on: reserved while the section is open, not during the lesson; NEXT in the count-in is the lesson\u2019s: ' + J({ open: lo.key1, lesson: lo.key2, cin: lo.cin2 }));
+  ok(lo.key3 === false && lo.judged && lo.gestures.length === 0, '(2) a strike on the lowest key (' + lo.ck + ') during the lesson is judged, not taken as a remote gesture: ' + J(lo.gestures));
+  ok(lo.done3.view === 'done' && lo.view3 === 'done' && lo.lumiOn3 && lo.back3 === false && lo.noRun3 && lo.lumiStill3,
+    '(3) the section opened over the results: BACK is "nothing here", no lesson run starts, the LUMI session keeps running: ' + J({ back: lo.back3 }));
+  ok(lo.stop3 === 'Stopped' && lo.lumiOff3 && lo.view3b === 'done' && lo.stop3b === false && lo.view3c === 'done',
+    '(3) STOP stops the LUMI session only; a second STOP is "nothing here" (no fall-through to the lesson card): ' + J([lo.stop3, lo.stop3b]));
+  ok(lo.lumiOn4 && lo.folded4 && lo.said4 === 'A lesson was opened.' && lo.next4 === 'Start' && lo.lesson4 === 'dm-r' && lo.noLumi4,
+    '(4) App.keysLessons.open with the section open closes it (the session stops) and NEXT starts that lesson: ' + J({ next: lo.next4, lesson: lo.lesson4 }));
+  ok(lo.openAway && lo.foldedAway && lo.next5 === 'Start' && lo.lesson5 === 'dm-r' && lo.noLumi5,
+    '(4) a section left open on another page is folded by a lesson opened from there: NEXT is the lesson\u2019s on return');
+  ok(lo.end, 'afterwards: section closed, nothing running, nothing reserved');
 
   console.log('# hints + help tour');
   const ht = await page.evaluate(async () => {
@@ -381,7 +456,7 @@ const MAP = { next: { midi: { t: 'cc', n: 86, ch: null, port: '' }, key: null },
   ok(/Nothing to go back to/.test(e2e.toast) && e2e.ev2[2] === 'back:cc:0', 'CC 87 = BACK in the list: nothing here (toast)');
   ok(e2e.raw.length === 0, 'the bound CCs never reached midi:raw: ' + J(e2e.raw));
 
-  console.log('# the lessons keep their own lowest-key double-tap (no remoteKey)');
+  console.log('# the lessons keep their own lowest-key double-tap (the LUMI section is closed: nothing reserved)');
   const dt = await page.evaluate(async () => {
     App.remote.setDoubleTap(true);
     await __wait(400);
@@ -394,7 +469,7 @@ const MAP = { next: { midi: { t: 'cc', n: 86, ch: null, port: '' }, key: null },
     App.remote.setDoubleTap(false);
     return o;
   });
-  ok(dt.ck === 48 && dt.reserved === false, 'piano declares no remoteKey: the lowest key is not reserved: ' + J(dt));
+  ok(dt.ck === 48 && dt.reserved === false, 'the LUMI section is closed: the Keys page reserves no key, the lowest key is not the remote\u2019s: ' + J(dt));
   ok(dt.view === 'run' && dt.claims === 1 && dt.ev.length === 0, 'a double-tap starts the lesson ONCE (kl.dbltap), not also via the remote');
   ok(dt.view2 === 'list', 'a second double-tap stops it');
 

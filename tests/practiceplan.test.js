@@ -1,5 +1,7 @@
 // Practice Plan: inert lesson-note imports, honest module mapping, measured
 // progress after launch, independent student plans, and phone/keyboard use.
+// 2.0 (Phase A): the Free practice section under the plan (#pp-tools) holds
+// the former Trainer page's cards, with their own look.
 const { chromium } = require('playwright');
 const env = require('./env');
 let fails = 0;
@@ -59,6 +61,59 @@ async function plan(page, text, opts) {
   }));
   ok(start.active === 'practiceplan' && start.panel && start.controls && start.nav, 'a registered page, navigation pill, and complete import/session controls');
   ok(start.rules >= 4 && start.plan.items.length >= 4 && start.week.trim(), 'readable mapping rules, a short starter session, and weekly progress');
+
+  console.log('# Free practice: the Trainer cards under the plan');
+  const tools = await page.evaluate(async () => {
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+    const d = document.getElementById('pp-tools'), wrap = document.querySelector('#panel-practiceplan .pp-wrap'), o = {};
+    o.exists = !!d && d.tagName === 'DETAILS' && !!d.closest('#panel-practiceplan') && !!wrap;
+    if (!o.exists) return o;
+    o.closed = !d.open;
+    o.summary = (d.querySelector('summary') || {}).textContent || '';
+    o.outside = !d.closest('.pp-wrap') && !d.classList.contains('card');
+    o.after = !!(wrap.compareDocumentPosition(d) & Node.DOCUMENT_POSITION_FOLLOWING);
+    // the three cards, each one its own .card inside the section's body
+    const cardOf = id => { const e = d.querySelector('#pp-tools-body #' + id); return e ? e.closest('#pp-tools-body .card') : null; };
+    const cards = [cardOf('tr-sess-start'), cardOf('tr-pr-chal'), cardOf('tr-cc-start')];
+    o.cards = cards.every(Boolean) && new Set(cards).size === 3;
+    o.ear = !!d.querySelector('#tr-ear-go') && !d.querySelector('#tr-ear-play, #tr-ear-grid');
+    d.open = true; await wait(80);
+    const box = id => document.getElementById(id).getBoundingClientRect();
+    const a = box('tr-cc-a'), b = box('tr-cc-b');
+    o.row = { viewport: window.innerWidth, a: [Math.round(a.left), Math.round(a.top), Math.round(a.width)], b: [Math.round(b.left), Math.round(b.top), Math.round(b.width)] };
+    o.oneRow = a.width > 0 && b.width > 0 && Math.abs(a.top - b.top) < 4 && a.right <= b.left;
+    o.label = Math.round(box('tr-sess-label').width);
+    o.overflow = document.documentElement.scrollWidth > window.innerWidth;
+    return o;
+  });
+  ok(tools.exists && tools.closed && /^Free practice/.test(tools.summary), 'the Plan page has a Free practice section, closed until it is opened: ' + JSON.stringify([tools.exists, tools.closed, tools.summary]));
+  ok(tools.outside && tools.after, 'the section sits after the plan (.pp-wrap), not inside it and not as a card');
+  ok(tools.cards && tools.ear, 'it holds the three Trainer cards (session log, random prompts, one-minute chord changes) and the button to ear training in Exercises; the interval trainer itself is gone');
+  ok(tools.row && tools.row.viewport === 1200 && tools.oneRow, 'at 1200 px chord A and chord B share one row: ' + JSON.stringify(tools.row));
+  ok(tools.label > 0 && tools.label <= 230 && !tools.overflow, 'and the session label is at most 230 px wide (the plan’s form rules did not reach the cards): ' + tools.label + ' px');
+  if (tools.exists && tools.cards) { // without the cards the checks above have already failed
+    // Space goes to the page while no field has the focus (a field keeps its own Space)
+    await page.evaluate(() => {
+      if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
+      document.getElementById('tr-sess-start').click(); document.getElementById('tr-cc-start').click();
+    });
+    await page.keyboard.press('Space'); await page.keyboard.press('Space');
+    const freeRun = await page.evaluate(async () => {
+      const wait = ms => new Promise(r => setTimeout(r, ms)), txt = id => document.getElementById(id).textContent.trim();
+      const o = { changes: txt('tr-cc-num'), timerRuns: document.getElementById('tr-sess-start').hidden && !document.getElementById('tr-sess-pause').hidden };
+      App.switchTo('chords'); await wait(120); App.switchTo('practiceplan'); await wait(120);
+      o.back = { changes: txt('tr-cc-num'), result: txt('tr-cc-result'), startOn: !document.getElementById('tr-cc-start').disabled,
+        timer: txt('tr-sess-start'), timerPaused: !document.getElementById('tr-sess-start').hidden && document.getElementById('tr-sess-pause').hidden,
+        stillOpen: document.getElementById('pp-tools').open, cards: !!document.querySelector('#pp-tools-body #tr-cc-start') };
+      document.getElementById('pp-tools').open = false; document.querySelector('details.pp-notes').open = true;
+      return o;
+    });
+    ok(freeRun.changes === '2' && freeRun.timerRuns, 'with the section open, Space counts a change during a one-minute chord run: ' + JSON.stringify(freeRun.changes));
+    ok(freeRun.back.changes === '0' && /Run cancelled/.test(freeRun.back.result) && freeRun.back.startOn && /Resume/.test(freeRun.back.timer) && freeRun.back.timerPaused,
+      'leaving the Plan page cancels the chord run and pauses the Free practice timer (Resume shows): ' + JSON.stringify(freeRun.back));
+    ok(freeRun.back.stillOpen && freeRun.back.cards, 'the section and its cards survive the page’s repaint on return');
+  }
+
   const beforeReview = JSON.stringify(start.plan.items);
   await page.fill('#pp-notes', 'C major scale right hand\nInvent a seven-string microtonal tapping etude');
   await page.click('#pp-review');
@@ -329,13 +384,19 @@ async function plan(page, text, opts) {
 
   ({ ctx, page, errs } = await open(browser, { width: 390, height: 844 }));
   await plan(page, 'C major scale right hand\n' + 'UnmatchedLongSourceWord'.repeat(24));
+  // Free practice open from here on: its cards must fit a phone too
+  await page.evaluate(() => { const t = document.getElementById('pp-tools'); if (t) t.open = true; });
+  await page.waitForTimeout(100);
   const mobile = await page.evaluate(() => ({
     overflow: document.documentElement.scrollWidth > window.innerWidth,
     today: document.getElementById('pp-today').getBoundingClientRect().width,
     notes: document.getElementById('pp-notes').getBoundingClientRect().width,
-    week: document.getElementById('pp-week').textContent
+    week: document.getElementById('pp-week').textContent,
+    tools: document.querySelector('#pp-tools[open]') ? Math.round(document.getElementById('pp-tools').getBoundingClientRect().width) : 0,
+    cards: document.querySelectorAll('#pp-tools-body .card').length
   }));
   ok(!mobile.overflow && mobile.today <= 390 && mobile.notes <= 390 && mobile.week.trim(), 'long imported notes and weekly/session cards fit a phone viewport: ' + JSON.stringify(mobile));
+  ok(!mobile.overflow && mobile.tools > 0 && mobile.tools <= 390 && mobile.cards >= 3, 'the open Free practice section and its cards fit a phone viewport too: ' + JSON.stringify([mobile.tools, mobile.cards]));
   await page.setViewportSize({ width: 360, height: 844 });
   await page.evaluate(() => document.fonts.ready);
   await page.waitForTimeout(150);
@@ -344,9 +405,11 @@ async function plan(page, text, opts) {
       const r = e.getBoundingClientRect(); return { label: e.textContent, top: r.top, left: r.left, right: r.right };
     });
     return { n: pills.length, oneRow: Math.max(...pills.map(r => r.top)) - Math.min(...pills.map(r => r.top)) <= 2,
-      fits: pills.every(r => r.left >= 0 && r.right <= window.innerWidth + 1), overflow: document.documentElement.scrollWidth > window.innerWidth, pills };
+      fits: pills.every(r => r.left >= 0 && r.right <= window.innerWidth + 1), overflow: document.documentElement.scrollWidth > window.innerWidth,
+      tools: !!document.querySelector('#pp-tools[open]'), pills };
   });
   ok(narrowNav.n >= 4 && narrowNav.oneRow && narrowNav.fits && !narrowNav.overflow, 'Learn navigation stays on one visible row at 360px: ' + JSON.stringify(narrowNav));
+  ok(narrowNav.tools && !narrowNav.overflow, 'no sideways scroll at 360px with Free practice open');
   ok(errs.length === 0, 'no phone page errors' + (errs.length ? ': ' + errs.join(' | ') : ''));
   await ctx.close(); await browser.close();
   console.log(fails ? '\nFAILED: ' + fails : '\nALL PASS');

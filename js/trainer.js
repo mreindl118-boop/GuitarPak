@@ -1,18 +1,22 @@
-/* GuitarLab — trainer module.
- * Practice dashboard: session log, random prompts, one-minute chord changes,
- * interval ear trainer. Four cards in a .grid2. No dependencies beyond App/Theory.
+/* soundLAB — Free practice cards (the former Trainer page).
+ * A card library, not a page (2.0 Phase A): js/practiceplan.js mounts it into
+ * #pp-tools-body, the collapsed "Free practice" section under the Practice
+ * plan, and forwards page show / hide, the Space key and the controller
+ * remote to App.trainerCards = { mount, show, hide, key, remote }.
+ * Cards in a .grid2: session log (tr.sessions), random prompts, one-minute
+ * chord changes (tr.ccA, tr.ccB, tr.best.<A>-<B>) and a short pointer to
+ * interval ear training, which lives in Exercises now (Intervals › All
+ * intervals › Ear). The old ear trainer's tr.earBest / tr.earHarm are left
+ * alone: never read, written or deleted here. Ids keep the tr- prefix.
+ * No dependencies beyond App/Theory.
  */
 (function () {
   'use strict';
 
-  var IV_ABBR = ['m2', 'M2', 'm3', 'M3', 'P4', 'TT', 'P5', 'm6', 'M6', 'm7', 'M7', 'P8'];
-  var IV_FULL = ['minor 2nd', 'major 2nd', 'minor 3rd', 'major 3rd', 'perfect 4th',
-    'tritone', 'perfect 5th', 'minor 6th', 'major 6th', 'minor 7th', 'major 7th', 'octave'];
   var CC_CHORDS = ['C', 'A', 'G', 'E', 'D', 'F', 'Am', 'Em', 'Dm', 'B7', 'A7', 'D7', 'E7', 'G7', 'C7'];
 
   // ---------- state ----------
   var els = {};
-  var ansBtns = [];
 
   // card 1: session log
   var sessAccum = 0;        // accumulated ms while paused
@@ -30,15 +34,6 @@
   var ccEnd = 0;
   var ccN = 0;
   var ccDoneAt = 0; // when the last run ran out (the remote's late-press guard)
-
-  // card 4: ear trainer
-  var earPair = null;
-  var earAnswered = false;
-  var earScore = 0;
-  var earStreak = 0;
-  var earBest = 0;
-  var earNextTO = null;
-  var earFlashTOs = [];
 
   // ---------- small helpers ----------
   function $(id) { return document.getElementById(id); }
@@ -304,75 +299,6 @@
   }
 
   // ================================================================
-  // Card 4 — interval ear trainer
-  // ================================================================
-  function clearAnsClasses() {
-    for (var i = 0; i < ansBtns.length; i++) {
-      ansBtns[i].classList.remove('tr-good', 'tr-bad', 'tr-reveal');
-    }
-  }
-
-  function renderEarStats() {
-    els.earScore.textContent = String(earScore);
-    els.earStreak.textContent = String(earStreak);
-    els.earBestEl.textContent = String(earBest);
-  }
-
-  function earSound() {
-    if (!earPair) return;
-    if (els.earHarm.checked) {
-      App.pluck(earPair.root, 0, 1.4, 0.3);
-      App.pluck(earPair.root + earPair.iv, 0, 1.4, 0.3);
-    } else {
-      App.pluck(earPair.root, 0, 1.1, 0.4);
-      App.pluck(earPair.root + earPair.iv, 0.5, 1.1, 0.4);
-    }
-  }
-
-  function earNewPair() {
-    if (earNextTO) { clearTimeout(earNextTO); earNextTO = null; }
-    earPair = { root: 40 + rand(37), iv: 1 + rand(12) }; // root 40..76, interval 1..12
-    earAnswered = false;
-    clearAnsClasses();
-    for (var i = 0; i < ansBtns.length; i++) ansBtns[i].disabled = false;
-    els.earReplay.disabled = false;
-    els.earMsg.textContent = 'Listen… which interval is it?';
-    earSound();
-  }
-
-  function earFlash(btn, cls) {
-    btn.classList.add(cls);
-    earFlashTOs.push(setTimeout(function () { btn.classList.remove(cls); }, 550));
-  }
-
-  function earAnswer(iv, btn) {
-    if (!earPair || earAnswered) return;
-    earAnswered = true;
-    App.getAudio(); // click gesture: keep context unlocked for the delayed next pair
-    if (iv === earPair.iv) {
-      earFlash(btn, 'tr-good');
-      earScore++;
-      earStreak++;
-      if (earStreak > earBest) {
-        earBest = earStreak;
-        App.store.set('tr.earBest', earBest);
-      }
-      els.earMsg.textContent = 'Correct — ' + IV_FULL[earPair.iv - 1] + '!';
-      earNextTO = setTimeout(function () {
-        earNextTO = null;
-        earNewPair();
-      }, 900);
-    } else {
-      earFlash(btn, 'tr-bad');
-      ansBtns[earPair.iv - 1].classList.add('tr-reveal');
-      earStreak = 0;
-      els.earMsg.textContent = 'It was ' + IV_FULL[earPair.iv - 1] + ' (' +
-        IV_ABBR[earPair.iv - 1] + '). Press Play for a new one.';
-    }
-    renderEarStats();
-  }
-
-  // ================================================================
   // module wiring
   // ================================================================
   function init(root) {
@@ -387,24 +313,12 @@
       '.tr-label-input { width: 230px; max-width: 100%; }',
       '.tr-cc-count { width: 100%; font-size: 22px; padding: 20px 10px; margin: 12px 0 10px; border-radius: 12px; }',
       '.tr-cc-count:not([disabled]) { background: var(--accent); color: #171106; border-color: var(--accent); }',
-      '.tr-cc-changes { text-align: center; }',
-      '.tr-ear-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin: 14px 0 12px; }',
-      '@media (max-width: 520px) { .tr-ear-grid { grid-template-columns: repeat(4, 1fr); } }',
-      '.tr-ear-ans { padding: 10px 4px; font-size: 13.5px; }',
-      '.tr-good { background: var(--green) !important; color: #12240f !important; border-color: var(--green) !important; }',
-      '.tr-bad { background: var(--red) !important; color: #2a0f0f !important; border-color: var(--red) !important; }',
-      '.tr-reveal { outline: 2px solid var(--green); outline-offset: 1px; }',
-      '.tr-harm-chip { cursor: pointer; }'
+      '.tr-cc-changes { text-align: center; }'
     ].join('\n'));
 
     var ccOpts = '';
     for (var i = 0; i < CC_CHORDS.length; i++) {
       ccOpts += '<option value="' + CC_CHORDS[i] + '">' + CC_CHORDS[i] + '</option>';
-    }
-    var ansHtml = '';
-    for (var j = 0; j < IV_ABBR.length; j++) {
-      ansHtml += '<button class="btn tr-ear-ans" data-tr-iv="' + (j + 1) + '" disabled>' +
-        IV_ABBR[j] + '</button>';
     }
 
     root.innerHTML =
@@ -469,21 +383,13 @@
         '</div>' +
       '</div>' +
 
-      // ---- card 4: interval ear trainer ----
+      // ---- card 4: where interval ear training went (Exercises) ----
       '<div class="card">' +
-        '<h2>Interval ear trainer</h2>' +
-        '<div class="row tight">' +
-          '<button class="btn primary" id="tr-ear-play">Play interval</button>' +
-          '<button class="btn" id="tr-ear-replay" disabled>Replay</button>' +
-          '<label class="chip tr-harm-chip"><input type="checkbox" id="tr-ear-harm"> Harmonic</label>' +
+        '<h2>Ear training</h2>' +
+        '<div>Interval ear training is in Exercises: Intervals › All intervals › Ear.</div>' +
+        '<div class="row tr-mt">' +
+          '<button class="btn primary" id="tr-ear-go">Open ear training</button>' +
         '</div>' +
-        '<div class="tr-ear-grid" id="tr-ear-grid">' + ansHtml + '</div>' +
-        '<div class="row tight">' +
-          '<span class="chip">Score <b id="tr-ear-score">0</b></span>' +
-          '<span class="chip">Streak <b id="tr-ear-streak">0</b></span>' +
-          '<span class="chip">Best <b id="tr-ear-best">0</b></span>' +
-        '</div>' +
-        '<div class="small muted tr-mt" id="tr-ear-msg">Press Play to hear an interval.</div>' +
       '</div>' +
 
       '</div>';
@@ -510,24 +416,12 @@
     els.ccStart = $('tr-cc-start');
     els.ccReset = $('tr-cc-reset');
     els.ccResult = $('tr-cc-result');
-    els.earPlay = $('tr-ear-play');
-    els.earReplay = $('tr-ear-replay');
-    els.earHarm = $('tr-ear-harm');
-    els.earScore = $('tr-ear-score');
-    els.earStreak = $('tr-ear-streak');
-    els.earBestEl = $('tr-ear-best');
-    els.earMsg = $('tr-ear-msg');
-
-    ansBtns = Array.prototype.slice.call(root.querySelectorAll('.tr-ear-ans'));
 
     // restore persisted settings
     var savedA = App.store.get('tr.ccA', 'C');
     var savedB = App.store.get('tr.ccB', 'G');
     els.ccA.value = CC_CHORDS.indexOf(savedA) !== -1 ? savedA : 'C';
     els.ccB.value = CC_CHORDS.indexOf(savedB) !== -1 ? savedB : 'G';
-    els.earHarm.checked = !!App.store.get('tr.earHarm', false);
-    earBest = App.store.get('tr.earBest', 0);
-    if (typeof earBest !== 'number' || !isFinite(earBest)) earBest = 0;
 
     // card 1 wiring
     els.sessStart.addEventListener('click', sessStart);
@@ -567,31 +461,26 @@
     els.ccReset.addEventListener('click', function () { ccReset(true); });
     els.ccCount.addEventListener('click', ccCount);
 
-    // card 4 wiring
-    els.earPlay.addEventListener('click', function () {
-      App.getAudio();
-      earNewPair();
-    });
-    els.earReplay.addEventListener('click', function () {
-      App.getAudio();
-      earSound();
-    });
-    els.earHarm.addEventListener('change', function () {
-      App.store.set('tr.earHarm', els.earHarm.checked);
-    });
-    ansBtns.forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        earAnswer(parseInt(btn.getAttribute('data-tr-iv'), 10), btn);
-      });
+    // card 4 wiring: open the Exercises ear level. Exercises refuses a level
+    // whose mode the selected Learn instrument does not have (Drums has only
+    // theory), so say that here instead of landing on a page that did nothing.
+    $('tr-ear-go').addEventListener('click', function () {
+      var li = App.learnInstruments;
+      if (li && !li.allowsMode('ear')) {
+        App.toast('Ear training is not part of the ' + li.label() + ' category. Pick another instrument in the Learn bar at the top of this page.');
+        return;
+      }
+      App.switchTo('quiz');
+      if (!(window.SLQuiz && SLQuiz.start('intervals/iall/ear/1'))) App.toast('Open Intervals › All intervals › Ear on this page.');
     });
 
     renderSessions();
     updateBestChip();
-    renderEarStats();
     sessButtons();
   }
 
   function onShow() {
+    if (!els.sessList) return; // not mounted
     renderSessions(); // 7-day window may have moved since last visit
   }
 
@@ -601,33 +490,22 @@
     // cancel a chord-change run in progress
     if (ccRunning) ccReset(true);
     if (ccInt) { clearInterval(ccInt); ccInt = null; }
-    // stop ear-trainer timeouts
-    if (earNextTO) { clearTimeout(earNextTO); earNextTO = null; }
-    for (var i = 0; i < earFlashTOs.length; i++) clearTimeout(earFlashTOs[i]);
-    earFlashTOs = [];
-    clearAnsClasses();
   }
 
   // the CONTROLLER REMOTE (js/remote.js): a foot for the hands-busy cards.
-  // NEXT = count a change while a chord-change run goes (like Space), else
-  // Play interval; BACK = Replay; STOP = the run's Reset, else the session
+  // The Plan page asks here first (js/practiceplan.js remote) and acts itself
+  // on false. NEXT = count a change while a chord-change run goes (like
+  // Space); BACK = nothing here; STOP = the run's Reset, else the session
   // clock's Pause. Nothing here listens to MIDI notes, so the reserved
   // double-tap key costs nothing.
   function remote(action) {
     if (action === 'next') {
       if (ccRunning) { ccCount(); return 'Change ' + ccN; }
-      // the minute just ran out: a late press must not play an interval
+      // the minute just ran out: a late press must not open a plan block
       if (ccDoneAt && Date.now() - ccDoneAt < 1500) return 'Time’s up';
-      try { App.getAudio(); } catch (e) { /* audio unavailable: the pair still shows */ }
-      earNewPair();
-      return 'New interval';
+      return false;
     }
-    if (action === 'back') {
-      if (!earPair) return false;
-      try { App.getAudio(); } catch (e) { /* as above */ }
-      earSound();
-      return 'Again';
-    }
+    if (action === 'back') return false;
     if (ccRunning) { ccReset(true); return 'Run cancelled'; }
     if (sessRunning) { sessPause(); return 'Session paused'; }
     return false;
@@ -642,12 +520,7 @@
     }
   }
 
-  App.register('trainer', {
-    init: init,
-    onShow: onShow,
-    onHide: onHide,
-    onKey: onKey,
-    onRemote: remote,
-    remoteKey: true
-  });
+  // not a page any more: the Plan page (js/practiceplan.js) mounts the cards
+  // and forwards its own show / hide / key / remote calls
+  App.trainerCards = { mount: init, show: onShow, hide: onHide, key: onKey, remote: remote };
 })();

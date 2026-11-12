@@ -35,8 +35,8 @@
  * master lives in the treble-clef menu.
  *
  * CONTROLLER REMOTE (js/remote.js, App.keysLessons.remote via the Keys
- * page's onRemote only: the Synth page hides this card): NEXT = Start / Next
- * level / Again / Go again (a passed top level selects the next lesson; a
+ * page's onRemote only, while the LUMI section is closed): NEXT = Start /
+ * Next level / Again / Go again (a passed top level selects the next lesson; a
  * playing run ignores it unless every note is judged); BACK = restart the
  * run, replay Listen first, or retry the level just played (start's step
  * override, the saved level untouched) - a finished run or an infinite one
@@ -44,6 +44,13 @@
  * End run button (a finite run is never scored, an infinite count-in isn't
  * either), on results = Lessons. The lowest-key double-tap above stays this
  * card's own (no remoteKey here), on the Keys page only.
+ *
+ * LUMI SECTION (#pn-lumi under this card, js/lumi-practice.js): open =
+ * owner. A lesson that starts (start) or is opened from the Learn bar or a
+ * Plan block (releaseRunner) closes the section, which stops its session;
+ * opening the section stops a run (halt, which keeps the credit instrument).
+ * While it is open this card's double-tap stands down (onKeysPage) and
+ * piano.js never asks remote().
  */
 (function () {
   'use strict';
@@ -81,14 +88,18 @@
   var root = null, view = 'list', R = null, last = null, demo = null, entryInstrument = null, doneAt = 0;
   App.on('learn:lesson',function(e){if(e&&e.kind==='keys'){stopAll(true);releaseRunner();entryInstrument=e.instrument==='synth'?'synth':'piano';if(root)paint();}});
   App.on('learn:instrument',function(){entryInstrument=null;if(R)stopAll(false);else if(root)paint();});
-  function creditInstrument(){return R?R.instrument:entryInstrument||(App.active==='synth'?'synth':'piano');}
+  function creditInstrument(){return R?R.instrument:entryInstrument||'piano';}
   function measure(r){if(!r||r.demo)return;var at=Date.now(),delta=(at-r.xpLast)/1000;r.xpLast=at;if(r.ctx.currentTime>=r.first&&delta>0&&delta<=1&&r.xpActivity!=null&&at-r.xpActivity<=5000)r.xpSeconds+=delta;}
   function recordRun(r,status){if(!r||r.demo||r.xpRecorded||!App.xp)return null;measure(r);r.xpRecorded=true;var hits=r.inf?r.inf.hits:r.targets.filter(function(t){return t.j&&t.j!=='miss';}).length,miss=r.inf?r.inf.miss:r.targets.filter(function(t){return t.j==='miss';}).length;return App.xp.finishLevel({sessionId:r.sessionId,instrument:r.instrument,status:status,mode:'keys:'+r.l.id,metrics:{engagedSeconds:r.xpSeconds,expected:r.inf?hits+miss:r.targets.length,matched:hits,missed:miss,extra:r.wrong,wrong:r.wrong}});}
 
   function K() { return App.keys; }
   // a lesson was opened (Learn, Practice plan): a Keys runner the remote
-  // paused no longer takes NEXT, the lesson does
-  function releaseRunner() { var k = K(); if (k && k.releaseRemote) k.releaseRemote(); }
+  // paused no longer takes NEXT, the lesson does. An open LUMI section is
+  // closed too (its session stops): it would keep the pedal otherwise
+  function releaseRunner() {
+    var k = K(); if (k && k.releaseRemote) k.releaseRemote();
+    if (App.lumiPractice) App.lumiPractice.close('A lesson was opened.');
+  }
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function el(id) { return document.getElementById(id); }
   function stepName(i) { return RATE_NAME[STEPS[i][1]] + ' at ' + STEPS[i][0]; }
@@ -119,8 +130,9 @@
     lastTap = { midi: midi, at: now };
     return false;
   }
-  // the Keys page only: the Synth page borrows the keyboard but hides this card
-  function onKeysPage() { return App.active === 'piano'; }
+  // the Keys page only, and not while the LUMI section is open: the
+  // double-tap key is that section's then
+  function onKeysPage() { return App.active === 'piano' && !(App.lumiPractice && App.lumiPractice.open); }
   // start from the list / results view, stop a run
   function tapControl() {
     if (R) { if (R.inf && !R.demo) finish(); else stopAll(false); return true; }
@@ -128,7 +140,8 @@
     return false;
   }
 
-  // CONTROLLER REMOTE (js/remote.js; piano.js onRemote asks here first):
+  // CONTROLLER REMOTE (js/remote.js; piano.js onRemote asks here first,
+  // unless the LUMI section is open - then it is not asked at all):
   // NEXT / BACK / STOP do what the card's own buttons do. false = nothing
   // for the lessons (a playing Keys runner, or nothing at all), else true or
   // the HUD label. Never touches the saved level (BACK retries via a step
@@ -262,11 +275,14 @@
   // remote's BACK retries the level just played after a level-up; the saved
   // progress is not touched until that run is scored
   function start(isDemo, stepOverride) {
+    // open = owner: every way a run starts (Start, Listen first, Again, Next
+    // level, a double-tap, the pedal) closes the LUMI section first
+    if (App.lumiPractice) App.lumiPractice.close('A lesson started. LUMI session stopped.');
     stopAll(true);
     var l = sel(), p = prog(l.id);
     var step = typeof stepOverride === 'number' && stepOverride >= 0 && stepOverride < STEPS.length ? stepOverride : p.step;
     try { R = build(l, step, isDemo ? 1 : reps(), isDemo); } catch (e) { R = null; return; }
-    R.instrument=entryInstrument||(App.active==='synth'?'synth':'piano');R.sessionId='keys-'+Date.now()+'-'+Math.random().toString(36).slice(2);R.xpLast=Date.now();R.xpSeconds=0;R.xpActivity=null;R.xpRecorded=false;if(!R.demo&&App.xp)App.xp.beginSession({id:R.sessionId,instrument:R.instrument,source:'keys'});
+    R.instrument=entryInstrument||'piano';R.sessionId='keys-'+Date.now()+'-'+Math.random().toString(36).slice(2);R.xpLast=Date.now();R.xpSeconds=0;R.xpActivity=null;R.xpRecorded=false;if(!R.demo&&App.xp)App.xp.beginSession({id:R.sessionId,instrument:R.instrument,source:'keys'});
     App.emit('transport:claim', { owner: 'keys' });
     App.wake.acquire('kl-run');
     R.timer = setInterval(tick, 25);
@@ -769,7 +785,7 @@
     '.kl-level{display:grid;grid-template-columns:auto minmax(0,max-content) auto;justify-content:start;align-items:center;gap:10px}.kl-level span{font-size:14px}' +
     // focus mode while a run plays: keyboard + run panel only
     '.kl-running #panel-piano .row.spread>span.row,.kl-running #pn-perf,.kl-running #pn-qwpanel,.kl-running .pn-practice,' +
-      '.kl-running #pn-legend,.kl-running .pn-foot,.kl-running .kl-head{display:none!important}' +
+      '.kl-running #pn-legend,.kl-running .pn-foot,.kl-running .kl-head,.kl-running #pn-lumi{display:none!important}' +
     '.kl-running .kl-card{margin-top:10px}' +
     '.kl-mastery{display:grid;gap:4px}.kl-mbar{display:block;height:6px;border-radius:3px;background:var(--line);overflow:hidden}.kl-mbar i{display:block;height:100%;background:var(--accent);border-radius:3px}' +
     '.kl-opts{display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap}' +
@@ -850,7 +866,10 @@
       paint();
     },
     stop: function () { stopAll(false); entryInstrument=null; },
-    // the controller remote on the Keys / Synth page: false | true | HUD label
+    // stop a run and keep the credit instrument: the LUMI section opened,
+    // or a LUMI session started. The next lesson is credited as before
+    halt: function () { stopAll(false); },
+    // the controller remote on the Keys page: false | true | HUD label
     remote: remote,
     // for the Exercises Progress tab: every lesson that has runs
     summary: function (instrument) {

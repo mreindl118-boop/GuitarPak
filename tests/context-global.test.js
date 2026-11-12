@@ -4,7 +4,7 @@ const { chromium } = require('playwright');
 const fs = require('fs'), path = require('path'), env = require('./env');
 let checks = 0;
 function ok(value, message) { if (!value) throw new Error(message); checks++; console.log('  PASS', message); }
-const pages = ['quiz', 'practiceplan', 'fretboard', 'tab', 'notation', 'helix', 'chords', 'piano', 'chart', 'synth', 'pads', 'deck', 'liveset', 'midihub', 'lumipractice', 'songs', 'jam', 'shed', 'tuner', 'trainer', 'theory', 'settings']; // 1.3: deck + liveset = the Synth tab
+const pages = ['quiz', 'practiceplan', 'fretboard', 'tab', 'notation', 'helix', 'chords', 'piano', 'chart', 'pads', 'deck', 'liveset', 'midihub', 'songs', 'jam', 'shed', 'tuner', 'theory', 'settings']; // 1.3: deck + liveset = the Synth tab; 2.0: the Synth, LUMI and Trainer pages are folded into Piano and Plan
 async function switchTo(page, name) {
   await page.evaluate(name => App.switchTo(name), name);
   await page.waitForFunction(name => App.active === name, name);

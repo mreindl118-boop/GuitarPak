@@ -444,7 +444,7 @@
     var configured = saved != null && saved !== '' || !!route, enabled = displayEnabled();
     return { enabled: enabled, configured: configured, connected: !!route,
       outputId: saved != null ? saved : route ? route.id : '', name: route ? route.name : '', cleanupOk: displayCleanupOk,
-      reason: !configured ? 'Choose a LUMI display output in Keys → LUMI (MIDI must be connected).' :
+      reason: !configured ? 'Choose a LUMI display output on the Piano page, under Notes and triads on the LUMI (MIDI must be connected).' :
         !route ? 'The configured LUMI display is disconnected or unavailable; no fallback is used.' :
         !enabled ? 'LUMI Display is off.' : 'LUMI Display is on: ' + route.name + '.' };
   }

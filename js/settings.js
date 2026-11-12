@@ -84,7 +84,7 @@
             '<button type="button" data-tone="synth">Synth</button>' +
           '</div>' +
         '</div>' +
-        '<div class="muted small set-theme-note">The voice for fretboard taps, scale practice, chord strums and trainer notes.</div>' +
+        '<div class="muted small set-theme-note">The voice for fretboard taps, scale practice, chord strums and practice notes.</div>' +
         '<div class="set-sub">Piano</div>' +
         '<div class="fb-field">' +
           '<div class="seg" id="set-ptone">' +
@@ -171,7 +171,7 @@
       // the controller remote (js/remote.js renders the rows)
       '<div class="card" id="set-remote-card">' +
         '<h2>Hands-free control</h2>' +
-        '<div class="muted small">Move practice on from the instrument: a pedal, a button on your synth or a page-turner pedal does Next, Back and Stop on Exercises, Keys lessons, the Woodshed, LUMI practice, the Practice plan, Songs, the fretboard runner, the Trainer, Live sets and the Deck.</div>' +
+        '<div class="muted small">Move practice on from the instrument: a pedal, a button on your synth or a page-turner pedal does Next, Back and Stop on Exercises, Keys lessons and LUMI practice on the Piano page, the Woodshed, the Practice plan and its one-minute chord changes, Songs, the fretboard runner, Live sets and the Deck.</div>' +
         '<div id="set-remote"></div>' +
       '</div>' +
       '<div class="card" id="set-audio-card">' +

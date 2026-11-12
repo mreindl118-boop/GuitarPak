@@ -1,6 +1,6 @@
 // soundLAB 2.0, Phase A ("Trim"): what left the app is gone, what stays still
 // works, and the 1.x data on the same origin is never touched.
-// Plan: docs/plans/phase-a/PLAN.md (section 4.5; A2 and A3b add to this file).
+// Plan: docs/plans/phase-a/PLAN.md (sections 4.5 and 5.7; A3b adds to this file).
 //
 // A1 = the Studio space, the loop/song sequencer, the sampler and its
 // database, and the plug-in API are out:
@@ -12,6 +12,18 @@
 //     this origin still owns them)
 //   - a stale workspace or page id lands on Exercises, never on a blank page
 //   - Backup import skips the keys of removed features and says so
+// A2 = three pills are folded into the pages that took their features in
+// (plan section 5): the Trainer cards are on the Plan page (Free practice),
+// the Synth pill is the Sound picker on Piano, LUMI practice is a section
+// under the Keys lessons:
+//   - no pill reads Trainer, Synth or LUMI; Keys is Piano | Charts | Pads,
+//     Train is Woodshed | Tuner
+//   - App.switchTo('trainer' / 'synth' / 'lumipractice') lands on Plan / Piano
+//     / Piano and says where the feature went; so does a stored last page
+//   - a stored pill (app.gtab.gkeys = synth, app.gtab.gprac = trainer) opens
+//     the first page of its tab
+//   - the interval ear trainer is Exercises now: #tr-ear-go starts the ear
+//     level, and says why it does not under a category without ear training
 // No hardware: no MIDI device, no microphone. Sound runs into a muted context.
 const { chromium } = require('playwright');
 const env = require('./env');
@@ -19,20 +31,31 @@ let fails = 0;
 function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console.log('  FAIL', msg); } }
 const J = JSON.stringify;
 
-// ---- what this app is (A2 and A3b edit these lists) ----
+// ---- what this app is (A2 edited these lists; A3b edits them again) ----
 // the page list of js/app.js (PAGES), in its order; Settings is an overlay page
-const PAGES = ['quiz', 'practiceplan', 'fretboard', 'tab', 'notation', 'helix', 'chords', 'piano', 'chart', 'synth', 'pads',
-  'deck', 'liveset', 'midihub', 'lumipractice', 'songs', 'jam', 'shed', 'tuner', 'trainer', 'theory'];
-// pages that left the app: App.switchTo(id) goes home and says why (MOVED in js/app.js)
-const MOVED = { arrange: /Studio is not part of soundLAB 2\.0/, tracks: /Studio is not part of soundLAB 2\.0/,
-  song: /Studio is not part of soundLAB 2\.0/, ideas: /Studio is not part of soundLAB 2\.0/ };
+const PAGES = ['quiz', 'practiceplan', 'fretboard', 'tab', 'notation', 'helix', 'chords', 'piano', 'chart', 'pads',
+  'deck', 'liveset', 'midihub', 'songs', 'jam', 'shed', 'tuner', 'theory'];
+// pages that left the app (MOVED in js/app.js): App.switchTo(id) goes to the page that took the feature in,
+// or home, and says why. there = what the sentence names, on the page it lands on.
+const STUDIO = /Studio is not part of soundLAB 2\.0/;
+const MOVED = {
+  arrange: { to: 'quiz', say: STUDIO }, tracks: { to: 'quiz', say: STUDIO }, song: { to: 'quiz', say: STUDIO }, ideas: { to: 'quiz', say: STUDIO },
+  trainer: { to: 'practiceplan', say: /^The Trainer cards are on the Plan page now, under Free practice\.$/, there: '#panel-practiceplan #pp-tools #tr-cc-start' },
+  synth: { to: 'piano', say: /^Synth sounds are in the Sound picker on the Piano page\.$/, there: '#panel-piano #pn-voice option:nth-of-type(2)' },
+  lumipractice: { to: 'piano', say: /^LUMI practice is on the Piano page now, under the lessons\.$/, there: '#panel-piano #pn-lumi #pn-lumi-body #lp-mode' }
+};
+const NAMES = { quiz: 'Exercises', practiceplan: 'the Plan page', piano: 'the Piano page' };
 // a tab or pill with one of these names would be a way into a removed page ("Songs" is not "Song")
 const GONE_LABELS = /^(studio|sketch|timeline|editor|song|ideas)$/i;
+// A2: pills only. "Synth" is still a tab (Deck, Live, Hub) until A3b.
+const GONE_PILLS = /^(trainer|synth|lumi)$/i;
 // controls that went with the Studio, the capture, the sequencer and the plug-in API
 const GONE_IDS = ['space-btn', 'cx-rec', 'cx-rec-msg', 'wipe', 'set-click', 'set-retro', 'set-voice', 'set-plugin-file',
-  'ws-track', 'pd-play', 'pd-rec', 'pd-click', 'pd-clear', 'pd-recinfo', 'pd-track', 'pd-mk'];
+  'ws-track', 'pd-play', 'pd-rec', 'pd-click', 'pd-clear', 'pd-recinfo', 'pd-track', 'pd-mk',
+  // A2: the Trainer's interval ear trainer (Exercises has it)
+  'tr-ear-play', 'tr-ear-replay', 'tr-ear-harm', 'tr-ear-grid', 'tr-ear-msg'];
 // help tours of removed pages (js/help.js)
-const GONE_TOURS = ['song', 'arrange', 'tracks', 'ideas'];
+const GONE_TOURS = ['song', 'arrange', 'tracks', 'ideas', 'trainer'];
 // keys of removed features: no 2.0 code writes or deletes them (same pattern as the Backup skip in js/settings.js)
 const DEAD = '^guitarlab\\.(st\\.|sd\\.|ideas\\.|song\\.|plugins\\.|app\\.space$|app\\.tabStudio$|app\\.click$|pads\\.track$)';
 
@@ -83,6 +106,7 @@ async function newPage(browser, raw, json) {
       return p.classList.contains('active') && getComputedStyle(p).display !== 'none' && r.height > 0 && p.children.length > 0; };
     window.__shown = () => Array.from(document.querySelectorAll('main > .panel.active')).map(p => p.id.slice(6)).join(',');
     window.__toast = () => { const t = document.getElementById('app-toast'); return t && !t.hidden ? t.textContent : ''; };
+    window.__hideToast = () => { const t = document.getElementById('app-toast'); if (t) { t.hidden = true; t.textContent = ''; } };
   }, [raw || {}, json || {}]);
   const page = await ctx.newPage(), errs = [], logs = [];
   page.on('pageerror', e => errs.push(e.message));
@@ -147,17 +171,20 @@ const lines = a => a.length ? '\n    ' + a.join('\n    ') : '';
 
   console.log('# A1 every page opens; no way into a removed page');
   const tour = await page.evaluate(async (ids) => {
-    const seen = [], labels = {};
-    const read = () => document.querySelectorAll('.tabbar-btn, .subtab').forEach(b => { const t = (b.textContent || '').trim(); if (t) labels[t] = 1; });
+    const seen = [], labels = {}, pills = {};
+    const read = () => document.querySelectorAll('.tabbar-btn, .subtab').forEach(b => { const t = (b.textContent || '').trim(); if (!t) return; labels[t] = 1; if (b.classList.contains('subtab')) pills[t] = 1; });
     read();
     for (const id of ids) { App.switchTo(id); await __wait(200); read(); seen.push({ id, active: App.active, shown: __shown(), seen: __seen(id) }); }
-    return { seen, labels: Object.keys(labels) };
+    return { seen, labels: Object.keys(labels), pills: Object.keys(pills) };
   }, PAGES.concat('settings'));
   const lost = tour.seen.filter(x => x.active !== x.id || x.shown !== x.id || !x.seen);
   ok(lost.length === 0, 'visited ' + tour.seen.length + ' pages, each one the active page with its own panel visible' + (lost.length ? '\n    not shown: ' + J(lost) : ''));
   const badLabels = tour.labels.filter(t => GONE_LABELS.test(t));
   ok(tour.labels.includes('Learn') && badLabels.length === 0, 'no tab or pill reads Studio, Sketch, Timeline, Editor, Song or Ideas (' + tour.labels.length + ' labels seen)' +
     (badLabels.length ? '\n    found: ' + badLabels.join(', ') : ''));
+  const badPills = tour.pills.filter(t => GONE_PILLS.test(t));
+  ok(tour.pills.includes('Piano') && tour.pills.includes('Woodshed') && tour.pills.includes('Plan') && badPills.length === 0,
+    'A2: no pill reads Trainer, Synth or LUMI (' + tour.pills.length + ' pills seen: ' + tour.pills.join(', ') + ')' + (badPills.length ? '\n    found: ' + badPills.join(', ') : ''));
   const gone = await page.evaluate((ids) => ({
     found: ids.filter(id => document.getElementById(id)),
     cards: Array.from(document.querySelectorAll('#panel-settings h2, #panel-settings h3')).map(h => h.textContent.trim()).filter(t => /^(studio|plug-?ins?)$/i.test(t)),
@@ -218,23 +245,24 @@ const lines = a => a.length ? '\n    ' + a.join('\n    ') : '';
   ok(snd.pad && snd.padFlash && snd.padDrums === 1, 'Pads: a hit flashes the pad and plays its own drum kit: ' + J([snd.pad, snd.padFlash, snd.padDrums]));
   ok(snd.kit === 'ok', 'DAW.createDrums(ctx).noteOn(...) plays all eight lanes: ' + snd.kit);
 
-  console.log('# A1 a removed page id never leaves a blank screen');
-  const moved = await page.evaluate(async (ids) => {
+  console.log('# A1 + A2 a removed page id never leaves a blank screen');
+  const moved = await page.evaluate(async (list) => {
     const out = [];
-    for (const id of ids) {
-      App.switchTo('piano'); await __wait(120);
-      const t = document.getElementById('app-toast'); if (t) { t.hidden = true; t.textContent = ''; }
+    for (const [id, to, there] of list) {
+      App.switchTo('songs'); await __wait(120); // a page that is neither home nor a landing page
+      __hideToast();
       App.switchTo(id); await __wait(120);
       let stored; try { stored = JSON.parse(localStorage.getItem('guitarlab.app.tab')); } catch (e) { stored = 'unreadable'; }
-      out.push({ id, active: App.active, shown: __shown(), seen: __seen('quiz'), toast: __toast(), stored });
+      out.push({ id, to, active: App.active, shown: __shown(), seen: __seen(to), toast: __toast(), stored, there: there ? !!document.querySelector(there) : null });
     }
     return out;
-  }, Object.keys(MOVED).concat('nosuchpage'));
+  }, Object.keys(MOVED).map(id => [id, MOVED[id].to, MOVED[id].there || '']).concat([['nosuchpage', 'quiz', '']]));
   for (const m of moved) {
-    const say = MOVED[m.id];
-    ok(m.active === 'quiz' && m.shown === 'quiz' && m.seen, 'App.switchTo("' + m.id + '") lands on Exercises with a visible panel: ' + J([m.active, m.shown, m.seen]));
-    if (say) ok(say.test(m.toast), 'App.switchTo("' + m.id + '") says where the page went: "' + m.toast + '"');
-    ok(m.stored === 'quiz', 'App.switchTo("' + m.id + '") is not stored as the last page (app.tab = ' + J(m.stored) + ')');
+    const mv = MOVED[m.id];
+    ok(m.active === m.to && m.shown === m.to && m.seen, 'App.switchTo("' + m.id + '") lands on ' + NAMES[m.to] + ' with a visible panel: ' + J([m.active, m.shown, m.seen]));
+    if (mv) ok(mv.say.test(m.toast), 'App.switchTo("' + m.id + '") says where the page went: "' + m.toast + '"');
+    if (mv && mv.there) ok(m.there, 'App.switchTo("' + m.id + '"): what the sentence names is on that page (' + mv.there + ')');
+    ok(m.stored === m.to, 'App.switchTo("' + m.id + '") is not stored as the last page (app.tab = ' + J(m.stored) + ')');
   }
 
   console.log('# A1 the 1.x data on this origin is untouched');
@@ -269,6 +297,77 @@ const lines = a => a.length ? '\n    ' + a.join('\n    ') : '';
   ok(stale.active === 'quiz' && stale.shown === 'quiz' && stale.seen, 'app.tab = arrange boots to Exercises with a visible panel: ' + J([stale.active, stale.shown, stale.seen]));
   ok(stale.stored === 'quiz', 'and the stored last page is a real page again: ' + J(stale.stored));
   ok(errs.length === 0 && logs.length === 0, 'no page or console error (stale last page)' + lines(errs.concat(logs)));
+  await ctx.close();
+
+  // ---------------------------------------------------------------- A2
+  console.log('# A2 a stored pill that is no longer a page');
+  ({ ctx, page, errs, logs } = await newPage(browser, {}, { 'app.gtab.gkeys': 'synth', 'app.gtab.gprac': 'trainer' }));
+  const mem = await page.evaluate(async () => {
+    const tab = label => Array.from(document.querySelectorAll('#tabbar .tabbar-btn')).find(b => (b.textContent || '').trim() === label);
+    const pills = () => Array.from(document.querySelectorAll('#subnav .subtab')).map(b => (b.textContent || '').trim()).join('|');
+    const o = { start: App.active, tabs: !!tab('Keys') && !!tab('Train') };
+    if (!o.tabs) return o;
+    __hideToast();
+    tab('Keys').click(); await __wait(150);
+    o.keys = { active: App.active, shown: __shown(), seen: __seen('piano'), pills: pills(), stored: App.store.get('app.gtab.gkeys', null) };
+    tab('Train').click(); await __wait(150);
+    o.train = { active: App.active, shown: __shown(), seen: __seen('shed'), pills: pills(), stored: App.store.get('app.gtab.gprac', null) };
+    return o;
+  });
+  ok(mem.start === 'quiz' && mem.tabs, 'the app starts on Exercises with its Keys and Train tabs');
+  if (mem.tabs) {
+    ok(mem.keys.active === 'piano' && mem.keys.shown === 'piano' && mem.keys.seen, 'app.gtab.gkeys = synth: the Keys tab opens Piano with a visible panel: ' + J([mem.keys.active, mem.keys.shown, mem.keys.seen]));
+    ok(mem.keys.pills === 'Piano|Charts|Pads' && mem.keys.stored === 'piano', 'Keys is Piano | Charts | Pads, and it remembers a real page again: ' + J([mem.keys.pills, mem.keys.stored]));
+    ok(mem.train.active === 'shed' && mem.train.shown === 'shed' && mem.train.seen, 'app.gtab.gprac = trainer: the Train tab opens the Woodshed with a visible panel: ' + J([mem.train.active, mem.train.shown, mem.train.seen]));
+    ok(mem.train.pills === 'Woodshed|Tuner' && mem.train.stored === 'shed', 'Train is Woodshed | Tuner, and it remembers a real page again: ' + J([mem.train.pills, mem.train.stored]));
+  }
+  // the same for the last page of a 1.x session: it comes back as the page that took the feature in
+  await page.evaluate(() => localStorage.setItem('guitarlab.app.tab', JSON.stringify('lumipractice')));
+  await page.reload();
+  await page.waitForFunction(() => window.App && App.active);
+  await page.waitForTimeout(250);
+  const last = await page.evaluate(() => {
+    let stored; try { stored = JSON.parse(localStorage.getItem('guitarlab.app.tab')); } catch (e) { stored = 'unreadable'; }
+    return { active: App.active, shown: __shown(), seen: __seen('piano'), toast: __toast(), stored };
+  });
+  ok(last.active === 'piano' && last.shown === 'piano' && last.seen && last.stored === 'piano', 'app.tab = lumipractice starts on the Piano page with a visible panel, stored as a real page: ' + J([last.active, last.shown, last.seen, last.stored]));
+  ok(MOVED.lumipractice.say.test(last.toast), 'and the start says where LUMI practice went: "' + last.toast + '"');
+
+  console.log('# A2 ear training left the Trainer cards: the button on the Plan page opens it in Exercises');
+  const ear = await page.evaluate(async () => {
+    const go = async (instrument) => {
+      if (window.SLQuiz && SLQuiz.cur) SLQuiz.stop();
+      App.practiceInstrument.set(instrument);
+      App.switchTo('practiceplan'); await __wait(200);
+      const box = document.getElementById('pp-tools'), btn = document.getElementById('tr-ear-go');
+      const o = { box: !!box, btn: !!btn && !!box && box.contains(btn), category: App.practiceInstrument.label() };
+      if (!o.btn) return o;
+      box.open = true; __hideToast();
+      btn.click(); await __wait(250);
+      o.active = App.active; o.shown = __shown(); o.toast = __toast();
+      o.view = window.SLQuiz ? SLQuiz.view : null;
+      o.level = window.SLQuiz && SLQuiz.cur && SLQuiz.cur.lvl ? SLQuiz.cur.lvl.id : null;
+      o.credit = window.SLQuiz && SLQuiz.cur ? SLQuiz.cur.instrument : null;
+      return o;
+    };
+    const piano = await go('piano'), drums = await go('drums');
+    if (window.SLQuiz && SLQuiz.cur) SLQuiz.stop();
+    App.practiceInstrument.set('piano'); App.switchTo('quiz'); await __wait(150);
+    return { piano, drums };
+  });
+  ok(ear.piano.box && ear.piano.btn && ear.drums.btn, 'the Plan page’s Free practice section has the ear-training button (#tr-ear-go)');
+  if (ear.piano.btn) {
+    ok(ear.piano.active === 'quiz' && ear.piano.shown === 'quiz' && ear.piano.view === 'run' && ear.piano.level === 'intervals/iall/ear/1' && ear.piano.credit === 'piano',
+      'Piano: the button starts Exercises › Intervals › All intervals › Ear, level 1: ' + J([ear.piano.active, ear.piano.view, ear.piano.level, ear.piano.credit]));
+    ok(!ear.piano.toast, 'Piano: nothing to explain, no notice: "' + ear.piano.toast + '"');
+  }
+  if (ear.drums.btn) {
+    ok(ear.drums.active === 'practiceplan' && ear.drums.shown === 'practiceplan' && ear.drums.view !== 'run' && ear.drums.level === null,
+      'Drums (theory only): the button stays on the Plan page and starts no exercise: ' + J([ear.drums.active, ear.drums.view, ear.drums.level]));
+    ok(ear.drums.category === 'Drums' && /Ear training is not part of the Drums category\./.test(ear.drums.toast) && /Learn bar/.test(ear.drums.toast),
+      'Drums: the notice names the category and where to change it: "' + ear.drums.toast + '"');
+  }
+  ok(errs.length === 0 && logs.length === 0, 'no page or console error (stored pills, stored last page, ear-training button)' + lines(errs.concat(logs)));
   await ctx.close();
 
   console.log('# A1 Backup import skips removed features');
