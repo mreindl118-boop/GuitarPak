@@ -1,7 +1,11 @@
 /* GuitarLab service worker — cache-first so the app works fully offline once visited. */
-// 2.0 (branch v2): caches are 'soundlab2-*' so the beta at /next/ never touches the
-// live app's 'guitarlab-*' caches on the same origin (and only cleans up its own).
-var CACHE = 'soundlab2-v3';
+// 2.0: the live app (/GuitarPak/) and the beta (/GuitarPak/next/) share one origin,
+// so each names its caches by where it runs ('sl2-live-*' / 'sl2-next-*') and only
+// cleans up its own. Also cleared: the beta's old 'soundlab2-*' caches and, on the
+// live app, the 1.x 'guitarlab-*' caches it replaces.
+var BETA = /\/next\/$/.test(self.registration.scope);
+var PREFIX = BETA ? 'sl2-next-' : 'sl2-live-';
+var CACHE = PREFIX + 'v4';
 var ASSETS = [
   '.',
   'index.html',
@@ -110,7 +114,8 @@ self.addEventListener('install', function (e) {
 self.addEventListener('activate', function (e) {
   e.waitUntil(
     caches.keys().then(function (keys) {
-      return Promise.all(keys.filter(function (k) { return k !== CACHE && k.indexOf('soundlab2-') === 0; }).map(function (k) { return caches.delete(k); }));
+      return Promise.all(keys.filter(function (k) { return k !== CACHE && (k.indexOf(PREFIX) === 0 || k.indexOf('soundlab2-') === 0 ||
+        (!BETA && k.indexOf('guitarlab-') === 0)); }).map(function (k) { return caches.delete(k); }));
     }).then(function () { return self.clients.claim(); })
   );
 });
