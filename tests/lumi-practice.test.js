@@ -1,5 +1,9 @@
 // Recovered from b8ccb55; fixtures plus the real served app and MIDI service.
 // Every port is simulated. These checks do not claim hardware validation.
+// 2.0: LUMI practice has no page of its own. The fixtures mount the module
+// into a plain #pn-lumi container and drive it through App.lumiPractice
+// (init / show / hide / close); the real-app parts open the folded section
+// #pn-lumi under the Keys lessons on the Piano page.
 const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright');
@@ -14,7 +18,7 @@ async function fixture(browser, native = false) {
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
-  await page.setContent('<!doctype html><html><head><style>body{font-family:sans-serif}.card{padding:16px} .field{display:flex;flex-direction:column}button{padding:8px}</style></head><body><section id="panel-lumipractice"></section></body></html>');
+  await page.setContent('<!doctype html><html><head><style>body{font-family:sans-serif}.card{padding:16px} .field{display:flex;flex-direction:column}button{padding:8px}</style></head><body><section id="pn-lumi"></section></body></html>');
   await page.addStyleTag({ content: css });
   await page.evaluate(native => {
     window.__sent = []; window.__attempted = []; window.__listeners = new Map(); window.__stale = [];
@@ -91,12 +95,13 @@ async function fixture(browser, native = false) {
     window.__click = id => document.getElementById('lp-' + id).click();
   }, native);
   await page.addScriptTag({ content: source });
-  await page.evaluate(() => { App.modules.lumipractice.init(document.getElementById('panel-lumipractice')); App.modules.lumipractice.onShow(); });
+  await page.evaluate(() => { App.lumiPractice.init(document.getElementById('pn-lumi')); App.lumiPractice.show(); });
   return { page, context, errors };
 }
 async function hardware(page) {
-  await page.evaluate(() => {
-    if (App.modules) App.modules.lumipractice.onShow(); else App.switchTo('lumipractice');
+  await page.evaluate(async () => {
+    // the real app: the Piano page with the section open; a fixture: the module shown directly
+    if (window.__openLumi) await __openLumi(); else App.lumiPractice.show();
     if (SLLumiPractice.snapshot().mode !== 'hardware') __change('mode', 'hardware');
     __change('input', 'modx-answer'); __change('output', 'lumi-display'); __click('start');
   });
@@ -147,7 +152,7 @@ async function guidedFixture(browser) {
 
   for (const boundary of ['stop', 'exercise', 'blur']) {
     const before = await page.evaluate(boundary => {
-      if (!SLLumiPractice.snapshot().visible) App.modules.lumipractice.onShow();
+      if (!SLLumiPractice.snapshot().visible) App.lumiPractice.show();
       __click('start');
       SLLumiPractice.snapshot().target.forEach(n => document.querySelector('[data-answer-note="' + n + '"]').click());
       const before = SLLumiPractice.snapshot();
@@ -211,6 +216,16 @@ async function fullApp(browser) {
       const el = document.getElementById('lp-' + id); el.value = value; el.dispatchEvent(new Event('change'));
     };
     window.__click = id => document.getElementById('lp-' + id).click();
+    // LUMI practice is the folded section under the Keys lessons: go to the
+    // Piano page, open it and let its 'toggle' event run (it is async;
+    // piano.js shows / hides the module from it). The 1 s fallback only
+    // keeps a missing event from hanging the run
+    const fold = open => {
+      const box = document.getElementById('pn-lumi');
+      return box.open === open ? Promise.resolve() : new Promise(done => { box.addEventListener('toggle', () => done(), { once: true }); box.open = open; setTimeout(done, 1000); });
+    };
+    window.__openLumi = async () => { App.switchTo('piano'); await fold(true); };
+    window.__foldLumi = () => fold(false);
     window.__lit = () => {
       const keys = {};
       __sent.filter(s => s.portId === 'lumi-display').forEach(s => {
@@ -226,15 +241,21 @@ async function fullApp(browser) {
   await page.goto(env.URL);
   await page.waitForFunction(() => window.App && window.SLLumiPractice && App.active === 'quiz');
   console.log('# real app: default simulation requires no MIDI permission or device traffic');
-  const simulation = await page.evaluate(() => {
-    App.switchTo('lumipractice');
+  const simulation = await page.evaluate(async () => {
+    const box = document.getElementById('pn-lumi');
+    const before = { tag: box.tagName, open: box.open, api: App.lumiPractice.open, after: box.previousElementSibling && box.previousElementSibling.id,
+      body: !!document.querySelector('#pn-lumi > #pn-lumi-body #lp-start'), panel: !!document.getElementById('panel-lumipractice') };
+    await __openLumi();
     __change('flow', 'manual'); __change('kind', 'major'); __click('start'); __click('preview');
     SLLumiPractice.snapshot().target.forEach(n => document.querySelector('[data-answer-note="' + n + '"]').click());
     __click('check');
-    return { s: SLLumiPractice.snapshot(), requests: __requests, sent: __sent.length, page: App.active };
+    return { before, s: SLLumiPractice.snapshot(), open: App.lumiPractice.open, requests: __requests, sent: __sent.length, page: App.active };
   });
-  ok(simulation.page === 'lumipractice' && simulation.s.correct === 1 && simulation.requests === 0 && simulation.sent === 0,
-    'served full app supports simulated triads without connecting MIDI');
+  ok(simulation.before.tag === 'DETAILS' && !simulation.before.open && !simulation.before.api && simulation.before.after === 'pn-lessons' &&
+    simulation.before.body && !simulation.before.panel,
+    'LUMI practice is a section under the Keys lessons, closed by default, with no panel of its own: ' + JSON.stringify(simulation.before));
+  ok(simulation.page === 'piano' && simulation.open && simulation.s.visible && simulation.s.correct === 1 && simulation.requests === 0 && simulation.sent === 0,
+    'served full app supports simulated triads in the open section without connecting MIDI');
 
   await page.evaluate(async () => { __click('stop'); await App.midi.enable(); App.midi.setDisplayOutput('lumi-display'); App.midi.setDisplayEnabled(true); App.help.set(4); });
   const baseline = await page.evaluate(() => ({ lit: Object.keys(__lit()).length,
@@ -316,9 +337,20 @@ async function fullApp(browser) {
   });
   ok(!leaving.s.running && !leaving.s.leased && !leaving.s.armed && leaving.s.activeOutputs === 0 && leaving.lit === 14,
     'real shell navigation cleans the pulse/subscription/lease and restores shared lights');
+  // the section stays open while another page shows; back on the Piano page it is live again
+  await hardware(page); await arm(page);
+  const folded = await page.evaluate(async () => {
+    const back = { page: App.active, open: App.lumiPractice.open, s: SLLumiPractice.snapshot() };
+    await __foldLumi();
+    return { back, s: SLLumiPractice.snapshot(), open: App.lumiPractice.open, lit: Object.keys(__lit()).length };
+  });
+  ok(folded.back.page === 'piano' && folded.back.open && folded.back.s.visible && folded.back.s.armed && folded.back.s.leased,
+    'an open section is live again when the Piano page comes back');
+  ok(!folded.open && !folded.s.visible && !folded.s.running && !folded.s.leased && !folded.s.armed && folded.s.activeOutputs === 0 && folded.lit === 14,
+    'folding the section by hand cleans the pulse/subscription/lease and restores shared lights');
 
   console.log('# real app: guided MODX answers drive a sustained LUMI instructional frame');
-  await page.evaluate(() => { App.switchTo('lumipractice'); __change('flow', 'guided'); __change('kind', 'major'); });
+  await page.evaluate(async () => { await __openLumi(); __change('flow', 'guided'); __change('kind', 'major'); });
   await hardware(page); await arm(page);
   const guidedFirst = await page.evaluate(() => SLLumiPractice.snapshot());
   await page.waitForTimeout(850);
@@ -439,13 +471,13 @@ async function fullApp(browser) {
     'Stop cleans sound routing, display ownership and queued advancement without changing global selections');
 
   await page.setViewportSize({ width: 375, height: 1000 });
-  await page.evaluate(() => { App.switchTo('lumipractice'); __change('mode', 'simulated'); __click('start'); });
+  await page.evaluate(async () => { await __openLumi(); __change('mode', 'simulated'); __click('start'); });
   const phone = await page.evaluate(() => {
-    const panel = document.getElementById('panel-lumipractice'), key = document.querySelector('[data-answer-note]');
+    const panel = document.getElementById('pn-lumi'), key = document.querySelector('[data-answer-note]');
     return { width: innerWidth, panel: panel.getBoundingClientRect().width,
       overflow: panel.scrollWidth > panel.clientWidth + 1, key: key.getBoundingClientRect().width };
   });
-  ok(!phone.overflow && phone.key >= 36, 'phone practice fits its panel with usable answer targets: ' + JSON.stringify(phone));
+  ok(!phone.overflow && phone.key >= 36, 'phone practice fits its section with usable answer targets: ' + JSON.stringify(phone));
   await page.waitForTimeout(950); // allow the shell's space transition to finish
   await page.screenshot({ path: '/tmp/soundlab-lumi-practice-phone.png', fullPage: true });
   ok(errors.length === 0, 'real full app has no browser exceptions: ' + errors.join('; '));
@@ -520,7 +552,7 @@ async function ingressFixture(browser) {
       if (boundary === 'exercise') { __change('kind', 'minor'); __change('kind', 'major'); }
       if (boundary === 'input') { __change('input', 'lumi-input'); __change('input', 'modx-answer'); }
       if (boundary === 'window') { __change('low', 60); __change('low', 48); }
-      if (boundary === 'hide') { App.modules.lumipractice.onHide(); App.modules.lumipractice.onShow(); }
+      if (boundary === 'hide') { App.lumiPractice.hide(); App.lumiPractice.show(); }
       if (boundary === 'blur') window.dispatchEvent(new Event('blur'));
       if (boundary === 'scale') App.emit('fb:set', {});
       __click('start'); stale({ portId: 'modx-answer', bytes: [100] }); __receive('modx-answer', [100]);
@@ -573,6 +605,26 @@ async function ingressFixture(browser) {
     ok(initial.state.flow === 'guided', 'wait-until-correct is the default progression');
     ok(initial.state.mode === 'simulated' && !initial.state.armed && !initial.state.running && /SIMULATED/.test(initial.badge), 'fresh page explicitly simulated; hardware output OFF');
     ok(initial.keys === 24 && initial.sent === 0 && initial.listeners === 0, '24-key reference and no port subscription or device traffic at initialization');
+    const surface = await page.evaluate(() => {
+      const lp = App.lumiPractice, o = { pages: Object.keys(App.modules),
+        missing: ['init', 'show', 'hide', 'close', 'stop', 'remote', 'remoteKey'].filter(k => typeof lp[k] !== 'function'),
+        open: lp.open, running: lp.running, key: lp.remoteKey() };
+      // a lesson or the runner taking over: close(msg) stops the session and says why; a second close does nothing
+      __click('start'); o.started = lp.running && SLLumiPractice.snapshot().running;
+      lp.close('A lesson started. LUMI session stopped.');
+      o.closed = { s: SLLumiPractice.snapshot(), open: lp.open, running: lp.running, status: document.getElementById('lp-status').textContent };
+      lp.close('Not shown: nothing to close.');
+      o.again = document.getElementById('lp-status').textContent;
+      // hidden: Start does nothing until the host shows it again
+      __click('start'); o.hiddenStart = SLLumiPractice.snapshot().running;
+      lp.show(); o.shown = lp.open && SLLumiPractice.snapshot().visible;
+      return o;
+    });
+    ok(surface.pages.length === 0 && surface.missing.length === 0 && surface.open === true && surface.running === false && surface.key === true,
+      'no page of its own: the host drives App.lumiPractice (init, show, hide, close, stop, remote, remoteKey, open, running): ' + JSON.stringify(surface.missing));
+    ok(surface.started && !surface.closed.s.running && !surface.closed.s.visible && !surface.closed.open && !surface.closed.running &&
+      surface.closed.status === 'A lesson started. LUMI session stopped.' && surface.again === surface.closed.status && !surface.hiddenStart && surface.shown,
+      'close(message) stops the session, hides the module and shows the message; closed, a second close and Start do nothing until it is shown again');
     const simulated = await page.evaluate(() => {
       __change('flow', 'manual'); __change('kind', 'major'); __click('start');
       const first = SLLumiPractice.snapshot(); __click('preview');
@@ -643,7 +695,8 @@ async function ingressFixture(browser) {
     ok(await page.evaluate(() => { const s = SLLumiPractice.snapshot(); return s.running && !s.armed && !s.tested && s.activeOutputs === 0; }), 'fresh session always resets output OFF and forgets the test');
 
     console.log('# cleanup boundaries');
-    const boundaries = ['stop', 'blur', 'pagehide', 'visibility', 'hide', 'window', 'channel', 'output-change', 'disconnect'];
+    // 'hide' = the Piano page left or the section folded by hand; 'close' = a lesson or the runner took over
+    const boundaries = ['stop', 'blur', 'pagehide', 'visibility', 'hide', 'close', 'window', 'channel', 'output-change', 'disconnect'];
     for (const boundary of boundaries) {
       await hardware(page); await arm(page);
       const cleaned = await page.evaluate(boundary => {
@@ -652,7 +705,8 @@ async function ingressFixture(browser) {
         if (boundary === 'blur') window.dispatchEvent(new Event('blur'));
         if (boundary === 'pagehide') window.dispatchEvent(new Event('pagehide'));
         if (boundary === 'visibility') { Object.defineProperty(document, 'hidden', { configurable: true, value: true }); document.dispatchEvent(new Event('visibilitychange')); delete document.hidden; }
-        if (boundary === 'hide') App.modules.lumipractice.onHide();
+        if (boundary === 'hide') App.lumiPractice.hide();
+        if (boundary === 'close') App.lumiPractice.close('A lesson started. LUMI session stopped.');
         if (boundary === 'window') __change('low', '49');
         if (boundary === 'channel') __change('channel', '2');
         if (boundary === 'output-change') __change('output', 'other-output');

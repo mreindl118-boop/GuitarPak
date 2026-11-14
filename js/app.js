@@ -34,60 +34,49 @@ window.App = (function () {
   var modules = {};
   var active = null;
   var audioCtx = null;
-  // Two workspaces over one app: Practice (the original tool set) and Studio
-  // (the DAW side). One clock, one key, one MIDI service — the context bar
-  // stays put; only the page set changes, behind a screen-wipe transition.
-  // Settings is deliberately in NEITHER list: it's an overlay page opened by
-  // the ever-present gear in the header, from any page in either space.
-  var SPACES = {
-    practice: ['quiz', 'practiceplan', 'fretboard', 'tab', 'notation', 'helix', 'chords', 'piano', 'chart', 'synth', 'pads', 'deck', 'liveset', 'midihub', 'lumipractice', 'songs', 'jam', 'shed', 'tuner', 'trainer', 'theory'],
-    studio: ['arrange', 'tracks', 'song', 'ideas']
-  };
+  // One app, one page set: every page shares the clock, the key and the MIDI
+  // service, and the context bar stays put. The first page is the home.
+  // Settings is deliberately NOT in the list: it's an overlay page opened by
+  // the ever-present gear in the header, from any page.
+  var PAGES = ['quiz', 'practiceplan', 'fretboard', 'tab', 'notation', 'helix', 'chords', 'piano', 'chart', 'pads', 'deck', 'liveset', 'midihub', 'songs', 'jam', 'shed', 'tuner', 'theory'];
+  var HOME = PAGES[0];
   var SPACE_LABELS = {
     metronome: 'Metronome', fretboard: 'Fretboard', tab: 'Tab', notation: 'Notation',
     chords: 'Chords', piano: 'Piano', songs: 'Songs', jam: 'Jam', tuner: 'Tuner',
-    trainer: 'Trainer', theory: 'Theory', settings: 'Settings', shed: 'Shed', synth: 'Synth',
-    song: 'Song', arrange: 'Arrange', tracks: 'Tracks', pads: 'Pads', ideas: 'Ideas',
-    quiz: 'Exercises', midihub: 'MIDI Hub', deck: 'Synth deck', liveset: 'Live sets', lumipractice: 'LUMI', practiceplan: 'Practice plan', helix: 'Helix Stadium', chart: 'Chord charts'
+    theory: 'Theory', settings: 'Settings', shed: 'Shed',
+    pads: 'Pads',
+    quiz: 'Exercises', midihub: 'MIDI Hub', deck: 'Synth deck', liveset: 'Live sets', practiceplan: 'Practice plan', helix: 'Helix Stadium', chart: 'Chord charts'
   };
-  // overlays live outside both page sets: the metronome opens as a SHEET over
+  // overlays live outside the page list: the metronome opens as a SHEET over
   // whatever page you're on (corner icon), settings toggles in place (gear)
-  var PANEL_ORDER = SPACES.practice.concat(SPACES.studio).concat(['metronome', 'lights', 'settings']);
+  var PANEL_ORDER = PAGES.concat(['metronome', 'lights', 'settings']);
   // Tab GROUPS: related pages share one entry in the page menu; the members
   // show as a sub-tab strip under the context bar. Pages/modules are untouched
-  // — this is navigation only, so cross-links (fb:practice, st:edit, plugin
-  // pages) keep addressing pages by id and the owning group follows along.
-  var GROUPS = {
-    practice: [
-      { id: 'gtheory', label: 'Learn', icon: 'learn', pages: ['quiz', 'chords', 'theory', 'practiceplan'] }, // Exercises = the home
-      { id: 'ginst', label: 'Guitar', icon: 'guitar', pages: ['fretboard', 'tab', 'notation', 'helix'] }, // helix = Helix Stadium (js/helix.js)
-      { id: 'gkeys', label: 'Keys', icon: 'keys', pages: ['piano', 'chart', 'synth', 'pads', 'lumipractice'] },
-      { id: 'gsynth', label: 'Synth', icon: 'sliders', pages: ['deck', 'liveset', 'midihub'] }, // 1.3: the Synth tab (js/synthtab.js) - Deck / Live / Hub (= the MIDI Hub, js/midihub.js)
-      { id: 'gplay', label: 'Play', icon: 'note', pages: ['songs', 'jam'] },
-      { id: 'gprac', label: 'Train', icon: 'target', pages: ['shed', 'trainer', 'tuner'] } // 1.3 (primer A1): 'Practice' is the space, 'Train' the tab // the game first
-    ],
-    studio: [
-      { id: 'gstudio', label: 'Studio', icon: 'sliders', pages: ['arrange', 'tracks'] }, // the DAW home
-      { id: 'gsketch', label: 'Sketch', icon: 'idea', pages: ['song', 'ideas'] }
-    ]
-  };
+  // — this is navigation only, so cross-links (fb:practice) keep addressing
+  // pages by id and the owning group follows along.
+  var GROUPS = [
+    { id: 'gtheory', label: 'Learn', icon: 'learn', pages: ['quiz', 'chords', 'theory', 'practiceplan'] }, // Exercises = the home
+    { id: 'ginst', label: 'Guitar', icon: 'guitar', pages: ['fretboard', 'tab', 'notation', 'helix'] }, // helix = Helix Stadium (js/helix.js)
+    { id: 'gkeys', label: 'Keys', icon: 'keys', pages: ['piano', 'chart', 'pads'] }, // synth sounds = the Sound picker on Piano; LUMI practice = a section under its lessons
+    { id: 'gsynth', label: 'Synth', icon: 'sliders', pages: ['deck', 'liveset', 'midihub'] }, // 1.3: the Synth tab (js/synthtab.js) - Deck / Live / Hub (= the MIDI Hub, js/midihub.js)
+    { id: 'gplay', label: 'Play', icon: 'note', pages: ['songs', 'jam'] },
+    { id: 'gprac', label: 'Train', icon: 'target', pages: ['shed', 'tuner'] } // 1.3 (primer A1): the tab is called 'Train' // the game first
+  ];
   // short member names for the strip (fall back to SPACE_LABELS)
   var SUB_LABELS = {
     fretboard: 'Neck', tab: 'Tab', notation: 'Notation', piano: 'Piano',
     chords: 'Chords', theory: 'Circle', songs: 'Songs', jam: 'Jam',
-    trainer: 'Trainer', shed: 'Woodshed', metronome: 'Metronome', tuner: 'Tuner',
-    song: 'Song', ideas: 'Ideas', tracks: 'Editor', arrange: 'Timeline', pads: 'Pads', synth: 'Synth',
-    quiz: 'Exercises', midihub: 'Hub', deck: 'Deck', liveset: 'Live', lumipractice: 'LUMI', practiceplan: 'Plan', helix: 'Helix', chart: 'Charts'
+    shed: 'Woodshed', metronome: 'Metronome', tuner: 'Tuner',
+    pads: 'Pads',
+    quiz: 'Exercises', midihub: 'Hub', deck: 'Deck', liveset: 'Live', practiceplan: 'Plan', helix: 'Helix', chart: 'Charts'
   };
 
   function groupOf(name) {
-    var gs = GROUPS.practice.concat(GROUPS.studio);
-    for (var i = 0; i < gs.length; i++) {
-      if (gs[i].pages.indexOf(name) !== -1) return gs[i];
+    for (var i = 0; i < GROUPS.length; i++) {
+      if (GROUPS[i].pages.indexOf(name) !== -1) return GROUPS[i];
     }
     return null;
   }
-  var space = 'practice';
   var prevTab = null; // where the gear came from, to toggle back to
 
   // ---- auto-update ----
@@ -289,8 +278,8 @@ window.App = (function () {
       var speakers = audioCtx.destination;
       masterGain = audioCtx.createGain();
       masterGain.gain.value = volPref() / 100;
-      // app-wide soft clipper: chords, the jam band and the studio stack
-      // voices — without it the sum clips harshly at the DAC. A WaveShaper
+      // app-wide soft clipper: chords, the jam band and the synth sounds
+      // stack voices — without it the sum clips harshly at the DAC. A WaveShaper
       // with oversample 'none' adds ZERO delay; the DynamicsCompressor used
       // before carries a fixed ~6ms lookahead on every note.
       var pre = audioCtx.createGain();
@@ -433,7 +422,8 @@ window.App = (function () {
     });
   }
 
-  // Plucked-string voice shared by fretboard / chords / jam / trainer:
+  // Plucked-string voice shared by fretboard / chords / jam / the Free
+  // practice cards on the Plan page (js/trainer.js):
   // the chosen sampled tone when its bank is decoded, synth twin otherwise.
   var pluckVoices = [];
   function trackPluck(node, gain) {
@@ -685,19 +675,15 @@ window.App = (function () {
     get active() { return wakeCount > 0; }
   };
 
-  function spaceOf(name) {
-    return SPACES.studio.indexOf(name) !== -1 ? 'studio' : 'practice';
-  }
+  var TAB_KEY = 'app.tab'; // the last page, opened again at the next start
 
-  function tabStoreKey(sp) { return sp === 'studio' ? 'app.tabStudio' : 'app.tab'; }
-
-  // SECTION TAB BAR — the app's main navigation: one tab per group of the
-  // current space (icon + label). Rendered twice: in the top bar on wide
+  // SECTION TAB BAR — the app's main navigation: one tab per group of
+  // pages (icon + label). Rendered twice: in the top bar on wide
   // screens and fixed along the bottom on phones / portrait tablets (CSS
   // shows one). The pages inside a section are the pill strip (#subnav).
   function populateNav() {
     var cur = active && groupOf(active), h = '';
-    GROUPS[space].forEach(function (g) {
+    GROUPS.forEach(function (g) {
       var on = cur === g;
       h += '<button type="button" class="tabbar-btn' + (on ? ' active' : '') + '" data-group="' + g.id + '"' +
         (on ? ' aria-current="page"' : '') + '>' + icon(g.icon || 'plus', 20) + '<span>' + g.label + '</span></button>';
@@ -709,7 +695,7 @@ window.App = (function () {
   }
 
   function goGroup(gid) {
-    var gs = GROUPS[space];
+    var gs = GROUPS;
     for (var i = 0; i < gs.length; i++) {
       if (gs[i].id !== gid) continue;
       if (groupOf(active) === gs[i]) { window.scrollTo({ top: 0, behavior: 'smooth' }); return; } // tap the open tab: back to the top
@@ -739,10 +725,30 @@ window.App = (function () {
     if (g) g.classList.toggle('active', active === 'settings');
   }
 
+  // pages that left this app: where they went and what to say (docs/ROADMAP-2.0.md, Phase A)
+  var MOVED = {
+    arrange: { say: 'The Studio is no longer part of soundLAB.' },
+    tracks:  { say: 'The Studio is no longer part of soundLAB.' },
+    song:    { say: 'The Studio is no longer part of soundLAB.' },
+    ideas:   { say: 'The Studio is no longer part of soundLAB.' },
+    trainer: { to: 'practiceplan', say: 'The Trainer cards are on the Plan page now, under Free practice.' },
+    synth:   { to: 'piano', say: 'Synth sounds are in the Sound picker on the Piano page.' },
+    lumipractice: { to: 'piano', say: 'LUMI practice is on the Piano page now, under the lessons.' }
+  };
+  // an id that is not a page of this app (an old link, a stored tab) goes
+  // where MOVED says, and otherwise to the home page — never to a blank screen
+  function resolvePage(name) {
+    if (name === 'settings' || SHEETS[name] || PAGES.indexOf(name) !== -1) return name;
+    var mv = MOVED[name];
+    if (mv && mv.say) toast(mv.say);
+    return (mv && mv.to) || HOME;
+  }
+
   function switchTo(name) {
     if (sheet && !SHEETS[name]) closeSheet(); // going somewhere: the overlay steps aside
+    name = resolvePage(name);
     if (name === active) return;
-    // settings is space-agnostic: overlay in place, no wipe, no nav entry
+    // settings is not in the page list: overlay in place, no nav entry
     if (name === 'settings') {
       prevTab = active;
       if (active && modules[active] && modules[active].onHide) {
@@ -764,8 +770,6 @@ window.App = (function () {
     }
     // overlay utilities open over the current page instead of replacing it
     if (SHEETS[name]) { openSheet(name); return; }
-    // crossing into the other workspace? go through the wipe
-    if (spaceOf(name) !== space) { setSpace(spaceOf(name), name); return; }
     if (active && modules[active] && modules[active].onHide) {
       try { modules[active].onHide(); } catch (e) { console.error(active + '.onHide', e); }
     }
@@ -775,7 +779,7 @@ window.App = (function () {
     }
     guardUp();
     active = name;
-    if (name === SPACES[space][0]) visited.length = 0; // home: Back from here leaves
+    if (name === HOME) visited.length = 0; // home: Back from here leaves
     var g = groupOf(name);
     if (g) store.set('app.gtab.' + g.id, name); // remember the member per group
     populateNav();
@@ -789,7 +793,7 @@ window.App = (function () {
     if (modules[name] && modules[name].onShow) {
       try { modules[name].onShow(); } catch (e) { console.error(name + '.onShow', e); }
     }
-    store.set(tabStoreKey(space), name);
+    store.set(TAB_KEY, name);
     paintGear();
     paintChrome();
   }
@@ -882,11 +886,11 @@ window.App = (function () {
     topbar.addEventListener('focusin', showBar);
   }
 
-  // plugin surface: add a whole page at runtime (SoundLab.registerPage)
+  // internal page hook (used by tests/remote.test.js): add a whole page at
+  // runtime. The third argument once named a workspace; it is ignored.
   function addPage(id, label, sp, mod) {
     if (!id || !/^[a-z][a-z0-9_-]*$/.test(id) || PANEL_ORDER.indexOf(id) !== -1) return false;
     if (!mod || typeof mod.init !== 'function') return false;
-    sp = SPACES[sp] ? sp : 'practice';
     var main = document.querySelector('main');
     if (!main) return false;
     var sec = document.createElement('section');
@@ -894,16 +898,16 @@ window.App = (function () {
     sec.id = 'panel-' + id;
     main.appendChild(sec);
     SPACE_LABELS[id] = String(label || id).slice(0, 20);
-    SPACES[sp].push(id);
+    PAGES.push(id);
     PANEL_ORDER.push(id);
-    GROUPS[sp].push({ id: 'gpl-' + id, label: SPACE_LABELS[id], icon: 'plus', pages: [id] });
+    GROUPS.push({ id: 'gpl-' + id, label: SPACE_LABELS[id], icon: 'plus', pages: [id] });
     SUB_LABELS[id] = SPACE_LABELS[id];
     modules[id] = mod;
     try {
       mod.init(sec);
     } catch (e) {
-      console.error('plugin page ' + id, e);
-      sec.innerHTML = '<div class="error">Plugin page "' + id + '" crashed during init: ' + e.message + '</div>';
+      console.error('added page ' + id, e);
+      sec.innerHTML = '<div class="error">Page "' + id + '" crashed during init: ' + e.message + '</div>';
     }
     populateNav();
     return true;
@@ -911,9 +915,9 @@ window.App = (function () {
 
   function toggleSettings() {
     if (active === 'settings') {
-      var back = (prevTab && prevTab !== 'settings' && SPACES[space].indexOf(prevTab) !== -1)
-        ? prevTab : store.get(tabStoreKey(space), SPACES[space][0]);
-      if (SPACES[space].indexOf(back) === -1) back = SPACES[space][0];
+      var back = (prevTab && prevTab !== 'settings' && PAGES.indexOf(prevTab) !== -1)
+        ? prevTab : store.get(TAB_KEY, HOME);
+      if (PAGES.indexOf(back) === -1) back = HOME;
       switchTo(back);
     } else {
       switchTo('settings');
@@ -1082,7 +1086,7 @@ window.App = (function () {
   // ---- Back: Android's back gesture (and the browser's) walks back through
   // the app instead of leaving it: help tour, sheet, settings, the page's own
   // back (module.onBack() -> true when it handled it, e.g. a quiz run -> the
-  // path), the previous page, the space's home. One guard entry sits on top
+  // path), the previous page, the home page. One guard entry sits on top
   // of the history; each Back pops it, we unwind one step and put it back.
   // With nothing left to unwind the guard stays down, a hint says the next
   // Back leaves, and any tap re-arms it.
@@ -1102,10 +1106,9 @@ window.App = (function () {
     if (m && m.onBack) { try { if (m.onBack()) return true; } catch (e) { console.error(active + '.onBack', e); } }
     while (visited.length) {
       var p = visited.pop();
-      if (p !== active && modules[p] && SPACES[spaceOf(p)] && !SHEETS[p]) { goBackTo(p); return true; }
+      if (p !== active && modules[p] && PAGES.indexOf(p) !== -1 && !SHEETS[p]) { goBackTo(p); return true; }
     }
-    if (space !== 'practice') { backNav = true; setSpace('practice'); setTimeout(function () { backNav = false; visited.length = 0; }, 700); return true; }
-    if (active !== SPACES.practice[0]) { goBackTo(SPACES.practice[0]); return true; }
+    if (active !== HOME) { goBackTo(HOME); return true; }
     return false;
   }
   // CONTROLLER REMOTE (js/remote.js): a pedal, a synth button or a page
@@ -1189,69 +1192,6 @@ window.App = (function () {
         t = setTimeout(function () { mb.classList.remove('tick'); }, 110);
       });
     }
-  }
-
-  // ---- workspace wipe ----
-  var wiping = false;
-  var wipeId = 0; // each wipe's safety timers only ever touch their own wipe
-
-  function applySpace(sp, tab) {
-    space = sp;
-    store.set('app.space', sp);
-    document.documentElement.setAttribute('data-space', sp);
-    var btn = document.getElementById('space-btn');
-    if (btn) {
-      btn.innerHTML = sp === 'studio'
-        ? icon('left', 14) + ' Practice'
-        : icon('right', 14) + ' Studio';
-      btn.setAttribute('aria-label', sp === 'studio' ? 'Back to the practice tools' : 'Over to the studio');
-    }
-    populateNav();
-    var next = tab || store.get(tabStoreKey(sp), SPACES[sp][0]);
-    if (SPACES[sp].indexOf(next) === -1) next = SPACES[sp][0];
-    switchTo(next);
-    emit('space', { space: sp });
-  }
-
-  function setSpace(sp, tab) {
-    if (sp === space || !SPACES[sp] || wiping) return;
-    var wipe = document.getElementById('wipe');
-    if (!wipe) { applySpace(sp, tab); return; }
-    wiping = true;
-    var my = ++wipeId;
-    var toStudio = sp === 'studio';
-    // sweep in from the side we're heading toward, swap under cover, sweep on
-    wipe.style.transition = 'none';
-    wipe.style.transform = 'translateX(' + (toStudio ? '102%' : '-102%') + ')';
-    wipe.style.display = 'block';
-    // force layout so the jump is committed before animating
-    void wipe.offsetWidth;
-    wipe.style.transition = 'transform 0.26s ease-in';
-    wipe.style.transform = 'translateX(0)';
-    var swapped = false;
-    function onEnd() {
-      if (!swapped) {
-        swapped = true;
-        applySpace(sp, tab);
-        wipe.style.transition = 'transform 0.26s ease-out';
-        wipe.style.transform = 'translateX(' + (toStudio ? '-102%' : '102%') + ')';
-        return;
-      }
-      wipe.removeEventListener('transitionend', onEnd);
-      wipe.style.display = 'none';
-      wiping = false;
-    }
-    wipe.addEventListener('transitionend', onEnd);
-    // safety: never leave the curtain stuck if transitionend is swallowed
-    // (a quick second switch starts a new wipe: this one's timers stand down)
-    setTimeout(function () {
-      if (my !== wipeId) return;
-      if (wiping && !swapped) onEnd();
-      setTimeout(function () {
-        if (my !== wipeId) return;
-        if (wiping) { wipe.removeEventListener('transitionend', onEnd); wipe.style.display = 'none'; wiping = false; }
-      }, 400);
-    }, 400);
   }
 
   // ---- persistent context bar: key / scale / mode / bpm / time ----
@@ -1457,44 +1397,25 @@ window.App = (function () {
       emit('sig', { sig: this.value, source: 'bar' });
     });
 
-    // THE transport button: one button, live on every tab, driving whichever
-    // clock the current space owns — the metronome in Practice, the loop or
-    // the song (on the Timeline) in the Studio. All transports are mutually
-    // exclusive via the transport:claim bus event.
+    // THE transport button: one button, live on every page, driving the
+    // metronome. All transports are mutually exclusive via the
+    // transport:claim bus event.
     var met = document.getElementById('cx-met');
     if (met) {
       var metRuns = false;
-      function anyRunning() {
-        var eng = window.DAW && DAW.engine;
-        return metRuns || !!(eng && (eng.playing || eng.songPlaying));
-      }
-      // Practice: metronome glyph + play/stop, so it never reads as the
-      // page's own Play (which plays the scale). Studio: plain play/stop —
-      // there it runs the loop or the song.
+      function anyRunning() { return metRuns; }
+      // metronome glyph + play/stop, so it never reads as the page's own
+      // Play (which plays the scale)
       function paintCx() {
         var runs = anyRunning();
         met.classList.toggle('on', runs);
-        met.innerHTML = (space === 'practice' ? icon('metronome', 16) : '') + icon(runs ? 'stop' : 'play', 12);
+        met.innerHTML = icon('metronome', 16) + icon(runs ? 'stop' : 'play', 12);
         met.setAttribute('aria-pressed', String(runs));
         if (!runs) met.classList.remove('tick');
       }
       paintCx();
-      met.addEventListener('click', function () {
-        var eng = window.DAW && DAW.engine;
-        if (space === 'studio' && eng) {
-          if (eng.songPlaying) { eng.songStop(); return; }
-          if (eng.playing) { eng.stop(); return; }
-          if (active === 'arrange') eng.songPlay();
-          else if (eng.tracks.length) eng.play();
-          else emit('met:toggle', {});
-          return;
-        }
-        emit('met:toggle', {});
-      });
+      met.addEventListener('click', function () { emit('met:toggle', {}); });
       on('met:state', function (d) { metRuns = !!(d && d.running); paintCx(); });
-      on('st:state', paintCx);
-      on('st:tr', paintCx);
-      on('space', paintCx);
       var tickTimer = null;
       function cxTick() {
         met.classList.add('tick');
@@ -1502,7 +1423,6 @@ window.App = (function () {
         tickTimer = setTimeout(function () { met.classList.remove('tick'); }, 110);
       }
       on('met:beat', cxTick);
-      on('st:step', function (d) { if (d && d.step % 4 === 0) cxTick(); }); // studio beats pulse too
     }
 
     // mirror changes made anywhere else
@@ -1622,13 +1542,6 @@ window.App = (function () {
     wireSheets();
     wireBack();
 
-    var spaceBtn = document.getElementById('space-btn');
-    if (spaceBtn) {
-      spaceBtn.addEventListener('click', function () {
-        setSpace(space === 'studio' ? 'practice' : 'studio');
-        this.blur();
-      });
-    }
     var gearBtn = document.getElementById('settings-btn');
     if (gearBtn) {
       gearBtn.innerHTML = icon('gear', 16);
@@ -1638,19 +1551,11 @@ window.App = (function () {
       });
     }
 
-    // theory-first: the app ALWAYS opens in Practice — the Studio is one
-    // button away but never the front door (v0.68.0 back-to-basics)
-    var startSpace = 'practice';
-    space = startSpace;
-    document.documentElement.setAttribute('data-space', space);
-    if (spaceBtn) {
-      spaceBtn.innerHTML = space === 'studio'
-        ? icon('left', 14) + ' Practice'
-        : icon('right', 14) + ' Studio';
-    }
     populateNav();
-    var startTab = store.get(tabStoreKey(space), SPACES[space][0]);
-    if (SPACES[space].indexOf(startTab) === -1) startTab = SPACES[space][0];
+    // the last page comes back; a stored id that is no longer a page goes
+    // where MOVED says or home, and an overlay (a sheet) is never a start page
+    var startTab = resolvePage(store.get(TAB_KEY, HOME));
+    if (PAGES.indexOf(startTab) === -1) startTab = HOME;
     switchTo(startTab);
 
     var foot = document.querySelector('.foot');
@@ -1752,9 +1657,6 @@ window.App = (function () {
     version: APP_VERSION,
     checkForUpdate: checkForUpdate,
     get active() { return active; },
-    get space() { return space; },
-    setSpace: setSpace,
-    switchTo: switchTo,
     addPage: addPage,
     setVolume: setVolume,
     sampleLead: sampleLead,

@@ -26,8 +26,8 @@
  * App.midi.send — the keybed lights share the same output, so a synth output
  * should keep key lights OFF (the Hub warns when they're on). Stores
  * midihub.* (ch, oct, vel, thru, rulesIn, rulesApp, profile, dev, model,
- * ccs, rules, hex, view, naming). Notes played here also emit note:input so
- * the Studio capture dot records them.
+ * ccs, rules, hex, view, naming). Notes played here also emit note:input
+ * {src: 'midihub'}, like the app's other on-screen keys.
  */
 (function () {
   'use strict';
@@ -1812,7 +1812,7 @@
     }
   });
 
-  // test / plugin hook
+  // test hook (Songs, the Synth Deck and the Synth tab call it too)
   window.SLMidiHub = { decode: decode, applyRules: applyRules, PROFILES: PROFILES, parseHex: parseHex, hex: hex, get rules() { return rules(); },
     split: { get: splitSpec, set: setSplit, enable: enableSplit, text: splitText, rules: splitRules, defaultPort: defaultSplitPort }, get outId() { return hubOutId(); }, knob: function (cc) { return kv(cc); }, turn: turn,
     // the Player: load a file (name, ArrayBuffer) -> summary; play/pause/stop/seek(seconds)

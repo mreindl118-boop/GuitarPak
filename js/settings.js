@@ -72,11 +72,7 @@
           '<input type="range" id="set-vol" min="0" max="100" step="5">' +
           '<span class="muted small" id="set-vol-val"></span>' +
         '</div>' +
-        '<div class="muted small set-theme-note">One knob for everything &mdash; metronome, practice notes, the Jam band, the Studio.</div>' +
-        '<label class="set-check">' +
-          '<input type="checkbox" id="set-click"><span>Metronome click during Studio playback' +
-          '<small>The loop, the Timeline song and pad recording. Also on the Pads page.</small></span>' +
-        '</label>' +
+        '<div class="muted small set-theme-note">One knob for everything &mdash; metronome, practice notes, the Jam band.</div>' +
         '<div class="set-sub">Latency</div>' +
         '<div class="muted small" id="set-latency">&mdash;</div>' +
         '<div class="set-sub">Guitar</div>' +
@@ -88,7 +84,7 @@
             '<button type="button" data-tone="synth">Synth</button>' +
           '</div>' +
         '</div>' +
-        '<div class="muted small set-theme-note">The voice for fretboard taps, scale practice, chord strums and trainer notes.</div>' +
+        '<div class="muted small set-theme-note">The voice for fretboard taps, scale practice, chord strums and practice notes.</div>' +
         '<div class="set-sub">Piano</div>' +
         '<div class="fb-field">' +
           '<div class="seg" id="set-ptone">' +
@@ -108,35 +104,14 @@
           '</div>' +
         '</div>' +
         '<div class="muted small set-theme-note">How the Jam backing-track bass plays &mdash; warm finger-plucked or bright picked. Takes effect on the next bass note.</div>' +
-      '</div>' +
-      '<div class="card">' +
-        '<h2>Studio</h2>' +
-        '<div class="set-sub">Retro-capture memory</div>' +
-        '<div class="fb-field">' +
-          '<div class="seg" id="set-retro">' +
-            '<button type="button" data-retro="15">15s</button>' +
-            '<button type="button" data-retro="30">30s</button>' +
-            '<button type="button" data-retro="60">60s</button>' +
-          '</div>' +
-        '</div>' +
-        '<div class="muted small set-theme-note">How far back &ldquo;Keep the last 30s&rdquo; on the Ideas page reaches. Everything you play is remembered for this long.</div>' +
-        '<div class="muted small set-theme-note">Time signature: the context-bar signature drives the metronome; the Studio loop and the Jam band currently play 4/4 (odd meters there are on the roadmap).</div>' +
-        '<div class="set-sub">Idea playback voice</div>' +
-        '<div class="fb-field">' +
-          '<div class="seg" id="set-voice">' +
-            '<button type="button" data-voice="saw">Saw</button>' +
-            '<button type="button" data-voice="pad">Pad</button>' +
-            '<button type="button" data-voice="keys">Keys</button>' +
-            '<button type="button" data-voice="bass">Bass</button>' +
-          '</div>' +
-        '</div>' +
-        '<div class="muted small set-theme-note">The studio synth preset ideas play back on (full ROLI slide/pressure expression).</div>' +
+        '<div class="set-sub">Time signature</div>' +
+        '<div class="muted small">The context-bar time signature drives the metronome; the Jam band plays 4/4.</div>' +
       '</div>' +
       '<div class="card">' +
         '<h2>Backup</h2>' +
         '<div class="muted small">Updates NEVER clear your settings &mdash; they live on this device and survive every version. ' +
           'If things ever look reset, you are probably in a different install (a Chrome tab vs the desktop app, or another browser profile). ' +
-          'Export moves everything &mdash; preferences, palettes, jam songs, studio tracks &mdash; between installs.</div>' +
+          'Export moves everything &mdash; preferences, palettes, jam songs, practice progress &mdash; between installs.</div>' +
         '<div class="row tight" style="margin-top:12px">' +
           '<button type="button" class="btn sm" id="set-backup-out">Export settings</button>' +
           '<label class="btn sm" style="cursor:pointer">Import settings<input type="file" id="set-backup-in" accept=".json" style="display:none"></label>' +
@@ -196,7 +171,7 @@
       // the controller remote (js/remote.js renders the rows)
       '<div class="card" id="set-remote-card">' +
         '<h2>Hands-free control</h2>' +
-        '<div class="muted small">Move practice on from the instrument: a pedal, a button on your synth or a page-turner pedal does Next, Back and Stop on Exercises, Keys lessons, the Woodshed, LUMI practice, the Practice plan, Songs, the fretboard runner, the Trainer, Live sets and the Deck.</div>' +
+        '<div class="muted small">Move practice on from the instrument: a pedal, a button on your synth or a page-turner pedal does Next, Back and Stop on Exercises, Keys lessons and LUMI practice on the Piano page, the Woodshed, the Practice plan and its one-minute chord changes, Songs, the fretboard runner, Live sets and the Deck.</div>' +
         '<div id="set-remote"></div>' +
       '</div>' +
       '<div class="card" id="set-audio-card">' +
@@ -232,17 +207,6 @@
         '<div class="muted small set-theme-note" id="set-ain-msg"></div>' +
       '</div>' +
       '<div class="card">' +
-        '<h2>Plugins</h2>' +
-        '<div class="muted small">Extend soundLAB with your own JavaScript: plugins can add pages, Studio effects and synth voices ' +
-          '(see <b>PLUGINS.md</b> in the GitHub repo for the API and a sample). Plugins run with full access to the app — ' +
-          '<b>only load code you trust</b>. Stored on this device only.</div>' +
-        '<div class="row tight" style="margin-top:12px">' +
-          '<label class="btn sm">Add plugin (.js)<input type="file" id="set-plugin-file" accept=".js,text/javascript" style="display:none"></label>' +
-          '<span class="muted small" id="set-plugin-msg"></span>' +
-        '</div>' +
-        '<div id="set-plugin-list" style="margin-top:6px"></div>' +
-      '</div>' +
-      '<div class="card">' +
         '<h2>About</h2>' +
         '<div class="row tight">' +
           '<span class="muted small">soundLAB v' + App.version + ' &mdash; updates are checked automatically at startup.</span>' +
@@ -275,47 +239,6 @@
       App.setVolume(parseInt(this.value, 10));
       volVal.textContent = App.volume + '%';
     });
-
-    // ---- global studio click ----
-    var clickChk = document.getElementById('set-click');
-    clickChk.checked = App.store.get('app.click', false) === true;
-    clickChk.addEventListener('change', function () {
-      App.store.set('app.click', !!this.checked);
-    });
-
-    // ---- studio prefs ----
-    var retroSeg = document.getElementById('set-retro');
-    function paintRetro() {
-      var v = parseInt(App.store.get('sd.retroSecs', 30), 10);
-      if ([15, 30, 60].indexOf(v) === -1) v = 30;
-      retroSeg.querySelectorAll('button').forEach(function (b) {
-        b.classList.toggle('active', parseInt(b.getAttribute('data-retro'), 10) === v);
-      });
-    }
-    retroSeg.addEventListener('click', function (e) {
-      var b = e.target.closest('[data-retro]');
-      if (!b) return;
-      App.store.set('sd.retroSecs', parseInt(b.getAttribute('data-retro'), 10));
-      App.emit('sd:prefs', {});
-      paintRetro();
-    });
-    paintRetro();
-
-    var voiceSeg = document.getElementById('set-voice');
-    function paintVoice() {
-      var v = App.store.get('sd.playVoice', 'keys');
-      voiceSeg.querySelectorAll('button').forEach(function (b) {
-        b.classList.toggle('active', b.getAttribute('data-voice') === v);
-      });
-    }
-    voiceSeg.addEventListener('click', function (e) {
-      var b = e.target.closest('[data-voice]');
-      if (!b) return;
-      App.store.set('sd.playVoice', b.getAttribute('data-voice'));
-      App.emit('sd:prefs', {});
-      paintVoice();
-    });
-    paintVoice();
 
     // ---- screen wake ----
     var wakeChk = document.getElementById('set-wake');
@@ -677,51 +600,6 @@
     listDevices(false);
     paintAin();
 
-    // ---- plugins ----
-    var plugMsg = document.getElementById('set-plugin-msg');
-    var plugList = document.getElementById('set-plugin-list');
-
-    function paintPlugins() {
-      var l = (window.SoundLab && SoundLab.plugins.list) || [];
-      if (!l.length) { plugList.innerHTML = ''; return; }
-      plugList.innerHTML = l.map(function (p) {
-        return '<div class="row tight" style="margin-top:8px" data-plug="' + p.id + '">' +
-          '<label class="row tight small" style="gap:6px"><input type="checkbox" data-plugon="' + p.id + '"' +
-            (p.on !== false ? ' checked' : '') + '>' + p.name.replace(/</g, '&lt;') + '</label>' +
-          (p.error ? '<span class="small" style="color:var(--red,#d9484a)">error: ' + String(p.error).replace(/</g, '&lt;') + '</span>' : '') +
-          '<button type="button" class="btn sm" data-plugrm="' + p.id + '">Remove</button>' +
-          '</div>';
-      }).join('');
-    }
-
-    document.getElementById('set-plugin-file').addEventListener('change', function () {
-      var f = this.files && this.files[0];
-      this.value = '';
-      if (!f || !window.SoundLab) return;
-      var rd = new FileReader();
-      rd.onload = function () {
-        var res = SoundLab.plugins.add(f.name.replace(/\.js$/i, ''), String(rd.result));
-        plugMsg.textContent = res.ok ? 'loaded and running' : ('failed: ' + res.error);
-        paintPlugins();
-      };
-      rd.readAsText(f);
-    });
-    plugList.addEventListener('click', function (e) {
-      var rm = e.target.closest('[data-plugrm]');
-      if (rm) {
-        SoundLab.plugins.remove(rm.getAttribute('data-plugrm'));
-        plugMsg.textContent = 'removed — fully unloads on the next app start';
-        paintPlugins();
-      }
-    });
-    plugList.addEventListener('change', function (e) {
-      var chk = e.target.closest('[data-plugon]');
-      if (!chk) return;
-      SoundLab.plugins.toggle(chk.getAttribute('data-plugon'), chk.checked);
-      plugMsg.textContent = chk.checked ? 'enabled' : 'disabled — unloads on the next app start';
-    });
-    paintPlugins();
-
     // ---- update check ----
     document.getElementById('set-update').addEventListener('click', function () {
       document.getElementById('set-update-msg').textContent =
@@ -972,6 +850,11 @@
       a.click();
       setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
     });
+    // Phase A (2.0): keys of features that left the app — the Studio and its
+    // prefs, ideas, the plug-in list, the workspace switch, the Pads drum
+    // track. The live app on this origin (2.0.0, the code before the trim) still owns them, so an import
+    // never writes them (a plug-in list is code the live app would run).
+    var DEAD = /^guitarlab\.(st\.|sd\.|ideas\.|song\.|plugins\.|app\.space$|app\.tabStudio$|app\.click$|pads\.track$)/;
     document.getElementById('set-backup-in').addEventListener('change', function () {
       var f = this.files && this.files[0];
       var msg = document.getElementById('set-backup-msg');
@@ -981,11 +864,17 @@
         try {
           var d = JSON.parse(rd.result);
           if (!d || d.app !== 'soundLAB' || !d.keys) throw new Error('not a soundLAB backup');
-          var n = 0;
+          var n = 0, dead = 0;
           Object.keys(d.keys).forEach(function (k) {
-            if (k.indexOf('guitarlab.') === 0) { localStorage.setItem(k, d.keys[k]); n++; }
+            if (k.indexOf('guitarlab.') !== 0) return;
+            if (DEAD.test(k)) { dead++; return; }
+            // an export holds strings only: anything else is not ours to write
+            if (typeof d.keys[k] !== 'string') return;
+            localStorage.setItem(k, d.keys[k]);
+            n++;
           });
-          msg.textContent = n + ' settings restored — reloading…';
+          msg.textContent = n + ' settings restored' +
+            (dead ? ', ' + dead + ' from removed features skipped' : '') + ' — reloading…';
           setTimeout(function () { location.reload(); }, 900);
         } catch (e) {
           msg.textContent = 'Import failed: ' + e.message;
@@ -1004,10 +893,8 @@
     onShow: function () {
       if (audioUI) audioUI.show();
       if (App.remote) App.remote.paint();
-      // dynamic prefs may have changed elsewhere (pads click chip, wake from
-      // code, volume) — re-read them when the page opens
-      var c = document.getElementById('set-click');
-      if (c) c.checked = App.store.get('app.click', false) === true;
+      // dynamic prefs may have changed elsewhere (wake from code, volume) —
+      // re-read them when the page opens
       var w = document.getElementById('set-wake');
       if (w) w.checked = App.store.get('app.keepAwake', true) !== false;
       var v = document.getElementById('set-vol');

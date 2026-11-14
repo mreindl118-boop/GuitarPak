@@ -2062,9 +2062,10 @@
       // same announcement as for a change made on this page
       App.emit('fb:scale', { root: state.root, scale: state.scale });
     });
-    // one-click practice from a Trainer prompt: apply root/scale/tempo, jump
-    // to this tab, and start the runner (emitted inside the click gesture, so
-    // the AudioContext is allowed to start)
+    // one-click practice from the Plan page (a Practice plan block or a Free
+    // practice prompt): apply root/scale/tempo, jump to this tab, and start
+    // the runner (emitted inside the click gesture, so the AudioContext is
+    // allowed to start)
     App.on('fb:practice', function (d) {
       if (!d) return;
       if (typeof d.root === 'number' && isFinite(d.root) && d.root >= 0 && d.root < 12) {
