@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Header and key bar · soundLAB 2.0 drawings</title>
+<!--
+  soundLAB 2.0 Phase B, step B1b: the header and the key bar, drawn before they are built
+  (docs/plans/phase-b/PLAN.md, table B1b.1; decisions D16-D20, D23; Appendix A).
+  This drawing answers the owner's gates G1 (the key bar, step B5a) and G2 (the header, step B6).
+
+  Opened without ?w= it shows every state at every width it needs, dark and light.
+  Opened with ?w= it is one state, laid out for the window it is given.
+  The parameters, the shell's markup and the sample data are in mock.js; the styles, which are
+  the first draft of css/components.css, are in mock.css. Read their header comments first.
+
+  The states are the list below: one entry each, in the order the owner should meet them
+  (the key bar on a phone, a tablet and a desktop; then the header; then the rest).
+  To add a state, add an entry: id, a title in plain words, the parameters, the widths.
+-->
+<link rel="icon" href="../../../icons/icon.svg">
+<link rel="stylesheet" href="../../../css/tokens.css">
+<link rel="stylesheet" href="mock.css">
+<script src="mock.js"></script>
+</head>
+<body>
+<noscript>This drawing is built by a script (mock.js). Please switch JavaScript on.</noscript>
+<script>
+(function () {
+  'use strict';
+  var ALL = [360, 390, 640, 641, 820, 1024, 1280];
+
+  if (Mock.single) {
+    // one state: the shell from the URL's parameters, over a quiet page (a headline and a keyboard)
+    Mock.page({ title: 'Header and key bar · soundLAB 2.0 drawings' });
+    return;
+  }
+
+  Mock.contact({
+    title: 'Header and key bar',
+    lead: [
+      'The frame around every page of soundLAB 2.0: the header at the top and, under it, the key bar.',
+      'Two questions wait for your yes, or for what you want changed: <b>is this the key bar</b>, and <b>is this the header</b>? ' +
+        'Each is built only after your answer.',
+      'Everything here is a drawing, but you can tap it: a chip opens its panel, the lock flips, a tab changes the page.'
+    ],
+    groups: [
+      { title: '1 · The key bar',
+        lead: 'Key, tempo, Scale lock, LUMI lights and Help are on every page, in one bar that stays when the header slides away. ' +
+          'The time signature moves into the metronome sheet. <b>Is this the bar?</b>',
+        states: [
+          { id: 'bar-phone', title: 'On a phone: one row of five small buttons. Each opens a panel.',
+            note: 'Key · tempo · Scale lock (it says “On” or “Off”) · LUMI lights · Help (four dots).', widths: [360, 390, 640] },
+          { id: 'bar-tablet', title: 'On a tablet: the controls in one row; under them the Scale lock says in words what it does.',
+            widths: [641, 820] },
+          { id: 'bar-desktop', title: 'On a desktop: one row. The labels show where there is room.',
+            widths: [1024, 1280] },
+          { id: 'lock-panel', title: 'A tap on the lock (phone) opens a small panel with the switch and the sentence.',
+            note: 'So one stray touch cannot switch the Scale lock.', params: { pop: 'lock' }, widths: [360, 390] },
+          { id: 'flip-on', title: 'Each time you flip the lock, a short message says what it now does.',
+            params: { toast: 'lock' }, widths: [390, 820, 1280] },
+          { id: 'lock-off', title: 'The lock off: the knob, the fill and the words all change.',
+            params: { lock: 0 }, widths: [360, 390, 641, 820, 1024, 1280] },
+          { id: 'flip-off', title: 'The message after switching it off.', params: { lock: 0, toast: 'lock' }, widths: [390, 1280] },
+          { id: 'key-default', title: 'The key the app starts with, A Minor Pentatonic: names shorten where the row is tight.',
+            note: 'The lock’s sentence takes the longest of three forms that fits: “only A Minor Pentatonic notes sound”, “A Minor Pentatonic only”, “A Min Pent only”.',
+            params: { key: 'A-minorPent' }, widths: ALL },
+          { id: 'key-longest', title: 'The longest name there is, Db Natural Minor (Aeolian).', params: { key: 'Db-aeolian' }, widths: ALL },
+          { id: 'panel-key', title: 'The Key panel: key, scale and mode.',
+            note: 'A card under the chip on a desktop; from the bottom, above the tabs, on a phone and a tablet.', params: { pop: 'key' }, widths: [390, 820, 1024, 1280] },
+          { id: 'panel-tempo', title: 'The Tempo panel (phone): minus, the number you can type, plus, and the click’s start.',
+            params: { pop: 'tempo' }, widths: [360, 390, 640] },
+          { id: 'panel-lights', title: 'The LUMI lights panel: the switch, what the keyboard is doing, and the way to its sheet.',
+            params: { pop: 'lights' }, widths: [390, 820, 1280] },
+          { id: 'panel-lights-none', title: 'The same panel with no keyboard connected.', params: { pop: 'lights', lights: 'none' }, widths: [390, 1280] },
+          { id: 'panel-help', title: 'The Help panel: five levels with a sentence each, and “Color notes by”.',
+            params: { pop: 'help' }, widths: [390, 820, 1024, 1280] },
+          { id: 'click-phone', title: 'The click is running (phone): the Tempo panel’s button now stops it.',
+            params: { met: 1, pop: 'tempo' }, widths: [390] },
+          { id: 'click-wide', title: 'The click is running: the bar’s ▶ has become ■, and the metronome in the corner is lit.',
+            note: 'Two buttons, two jobs: ▶ in the bar starts and stops the click; the metronome in the corner opens its sheet.', params: { met: 1 }, widths: [820, 1280] }
+        ] },
+      { title: '2 · The header',
+        lead: 'The logo (a tap goes home), the five tabs, your instrument, the keyboard’s state in words, help, settings, the way to Gear, ' +
+          'and the metronome in the corner. On a phone four of them sit behind “More”. <b>Is this the header?</b>',
+        states: [
+          { id: 'more', title: 'On a phone, “More” lists Keyboard lights, Help, Settings and Gear, each with its words.',
+            params: { pop: 'more' }, widths: [360, 390, 640] },
+          { id: 'inst', title: 'Your instrument is in the header on every page, here Guitar while the Keys tab is open.',
+            note: 'From 1100 px the word “Practising” stands over it.', params: { inst: 'guitar' }, widths: [360, 390, 820, 1024, 1280] },
+          { id: 'status-off', title: 'The keyboard’s state in words: a LUMI with its lights off.',
+            note: 'The key bar’s lights chip says “Off” too.', params: { lights: 'off' }, widths: [390, 820, 1280] },
+          { id: 'status-kbd', title: 'Another keyboard than a LUMI.', params: { lights: 'kbd' }, widths: [820, 1280] },
+          { id: 'status-none', title: 'No keyboard connected.', params: { lights: 'none' }, widths: [390, 820, 1280] },
+          { id: 'status-none-more', title: 'No keyboard, on a phone: “More” says so.', params: { lights: 'none', pop: 'more' }, widths: [390] },
+          { id: 'goal', title: 'A dot on the Learn tab while today’s goal is still open.',
+            note: 'Here the Learn tab is open, with its four pages as pills in one row.', params: { goal: 1, page: 'quiz' }, widths: [360, 390, 820, 1280] },
+          { id: 'beta', title: 'At the beta address the word “beta” stands beside the logo; “alpha” is gone.',
+            params: { beta: 1 }, widths: [360, 390, 820, 1024, 1280] },
+          { id: 'no-pills', title: 'Settings: no tab is marked and there is no row of pills.', params: { page: 'settings' }, widths: [390, 1280] }
+        ] },
+      { title: '3 · The rest',
+        states: [
+          { id: 'scrolled', title: 'Scroll down and the header slides away. The key bar stays at the top.',
+            params: { scrolled: 1 }, widths: [390, 820, 1280] },
+          { id: 'help-full', title: 'Help set to Full: four dots, and the keys show their names.', params: { help: 4 }, widths: [390, 1280] },
+          { id: 'help-none', title: 'Help set to None: no dot, a bare keyboard.', params: { help: 0 }, widths: [390, 1280] }
+        ] }
+    ]
+  });
+})();
+</script>
+</body>
+</html>

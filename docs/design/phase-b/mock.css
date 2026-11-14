@@ -1,0 +1,1641 @@
+/* soundLAB 2.0 Phase B, step B1b: the styles of the drawings in docs/design/phase-b/,
+ * and the first draft of css/components.css (docs/plans/phase-b/PLAN.md, B1b.1).
+ *
+ * THE CONVENTIONS EVERY DRAWING SHARES (read these, then the header of mock.js)
+ *
+ * What a drawing loads, in this order, and nothing else:
+ *     <link rel="stylesheet" href="../../../css/tokens.css">
+ *     <link rel="stylesheet" href="mock.css">
+ *     <script src="mock.js"></script>            (and mock-hero.js when it draws an instrument)
+ *   No app script and no app stylesheet: a drawing must not change when the app's code does.
+ *
+ * Tokens only. Every colour, font, font size, space, radius, shadow, duration and layer in this
+ *   file is a var(--sl-…) of css/tokens.css. There is no raw colour, no old variable (--bg,
+ *   --accent, …), no literal z-index and no literal duration. Three names are not tokens:
+ *     --c             a note's colour, set inline on the element (App.colors is its only source, D12)
+ *     --p             a share from 0 to 100, set inline (the goal ring, a meter)
+ *     --sl-topbar-h   the header's height, published on <html> by script (B5a); 0 px without it
+ *   Where no token exists a size is a calc() of tokens, or one of the few literals left: a
+ *   hairline (1px, 2px), a percentage, 0, and the plan's own fixed numbers (the sheet's 440 px
+ *   of D24, the message's 460 px of D25, the breakpoints).
+ *
+ * Class names are the plan's (Appendix A for the shell, Appendix B for the components), exactly.
+ *   A shared class of today's app (btn, chip, seg, card, field, …) is written
+ *   :where(.sl-skin) .btn { … } as decision D6 asks, so the rule weighs what the old one weighs.
+ *   A part inside a component that the plan does not name gets a name that starts with the
+ *   component's (sl-switch-track, sl-kchip-value). A name that starts with mk- exists only for
+ *   the drawings and never goes into the app.
+ *
+ * States. Hover only under (hover: hover). Focus is :focus-visible with --sl-focus and a
+ *   transparent outline (it survives forced colours). "On" is class active or
+ *   aria-pressed="true" and is always a fill AND a border AND a word or a mark, never a
+ *   colour alone. Disabled keeps readable text and gets a dashed boundary.
+ *
+ * Widths. Two breakpoints, the app's: 640 px ("More" in the header, the key bar's row of five
+ *   chips) and 900 px (bottom tab bar, bottom sheets, panels from the bottom). One more
+ *   number comes from the plan and changes one label, not the layout: the word "Practising"
+ *   in the instrument chip from 1100 px (D23). Whether the key bar shows its labels and which
+ *   form the lock's sentence takes is not a breakpoint: mock.js measures what fits (D17) and
+ *   sets has-labels, is-tight or is-tighter on the bar. The gap between the header's tabs is
+ *   fluid (it closes towards 901 px), again without a breakpoint.
+ *   Touch heights come from the tokens ((any-pointer: coarse) is in css/tokens.css).
+ *
+ * The light theme comes from the tokens alone (data-theme="light" on <html>). This file has
+ *   no theme rule.
+ *
+ * Where a rule goes. A component's rules go into this file, under the heading of its section.
+ *   A drawing's own layout (the home's stage, a page's columns) goes into a <style> element of
+ *   that drawing, written from tokens too.
+ *
+ * Contents: 1 fonts · 2 the marker · 3 components · 4 the shell · 5 drawing-only
+ */
+
+/* ==========================================================================
+   1 · Fonts: the app's own files, only the weights that have a file (D34)
+   ========================================================================== */
+
+@font-face {
+  font-family: 'Barlow';
+  font-style: normal;
+  font-weight: 400;
+  src: url('../../../fonts/barlow-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Barlow';
+  font-style: normal;
+  font-weight: 500;
+  src: url('../../../fonts/barlow-500.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Barlow Condensed';
+  font-style: normal;
+  font-weight: 600;
+  src: url('../../../fonts/barlowcond-600.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Barlow Condensed';
+  font-style: normal;
+  font-weight: 700;
+  src: url('../../../fonts/barlowcond-700.woff2') format('woff2');
+}
+/* the display face: caps only, one weight */
+@font-face {
+  font-family: 'Bebas Neue';
+  font-style: normal;
+  font-weight: 400;
+  src: url('../../../fonts/bebasneue-400.ttf') format('truetype');
+}
+
+/* ==========================================================================
+   2 · The marker: a container that carries .sl-skin shows the new looks
+   ========================================================================== */
+
+.sl-skin {
+  font-family: var(--sl-font-body);
+  font-size: var(--sl-text-md);
+  font-weight: var(--sl-weight-regular);
+  line-height: var(--sl-leading);
+  font-synthesis-weight: none;          /* a weight without a file is never faked (D34) */
+  color: var(--sl-ink);
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+:where(.sl-skin) :where(button, input, select, textarea) {
+  font: inherit;
+  color: inherit;
+  margin: 0;
+}
+:where(.sl-skin) :where(b, strong) { font-weight: var(--sl-weight-medium); }   /* Barlow has 400 and 500 */
+:where(.sl-skin) :where(p) { margin: 0; }
+:where(.sl-skin) :where(a) { color: inherit; }
+/* one focus ring for everything that takes the keyboard */
+:where(.sl-skin) :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  box-shadow: var(--sl-focus);
+}
+
+/* ==========================================================================
+   3 · Components (Appendix B), each with all its states.
+       Three control heights (D9): --sl-control-h (44, 48 on touch) is the rule;
+       --sl-control-h-hero (64) is the one Start button; --sl-control-h-dense
+       (36 with a mouse, 48 on touch) is .sm, for rows of a list in a card or a fold.
+   ========================================================================== */
+
+/* ---- Button: .btn, .btn.primary, .btn.sm, .btn.ghost, .sl-hero-btn -------- */
+:where(.sl-skin) .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sl-space-2);
+  min-height: var(--sl-control-h);
+  min-width: var(--sl-control-h);
+  padding: 0 var(--sl-space-5);
+  border: 1px solid var(--sl-line-control);
+  border-radius: var(--sl-radius-pill);
+  background: var(--sl-surface-2);
+  color: var(--sl-ink);
+  font-family: var(--sl-font-body);
+  font-size: var(--sl-text-md);
+  font-weight: var(--sl-weight-medium);
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color var(--sl-dur-fast) var(--sl-ease), border-color var(--sl-dur-fast) var(--sl-ease),
+    color var(--sl-dur-fast) var(--sl-ease), box-shadow var(--sl-dur-fast) var(--sl-ease), transform var(--sl-dur-fast) var(--sl-ease);
+}
+@media (hover: hover) {
+  :where(.sl-skin) .btn:hover { background: var(--sl-surface); border-color: var(--sl-ink-soft); }
+}
+:where(.sl-skin) .btn:active { transform: translateY(1px); background: var(--sl-surface-sunken); }
+/* on: a fill, an amber boundary and a check mark */
+:where(.sl-skin) .btn.active,
+:where(.sl-skin) .btn[aria-pressed="true"] {
+  background: var(--sl-accent-soft);
+  border-color: var(--sl-accent-deep);
+}
+:where(.sl-skin) .btn:disabled,
+:where(.sl-skin) .btn[aria-disabled="true"] {
+  background: transparent;
+  border-style: dashed;
+  color: var(--sl-ink-muted);
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+:where(.sl-skin) .btn.primary {
+  background: var(--sl-accent);
+  border-color: transparent;
+  color: var(--sl-accent-ink);
+}
+@media (hover: hover) {
+  :where(.sl-skin) .btn.primary:hover { background: var(--sl-accent); border-color: transparent; box-shadow: var(--sl-accent-glow); }
+}
+:where(.sl-skin) .btn.primary:active { background: var(--sl-accent); box-shadow: none; }
+:where(.sl-skin) .btn.primary:disabled,
+:where(.sl-skin) .btn.primary[aria-disabled="true"] {
+  background: transparent;
+  border-color: var(--sl-line-control);
+  color: var(--sl-ink-muted);
+}
+
+/* small = the dense tier: 36 px with a mouse, 48 px as soon as a finger can be the pointer */
+:where(.sl-skin) .btn.sm {
+  min-height: var(--sl-control-h-dense);
+  min-width: var(--sl-control-h-dense);
+  padding: 0 var(--sl-space-4);
+  font-size: var(--sl-text-sm);
+}
+
+:where(.sl-skin) .btn.ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--sl-ink-soft);
+}
+@media (hover: hover) {
+  :where(.sl-skin) .btn.ghost:hover { background: var(--sl-surface-2); border-color: transparent; color: var(--sl-ink); }
+}
+:where(.sl-skin) .btn.ghost:active { background: var(--sl-surface-sunken); }
+:where(.sl-skin) .btn.ghost.active,
+:where(.sl-skin) .btn.ghost[aria-pressed="true"],
+:where(.sl-skin) .btn.ghost[aria-expanded="true"] {
+  background: var(--sl-accent-soft);
+  border-color: var(--sl-accent-deep);
+  color: var(--sl-ink);
+}
+:where(.sl-skin) .btn.ghost:disabled { border-color: transparent; }
+
+/* the one Start button of the home: Barlow Condensed caps, 64 px, the amber glow */
+.sl-hero-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sl-space-3);
+  min-height: var(--sl-control-h-hero);
+  padding: 0 var(--sl-space-6);
+  border: 1px solid transparent;
+  border-radius: var(--sl-radius-pill);
+  background: var(--sl-accent);
+  color: var(--sl-accent-ink);
+  font-family: var(--sl-font-cond);
+  font-size: var(--sl-text-lg);
+  font-weight: var(--sl-weight-cond-bold);
+  line-height: 1;
+  letter-spacing: var(--sl-caps-ls);
+  text-transform: uppercase;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: var(--sl-accent-glow);
+  -webkit-tap-highlight-color: transparent;
+  transition: transform var(--sl-dur-fast) var(--sl-ease), box-shadow var(--sl-dur-fast) var(--sl-ease);
+}
+@media (hover: hover) { .sl-hero-btn:hover { transform: translateY(-1px); } }
+.sl-hero-btn:active { transform: translateY(1px); box-shadow: none; }
+.sl-hero-btn:focus-visible { outline: 2px solid transparent; outline-offset: 2px; box-shadow: var(--sl-focus); }
+.sl-hero-btn:disabled,
+.sl-hero-btn[aria-disabled="true"] {
+  background: transparent;
+  border: 1px dashed var(--sl-line-control);
+  color: var(--sl-ink-muted);
+  box-shadow: none;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ---- Icon button: square, 44 / 48 px, never the dense tier, needs a name -- */
+:where(.sl-skin) :is(.icon-btn, .btn.icon-btn, .btn.sm.icon-btn) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: var(--sl-control-h);
+  height: var(--sl-control-h);
+  min-width: var(--sl-control-h);
+  min-height: var(--sl-control-h);
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--sl-radius-pill);
+  background: transparent;
+  color: var(--sl-ink-soft);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color var(--sl-dur-fast) var(--sl-ease), color var(--sl-dur-fast) var(--sl-ease), border-color var(--sl-dur-fast) var(--sl-ease);
+}
+@media (hover: hover) {
+  :where(.sl-skin) :is(.icon-btn, .btn.icon-btn, .btn.sm.icon-btn):hover { background: var(--sl-surface-2); border-color: transparent; color: var(--sl-ink); }
+}
+:where(.sl-skin) :is(.icon-btn, .btn.icon-btn, .btn.sm.icon-btn):active { background: var(--sl-surface-sunken); transform: none; }
+:where(.sl-skin) :is(.icon-btn, .btn.icon-btn, .btn.sm.icon-btn):is(.active, .on, [aria-pressed="true"], [aria-expanded="true"]) {
+  background: var(--sl-accent-soft);
+  border-color: var(--sl-accent-deep);
+  color: var(--sl-ink);
+}
+:where(.sl-skin) :is(.icon-btn, .btn.icon-btn, .btn.sm.icon-btn):disabled { border: 1px dashed var(--sl-line-control); color: var(--sl-ink-muted); cursor: not-allowed; }
+:where(.sl-skin) .ic { flex: 0 0 auto; display: block; }
+
+/* ---- Chip: .chip. On = a fill, an amber boundary and a check mark ------- */
+:where(.sl-skin) .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sl-space-2);
+  min-height: var(--sl-control-h);
+  padding: 0 var(--sl-space-4);
+  border: 1px solid var(--sl-line-control);
+  border-radius: var(--sl-radius-pill);
+  background: transparent;
+  color: var(--sl-ink-soft);
+  font-size: var(--sl-text-sm);
+  font-weight: var(--sl-weight-medium);
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color var(--sl-dur-fast) var(--sl-ease), border-color var(--sl-dur-fast) var(--sl-ease), color var(--sl-dur-fast) var(--sl-ease);
+}
+@media (hover: hover) { :where(.sl-skin) .chip:hover { background: var(--sl-surface-2); color: var(--sl-ink); } }
+:where(.sl-skin) .chip:active { background: var(--sl-surface-sunken); }
+:where(.sl-skin) .chip.active,
+:where(.sl-skin) .chip[aria-pressed="true"] {
+  background: var(--sl-accent-soft);
+  border-color: var(--sl-accent-deep);
+  color: var(--sl-ink);
+}
+:where(.sl-skin) .chip:disabled { border-style: dashed; color: var(--sl-ink-muted); cursor: not-allowed; }
+/* the check mark of "on", drawn in the text colour: chips, segments, pressed buttons.
+   (One selector each, not one :is(): its weight would be that of its heaviest part.) */
+:where(.sl-skin) .chip.active::before,
+:where(.sl-skin) .chip[aria-pressed="true"]::before,
+:where(.sl-skin) .seg > button.active::before,
+:where(.sl-skin) .seg > button[aria-pressed="true"]::before,
+:where(.sl-skin) .btn.active::before,
+:where(.sl-skin) .btn[aria-pressed="true"]::before {
+  content: '';
+  flex: 0 0 auto;
+  width: calc(var(--sl-space-1) + 1px);
+  height: calc(var(--sl-space-2) + 1px);
+  margin: 0 var(--sl-space-2) var(--sl-space-1) var(--sl-space-1);
+  border: solid currentColor;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+:where(.sl-skin) .btn.primary::before, :where(.sl-skin) .icon-btn::before { content: none; }      /* these two say "on" another way */
+
+/* ---- Segmented control: .seg. One sunken track; a wrapped control keeps
+        separate rounded segments ------------------------------------------- */
+:where(.sl-skin) .seg {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--sl-space-1);
+  padding: var(--sl-space-1);
+  border: 1px solid var(--sl-line-control);
+  border-radius: calc(var(--sl-control-h) / 2 + var(--sl-space-1));
+  background: var(--sl-surface-sunken);
+}
+:where(.sl-skin) .seg > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1 1 auto;
+  min-height: calc(var(--sl-control-h) - var(--sl-space-2) - 2px);   /* the track is the 44 / 48 px control */
+  min-width: var(--sl-control-h);
+  padding: 0 var(--sl-space-4);
+  border: 1px solid transparent;
+  border-radius: var(--sl-radius-pill);
+  background: transparent;
+  color: var(--sl-ink-soft);
+  font-size: var(--sl-text-sm);
+  font-weight: var(--sl-weight-medium);
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color var(--sl-dur-fast) var(--sl-ease), border-color var(--sl-dur-fast) var(--sl-ease), color var(--sl-dur-fast) var(--sl-ease);
+}
+@media (hover: hover) { :where(.sl-skin) .seg > button:hover { color: var(--sl-ink); background: var(--sl-surface-2); } }
+:where(.sl-skin) .seg > button:active { background: var(--sl-surface); }
+:where(.sl-skin) .seg > button.active,
+:where(.sl-skin) .seg > button[aria-pressed="true"] {
+  background: var(--sl-accent-soft);
+  border-color: var(--sl-accent-deep);
+  color: var(--sl-ink);
+}
+:where(.sl-skin) .seg > button:disabled { color: var(--sl-ink-muted); cursor: not-allowed; }
+:where(.sl-skin) .seg.sm > button { min-height: calc(var(--sl-control-h-dense) - var(--sl-space-2) - 2px); }
+
+/* ---- Field, select, number, range ---------------------------------------- */
+:where(.sl-skin) label.field,
+:where(.sl-skin) .field {
+  display: grid;
+  gap: var(--sl-space-1);
+  min-width: 0;
+  color: var(--sl-ink-soft);
+  font-family: var(--sl-font-cond);
+  font-size: var(--sl-text-xs);
+  font-weight: var(--sl-weight-cond);
+  letter-spacing: var(--sl-caps-ls);
+  text-transform: uppercase;
+}
+:where(.sl-skin) :is(select, .select, input[type="text"], input[type="number"], input[type="search"], textarea) {
+  width: 100%;
+  min-width: 0;
+  min-height: var(--sl-control-h);
+  padding: 0 var(--sl-space-4);
+  border: 1px solid var(--sl-line-control);
+  border-radius: var(--sl-radius-md);
+  background-color: var(--sl-surface-sunken);
+  color: var(--sl-ink);
+  font-family: var(--sl-font-body);
+  font-size: var(--sl-text-md);       /* 16 px: a phone does not zoom into the field */
+  font-weight: var(--sl-weight-regular);
+  letter-spacing: 0;
+  text-transform: none;
+  transition: border-color var(--sl-dur-fast) var(--sl-ease);
+}
+@media (hover: hover) {
+  :where(.sl-skin) :is(select, .select, input[type="text"], input[type="number"], input[type="search"], textarea):hover { border-color: var(--sl-ink-soft); }
+}
+:where(.sl-skin) :is(select, .select, input, textarea):disabled { border-style: dashed; color: var(--sl-ink-muted); cursor: not-allowed; }
+:where(.sl-skin) :is(input, textarea)[aria-invalid="true"] { border-color: var(--sl-bad); }
+/* the chevron of a select, drawn from two strokes in the ink colour: one rule for both themes.
+   (D6 writes this one look with weight: :root .sl-skin select.) */
+:root .sl-skin select {
+  -webkit-appearance: none;
+  appearance: none;
+  padding-right: var(--sl-space-7);
+  background-image:
+    linear-gradient(45deg, transparent calc(50% - 1px), var(--sl-ink-soft) calc(50% - 1px), var(--sl-ink-soft) calc(50% + 1px), transparent calc(50% + 1px)),
+    linear-gradient(-45deg, transparent calc(50% - 1px), var(--sl-ink-soft) calc(50% - 1px), var(--sl-ink-soft) calc(50% + 1px), transparent calc(50% + 1px));
+  background-size: calc(var(--sl-space-2) - 1px) calc(var(--sl-space-2) - 1px);
+  background-repeat: no-repeat;
+  background-position: right calc(var(--sl-space-4) + var(--sl-space-2) - 2px) center, right var(--sl-space-4) center;
+  cursor: pointer;
+}
+:where(.sl-skin) input[type="number"] { -moz-appearance: textfield; appearance: textfield; font-variant-numeric: tabular-nums; }
+:where(.sl-skin) input[type="number"]::-webkit-outer-spin-button,
+:where(.sl-skin) input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+:where(.sl-skin) input[type="range"] {
+  width: 100%;
+  min-height: var(--sl-control-h);
+  margin: 0;
+  background: transparent;
+  accent-color: var(--sl-accent);
+  cursor: pointer;
+}
+
+/* ---- Switch: .sl-switch, a button with aria-pressed. The knob moves, the
+        fill changes, and a word stands beside it ---------------------------- */
+.sl-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sl-space-2);
+  min-height: var(--sl-control-h);
+  padding: 0 var(--sl-space-2) 0 var(--sl-space-1);
+  border: 0;
+  border-radius: var(--sl-radius-pill);
+  background: transparent;
+  color: var(--sl-ink);
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.sl-switch-track {
+  position: relative;
+  flex: 0 0 auto;
+  width: calc(var(--sl-space-5) * 2 - var(--sl-space-1));     /* 44 */
+  height: var(--sl-space-5);                                  /* 24 */
+  border: 1px solid var(--sl-line-control);
+  border-radius: var(--sl-radius-pill);
+  background: var(--sl-surface-sunken);
+  transition: background-color var(--sl-dur) var(--sl-ease), border-color var(--sl-dur) var(--sl-ease);
+}
+.sl-switch-track::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: calc(var(--sl-space-5) - var(--sl-space-1) - 2px);     /* 18 */
+  height: calc(var(--sl-space-5) - var(--sl-space-1) - 2px);
+  border-radius: var(--sl-radius-pill);
+  background: var(--sl-ink-soft);
+  transition: transform var(--sl-dur) var(--sl-ease), background-color var(--sl-dur) var(--sl-ease);
+}
+.sl-switch[aria-pressed="true"] .sl-switch-track { background: var(--sl-accent); border-color: var(--sl-accent-deep); }
+.sl-switch[aria-pressed="true"] .sl-switch-track::after { background: var(--sl-accent-ink); transform: translateX(calc(var(--sl-space-5) - var(--sl-space-1))); }
+.sl-switch-label {
+  font-family: var(--sl-font-cond);
+  font-size: var(--sl-text-xs);
+  font-weight: var(--sl-weight-cond);
+  letter-spacing: var(--sl-caps-ls);
+  text-transform: uppercase;
+}
+.sl-switch-state { font-size: var(--sl-text-sm); font-weight: var(--sl-weight-medium); color: var(--sl-ink-soft); }
+.sl-switch[aria-pressed="true"] .sl-switch-state { color: var(--sl-accent-text); }
+@media (hover: hover) {
+  .sl-switch:hover .sl-switch-track { border-color: var(--sl-ink-soft); }
+  .sl-switch[aria-pressed="true"]:hover .sl-switch-track { border-color: var(--sl-accent-text); }
+}
+.sl-switch:active .sl-switch-track::after { background: var(--sl-ink); }
+.sl-switch[aria-pressed="true"]:active .sl-switch-track::after { background: var(--sl-accent-ink); }
+.sl-switch:disabled { cursor: not-allowed; color: var(--sl-ink-muted); }
+.sl-switch:disabled .sl-switch-track { border-style: dashed; background: transparent; }
+.sl-switch:disabled .sl-switch-track::after { background: var(--sl-ink-muted); }
+
+/* ---- Stepper: .sl-stepper = minus, a typed number, plus ------------------ */
+.sl-stepper {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--sl-radius-pill);
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--sl-line-control);      /* drawn inside: the pill is exactly one control high */
+}
+.sl-stepper > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: var(--sl-control-h);
+  height: var(--sl-control-h);
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--sl-radius-pill);
+  background: transparent;
+  color: var(--sl-ink-soft);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color var(--sl-dur-fast) var(--sl-ease), color var(--sl-dur-fast) var(--sl-ease);
+}
+@media (hover: hover) { .sl-stepper > button:hover { background: var(--sl-surface-2); color: var(--sl-ink); } }
+.sl-stepper > button:active { background: var(--sl-surface-sunken); }
+.sl-stepper > button:disabled { color: var(--sl-ink-muted); cursor: not-allowed; }
+.sl-stepper > button[aria-pressed="true"] { background: var(--sl-accent); border-color: var(--sl-accent-deep); color: var(--sl-accent-ink); }
+/* the typed number with its unit under it, in one 44 / 48 px field: the unit is a
+   sibling that lies over the lower part of the field and takes no tap */
+.sl-stepper > input,
+.sl-stepper > input[type="number"] {
+  flex: 0 0 auto;
+  width: var(--sl-space-7);
+  height: var(--sl-control-h);
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--sl-radius-sm);
+  background: transparent;
+  color: var(--sl-ink);
+  font-size: var(--sl-text-md);
+  font-weight: var(--sl-weight-medium);
+  line-height: 1;
+  text-align: center;
+}
+.sl-stepper > input:has(+ .sl-stepper-unit) { padding-bottom: calc(var(--sl-space-3) + 2px); }
+.sl-stepper-unit {
+  flex: 0 0 auto;
+  align-self: flex-end;
+  width: var(--sl-space-7);
+  margin-left: calc(-1 * var(--sl-space-7));
+  padding-bottom: calc(var(--sl-space-2) - 1px);
+  color: var(--sl-ink-muted);
+  font-family: var(--sl-font-cond);
+  font-size: var(--sl-text-xs);
+  font-weight: var(--sl-weight-cond);
+  line-height: 1;
+  letter-spacing: var(--sl-caps-ls);
+  text-align: center;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+/* ---- Card: .card. No title dot; tool pages and Settings only -------------- */
+:where(.sl-skin) .card {
+  padding: var(--sl-space-5);
+  border: 1px solid var(--sl-line-strong);
+  border-radius: var(--sl-radius-lg);
+  background: var(--sl-surface);
+  box-shadow: var(--sl-shadow-1);
+}
+:where(.sl-skin) .card h2 {
+  margin: 0 0 var(--sl-space-3);
+  font-family: var(--sl-font-cond);
+  font-size: var(--sl-text-lg);
+  font-weight: var(--sl-weight-cond-bold);
+  line-height: 1.2;
+  letter-spacing: 0;
+  text-transform: none;
+}
+:where(.sl-skin) .card h2::before { content: none; }
+@media (max-width: 640px) { :where(.sl-skin) .card { padding: var(--sl-space-4); } }
+
+/* ---- Rows: .sl-rows, .sl-row, done = a check mark and the word "Done" ----- */
+.sl-rows { display: grid; gap: var(--sl-space-1); margin: 0; padding: 0; list-style: none; }
+.sl-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sl-space-3);
+  min-height: var(--sl-control-h-dense);
+  padding: var(--sl-space-1) var(--sl-space-3);
+  border: 1px solid transparent;
+  border-radius: var(--sl-radius-sm);
+  background: var(--sl-surface-2);
+  color: var(--sl-ink);
+  font-size: var(--sl-text-sm);
+}
+@media (hover: hover) { :is(a, button).sl-row:hover { border-color: var(--sl-line-control); } }
+:is(a, button).sl-row { width: 100%; text-align: left; text-decoration: none; cursor: pointer; }
+:is(a, button).sl-row:active { background: var(--sl-surface-sunken); }
+.sl-row-main { flex: 1 1 auto; min-width: 0; }
+.sl-row-state { flex: 0 0 auto; color: var(--sl-ink-muted); font-size: var(--sl-text-xs); }
+.sl-row.is-done { background: transparent; border-color: var(--sl-line-strong); color: var(--sl-ink-soft); }
+.sl-row.is-done .sl-row-state { color: var(--sl-ok); }
+.sl-row.is-done .sl-row-state::before {
+  content: '';
+  display: inline-block;
+  width: calc(var(--sl-space-1) + 1px);
+  height: calc(var(--sl-space-2) + 1px);
+  margin: 0 var(--sl-space-2) 1px 0;
+  border: solid currentColor;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+/* ---- Fold: details.sl-fold (details.tips keeps its name and takes this look) */
+:where(.sl-skin) :is(details.sl-fold, details.tips) {
+  border-top: 1px solid var(--sl-line-strong);
+}
+:where(.sl-skin) :is(details.sl-fold, details.tips) > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sl-space-3);
+  min-height: var(--sl-control-h);
+  padding: 0 var(--sl-space-1);
+  color: var(--sl-ink);
+  font-size: var(--sl-text-md);
+  font-weight: var(--sl-weight-medium);
+  list-style: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+:where(.sl-skin) :is(details.sl-fold, details.tips) > summary::-webkit-details-marker { display: none; }
+:where(.sl-skin) :is(details.sl-fold, details.tips) > summary::after {      /* the caret */
+  content: '';
+  flex: 0 0 auto;
+  width: var(--sl-space-2);
+  height: var(--sl-space-2);
+  margin: 0 var(--sl-space-2) var(--sl-space-1);
+  border: solid var(--sl-ink-soft);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+  transition: transform var(--sl-dur) var(--sl-ease);
+}
+:where(.sl-skin) :is(details.sl-fold, details.tips)[open] > summary::after { transform: translateY(var(--sl-space-1)) rotate(-135deg); }
+@media (hover: hover) { :where(.sl-skin) :is(details.sl-fold, details.tips) > summary:hover { color: var(--sl-accent-text); } }
+:where(.sl-skin) :is(details.sl-fold, details.tips) > summary:active { background: var(--sl-surface-sunken); }
+:where(.sl-skin) :is(details.sl-fold, details.tips) > :not(summary) { padding: 0 var(--sl-space-1) var(--sl-space-4); }
+
+/* ---- Tile and ring: .sl-tile, .sl-ring (--p is the share, 0 to 100) ------- */
+.sl-tile { display: grid; gap: var(--sl-space-1); padding: var(--sl-space-3) var(--sl-space-4); border-radius: var(--sl-radius-md); background: var(--sl-surface-2); }
+.sl-tile-num { font-family: var(--sl-font-display); font-size: var(--sl-display-sm); line-height: 1; font-variant-numeric: tabular-nums; }
+.sl-tile-label { color: var(--sl-ink-muted); font-size: var(--sl-text-xs); }
+.sl-ring {
+  --p: 0;
+  display: inline-block;
+  flex: 0 0 auto;
+  width: var(--sl-space-6);
+  height: var(--sl-space-6);
+  border-radius: var(--sl-radius-pill);
+  background: conic-gradient(var(--sl-accent-text) calc(var(--p) * 1%), var(--sl-line-strong) 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - var(--sl-space-1) - 1px), var(--sl-ink) calc(100% - var(--sl-space-1)));
+  mask: radial-gradient(farthest-side, transparent calc(100% - var(--sl-space-1) - 1px), var(--sl-ink) calc(100% - var(--sl-space-1)));
+}
+
+/* ---- Meter and bar: .sl-bar (level, progress, clock) ---------------------- */
+.sl-bar { --p: 0; display: block; height: var(--sl-space-2); border-radius: var(--sl-radius-pill); background: var(--sl-surface-sunken); border: 1px solid var(--sl-line-strong); overflow: hidden; }
+.sl-bar::before { content: ''; display: block; width: calc(var(--p) * 1%); height: 100%; border-radius: var(--sl-radius-pill); background: var(--sl-accent-text); transition: width var(--sl-dur) var(--sl-ease); }
+
+/* ---- Readout: .sl-readout, big tabular numbers ---------------------------- */
+.sl-readout { font-family: var(--sl-font-display); font-size: var(--sl-display-md); line-height: 1; font-variant-numeric: tabular-nums; color: var(--sl-ink); }
+
+/* ---- Eyebrow, headline, footer line ---------------------------------------- */
+.sl-eyebrow {
+  margin: 0;
+  color: var(--sl-accent-text);
+  font-family: var(--sl-font-cond);
+  font-size: var(--sl-text-sm);
+  font-weight: var(--sl-weight-cond);
+  line-height: 1.2;
+  letter-spacing: var(--sl-eyebrow-ls);
+  text-transform: uppercase;
+}
+:where(.sl-skin) h1 {
+  margin: 0;
+  font-family: var(--sl-font-display);
+  font-size: var(--sl-display-sm);          /* practice and tool pages (D28); the home sets --sl-display-lg itself */
+  font-weight: var(--sl-weight-regular);
+  line-height: var(--sl-leading-tight);
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+.sl-footline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sl-space-2) var(--sl-space-6);
+  padding: var(--sl-space-4) 0;
+  border-top: 1px solid var(--sl-line);
+  color: var(--sl-ink-muted);
+  font-size: var(--sl-text-sm);
+}
+.sl-footline b { color: var(--sl-ink); }
+
+/* ---- Hint and screen-reader text (.hint and .sr keep working) -------------- */
+.sl-hint, :where(.sl-skin) .hint { color: var(--sl-ink-muted); font-size: var(--sl-text-sm); line-height: var(--sl-leading); }
+.sl-sr, :where(.sl-skin) .sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* the small helpers a page and the tour card use */
+:where(.sl-skin) .row { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sl-space-3); }
+:where(.sl-skin) .row.tight { gap: var(--sl-space-2); }
+:where(.sl-skin) .row.spread { justify-content: space-between; }
+:where(.sl-skin) .muted { color: var(--sl-ink-muted); }
+:where(.sl-skin) .small { font-size: var(--sl-text-sm); }
+
+/* ---- Empty, loading, error: words plus an icon ------------------------------ */
+.sl-empty, .sl-loading {
+  display: grid;
+  justify-items: center;
+  gap: var(--sl-space-3);
+  padding: var(--sl-space-6) var(--sl-space-4);
+  color: var(--sl-ink-muted);
+  font-size: var(--sl-text-sm);
+  text-align: center;
+}
+.sl-empty b, .sl-loading b { color: var(--sl-ink); font-size: var(--sl-text-md); }
+.sl-loading::before {                      /* still when motion is reduced: the duration token is 0 then */
+  content: '';
+  width: var(--sl-space-5);
+  height: var(--sl-space-5);
+  border: 2px solid var(--sl-line-strong);
+  border-top-color: var(--sl-accent-text);
+  border-radius: var(--sl-radius-pill);
+  animation: sl-spin calc(var(--sl-dur) * 5) linear infinite;
+}
+@keyframes sl-spin { to { transform: rotate(360deg); } }
+:where(.sl-skin) .error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sl-space-3);
+  padding: var(--sl-space-3) var(--sl-space-4);
+  border: 1px solid var(--sl-bad);
+  border-radius: var(--sl-radius-md);
+  background: var(--sl-surface);
+  color: var(--sl-ink);
+  font-size: var(--sl-text-sm);
+}
+:where(.sl-skin) .error .ic { color: var(--sl-bad); }
+
+/* ---- Two-tap confirm: .sl-confirm, armed for 3 s ---------------------------- */
+.sl-confirm { position: relative; overflow: hidden; }
+.sl-confirm.is-armed { border-color: var(--sl-bad); background: var(--sl-surface); color: var(--sl-bad); }
+.sl-confirm.is-armed::after {             /* the three seconds run out along the bottom edge */
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--sl-bad);
+  transform-origin: left;
+  animation: sl-drain calc(var(--sl-dur) * 15) linear forwards;
+}
+@keyframes sl-drain { to { transform: scaleX(0); } }
+
+/* ---- Cross-page classes, defined once until their owners' steps (D8) ------- */
+.fb-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sl-space-2);
+  min-height: var(--sl-control-h-dense);
+  padding: 0 var(--sl-space-3);
+  border: 1px solid var(--sl-line-control);
+  border-radius: var(--sl-radius-pill);
+  color: var(--sl-ink-soft);
+  font-size: var(--sl-text-sm);
+}
+.fb-stroke { display: inline-flex; align-items: center; color: var(--sl-ink-soft); }
+.fb-field { display: inline-flex; align-items: center; gap: var(--sl-space-2); color: var(--sl-ink-soft); font-size: var(--sl-text-sm); }
+.jam-now { color: var(--sl-accent-text); font-weight: var(--sl-weight-medium); }
+
+/* ---- Instrument heroes: .sl-hero, .sl-kbd, .sl-neck, .sl-pads.
+        A first draft; mock-hero.js draws the instruments and owns the inner parts.
+        The lighting vocabulary (D30) as classes on a key, a fret position or a pad;
+        the note's colour arrives as --c. No ring, outline or glow in the accent here. */
+.sl-hero {
+  position: relative;
+  padding: var(--sl-space-4);
+  border-radius: var(--sl-radius-lg);
+  background: var(--sl-stage);
+  color: var(--sl-ink-on-stage);
+}
+/* a keyboard is a grid with three columns for each ivory key: an ivory key spans three, an
+   ebony key spans the two around a boundary. The ebony keys are written after the ivory
+   ones, so they lie over them without a layer number. The drawing code sets each
+   key's grid-column and the grid's column count inline. */
+.sl-kbd { display: grid; width: 100%; height: 100%; }
+.sl-key {
+  position: relative;
+  grid-row: 1;
+  min-width: 0;
+  border: 1px solid var(--sl-key-line);
+  border-top: 0;
+  border-radius: 0 0 var(--sl-radius-sm) var(--sl-radius-sm);
+  background: var(--sl-key-white);
+}
+.sl-key + .sl-key { border-left: 0; }
+.sl-key.sl-key-b {
+  align-self: start;
+  height: 62%;
+  border: 1px solid var(--sl-key-line);
+  border-top: 0;
+  border-radius: 0 0 calc(var(--sl-radius-sm) - 2px) calc(var(--sl-radius-sm) - 2px);
+  background: var(--sl-key-black);
+  box-shadow: var(--sl-shadow-1);
+}
+.sl-dot {                                  /* in the scale: a dot in the note's colour with a dark ring */
+  position: absolute;
+  left: 50%;
+  bottom: 12%;
+  display: grid;
+  place-items: center;
+  width: min(72%, var(--sl-space-5));
+  aspect-ratio: 1;
+  transform: translateX(-50%);
+  border-radius: var(--sl-radius-pill);
+  background: var(--c);
+  box-shadow: 0 0 0 2px var(--sl-ink-on-color);
+  color: var(--sl-ink-on-color);
+  font-family: var(--sl-font-cond);
+  font-size: var(--sl-text-xs);
+  font-weight: var(--sl-weight-cond-bold);
+  line-height: 1;
+}
+.sl-dot.is-ink-light { color: var(--sl-ink-on-color-light); }
+.is-root > .sl-dot { box-shadow: 0 0 0 var(--sl-space-1) var(--sl-ink-on-color); }            /* the root: a thicker ring */
+.sl-key-b > .sl-dot { bottom: 10%; width: min(78%, var(--sl-space-5)); box-shadow: 0 0 0 2px var(--sl-key-white); }
+.sl-key-b.is-root > .sl-dot { box-shadow: 0 0 0 var(--sl-space-1) var(--sl-key-white); }
+:is(.sl-key, .sl-key-b).is-now { background: var(--c); box-shadow: inset 0 0 0 calc(var(--sl-space-1) - 1px) var(--sl-ink-on-color); }   /* now: the key is filled */
+:is(.sl-key, .sl-key-b).is-now > .sl-dot { background: transparent; box-shadow: none; }
+.is-next > .sl-dot { background: transparent; box-shadow: inset 0 0 0 calc(var(--sl-space-1) - 1px) var(--c), 0 0 0 1px var(--sl-ink-on-color); }   /* next: an empty ring */
+:is(.sl-key, .sl-key-b).is-press { background: var(--sl-key-press); box-shadow: inset 0 calc(-1 * var(--sl-space-1)) 0 var(--sl-key-line); }
+:is(.sl-key, .sl-key-b).is-right { background: var(--sl-ok); }
+:is(.sl-key, .sl-key-b).is-wrong { background: var(--sl-bad); }
+.sl-neck, .sl-pads { position: relative; width: 100%; }
+
+/* ==========================================================================
+   4 · The shell (Appendix A): header, tabs and pills, key bar, sheets,
+       messages, tour card
+   ========================================================================== */
+
+/* ---- The ground and the page's frame (B6) --------------------------------- */
+html, body { background: var(--sl-bg); }
+:root:not([data-app="gear"]) main {
+  display: block;
+  margin: 0 auto;
+  /* the last line of a page stays clear of the bottom tab bar (its height is
+     --sl-control-h + --sl-space-4, written out wherever it is needed) */
+  padding: var(--sl-space-5) calc(var(--sl-gutter) + env(safe-area-inset-right, 0px))
+    calc(var(--sl-control-h) + var(--sl-space-4) + var(--sl-space-6) + env(safe-area-inset-bottom, 0px))
+    calc(var(--sl-gutter) + env(safe-area-inset-left, 0px));
+}
+.panel { display: none; }
+.panel.active { display: block; }
+.foot {
+  padding: var(--sl-space-4) var(--sl-gutter) calc(var(--sl-control-h) + var(--sl-space-4) + var(--sl-space-5) + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--sl-line);
+  color: var(--sl-ink-muted);
+  font-family: var(--sl-font-body);
+  font-size: var(--sl-text-xs);
+}
+@media (min-width: 901px) {
+  :root:not([data-app="gear"]) main { padding: var(--sl-space-6) var(--sl-space-5) var(--sl-space-7); }
+  .foot { padding: var(--sl-space-4) var(--sl-space-5) var(--sl-space-6); }
+}
+
+/* ---- Header (D19): wordmark, tabs, tools; the pill row is its second row --- */
+.sl-skin.topbar {
+  position: sticky;
+  top: 0;
+  z-index: calc(var(--sl-z-bar) + 1);      /* its More panel lies over the key bar */
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0 var(--sl-space-2);
+  padding: calc(var(--sl-space-2) + env(safe-area-inset-top, 0px)) calc(var(--sl-gutter) + env(safe-area-inset-right, 0px))
+    var(--sl-space-2) calc(var(--sl-gutter) + env(safe-area-inset-left, 0px));
+  background: var(--sl-bg-raised);
+  transition: transform var(--sl-dur) var(--sl-ease);
+}
+.sl-skin.topbar.bar-hidden { transform: translateY(-100%); }      /* slides away on scroll down (D18) */
+
+.sl-skin .brand {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: var(--sl-space-2);
+  min-height: var(--sl-control-h);
+  border-radius: var(--sl-radius-sm);
+  color: var(--sl-ink);
+  text-decoration: none;
+}
+.sl-skin .wordmark { display: block; width: auto; height: var(--sl-text-xl); }
+.sl-skin .wordmark .wm-lab { color: var(--sl-accent); }           /* "LAB": the one accent */
+.sl-skin .brand .tag {
+  padding: var(--sl-space-1) calc(var(--sl-space-1) + 2px);
+  border: 1px solid var(--sl-accent-deep);
+  border-radius: var(--sl-radius-pill);
+  background: var(--sl-accent-soft);
+  color: var(--sl-accent-text);
+  font-family: var(--sl-font-cond);
+  font-size: var(--sl-text-xs);
+  font-weight: var(--sl-weight-cond);
+  line-height: 1;
+  letter-spacing: var(--sl-eyebrow-ls);
+  text-transform: uppercase;
+}
+
+/* ---- Tabs (D20): text with an underline above 900 px, icon over label along
+        the bottom at 900 px and below. The open tab: underline AND weight ---- */
+.sl-skin .tabbar, .sl-skin.tabbar { display: flex; align-items: center; }
+/* the tabs stand closer together as the window gets narrower, down to no gap at 901 px,
+   where the wordmark, five tabs and the tools just share the row */
+.sl-skin .tabbar-top {
+  flex: 1 1 auto;
+  min-width: 0;
+  gap: clamp(0px, calc((100vw - 901px) / 20), var(--sl-space-4));
+  margin-left: clamp(var(--sl-space-1), calc((100vw - 901px) / 12), var(--sl-space-5));
+}
+.tabbar-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--sl-control-h);
+  padding: 0 var(--sl-space-2);
+  border: 0;
+  border-radius: var(--sl-radius-sm);
+  background: transparent;
+  color: var(--sl-ink-muted);
+  font-family: var(--sl-font-cond);
+  font-size: var(--sl-text-sm);
+  font-weight: var(--sl-weight-cond);
+  line-height: 1;
+  letter-spacing: var(--sl-caps-ls);
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: color var(--sl-dur-fast) var(--sl-ease);
+}
+.tabbar-btn > span { padding: var(--sl-space-1) 0; border-bottom: 2px solid transparent; }
+@media (hover: hover) { .tabbar-btn:hover { color: var(--sl-ink); } }
+.tabbar-btn:active { color: var(--sl-ink); background: var(--sl-surface-2); }
+.tabbar-btn.active { color: var(--sl-ink); font-weight: var(--sl-weight-cond-bold); }
+.tabbar-top .tabbar-btn .ic { display: none; }
+.tabbar-top .tabbar-btn.active > span { border-bottom-color: var(--sl-accent); }
+
+.sl-skin.tabbar-bottom {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: var(--sl-z-pop);
+  display: none;
+  align-items: stretch;
+  padding: 0 env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+  border-top: 1px solid var(--sl-line-strong);
+  background: var(--sl-bg-raised);
+}
+.tabbar-bottom .tabbar-btn {
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--sl-space-1);
+  min-width: 0;
+  min-height: calc(var(--sl-control-h) + var(--sl-space-4));
+  padding: 0;
+  border-radius: 0;
+  font-size: var(--sl-text-xs);
+}
+.tabbar-bottom .tabbar-btn > span { padding: 0; border: 0; }
+.tabbar-bottom .tabbar-btn.active::before {        /* the open tab's bar, at the top edge */
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: 50%;
+  width: var(--sl-space-6);
+  height: 2px;
+  transform: translateX(-50%);
+  background: var(--sl-accent);
+}
+/* the mark on the Learn tab while today's goal is open, in both bars; the words
+   ", today's goal is open" are in the button for a screen reader (.sl-goal-sr) */
+.goal-due .tabbar-btn[data-group="gtheory"]::after {
+  content: '';
+  position: absolute;
+  top: calc(50% - var(--sl-space-3));
+  right: 0;
+  width: var(--sl-space-2);
+  height: var(--sl-space-2);
+  border-radius: var(--sl-radius-pill);
+  background: var(--sl-accent-text);
+  box-shadow: 0 0 0 2px var(--sl-bg-raised);
+}
+.goal-due .tabbar-bottom .tabbar-btn[data-group="gtheory"]::after { top: var(--sl-space-2); right: calc(50% - var(--sl-space-4)); }
+.sl-goal-sr { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
+html:not(.goal-due) .sl-goal-sr { display: none; }
+
+/* ---- Pills (#subnav): the pages of the open tab, drawn as chips; the open
+        pill is filled, bordered and heavier ---------------------------------- */
+#subnav.sl-skin {
+  display: flex;
+  flex: 1 1 100%;
+  gap: var(--sl-space-1);
+  min-width: 0;
+  padding-top: var(--sl-space-1);
+}
+#subnav.sl-skin[hidden] { display: none; }
+.subtab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 1 auto;
+  min-width: 0;
+  min-height: var(--sl-control-h);
+  padding: 0 var(--sl-space-4);
+  border: 1px solid transparent;
+  border-radius: var(--sl-radius-pill);
+  background: transparent;
+  color: var(--sl-ink-muted);
+  font-size: var(--sl-text-sm);
+  font-weight: var(--sl-weight-regular);
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color var(--sl-dur-fast) var(--sl-ease), color var(--sl-dur-fast) var(--sl-ease), border-color var(--sl-dur-fast) var(--sl-ease);
+}
+@media (hover: hover) { .subtab:hover { background: var(--sl-surface-2); color: var(--sl-ink); } }
+.subtab:active { background: var(--sl-surface-sunken); }
+.subtab.active {
+  background: var(--sl-accent-soft);
+  border-color: var(--sl-accent-deep);
+  color: var(--sl-ink);
+  font-weight: var(--sl-weight-medium);
+}
+
+/* ---- Tools in the header: instrument chip, keyboard status, help, settings,
+        the link across, the metronome in the corner ---------------------------- */
+.sl-skin .tb-tools { display: flex; align-items: center; flex: 0 0 auto; gap: calc(var(--sl-space-1) / 2); margin-left: auto; }
+.sl-skin .tb-tools .btn { min-height: var(--sl-control-h); }      /* never the dense tier in the header (D9) */
+.sl-skin .tb-tools #app-switch {
+  padding: 0 var(--sl-space-2);
+  border-color: transparent;
+  background: transparent;
+  color: var(--sl-ink-soft);
+  font-size: var(--sl-text-sm);
+}
+@media (hover: hover) { .sl-skin .tb-tools #app-switch:hover { background: var(--sl-surface-2); color: var(--sl-ink); } }
+.tb-word, .tb-ic { display: none; }         /* a tool's words and the link's icon: shown in the More list only */
+#met-btn.tick { color: var(--sl-accent-text); }        /* the beat */
+
+/* the keyboard's state in words (.sl-status): a dot, the keyboard's short name, the state */
+.sl-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sl-space-2);
+  min-height: var(--sl-control-h);
+  padding: 0 var(--sl-space-2);
+  border: 1px solid transparent;
+  border-radius: var(--sl-radius-pill);
+  background: transparent;
+  color: var(--sl-ink-soft);
+  font-size: var(--sl-text-sm);
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color var(--sl-dur-fast) var(--sl-ease), color var(--sl-dur-fast) var(--sl-ease);
+}
+@media (hover: hover) { .sl-status:hover { background: var(--sl-surface-2); color: var(--sl-ink); } }
+.sl-status:active { background: var(--sl-surface-sunken); }
+.sl-status.active, .sl-status[aria-expanded="true"] { background: var(--sl-accent-soft); border-color: var(--sl-accent-deep); color: var(--sl-ink); }
+.sl-status-dot {
+  flex: 0 0 auto;
+  width: var(--sl-space-2);
+  height: var(--sl-space-2);
+  border: 1px solid var(--sl-line-control);
+  border-radius: var(--sl-radius-pill);
+  background: transparent;                  /* hollow: no keyboard */
+}
+.sl-status.is-connected .sl-status-dot { border-color: var(--sl-ok); background: var(--sl-ok); }      /* filled: a keyboard is connected */
+.sl-status-name { color: var(--sl-ink); font-weight: var(--sl-weight-medium); }
+.sl-status-text { color: var(--sl-ink-muted); }
+.sl-status-text:not(:empty)::before { content: '\00b7'; margin-right: var(--sl-space-2); }
+
+/* ---- Key bar (D16-D18): .sl-keybar, its chips .sl-kchip, the Help dots ----- */
+.sl-keybar {
+  position: sticky;
+  top: var(--sl-topbar-h, 0px);            /* under the header; the header's height is published by script */
+  z-index: var(--sl-z-bar);
+  display: flex;
+  align-items: center;
+  gap: var(--sl-space-2);
+  padding: var(--sl-space-2) calc(var(--sl-gutter) + env(safe-area-inset-right, 0px)) var(--sl-space-2) calc(var(--sl-gutter) + env(safe-area-inset-left, 0px));
+  border-bottom: 1px solid var(--sl-line-strong);
+  background: var(--sl-bg-raised);
+  transition: top var(--sl-dur) var(--sl-ease);
+}
+.sl-keybar[hidden] { display: none; }       /* Gear: folded until #cx-toggle is pressed (D14) */
+html.bar-hidden .sl-keybar {                /* the header is gone: the bar is the top edge and takes its inset */
+  top: 0;
+  padding-top: calc(var(--sl-space-2) + env(safe-area-inset-top, 0px));
+}
+.sl-keybar[inert], .sl-keybar[aria-disabled="true"] { pointer-events: none; }
+
+.sl-kchip {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: var(--sl-space-2);
+  min-width: var(--sl-control-h);
+  min-height: var(--sl-control-h);
+  padding: 0 var(--sl-space-4);
+  border: 1px solid var(--sl-line-control);
+  border-radius: var(--sl-radius-pill);
+  background: transparent;
+  color: var(--sl-ink);
+  font-family: var(--sl-font-body);
+  font-size: var(--sl-text-md);
+  font-weight: var(--sl-weight-medium);
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color var(--sl-dur-fast) var(--sl-ease), border-color var(--sl-dur-fast) var(--sl-ease);
+}
+@media (hover: hover) { .sl-kchip:hover { background: var(--sl-surface-2); border-color: var(--sl-ink-soft); } }
+.sl-kchip:active { background: var(--sl-surface-sunken); }
+.sl-kchip:focus-visible { outline: 2px solid transparent; outline-offset: 2px; box-shadow: var(--sl-focus); }
+.sl-kchip.is-on { background: var(--sl-accent-soft); border-color: var(--sl-accent-deep); }          /* on: fill, boundary, and its word */
+.sl-kchip[aria-expanded="true"] { border-color: var(--sl-ink); box-shadow: inset 0 0 0 1px var(--sl-ink); }      /* its panel is open */
+.sl-kchip[aria-expanded="true"]:not(.is-on) { background: var(--sl-surface-2); }
+.sl-kchip:disabled { border-style: dashed; color: var(--sl-ink-muted); cursor: not-allowed; }
+.sl-kchip > .ic { color: var(--sl-ink-soft); }
+.sl-kchip-label, .sl-pop-title {
+  color: var(--sl-ink-muted);
+  font-family: var(--sl-font-cond);
+  font-size: var(--sl-text-xs);
+  font-weight: var(--sl-weight-cond);
+  line-height: 1;
+  letter-spacing: var(--sl-caps-ls);
+  text-transform: uppercase;
+}
+.sl-kchip-label { display: none; }          /* "Key", "LUMI lights", "Help": only where the row has room (D17) */
+.sl-keybar.has-labels .sl-kchip-label { display: inline; }
+.sl-keybar.has-labels .sl-kchip-label + .ic { display: none; }      /* the label says what the icon said */
+.sl-kchip-caret { margin-right: calc(-1 * var(--sl-space-1)); color: var(--sl-ink-muted); transition: transform var(--sl-dur) var(--sl-ease); }
+.sl-kchip[aria-expanded="true"] .sl-kchip-caret { transform: rotate(180deg); }
+/* two lines in one chip: a small label over the value ("Practising" over "Guitar", the tempo over "BPM") */
+.sl-kchip-stack { display: grid; justify-items: start; gap: 2px; text-align: left; }
+.sl-kchip-stack > .sl-kchip-label { display: block; }
+.sl-kchip-stack.is-centred { justify-items: center; }
+
+/* the Help level as four dots: filled up to the level, hollow above it */
+.sl-dots { display: inline-flex; align-items: center; gap: var(--sl-space-1); }
+.sl-dots > i {
+  width: var(--sl-space-2);
+  height: var(--sl-space-2);
+  border: 1px solid var(--sl-line-control);
+  border-radius: var(--sl-radius-pill);
+  background: transparent;
+}
+.sl-dots > i.on { border-color: var(--sl-accent-text); background: var(--sl-accent-text); }
+
+/* the lock's sentence, always in words */
+#cx-lockhint {
+  color: var(--sl-ink-muted);
+  font-family: var(--sl-font-cond);
+  font-size: var(--sl-text-sm);
+  font-weight: var(--sl-weight-cond-bold);
+  line-height: 1.2;
+  letter-spacing: var(--sl-caps-ls);
+}
+.is-on > #cx-lockhint { color: var(--sl-accent-text); }
+#cx-tnote { color: var(--sl-ink-soft); font-size: var(--sl-text-sm); }
+#cx-tnote[hidden] { display: none; }
+
+/* ---- Popover: .sl-pop. A card under its chip above 900 px (script puts it
+        under the chip), a panel from the bottom at 900 px and below ----------- */
+.sl-pop {
+  z-index: var(--sl-z-pop);
+  display: grid;
+  gap: var(--sl-space-3);
+  padding: var(--sl-space-4);
+  border: 1px solid var(--sl-line-control);
+  border-radius: var(--sl-radius-lg);
+  background: var(--sl-surface);
+  color: var(--sl-ink);
+  box-shadow: var(--sl-shadow-2);
+}
+.sl-pop[hidden] { display: none; }
+@media (min-width: 901px) {
+  .sl-pop {
+    position: absolute;
+    top: calc(100% + var(--sl-space-2));
+    left: var(--sl-space-5);
+    width: max-content;
+    max-width: min(440px, calc(100vw - var(--sl-space-5) * 2));
+    max-height: calc(100vh - var(--sl-topbar-h, 0px) - var(--sl-control-h) * 2);      /* never past the window's lower edge */
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
+@media (max-width: 900px) {
+  .sl-pop {
+    position: fixed;
+    left: calc(var(--sl-gutter) + env(safe-area-inset-left, 0px));
+    right: calc(var(--sl-gutter) + env(safe-area-inset-right, 0px));
+    bottom: calc(var(--sl-control-h) + var(--sl-space-4) + var(--sl-space-3) + env(safe-area-inset-bottom, 0px));   /* above the tab bar */
+    max-width: calc(var(--sl-space-8) * 8);
+    max-height: calc(100vh - var(--sl-control-h) * 5);
+    margin: 0 auto;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
+.sl-pop-title { margin: 0; color: var(--sl-ink-soft); }
+
+/* the Key panel: three native selects */
+#cx-pop-key { grid-template-columns: minmax(0, 2fr) minmax(0, 5fr); align-items: end; }
+#cx-pop-key > #cx-mode-wrap { grid-column: 1 / -1; }
+#cx-mode-wrap[hidden] { display: none; }
+@media (min-width: 901px) {
+  #cx-pop-key { grid-template-columns: calc(var(--sl-space-8) + var(--sl-space-5)) calc(var(--sl-space-8) * 3 + var(--sl-space-5)); }
+}
+/* the Lights panel: the switch, the status line, the way to the sheet */
+#cx-pop-lights { justify-items: start; }
+#cx-pop-lights > #cx-tnote { max-width: 46ch; }
+/* the Help panel: the five levels, a sentence each, then "Color notes by" */
+.sl-pop .cx-levels { display: grid; border-radius: var(--sl-radius-md); }
+.sl-pop .cx-levels > button {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  justify-content: start;
+  gap: 2px var(--sl-space-3);
+  min-height: var(--sl-control-h);
+  padding: var(--sl-space-2) var(--sl-space-3);
+  border-radius: var(--sl-radius-sm);
+  text-align: left;
+  white-space: normal;
+}
+.sl-pop .cx-levels > button::before {      /* the mark's place is kept on every row, so the names stand in one column */
+  content: '';
+  grid-row: 1 / span 2;
+  width: calc(var(--sl-space-1) + 1px);
+  height: calc(var(--sl-space-2) + 1px);
+  margin: 0 var(--sl-space-1) var(--sl-space-1);
+  border: solid transparent;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+.sl-pop .cx-levels > button.active::before { border-color: currentColor; }
+.cx-level-name { display: flex; align-items: center; gap: var(--sl-space-2); color: var(--sl-ink); font-size: var(--sl-text-md); }
+.cx-level-text { grid-column: 2; color: var(--sl-ink-soft); font-size: var(--sl-text-sm); font-weight: var(--sl-weight-regular); line-height: 1.3; }
+.sl-pop .cx-colors { justify-self: start; }
+@media (min-width: 901px) {      /* the name beside its sentence: the panel fits a window 640 px high */
+  #cx-pop-help { width: 440px; }
+  .sl-pop .cx-levels > button { grid-template-columns: auto calc(var(--sl-space-8) + var(--sl-space-6)) 1fr; padding: var(--sl-space-1) var(--sl-space-3); }
+  .sl-pop .cx-levels > button::before { grid-row: 1; }
+  .cx-level-text { grid-column: 3; }
+}
+
+/* ---- The key bar's width tiers (D17) --------------------------------------- */
+
+/* 641 px and wider: the Tempo and the Scale lock panels are laid out in the bar,
+   and their two chips are not displayed */
+@media (min-width: 641px) {
+  #cx-tempo, #cx-lockchip { display: none; }
+  #cx-pop-tempo, #cx-pop-lock {
+    position: static;
+    z-index: auto;
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+    gap: 0;
+    width: auto;
+    max-width: none;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    overflow: visible;
+    border: 0;
+    border-radius: var(--sl-radius-pill);
+    background: transparent;
+    box-shadow: inset 0 0 0 1px var(--sl-line-control);      /* drawn inside: as high as a chip */
+  }
+  #cx-pop-tempo > .sl-pop-title { display: none; margin: 0 var(--sl-space-1) 0 var(--sl-space-4); color: var(--sl-ink-muted); }
+  .sl-keybar.has-labels #cx-pop-tempo > .sl-pop-title { display: inline; }
+  #cx-pop-tempo .cx-met-word { display: none; }
+  #cx-pop-lock { gap: var(--sl-space-2); padding-right: var(--sl-space-4); }
+  #cx-pop-lock.is-on { background: var(--sl-accent-soft); box-shadow: inset 0 0 0 1px var(--sl-accent-deep); }
+  #cx-lockhint { white-space: nowrap; }
+  /* the last steps before anything is cut: Help shows its dots only (and the lights chip its
+     one-word form); then the switch stands without the words "Scale lock" beside it */
+  .sl-keybar.is-tight #cx-help .sl-kchip-value { display: none; }
+  .sl-keybar.is-tighter #cx-lock .sl-switch-label { display: none; }
+}
+
+/* 641 to 900 px: two rows. The controls, then the lock with its sentence in full */
+@media (min-width: 641px) and (max-width: 900px) {
+  .sl-keybar { display: grid; grid-template-columns: repeat(4, max-content) 1fr; justify-items: start; }      /* max-content: a track never gets narrower than its chip */
+  #cx-key { grid-area: 1 / 1; }
+  #cx-pop-tempo { grid-area: 1 / 2; }
+  #cx-lights { grid-area: 1 / 3; }
+  #cx-help { grid-area: 1 / 4; }
+  #cx-pop-lock { grid-area: 2 / 1 / 3 / -1; }
+}
+
+/* 640 px and narrower: one row of five chips, each opens a panel from the bottom */
+@media (max-width: 640px) {
+  .sl-keybar { gap: var(--sl-space-1); padding-top: var(--sl-space-1); padding-bottom: var(--sl-space-1); }
+  html.bar-hidden .sl-keybar { padding-top: calc(var(--sl-space-1) + env(safe-area-inset-top, 0px)); }
+  /* the words of the five chips take the condensed face, between two type tokens: the longest
+     short name ("Ab Harm Minor") then fits a 360 px phone */
+  .sl-keybar > .sl-kchip {
+    justify-content: center;
+    gap: var(--sl-space-1);
+    padding: 0 var(--sl-space-2);
+    font-family: var(--sl-font-cond);
+    font-size: clamp(var(--sl-text-sm), 4.1vw, var(--sl-text-md));
+    font-weight: var(--sl-weight-cond);
+  }
+  #cx-key { flex: 1 1 0; justify-content: flex-start; min-width: 0; }
+  #cx-key .sl-kchip-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; }      /* the last resort; mock.js picks a name that fits */
+  #cx-key .sl-kchip-caret, #cx-lights .sl-kchip-caret, #cx-help .sl-kchip-caret, #cx-help .sl-kchip-value { display: none; }
+  #cx-help .sl-dots { gap: calc(var(--sl-space-1) - 1px); }
+  #cx-help .sl-dots > i { width: calc(var(--sl-space-2) - 2px); height: calc(var(--sl-space-2) - 2px); }
+  /* the Tempo panel: the stepper's parts stand alone, each with its own boundary */
+  #cx-pop-tempo { grid-template-columns: auto 1fr auto; align-items: center; border-radius: var(--sl-radius-lg); }
+  #cx-pop-tempo > .sl-pop-title { grid-area: 1 / 1 / 2 / -1; }
+  #cx-pop-tempo > button { border-color: var(--sl-line-control); }
+  #cx-pop-tempo > #cx-bpm-dec { grid-area: 2 / 1; }
+  #cx-pop-tempo > #cx-bpm-inc { grid-area: 2 / 3; }
+  #cx-pop-tempo > #cx-bpm {
+    grid-area: 2 / 2;
+    width: 100%;
+    height: calc(var(--sl-control-h) + var(--sl-space-4));
+    padding-bottom: var(--sl-space-4);
+    font-size: var(--sl-text-xl);
+  }
+  #cx-pop-tempo > .sl-stepper-unit { grid-area: 2 / 2; align-self: end; justify-self: center; width: auto; margin: 0; padding-bottom: var(--sl-space-2); }
+  #cx-pop-tempo > #cx-met {
+    grid-area: 3 / 1 / 4 / -1;
+    gap: var(--sl-space-2);
+    width: auto;
+    color: var(--sl-ink);
+    font-size: var(--sl-text-md);
+    font-weight: var(--sl-weight-medium);
+  }
+  #cx-pop-tempo > #cx-met[aria-pressed="true"] { color: var(--sl-accent-ink); }
+  /* the Scale lock panel: the switch, then the sentence */
+  #cx-pop-lock { justify-items: start; }
+  #cx-pop-lock .sl-switch-label { font-size: var(--sl-text-sm); }
+  #cx-lockhint { font-size: var(--sl-text-md); }
+}
+
+/* ---- "More" (D19): at 640 px and narrower four header tools sit in one panel,
+        each with its words; above it the panel is no box at all ---------------- */
+@media (min-width: 641px) {
+  #tb-more-btn { display: none; }
+  #tb-more { display: contents; }
+}
+@media (max-width: 640px) {
+  #tb-more { gap: var(--sl-space-1); padding: var(--sl-space-2); }
+  #tb-more > :is(button, a) {
+    justify-content: flex-start;
+    gap: var(--sl-space-3);
+    width: 100%;
+    height: auto;
+    min-height: var(--sl-control-h);
+    padding: 0 var(--sl-space-3);
+    border-radius: var(--sl-radius-md);
+    color: var(--sl-ink);
+    font-size: var(--sl-text-md);
+    font-weight: var(--sl-weight-regular);
+  }
+  #tb-more .tb-word { display: inline; flex: 1 1 auto; text-align: left; }
+  #tb-more .tb-ic { display: block; }
+  #tb-more .ic { color: var(--sl-ink-soft); }
+  #tb-more .sl-status-dot { margin: 0 calc(var(--sl-space-2) - 2px); }      /* the dot stands where the icons stand */
+  #tb-more .sl-status-name, #tb-more .sl-status-text { font-size: var(--sl-text-sm); }
+  .sl-skin .tb-tools #tb-more #app-switch { padding: 0 var(--sl-space-3); font-size: var(--sl-text-md); color: var(--sl-ink); }
+}
+
+/* the instrument chip (D23): the word "Practising" over the name from 1100 px.
+   (In Gear the chip in its place, #cx-toggle, names the key and unfolds the key bar, D14.) */
+#inst-btn, #cx-toggle { margin-right: var(--sl-space-1); padding: 0 var(--sl-space-3); }
+#inst-btn .sl-kchip-label { display: none; }
+@media (min-width: 1100px) { #inst-btn .sl-kchip-label { display: block; } }
+
+/* ---- The header's width tiers ---------------------------------------------- */
+@media (min-width: 901px) {
+  .sl-skin.topbar { padding-left: calc(var(--sl-space-5) + env(safe-area-inset-left, 0px)); padding-right: calc(var(--sl-space-5) + env(safe-area-inset-right, 0px)); }
+  .sl-keybar { padding-left: calc(var(--sl-space-5) + env(safe-area-inset-left, 0px)); padding-right: calc(var(--sl-space-5) + env(safe-area-inset-right, 0px)); }
+}
+@media (max-width: 900px) {
+  .sl-skin .tabbar-top { display: none; }
+  .sl-skin.tabbar-bottom { display: flex; }
+  #subnav.sl-skin .subtab { padding: 0 var(--sl-space-3); }      /* the pills share one row: they shrink before they wrap */
+}
+@media (max-width: 640px) {
+  .sl-skin.topbar { padding-top: calc(var(--sl-space-1) + env(safe-area-inset-top, 0px)); padding-bottom: var(--sl-space-1); column-gap: var(--sl-space-2); }
+  .sl-skin .wordmark { height: calc(var(--sl-text-xl) - var(--sl-space-1)); }
+  .sl-skin .brand { gap: calc(var(--sl-space-1) + 2px); }
+  .sl-skin .brand .tag { padding: 2px calc(var(--sl-space-1) + 2px); letter-spacing: var(--sl-caps-ls); }
+  #inst-btn, #cx-toggle { gap: calc(var(--sl-space-1) + 2px); margin-right: 0; padding: 0 var(--sl-space-3) 0 var(--sl-space-2); font-size: var(--sl-text-sm); }
+}
+
+/* ---- Sheet (D24): a panel on the right, 440 px, above 900 px; a bottom sheet
+        at 900 px and below -------------------------------------------------- */
+.sheet {
+  position: fixed;
+  inset: 0;
+  z-index: var(--sl-z-sheet);
+  display: flex;
+  justify-content: flex-end;
+  background: var(--sl-overlay);          /* the scrim: a tap on it closes the sheet */
+}
+.sheet[hidden] { display: none; }
+.sheet-card {
+  display: flex;
+  flex-direction: column;
+  width: min(440px, 100%);
+  height: 100%;
+  border-left: 1px solid var(--sl-line-control);
+  background: var(--sl-bg-raised);
+  box-shadow: var(--sl-shadow-2);
+}
+.sheet-head {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: var(--sl-space-1);
+  padding: calc(var(--sl-space-3) + env(safe-area-inset-top, 0px)) var(--sl-space-3) var(--sl-space-3) var(--sl-space-5);
+  border-bottom: 1px solid var(--sl-line-strong);
+}
+.sheet-head h2 {
+  flex: 1 1 auto;
+  margin: 0;
+  font-family: var(--sl-font-display);
+  font-size: var(--sl-display-sm);
+  font-weight: var(--sl-weight-regular);
+  line-height: 1;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+.sheet-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: var(--sl-space-5) var(--sl-space-5) calc(var(--sl-space-5) + env(safe-area-inset-bottom, 0px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+@media (max-width: 900px) {
+  .sheet { align-items: flex-end; justify-content: center; }
+  .sheet-card {
+    width: 100%;
+    max-width: calc(var(--sl-space-8) * 9);
+    height: auto;
+    max-height: 88vh;
+    border: 1px solid var(--sl-line-control);
+    border-bottom: 0;
+    border-radius: var(--sl-radius-lg) var(--sl-radius-lg) 0 0;
+  }
+  .sheet-head { padding-top: var(--sl-space-3); }
+}
+
+/* ---- Message stack (D25): #sl-float holds .sl-toasts, a column of .sl-toast,
+        above an open sheet ---------------------------------------------------- */
+.sl-toasts {
+  position: fixed;
+  left: calc(var(--sl-gutter) + env(safe-area-inset-left, 0px));
+  right: calc(var(--sl-gutter) + env(safe-area-inset-right, 0px));
+  bottom: calc(var(--sl-control-h) + var(--sl-space-4) + var(--sl-space-3) + env(safe-area-inset-bottom, 0px));   /* above the tab bar */
+  z-index: var(--sl-z-toast);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sl-space-2);
+  pointer-events: none;
+}
+.sl-toast {
+  display: flex;
+  align-items: center;
+  gap: var(--sl-space-3);
+  width: 100%;
+  max-width: 460px;
+  min-height: var(--sl-control-h);
+  padding: var(--sl-space-3) var(--sl-space-4);
+  border: 1px solid var(--sl-line-control);
+  border-left: var(--sl-space-1) solid var(--sl-accent-text);      /* the amber edge says "a message" */
+  border-radius: var(--sl-radius-md);
+  background: var(--sl-surface-2);
+  color: var(--sl-ink);
+  font-size: var(--sl-text-sm);
+  line-height: 1.35;
+  box-shadow: var(--sl-shadow-2);
+  pointer-events: auto;
+}
+.sl-toast[hidden] { display: none; }
+.sl-toast-bad { border-color: var(--sl-bad); }
+.sl-toast-bad .ic { color: var(--sl-bad); }
+.sl-toast-action { justify-content: space-between; }
+.sl-toast-action > :first-child { flex: 1 1 auto; min-width: 0; }
+@media (min-width: 901px) { .sl-toasts { bottom: var(--sl-space-5); } }
+@media (max-width: 640px) { .sl-toast { max-width: none; } }
+
+/* ---- Tour card (D26): the classes of js/help.js, the layer #hp-ov.sl-skin -- */
+#hp-ov { position: fixed; inset: 0; z-index: var(--sl-z-tour); background: var(--sl-overlay); }
+.hp-ring {
+  position: absolute;
+  border: 2px solid var(--sl-accent);
+  border-radius: var(--sl-radius-md);
+  box-shadow: var(--sl-accent-glow);
+  pointer-events: none;
+}
+#hp-ov .hp-card {      /* written after the ring, so it lies over it */
+  position: absolute;
+  width: min(calc(var(--sl-space-8) * 4 + var(--sl-space-6)), 86vw);
+  padding: var(--sl-space-4) var(--sl-space-5);
+  border-color: var(--sl-accent-deep);
+  box-shadow: var(--sl-shadow-2);
+}
+.hp-t { margin-bottom: var(--sl-space-2); font-family: var(--sl-font-cond); font-size: var(--sl-text-lg); font-weight: var(--sl-weight-cond-bold); line-height: 1.2; }
+.hp-x { color: var(--sl-ink-soft); font-size: var(--sl-text-sm); line-height: var(--sl-leading); }
+#hp-ov .hp-close { position: absolute; top: calc(var(--sl-space-3) + env(safe-area-inset-top, 0px)); right: var(--sl-space-3); }
+
+/* ==========================================================================
+   5 · drawing-only: none of this goes into the app
+   ========================================================================== */
+
+/* what css/style.css already gives every page of the app */
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body { margin: 0; min-height: 100vh; font-family: var(--sl-font-body); color: var(--sl-ink); }
+
+/* placements A and C of decision D20 (gate G3), for home.html: in C the pills
+   sit in the header's row above 900 px. B, the default, needs no rule. */
+@media (min-width: 901px) {
+  .sl-skin.topbar.mk-pills-inline #subnav.sl-skin { flex: 0 0 auto; order: 1; gap: 0; padding-top: 0; margin-left: var(--sl-space-2); }
+  .sl-skin.topbar.mk-pills-inline #subnav.sl-skin .subtab { padding: 0 var(--sl-space-2); }
+  .sl-skin.topbar.mk-pills-inline .tabbar-top { flex: 0 0 auto; order: 0; gap: 0; }
+  .sl-skin.topbar.mk-pills-inline .tb-tools { order: 2; }
+}
+
+/* Gear's <main> keeps the rules of css/style.css in the app (D13), and a drawing does not load
+   that file: this stands in for them, so that a page body does not touch the window's edges */
+:root[data-app="gear"] main {
+  display: block;
+  padding: var(--sl-space-5) var(--sl-gutter) calc(var(--sl-control-h) + var(--sl-space-4) + var(--sl-space-6));
+}
+
+/* a quiet page under the shell: a headline and an instrument (mock.js quietPage) */
+.mk-quiet { display: grid; align-content: start; gap: var(--sl-space-4); max-width: calc(var(--sl-space-8) * 16); margin: 0 auto; }
+.mk-quiet-head { display: grid; gap: var(--sl-space-2); }
+.mk-quiet .sl-hero { height: calc(var(--sl-space-8) * 3); padding: 0 var(--sl-space-3) var(--sl-space-4); }
+.mk-quiet-folds { display: grid; }
+.mk-quiet-folds > details:last-child { border-bottom: 1px solid var(--sl-line-strong); }
+.mk-quiet-tall { min-height: 130vh; }
+@media (max-width: 640px) { .mk-quiet .sl-hero { height: calc(var(--sl-space-8) * 2 + var(--sl-space-5)); padding: 0 var(--sl-space-2) var(--sl-space-3); } }
+
+/* the note above a state that is not shown at the width its frame had */
+.mk-note {
+  margin: 0;
+  padding: var(--sl-space-2) var(--sl-gutter);
+  border-bottom: 1px solid var(--sl-line-strong);
+  background: var(--sl-surface-2);
+  color: var(--sl-ink-soft);
+  font-family: var(--sl-font-body);
+  font-size: var(--sl-text-xs);
+  line-height: var(--sl-leading);
+}
+.mk-note a { color: var(--sl-accent-text); }
+
+/* the contact view: every state of a drawing as labelled, scaled frames */
+.mk-contact { max-width: none; padding: var(--sl-space-5) var(--sl-gutter) var(--sl-space-8); }
+.mk-contact-head { display: grid; gap: var(--sl-space-3); max-width: 72ch; margin-bottom: var(--sl-space-6); }
+.mk-contact-head h1 { font-size: clamp(var(--sl-display-sm), 6vw, var(--sl-display-md)); }
+.mk-contact-head p { color: var(--sl-ink-soft); }
+.mk-tools { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sl-space-2); }
+.mk-tools-label { color: var(--sl-ink-muted); font-size: var(--sl-text-sm); margin-right: var(--sl-space-1); }
+.mk-tools-gap { flex: 0 0 var(--sl-space-4); }
+.mk-toc ol { display: grid; gap: var(--sl-space-1); margin: 0; padding: 0; list-style: none; }
+.mk-toc li.mk-toc-group { margin-top: var(--sl-space-3); color: var(--sl-ink-muted); font-family: var(--sl-font-cond); font-size: var(--sl-text-xs); font-weight: var(--sl-weight-cond); letter-spacing: var(--sl-caps-ls); text-transform: uppercase; }
+.mk-toc a { display: flex; align-items: center; min-height: var(--sl-control-h-dense); color: var(--sl-ink-soft); font-size: var(--sl-text-sm); text-decoration: none; }
+@media (hover: hover) { .mk-toc a:hover { color: var(--sl-accent-text); } }
+.mk-group { margin-top: var(--sl-space-7); }
+.mk-group > h2 {
+  margin: 0 0 var(--sl-space-2);
+  font-family: var(--sl-font-display);
+  font-size: var(--sl-display-sm);
+  font-weight: var(--sl-weight-regular);
+  line-height: 1;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+.mk-group > p { max-width: 72ch; color: var(--sl-ink-soft); }
+.mk-state { margin-top: var(--sl-space-6); padding-top: var(--sl-space-4); border-top: 1px solid var(--sl-line-strong); }
+.mk-state > h3 { margin: 0; font-family: var(--sl-font-cond); font-size: var(--sl-text-lg); font-weight: var(--sl-weight-cond-bold); line-height: 1.25; }
+.mk-state > h3 a { text-decoration: none; }
+.mk-state > p { max-width: 72ch; margin-top: var(--sl-space-1); color: var(--sl-ink-soft); font-size: var(--sl-text-sm); }
+.mk-frames { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--sl-space-5) var(--sl-space-4); margin-top: var(--sl-space-4); }
+.mk-frame { margin: 0; min-width: 0; }
+.mk-frame > figcaption { margin-bottom: var(--sl-space-2); }
+.mk-frame > figcaption a {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sl-space-2);
+  min-height: var(--sl-control-h-dense);
+  color: var(--sl-ink-soft);
+  font-family: var(--sl-font-cond);
+  font-size: var(--sl-text-sm);
+  font-weight: var(--sl-weight-cond);
+  letter-spacing: var(--sl-caps-ls);
+  text-transform: uppercase;
+  text-decoration: none;
+}
+.mk-frame > figcaption a b { color: var(--sl-ink); font-weight: var(--sl-weight-cond-bold); }
+@media (hover: hover) { .mk-frame > figcaption a:hover { color: var(--sl-accent-text); } }
+.mk-view {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--sl-line-control);
+  border-radius: var(--sl-radius-md);
+  background: var(--sl-bg-raised);
+  box-shadow: var(--sl-shadow-2);
+}
+.mk-view > iframe { display: block; border: 0; transform-origin: 0 0; }
