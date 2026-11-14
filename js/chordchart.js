@@ -75,7 +75,12 @@
   function charts() {
     var a = App.store.get('cc.charts', null);
     a = Array.isArray(a) ? a.map(clean).filter(Boolean) : [];
-    if (!a.length) { a = [blankChart('My first chart')]; App.store.set('cc.charts', a); }
+    if (!a.length) {
+      a = [blankChart('My first chart')];
+      // not while the 1.x charts still wait for their copy (they did not fit yet): a stored
+      // default would count as 2.0's own charts, and the copy would stop trying (js/app.js)
+      if (!App.store.waiting('cc.charts')) App.store.set('cc.charts', a);
+    }
     return a;
   }
   var all = null, chart = null;

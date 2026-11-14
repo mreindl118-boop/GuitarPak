@@ -22,9 +22,9 @@ async function newPage(browser, seed, locked) {
     ['pointerdown', 'keydown'].forEach(t => document.addEventListener(t, e => { if (e.isTrusted) window.__gest = true; }, true));
   });
   await ctx.addInitScript((seed) => {
-    localStorage.setItem('guitarlab.help.seen', 'true');
-    localStorage.setItem('guitarlab.help.done', 'true');
-    for (const k in seed) localStorage.setItem('guitarlab.' + k, JSON.stringify(seed[k]));
+    localStorage.setItem('soundlab2.help.seen', 'true');
+    localStorage.setItem('soundlab2.help.done', 'true');
+    for (const k in seed) localStorage.setItem('soundlab2.' + k, JSON.stringify(seed[k]));
     window.__comp = 0;
     const P = (window.BaseAudioContext || window.AudioContext).prototype;
     const orig = P.createDynamicsCompressor;
@@ -56,7 +56,7 @@ async function newPage(browser, seed, locked) {
     pills: [...document.querySelectorAll('#subnav .subtab')].map(b => b.textContent) }));
   ok(nav.v === 'Learn' && nav.first === 'Learn', 'Learn tab first + active: ' + JSON.stringify(nav));
   ok(nav.pills.join('|') === 'Exercises|Chords|Circle|Plan', 'pill strip: ' + nav.pills.join('|'));
-  ok(await page.evaluate(() => JSON.parse(localStorage.getItem('guitarlab.qz.landed'))) === true, 'qz.landed stored');
+  ok(await page.evaluate(() => JSON.parse(localStorage.getItem('soundlab2.qz.landed'))) === true, 'qz.landed stored');
   ok(await page.evaluate(() => !!document.querySelector('.qz-path') && !!document.querySelector('.qz-strip')), 'home opens on the path with the stats strip');
   await page.evaluate(() => document.querySelector('[data-qzh="topics"]').click());
   const topics = await page.$$eval('.qz-topic .qz-tname', a => a.map(x => x.textContent));
@@ -143,7 +143,7 @@ async function newPage(browser, seed, locked) {
       await wait(10);
     }
     return { view: SLQuiz.view, big: document.querySelector('.qz-big') && document.querySelector('.qz-big').textContent,
-      stars: document.querySelector('.qz-stars').textContent, prog: JSON.parse(localStorage.getItem('guitarlab.qz.instrumentProg')).piano, svgs };
+      stars: document.querySelector('.qz-stars').textContent, prog: JSON.parse(localStorage.getItem('soundlab2.qz.instrumentProg')).piano, svgs };
   });
   ok(run1.view === 'done' && run1.big === '10/10' && run1.stars === '★★★', 'done view 10/10 ★★★: ' + JSON.stringify([run1.view, run1.big, run1.stars]));
   ok(run1.prog['notes/nat/treble/1'] && run1.prog['notes/nat/treble/1'].s === 3, 'progress saved with 3 stars');

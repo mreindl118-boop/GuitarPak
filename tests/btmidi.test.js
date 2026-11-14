@@ -19,7 +19,7 @@ async function newPage(browser, opts) {
   opts = opts || {};
   const ctx = await browser.newContext({ viewport: { width: 1200, height: 900 }, userAgent: opts.ua });
   await ctx.addInitScript(([bridge, script]) => {
-    ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
+    ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true'));
     if (!bridge) {
       // a plain browser: Web MIDI with no ports
       navigator.requestMIDIAccess = () => Promise.resolve({ inputs: new Map(), outputs: new Map(), sysexEnabled: true, onstatechange: null });

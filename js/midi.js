@@ -444,7 +444,8 @@
     var configured = saved != null && saved !== '' || !!route, enabled = displayEnabled();
     return { enabled: enabled, configured: configured, connected: !!route,
       outputId: saved != null ? saved : route ? route.id : '', name: route ? route.name : '', cleanupOk: displayCleanupOk,
-      reason: !configured ? 'Choose a LUMI display output in Keys → LUMI (MIDI must be connected).' :
+      // (the Piano page is soundLAB's: soundLAB Gear says so)
+      reason: !configured ? 'Choose a LUMI display output on the Piano page' + (App.app === 'gear' ? ' in soundLAB' : '') + ', under Notes and triads on the LUMI (MIDI must be connected).' :
         !route ? 'The configured LUMI display is disconnected or unavailable; no fallback is used.' :
         !enabled ? 'LUMI Display is off.' : 'LUMI Display is on: ' + route.name + '.' };
   }
@@ -864,6 +865,40 @@
     return function (bytes) { return writeOutput(route, bytes, 'music'); };
   }
 
+  // ---- SYNTH OUT (v0.80.0; here since 2.0 Phase A3a, was js/midihub.js):
+  // which output is the synth, independent of the key-light output, so a
+  // LUMI keeps the lights while a MODX gets the controls. The MIDI Hub and
+  // the score player (js/scoreplayer.js) read the one copy, App.midi.synthOut.
+  // midihub.outId = a port id, 'shared' (the light output), or unset = auto:
+  // a synth-named port (port 1 of a multi-port synth first), never a LUMI or
+  // Windows' built-in GS Wavetable.
+  var SYNTH_RE = /modx|montage|motif|yamaha|roland|korg|nord|kronos|fantom|juno|jupiter|moog|sequential|prophet|arturia|novation|waldorf|elektron|kawai|casio|synth/i;
+  var NOT_SYNTH_RE = /lumi|wavetable|microsoft/i;
+  function synthAutoOut() {
+    if (!ready()) return null;
+    var c = listPorts('outputs').filter(function (p) { return !NOT_SYNTH_RE.test(p.name || ''); });
+    var named = c.filter(function (p) { return SYNTH_RE.test(p.name || ''); });
+    var pool = named.length ? named : c;
+    var first = pool.filter(function (p) { return /(-|port\s*)1\b|\s1$/i.test(p.name || ''); })[0] || pool[0];
+    return first ? first.id : null;
+  }
+  function synthOutId() {
+    if (!ready()) return null;
+    // native bridges (Android / iOS) have ONE route: the service's selected
+    // output. Resolving a port id here would only mislabel where bytes go
+    // (the deck's LUMI guard and the Scope read this name), so say so.
+    if (native) return null;
+    var id = App.store.get('midihub.outId', null);
+    if (id === 'shared') return null;
+    if (id != null && listPorts('outputs').some(function (p) { return String(p.id) === String(id); })) return id;
+    return synthAutoOut();
+  }
+  function synthPortName(id) { var p = listPorts('outputs').filter(function (x) { return String(x.id) === String(id); })[0]; return p ? p.name || '' : ''; }
+  function synthOutName() { var id = synthOutId(); return id == null ? outName() || '' : synthPortName(id); }
+  function synthOutHas() { return !!(ready() && (synthOutId() != null || hasOutput())); }
+  // the same value the Hub's 'Synth out' select stores: no id = the key-light output
+  function synthOutSet(v) { App.store.set('midihub.outId', v == null || v === '' ? 'shared' : v); }
+
   // ---- LED output (generic: devices light incoming notes) ----
 
   var lit = {};
@@ -1255,6 +1290,9 @@
     // bytes | null that runs before dispatch (null drops the message)
     send: function (bytes) { return sendBytes(bytes); },
     sendTo: sendTo, // (portId, bytes): one chosen output, not the light output
+    // which output is the synth (stored as midihub.outId): id() = a port id or
+    // null (the key-light output / a native bridge), name(), has(), set(id)
+    synthOut: { id: synthOutId, name: synthOutName, has: synthOutHas, set: synthOutSet },
     get explicitPortsSupported() { return !native && !!access; },
     subscribeInput: subscribeInput,
     inputFingerprint: inputFingerprint,

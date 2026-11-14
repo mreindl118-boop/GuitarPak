@@ -6,6 +6,7 @@
 // app (ONE output, shared with the key lights) picking the synth in the panel
 // moves that output and switches the key lights off. After the fix the same
 // press sends. Nothing may reach the LUMI as channel messages.
+// 2.0 Phase A3b: the Synth tab is soundLAB Gear (gear.html, env.GEAR_URL), which boots on the Deck.
 const { chromium } = require('playwright');
 const env = require('./env');
 let fails = 0;
@@ -17,11 +18,11 @@ const LIVE = { sets: [{ id: 's1', name: 'Gig', pages: [[{ modx: { lsb: 0, pc: 3 
 async function newPage(browser, opts) {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true });
   await ctx.addInitScript((o) => {
-    ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
-    if (o.wanted !== false) localStorage.setItem('guitarlab.midi.wanted', 'true');
-    if (o.sel != null) localStorage.setItem('guitarlab.midi.outputId', JSON.stringify(o.sel));
-    if (o.hubOut != null) localStorage.setItem('guitarlab.midihub.outId', JSON.stringify(o.hubOut));
-    for (const k in (o.seed || {})) localStorage.setItem('guitarlab.' + k, JSON.stringify(o.seed[k]));
+    ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true'));
+    if (o.wanted !== false) localStorage.setItem('soundlab2.midi.wanted', 'true');
+    if (o.sel != null) localStorage.setItem('soundlab2.midi.outputId', JSON.stringify(o.sel));
+    if (o.hubOut != null) localStorage.setItem('soundlab2.midihub.outId', JSON.stringify(o.hubOut));
+    for (const k in (o.seed || {})) localStorage.setItem('soundlab2.' + k, JSON.stringify(o.seed[k]));
     window.__sent = []; window.__posts = [];
     window.__wait = (ms) => new Promise(r => setTimeout(r, ms));
     window.__q = (s) => document.querySelector(s);
@@ -52,8 +53,8 @@ async function newPage(browser, opts) {
   }, opts);
   const page = await ctx.newPage(), errs = [];
   page.on('pageerror', e => errs.push(e.message));
-  await page.goto(env.URL);
-  await page.waitForFunction(() => window.App && App.midi && App.active === 'quiz');
+  await page.goto(env.GEAR_URL);
+  await page.waitForFunction(() => window.App && App.midi && App.active === 'deck');
   await page.waitForTimeout(300);
   return { ctx, page, errs };
 }

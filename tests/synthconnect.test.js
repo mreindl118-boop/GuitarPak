@@ -2,6 +2,8 @@
 // what is missing. Before, a first visit showed live-looking controls that silently refused
 // every tap (found on Matt's MODX8+ on 2026-10-26: the controls worked once connected, but
 // nothing on the Synth tab ever asked the browser for MIDI).
+// 2.0 Phase A3b: the Synth tab is soundLAB Gear (gear.html, env.GEAR_URL). It boots on the Deck,
+// so the Deck is already showing when a case starts (App.switchTo('deck') is then a no-op).
 const { chromium } = require('playwright');
 const env = require('./env');
 let fails = 0;
@@ -12,11 +14,11 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
 async function open(browser, opts, viewport) {
   const ctx = await browser.newContext(Object.assign({ viewport: viewport || { width: 1200, height: 900 }, serviceWorkers: 'block' }, opts.ctx || {}));
   await ctx.addInitScript((o) => {
-    ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
-    if (o.wanted) localStorage.setItem('guitarlab.midi.wanted', 'true');
-    localStorage.setItem('guitarlab.lights.on', 'false');
-    localStorage.setItem('guitarlab.midihub.profile', JSON.stringify('yamaha'));
-    if (o.outId) localStorage.setItem('guitarlab.midihub.outId', JSON.stringify(o.outId));
+    ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true'));
+    if (o.wanted) localStorage.setItem('soundlab2.midi.wanted', 'true');
+    localStorage.setItem('soundlab2.lights.on', 'false');
+    localStorage.setItem('soundlab2.midihub.profile', JSON.stringify('yamaha'));
+    if (o.outId) localStorage.setItem('soundlab2.midihub.outId', JSON.stringify(o.outId));
     window.__wait = ms => new Promise(r => setTimeout(r, ms));
     window.__sent = { modx: [], lumi: [] }; window.__asks = 0;
     if (o.midi === 'none') {
@@ -33,7 +35,7 @@ async function open(browser, opts, viewport) {
   }, opts);
   const page = await ctx.newPage(), errs = [];
   page.on('pageerror', e => errs.push(e.message));
-  await page.goto(env.URL);
+  await page.goto(env.GEAR_URL);
   await page.waitForFunction(() => window.App && App.midi && window.SLSynthTab && window.SLSynthLive);
   return { ctx, page, errs };
 }

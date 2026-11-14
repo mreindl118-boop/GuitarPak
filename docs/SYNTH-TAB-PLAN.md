@@ -1,3 +1,5 @@
+> 2.0: this page lives in soundLAB Gear (gear.html) since Phase A. Menu paths below are from before Phase A (1.x and the live 2.0.0).
+
 # Synth tab — plan (agreed with Matt, 2026-10-25)
 
 The Synth Deck (today the Control view inside Keys › MIDI, `js/synthdeck.js`, docs/SYNTH-DECK.md)

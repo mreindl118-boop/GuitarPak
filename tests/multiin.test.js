@@ -10,8 +10,8 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
 async function newPage(browser, seed) {
   const ctx = await browser.newContext({ viewport: { width: 1200, height: 900 } });
   await ctx.addInitScript((seed) => {
-    ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
-    for (const k in seed) localStorage.setItem('guitarlab.' + k, JSON.stringify(seed[k]));
+    ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true'));
+    for (const k in seed) localStorage.setItem('soundlab2.' + k, JSON.stringify(seed[k]));
     window.__sent = { 'out-modx': [], 'out-lumi': [] };
     const mkIn = (id, name) => ({ id, name, state: 'connected', onmidimessage: null });
     const mkOut = (id, name) => ({ id, name, state: 'connected', send: b => window.__sent[id].push(Array.from(b)) });
@@ -75,7 +75,7 @@ async function newPage(browser, seed) {
     const o = { id: App.midi.inputId, got: got.slice() };
     App.midi.setInput('all'); __play('lumi', 66);
     o.back = App.midi.inputId; o.got2 = got.slice();
-    o.stored = JSON.parse(localStorage.getItem('guitarlab.midi.inputId'));
+    o.stored = JSON.parse(localStorage.getItem('soundlab2.midi.inputId'));
     return o;
   });
   ok(s.id === 'in-modx' && s.got.join() === '61', 'picking one input hears only it: ' + s.got);
@@ -92,13 +92,8 @@ async function newPage(browser, seed) {
   });
   ok(y.lumi === false && y.notes === 0, 'MODX output + LUMI among the inputs: not treated as a LUMI, no note-on lights sent: ' + JSON.stringify(y));
 
-  console.log('# MIDI Hub input picker');
-  const h = await page.evaluate(() => {
-    App.switchTo('midihub');
-    const sel = [...document.querySelectorAll('select')].find(x => [...x.options].some(o => o.value === 'all'));
-    return sel ? { val: sel.value, first: sel.options[0].textContent } : null;
-  });
-  ok(h && h.val === 'all' && h.first === 'All keyboards', 'the Hub offers All keyboards and shows it selected: ' + JSON.stringify(h));
+  // 2.0 Phase A3b: the MIDI Hub's input picker is checked in tests/gear.test.js (the Hub is soundLAB Gear)
+  console.log('# Settings › MIDI input picker');
   const st = await page.evaluate(() => {
     App.switchTo('settings');
     const sel = document.getElementById('set-midi-in');
@@ -142,7 +137,7 @@ async function newPage(browser, seed) {
     o.chips = document.getElementById('set-midi-gear').textContent;
     o.note = document.getElementById('set-midi-voicenote').textContent;
     document.querySelector('#set-midi-voice [data-voice="off"]').click();
-    o.clicked = [App.midi.voice, JSON.parse(localStorage.getItem('guitarlab.midi.appSound'))];
+    o.clicked = [App.midi.voice, JSON.parse(localStorage.getItem('soundlab2.midi.appSound'))];
     o.bendHidden = !!document.getElementById('set-midi-bend').closest('details') && !document.getElementById('set-midi-more').open;
     return o;
   });

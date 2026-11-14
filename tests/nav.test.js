@@ -6,8 +6,8 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
 async function open(browser, vp, seed, mobile) {
   const ctx = await browser.newContext({ viewport: vp, hasTouch: !!mobile, isMobile: !!mobile });
   await ctx.addInitScript((seed) => {
-    localStorage.setItem('guitarlab.help.seen', 'true'); localStorage.setItem('guitarlab.help.done', 'true'); localStorage.setItem('guitarlab.qz.landed', 'true');
-    for (const k in seed) localStorage.setItem('guitarlab.' + k, JSON.stringify(seed[k]));
+    localStorage.setItem('soundlab2.help.seen', 'true'); localStorage.setItem('soundlab2.help.done', 'true'); localStorage.setItem('soundlab2.qz.landed', 'true');
+    for (const k in seed) localStorage.setItem('soundlab2.' + k, JSON.stringify(seed[k]));
   }, seed || {});
   const page = await ctx.newPage(); const errs = [];
   page.on('pageerror', e => errs.push('pageerror: ' + e.message));
@@ -30,22 +30,24 @@ const tabs = sel => [...document.querySelectorAll(sel + ' .tabbar-btn')].map(b =
     botShown: getComputedStyle(document.getElementById('tabbar-m')).display !== 'none',
     active: (document.querySelector('#tabbar .tabbar-btn.active') || {}).textContent,
     noSelect: !document.getElementById('nav-select'),
-    metTab: [...document.querySelectorAll('.tabbar-btn, .subtab')].some(x => /metronome/i.test(x.textContent))
+    metTab: [...document.querySelectorAll('.tabbar-btn, .subtab')].some(x => /metronome/i.test(x.textContent)),
+    // the way across to soundLAB Gear: a real link in the header
+    gear: (a => a ? { tag: a.tagName, href: a.getAttribute('href'), text: a.textContent.trim(), label: a.getAttribute('aria-label'), shown: !a.hidden && a.getBoundingClientRect().width > 0 } : null)(document.getElementById('app-switch'))
   }));
-  ok(d1.tabs.join('|') === 'Learn|Guitar|Keys|Synth|Play|Train' && d1.active === 'Learn', 'sections (1.3: Synth is its own tab): ' + d1.tabs.join('|') + ' (active ' + d1.active + ')');
+  ok(d1.tabs.join('|') === 'Learn|Guitar|Keys|Play|Train' && d1.active === 'Learn', 'sections (2.0: five tabs; Synth and Helix are soundLAB Gear): ' + d1.tabs.join('|') + ' (active ' + d1.active + ')');
+  ok(d1.gear && d1.gear.tag === 'A' && d1.gear.href === 'gear.html' && d1.gear.text === 'Gear' && d1.gear.label === 'Open soundLAB Gear' && d1.gear.shown, 'the header has a "Gear" link to gear.html (#app-switch): ' + JSON.stringify(d1.gear));
   ok(d1.topShown && !d1.botShown && d1.noSelect && !d1.metTab, 'top tab bar on desktop, no drop-down, no metronome tab: ' + JSON.stringify(d1));
   const clickTab = async (label, sel) => { await page.click((sel || '#tabbar') + ' .tabbar-btn:has-text("' + label + '")'); await page.waitForTimeout(120); return page.evaluate(() => App.active); };
   ok(await clickTab('Keys') === 'piano', 'Keys tab opens the piano');
-  ok((await page.evaluate(() => [...document.querySelectorAll('#subnav .subtab')].map(b => b.textContent).join('|'))) === 'Piano|Charts|Synth|Pads|LUMI', 'Keys pills: Piano, Charts (2.0), Synth, Pads, LUMI (the MIDI Hub moved to the Synth tab)');
-  ok(await clickTab('Synth') === 'deck' && (await page.evaluate(() => [...document.querySelectorAll('#subnav .subtab')].map(b => b.textContent).join('|'))) === 'Deck|Live|Hub' && (await page.evaluate(() => window.SLSynthTab && SLSynthTab.borrowed())), 'Synth tab opens the Deck with pills Deck|Live|Hub, borrowing the Hub Control view');
-  ok((await page.evaluate(async () => { App.switchTo('midihub'); await new Promise(r => setTimeout(r, 150)); return [App.active, !!document.querySelector('#panel-midihub .mh-view[data-view="control"]'), SLSynthTab.borrowed()].join(); })) === 'midihub,true,false', 'leaving the Deck gives the Control view back to the Hub');
-  await clickTab('Keys'); // back from the Synth tab to the Keys pills
-  await page.click('#subnav .subtab:has-text("Synth")'); await page.waitForTimeout(150);
+  ok((await page.evaluate(() => [...document.querySelectorAll('#subnav .subtab')].map(b => b.textContent).join('|'))) === 'Piano|Charts|Pads', 'Keys pills: Piano | Charts | Pads (2.0: synth sounds are the Sound picker on Piano, LUMI practice a section under its lessons)');
+  await page.click('#subnav .subtab:has-text("Charts")'); await page.waitForTimeout(150);
+  ok(await page.evaluate(() => App.active) === 'chart', 'Charts is a page under Keys');
   ok(await clickTab('Guitar') === 'fretboard', 'Guitar tab opens the neck');
-  ok((await page.evaluate(() => [...document.querySelectorAll('#subnav .subtab')].map(b => b.textContent).join('|'))) === 'Neck|Tab|Notation|Helix', 'Guitar pills: Neck | Tab | Notation | Helix');
-  ok(await clickTab('Keys') === 'synth', 'Keys remembers the last page (Synth)');
+  ok((await page.evaluate(() => [...document.querySelectorAll('#subnav .subtab')].map(b => b.textContent).join('|'))) === 'Neck|Tab|Notation', 'Guitar pills: Neck | Tab | Notation (2.0: Helix is soundLAB Gear)');
+  ok(await clickTab('Keys') === 'chart', 'Keys remembers the last page (Charts)');
+  await page.click('#subnav .subtab:has-text("Piano")'); await page.waitForTimeout(150); // the scroll check below wants the tall Piano page
   ok(await clickTab('Train') === 'shed', 'Train opens the Woodshed');
-  ok((await page.evaluate(() => [...document.querySelectorAll('#subnav .subtab')].map(b => b.textContent).join('|'))) === 'Woodshed|Trainer|Tuner', 'Train pills: Woodshed | Trainer | Tuner');
+  ok((await page.evaluate(() => [...document.querySelectorAll('#subnav .subtab')].map(b => b.textContent).join('|'))) === 'Woodshed|Tuner', 'Train pills: Woodshed | Tuner (2.0: the Trainer cards are on the Plan page)');
   await page.click('#subnav .subtab:has-text("Tuner")'); await page.waitForTimeout(200);
   ok(await page.evaluate(() => App.active) === 'tuner', 'Tuner is a page under Train');
   await clickTab('Keys'); await page.evaluate(() => window.scrollTo(0, 600)); await page.waitForTimeout(150);
@@ -117,7 +119,7 @@ const tabs = sel => [...document.querySelectorAll(sel + ' .tabbar-btn')].map(b =
     const sel = document.getElementById('cx-scale');
     const groups = [...sel.querySelectorAll('optgroup')].map(g => g.label + ':' + g.children.length);
     sel.value = 'blues'; sel.dispatchEvent(new Event('change'));
-    return { groups, n: sel.options.length, first: sel.options[0].value, stored: JSON.parse(localStorage.getItem('guitarlab.fb.scale')) };
+    return { groups, n: sel.options.length, first: sel.options[0].value, stored: JSON.parse(localStorage.getItem('soundlab2.fb.scale')) };
   });
   ok(sc.groups.join(',') === 'Common:5,Minor family:2,Modes:5,Exotic:1' && sc.n === 13 && sc.first === 'major' && sc.stored === 'blues', 'scales grouped, all 13 kept, selection works: ' + JSON.stringify(sc));
   ok(errs.length === 0, 'no page errors (desktop)' + (errs.length ? '\n    ' + errs.join('\n    ') : ''));
@@ -133,7 +135,7 @@ const tabs = sel => [...document.querySelectorAll(sel + ' .tabbar-btn')].map(b =
       barBottom: Math.round(bar.bottom), vh: window.innerHeight, n: document.querySelectorAll('#tabbar-m .tabbar-btn').length,
       oneRow: Math.abs(met.top - brand.top) < 24, metRight: Math.round(window.innerWidth - met.right) };
   });
-  ok(m1.botShown && !m1.topShown && m1.barBottom === m1.vh && m1.n === 6 && m1.oneRow, 'phone: six tabs fixed along the bottom in one row: ' + JSON.stringify(m1));
+  ok(m1.botShown && !m1.topShown && m1.barBottom === m1.vh && m1.n === 5 && m1.oneRow, 'phone: five tabs fixed along the bottom in one row: ' + JSON.stringify(m1));
   ok(m1.oneRow && m1.metRight < 20, 'phone: logo and corner icons share one row, metronome in the corner: ' + JSON.stringify(m1));
   await page.evaluate(() => App.switchTo('fretboard')); await page.waitForTimeout(150);
   await page.tap('#ctx-btn'); await page.waitForTimeout(200);
@@ -150,26 +152,6 @@ const tabs = sel => [...document.querySelectorAll(sel + ' .tabbar-btn')].map(b =
   const ov = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
   ok(!ov, 'phone: no sideways scroll');
   ok(errs.length === 0, 'no page errors (phone)' + (errs.length ? '\n    ' + errs.join('\n    ') : ''));
-  await ctx.close();
-
-  console.log('# studio space');
-  ({ ctx, page, errs } = await open(b, { width: 1280, height: 800 }));
-  await page.click('#space-btn'); await page.waitForTimeout(900);
-  const st = await page.evaluate(() => ({ space: App.space, tabs: [...document.querySelectorAll('#tabbar .tabbar-btn')].map(b => b.textContent).join('|'), active: App.active }));
-  ok(st.space === 'studio' && st.tabs === 'Studio|Sketch', 'studio tabs: ' + JSON.stringify(st));
-  // a second switch started right after the first finished must not be eaten
-  // by the first wipe's leftover safety timers (it used to land nowhere)
-  const quick = await page.evaluate(async () => {
-    const wipe = document.getElementById('wipe'), t0 = performance.now();
-    App.setSpace('practice');
-    while (performance.now() - t0 < 2000 && (App.space !== 'practice' || wipe.style.display !== 'none')) await new Promise(r => setTimeout(r, 10));
-    const firstMs = Math.round(performance.now() - t0);
-    App.setSpace('studio');
-    await new Promise(r => setTimeout(r, 1500));
-    return { firstMs, space: App.space, curtain: wipe.style.display };
-  });
-  ok(quick.space === 'studio' && quick.curtain === 'none', 'a quick second workspace switch lands: ' + JSON.stringify(quick));
-  ok(errs.length === 0, 'no page errors (studio)' + (errs.length ? '\n    ' + errs.join('\n    ') : ''));
   await ctx.close();
   await b.close();
   console.log(fails ? '\nFAILED: ' + fails : '\nALL PASS');

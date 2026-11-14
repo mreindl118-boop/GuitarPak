@@ -1,6 +1,7 @@
 // Full app + simulated EventTarget MIDI ports. No physical device I/O.
 // Verify the independent display master and lock controls through the real
-// shared MIDI renderer, instructional page, and selected synth sound route.
+// shared MIDI renderer, the instructional LUMI section on the Piano page
+// (#pn-lumi under the Keys lessons), and the selected synth sound route.
 const { chromium } = require('playwright');
 const env = require('./env');
 let checks = 0;
@@ -12,9 +13,9 @@ function ok(value, message) {
 async function openApp(browser) {
   const context = await browser.newContext({ viewport: { width: 1280, height: 1000 }, serviceWorkers: 'block' });
   await context.addInitScript(() => {
-    ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
-    if (localStorage.getItem('guitarlab.fb.root') == null) localStorage.setItem('guitarlab.fb.root', '0');
-    if (localStorage.getItem('guitarlab.fb.scale') == null) localStorage.setItem('guitarlab.fb.scale', '"major"');
+    ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true'));
+    if (localStorage.getItem('soundlab2.fb.root') == null) localStorage.setItem('soundlab2.fb.root', '0');
+    if (localStorage.getItem('soundlab2.fb.scale') == null) localStorage.setItem('soundlab2.fb.scale', '"major"');
     window.__sent = []; window.__requests = 0;
     class Port extends EventTarget {
       constructor(id, name) { super(); this.id = id; this.name = name; this.state = 'connected'; this.onmidimessage = null; }
@@ -123,15 +124,24 @@ async function openApp(browser) {
     ok(style.offStyle && style.onStyle, 'Guide colors style does not act as a second display master');
 
     console.log('# master OFF releases an active lesson frame while synth sound continues');
-    await page.evaluate(() => {
+    const section = await page.evaluate(async () => {
       App.emit('fb:set', { source: 'test', root: 0, scale: 'major', mode: 1 });
-      App.scaleLock.set(true); App.switchTo('lumipractice');
+      App.scaleLock.set(true);
+      // LUMI practice is the folded section under the Keys lessons: open it
+      // on the Piano page and let its 'toggle' event run (it is async; the
+      // 1 s fallback only keeps a missing event from hanging the run)
+      App.switchTo('piano');
+      const box = document.getElementById('pn-lumi');
+      if (!box.open) await new Promise(done => { box.addEventListener('toggle', () => done(), { once: true }); box.open = true; setTimeout(done, 1000); });
+      const where = { page: App.active, open: App.lumiPractice.open, visible: SLLumiPractice.snapshot().visible };
       __change('mode', 'hardware'); __change('flow', 'guided'); __change('kind', 'major');
       __change('input', 'synth-in'); __change('output', 'lumi-out'); __change('sound-output', 'synth-out');
       __click('start');
       const ack = document.getElementById('lp-local-control'); ack.checked = true; ack.dispatchEvent(new Event('change'));
       __click('sound-start'); __click('test');
+      return where;
     });
+    ok(section.page === 'piano' && section.open && section.visible, 'the instructional section is open on the Piano page');
     await page.waitForFunction(() => SLLumiPractice.snapshot().tested);
     await page.evaluate(() => __click('arm'));
     const active = await page.evaluate(() => ({ page: SLLumiPractice.snapshot(), sound: App.practiceRouter.state, lit: Object.keys(__lit()).length }));

@@ -6,7 +6,7 @@ const FEED = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/v
 async function run(b, url, feed, shell) {
   const ctx = await b.newContext();
   await ctx.addInitScript((shell) => {
-    localStorage.setItem('guitarlab.help.seen', 'true'); localStorage.setItem('guitarlab.help.done', 'true'); localStorage.setItem('guitarlab.qz.landed', 'true');
+    localStorage.setItem('soundlab2.help.seen', 'true'); localStorage.setItem('soundlab2.help.done', 'true'); localStorage.setItem('soundlab2.qz.landed', 'true');
     if (shell) window.GuitarLabHost = { shellVersion: () => shell, setKeepScreenOn: () => {} };
   }, shell || null);
   await ctx.route(FEED, r => r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(feed) }));

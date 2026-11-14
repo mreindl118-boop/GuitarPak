@@ -1,16 +1,20 @@
-/* soundLAB studio synth — the OpenStudio PolySynth, ported.
+/* soundLAB sound library: the poly synth — the OpenStudio PolySynth, ported.
+ * It is the synth voice of Piano, the Woodshed and the guided performance
+ * player.
  *
- * Origin: the Sampler-DAW (OpenStudio) project's src/audio/synth.ts, carried
- * over as the first piece of the studio engine. Same architecture: polyphonic
- * subtractive voices (2 osc + noise -> filter w/ envelope -> amp envelope),
- * unison stacking, glide, one shared LFO, and full MPE expression — per-channel
- * pitch bend, pressure (loudness) and timbre (CC74 slide -> filter brightness)
- * so ROLI-style controllers play it expressively.
+ * Origin: the Sampler-DAW (OpenStudio) project's src/audio/synth.ts. Same
+ * architecture: polyphonic subtractive voices (2 osc + noise -> filter w/
+ * envelope -> amp envelope), unison stacking, glide, one shared LFO, and full
+ * MPE expression — per-channel pitch bend, pressure (loudness) and timbre
+ * (CC74 slide -> filter brightness) so ROLI-style controllers play it
+ * expressively.
  *
- * Exposed as window.DAW (extended by later studio modules):
+ * Exposed on window.DAW (js/daw/engine.js adds the drum kit):
  *   DAW.defaultSynth()                  -> params object
- *   DAW.SYNTH_PRESETS                   [{id, name, params}]
+ *   DAW.SYNTH_PRESETS                   [{id, name, params}] — the order is
+ *                                       fixed, consumers pick by index
  *   DAW.createSynth(ctx, params)        -> instrument
+ *   DAW.guardPitched(instrument)        -> the same instrument behind Scale Lock
  * Instrument surface: output (GainNode), noteOn(pitch, vel, time, chan?),
  * noteOff(pitch, time, chan?), allNotesOff(), update(params), pitchBend(),
  * pressure(), timbre(), dispose().

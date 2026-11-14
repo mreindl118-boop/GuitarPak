@@ -11,7 +11,7 @@ const near = (a, b) => Math.abs(a - b) < 0.00001;
   const browser = await chromium.launch({ executablePath: env.CHROMIUM, args: ['--autoplay-policy=no-user-gesture-required'] });
   try {
     const context = await browser.newContext({ serviceWorkers: 'block', acceptDownloads: true });
-    await context.addInitScript(() => ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true')));
+    await context.addInitScript(() => ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true')));
     const page = await context.newPage(), errors = [];
     page.on('pageerror', e => errors.push(e.message));
     await page.goto(env.URL);
