@@ -1,11 +1,12 @@
-/* soundLAB HELIX STADIUM page ('helix', Guitar group pill "Helix"): read, write
- * and control a Line 6 Helix Stadium / Stadium XL. Built in since 0.82.0; it
- * began as plugins/helix-stadium.js and outgrew the 100 KB plugin cap.
+/* soundLAB HELIX STADIUM page ('helix'): read, write and control a Line 6
+ * Helix Stadium / Stadium XL. Built in since 0.82.0. A soundLAB Gear page
+ * (gear.html, its own Helix tab) since 2.0; soundLAB itself (index.html) does
+ * not load this file.
  *
  * NOTHING CONNECTS AT BOOT: init only builds the DOM. Web MIDI is requested on
  * the first visit; the network bridge connects only after the user pressed
  * Connect bridge once (hx.bridgeAuto, default off) and retries only while the
- * page is visible. js/plugins.js skips an old stored copy of the plugin.
+ * page is visible.
  *
  * Two ways in, used together when both are there:
  *
@@ -1046,6 +1047,7 @@
     '.hx-strip{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:6px 0;font-size:13px}.hx-lab{font-weight:700;min-width:48px}.hx-st{flex:1;min-width:120px}.hx-st.ok{color:var(--green)}.hx-st.bad{color:var(--red)}',
     '.hx-led{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--line);transition:background .08s}.hx-led.in.lit{background:var(--accent)}.hx-led.out.lit{background:var(--green)}',
     '.hx-dev{margin:8px 0;font-size:13px;line-height:1.5}.hx-views{margin-top:10px;flex-wrap:wrap}.hx-views button{flex:1 1 auto}',
+    '#hx-fsmode{flex-wrap:wrap}#hx-fsmode button{flex:1 1 auto}', // six modes: wraps on a phone like the view switch, instead of scrolling the page sideways
     '.hx-row{flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0}.hx-row label{display:inline-flex;align-items:center;gap:6px;font-size:13px}.hx-row input[type=number]{width:5em}.hx-mono{font-family:ui-monospace,Consolas,Menlo,monospace}',
     '.hx-needbr.off{opacity:.45;pointer-events:none}',
     '.hx-armrow{padding:6px 8px;border-radius:10px;border:1px solid var(--line);background:var(--card2)}.hx-armrow.flash{animation:hxflash .5s 2}@keyframes hxflash{50%{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}}',
@@ -1106,6 +1108,6 @@
     }
   });
 
-  window.SLHelix = { builtIn: true, CC: CC, MIX: MIX, cc: cc, pc: pc, rpc: rpc, get dev() { return dev; }, get st() { return st; }, get midi() { return midi; }, get bridge() { return br; }, useEditBuffer: useEditBuffer, slotLabel: slotLabel, onMidiIn: onMidiIn, showView: showView,
+  window.SLHelix = { CC: CC, MIX: MIX, cc: cc, pc: pc, rpc: rpc, get dev() { return dev; }, get st() { return st; }, get midi() { return midi; }, get bridge() { return br; }, useEditBuffer: useEditBuffer, slotLabel: slotLabel, onMidiIn: onMidiIn, showView: showView,
     get armed() { return armed(); }, arm: function (on) { setArmed(on !== false); }, favs: favs, recallBytes: recallBytes, addrOf: addrOf, isHelix: isHelix, shortName: shortName, get obs() { return obs; }, get rx() { return rx; } };
 })();

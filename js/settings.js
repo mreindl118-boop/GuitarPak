@@ -5,6 +5,7 @@
   'use strict';
 
   var audioUI = null; // the Sound input card's meter (set by init)
+  var hubRules = null; // the MIDI keyboard card's "MIDI Hub rules" line (set by init)
 
   function init(rootEl) {
     App.injectCSS('settings',
@@ -72,11 +73,7 @@
           '<input type="range" id="set-vol" min="0" max="100" step="5">' +
           '<span class="muted small" id="set-vol-val"></span>' +
         '</div>' +
-        '<div class="muted small set-theme-note">One knob for everything &mdash; metronome, practice notes, the Jam band, the Studio.</div>' +
-        '<label class="set-check">' +
-          '<input type="checkbox" id="set-click"><span>Metronome click during Studio playback' +
-          '<small>The loop, the Timeline song and pad recording. Also on the Pads page.</small></span>' +
-        '</label>' +
+        '<div class="muted small set-theme-note">One knob for everything &mdash; metronome, practice notes, the Jam band.</div>' +
         '<div class="set-sub">Latency</div>' +
         '<div class="muted small" id="set-latency">&mdash;</div>' +
         '<div class="set-sub">Guitar</div>' +
@@ -88,7 +85,7 @@
             '<button type="button" data-tone="synth">Synth</button>' +
           '</div>' +
         '</div>' +
-        '<div class="muted small set-theme-note">The voice for fretboard taps, scale practice, chord strums and trainer notes.</div>' +
+        '<div class="muted small set-theme-note">The voice for fretboard taps, scale practice, chord strums and practice notes.</div>' +
         '<div class="set-sub">Piano</div>' +
         '<div class="fb-field">' +
           '<div class="seg" id="set-ptone">' +
@@ -108,35 +105,14 @@
           '</div>' +
         '</div>' +
         '<div class="muted small set-theme-note">How the Jam backing-track bass plays &mdash; warm finger-plucked or bright picked. Takes effect on the next bass note.</div>' +
-      '</div>' +
-      '<div class="card">' +
-        '<h2>Studio</h2>' +
-        '<div class="set-sub">Retro-capture memory</div>' +
-        '<div class="fb-field">' +
-          '<div class="seg" id="set-retro">' +
-            '<button type="button" data-retro="15">15s</button>' +
-            '<button type="button" data-retro="30">30s</button>' +
-            '<button type="button" data-retro="60">60s</button>' +
-          '</div>' +
-        '</div>' +
-        '<div class="muted small set-theme-note">How far back &ldquo;Keep the last 30s&rdquo; on the Ideas page reaches. Everything you play is remembered for this long.</div>' +
-        '<div class="muted small set-theme-note">Time signature: the context-bar signature drives the metronome; the Studio loop and the Jam band currently play 4/4 (odd meters there are on the roadmap).</div>' +
-        '<div class="set-sub">Idea playback voice</div>' +
-        '<div class="fb-field">' +
-          '<div class="seg" id="set-voice">' +
-            '<button type="button" data-voice="saw">Saw</button>' +
-            '<button type="button" data-voice="pad">Pad</button>' +
-            '<button type="button" data-voice="keys">Keys</button>' +
-            '<button type="button" data-voice="bass">Bass</button>' +
-          '</div>' +
-        '</div>' +
-        '<div class="muted small set-theme-note">The studio synth preset ideas play back on (full ROLI slide/pressure expression).</div>' +
+        '<div class="set-sub">Time signature</div>' +
+        '<div class="muted small">The context-bar time signature drives the metronome; the Jam band plays 4/4.</div>' +
       '</div>' +
       '<div class="card">' +
         '<h2>Backup</h2>' +
         '<div class="muted small">Updates NEVER clear your settings &mdash; they live on this device and survive every version. ' +
           'If things ever look reset, you are probably in a different install (a Chrome tab vs the desktop app, or another browser profile). ' +
-          'Export moves everything &mdash; preferences, palettes, jam songs, studio tracks &mdash; between installs.</div>' +
+          'Export moves everything &mdash; preferences, palettes, jam songs, practice progress &mdash; between installs.</div>' +
         '<div class="row tight" style="margin-top:12px">' +
           '<button type="button" class="btn sm" id="set-backup-out">Export settings</button>' +
           '<label class="btn sm" style="cursor:pointer">Import settings<input type="file" id="set-backup-in" accept=".json" style="display:none"></label>' +
@@ -157,6 +133,8 @@
           '<button type="button" class="btn sm primary" id="set-midi-enable">Connect MIDI</button>' +
           '<span class="muted small" id="set-midi-msg" role="status"></span>' +
         '</div>' +
+        // MIDI Hub rules that change what soundLAB hears (js/midirules.js; paintRules fills it)
+        '<div class="muted small set-theme-note" id="set-midi-rules" hidden></div>' +
         '<div id="set-midi-ports" style="display:none">' +
           '<div class="set-gear" id="set-midi-gear"></div>' +
           '<div class="row" style="margin-top:12px">' +
@@ -196,7 +174,8 @@
       // the controller remote (js/remote.js renders the rows)
       '<div class="card" id="set-remote-card">' +
         '<h2>Hands-free control</h2>' +
-        '<div class="muted small">Move practice on from the instrument: a pedal, a button on your synth or a page-turner pedal does Next, Back and Stop on Exercises, Keys lessons, the Woodshed, LUMI practice, the Practice plan, Songs, the fretboard runner, the Trainer, Live sets and the Deck.</div>' +
+        '<div class="muted small">Move practice on from the instrument: a pedal, a button on your synth or a page-turner pedal does Next, Back and Stop on Exercises, Keys lessons and LUMI practice on the Piano page, the Woodshed, the Practice plan and its one-minute chord changes, Songs and the fretboard runner, and on Live sets and the Deck in soundLAB Gear. ' +
+          'With soundLAB and Gear both on screen, a MIDI pedal or synth button works in soundLAB. Gear answers it when soundLAB is hidden or closed.</div>' +
         '<div id="set-remote"></div>' +
       '</div>' +
       '<div class="card" id="set-audio-card">' +
@@ -232,17 +211,6 @@
         '<div class="muted small set-theme-note" id="set-ain-msg"></div>' +
       '</div>' +
       '<div class="card">' +
-        '<h2>Plugins</h2>' +
-        '<div class="muted small">Extend soundLAB with your own JavaScript: plugins can add pages, Studio effects and synth voices ' +
-          '(see <b>PLUGINS.md</b> in the GitHub repo for the API and a sample). Plugins run with full access to the app — ' +
-          '<b>only load code you trust</b>. Stored on this device only.</div>' +
-        '<div class="row tight" style="margin-top:12px">' +
-          '<label class="btn sm">Add plugin (.js)<input type="file" id="set-plugin-file" accept=".js,text/javascript" style="display:none"></label>' +
-          '<span class="muted small" id="set-plugin-msg"></span>' +
-        '</div>' +
-        '<div id="set-plugin-list" style="margin-top:6px"></div>' +
-      '</div>' +
-      '<div class="card">' +
         '<h2>About</h2>' +
         '<div class="row tight">' +
           '<span class="muted small">soundLAB v' + App.version + ' &mdash; updates are checked automatically at startup.</span>' +
@@ -275,47 +243,6 @@
       App.setVolume(parseInt(this.value, 10));
       volVal.textContent = App.volume + '%';
     });
-
-    // ---- global studio click ----
-    var clickChk = document.getElementById('set-click');
-    clickChk.checked = App.store.get('app.click', false) === true;
-    clickChk.addEventListener('change', function () {
-      App.store.set('app.click', !!this.checked);
-    });
-
-    // ---- studio prefs ----
-    var retroSeg = document.getElementById('set-retro');
-    function paintRetro() {
-      var v = parseInt(App.store.get('sd.retroSecs', 30), 10);
-      if ([15, 30, 60].indexOf(v) === -1) v = 30;
-      retroSeg.querySelectorAll('button').forEach(function (b) {
-        b.classList.toggle('active', parseInt(b.getAttribute('data-retro'), 10) === v);
-      });
-    }
-    retroSeg.addEventListener('click', function (e) {
-      var b = e.target.closest('[data-retro]');
-      if (!b) return;
-      App.store.set('sd.retroSecs', parseInt(b.getAttribute('data-retro'), 10));
-      App.emit('sd:prefs', {});
-      paintRetro();
-    });
-    paintRetro();
-
-    var voiceSeg = document.getElementById('set-voice');
-    function paintVoice() {
-      var v = App.store.get('sd.playVoice', 'keys');
-      voiceSeg.querySelectorAll('button').forEach(function (b) {
-        b.classList.toggle('active', b.getAttribute('data-voice') === v);
-      });
-    }
-    voiceSeg.addEventListener('click', function (e) {
-      var b = e.target.closest('[data-voice]');
-      if (!b) return;
-      App.store.set('sd.playVoice', b.getAttribute('data-voice'));
-      App.emit('sd:prefs', {});
-      paintVoice();
-    });
-    paintVoice();
 
     // ---- screen wake ----
     var wakeChk = document.getElementById('set-wake');
@@ -486,29 +413,11 @@
 
     // the chosen output (audio.outId), applied to the shared context — at the
     // first gesture after launch (no AudioContext before one) and again when
-    // the device comes back after an unplug (force: the context fell back)
+    // the device comes back after an unplug (force: the context fell back).
+    // The code is App.audioIn.applySink (js/audioin.js): soundLAB Gear has no
+    // Settings page and applies the same choice with it
     function applySink(force) {
-      var id = App.store.get('audio.outId', '');
-      if (!id) return;
-      function go() {
-        try {
-          var ctx = App.getAudio();
-          if (typeof ctx.setSinkId !== 'function' || (!force && ctx.sinkId === id)) return;
-          ctx.setSinkId(id).catch(function () { audMsg.textContent = 'The browser refused that output. Using the system default.'; });
-        } catch (e) { /* no audio here */ }
-      }
-      var ua = navigator.userActivation;
-      if (!ua || ua.hasBeenActive) { go(); return; }
-      if (applySink.wait) return;
-      applySink.wait = true;
-      function once() {
-        document.removeEventListener('pointerdown', once, true);
-        document.removeEventListener('keydown', once, true);
-        applySink.wait = false;
-        go();
-      }
-      document.addEventListener('pointerdown', once, true);
-      document.addEventListener('keydown', once, true);
+      if (AIN) AIN.applySink(force, function () { audMsg.textContent = 'The browser refused that output. Using the system default.'; });
     }
 
     function listDevices(withPoke) {
@@ -627,10 +536,17 @@
       var v = AIN ? AIN.setGain(parseInt(this.value, 10)) : parseInt(this.value, 10);
       ainGainVal.textContent = v + '%';
     });
-    App.on('audioin:state', paintAin);
+    // The stored switch can also change in another window (soundLAB Gear's
+    // Hub has its own Off / On): the card repaints, and Off pressed over
+    // there lets the meter go, as Off pressed here does. Without this the
+    // meter would keep the device open after the last use of it ended.
+    App.on('audioin:state', function () {
+      paintAin();
+      if (meterHeld && App.active === 'settings' && !meterWanted()) meterStart();
+    });
 
     // live level meter (dBFS, -60..0): polled only while Settings is on screen
-    var meterTimer = null, pkHold = 0, pkAt = 0;
+    var meterTimer = null, meterHeld = false, pkHold = 0, pkAt = 0; // meterHeld: this card holds the input open for the meter
     function meterTick() {
       var l = AIN.level();
       var pct = l.peak > 0.001 ? Math.max(0, Math.min(100, (20 * Math.log(l.peak) / Math.LN10 + 60) / 60 * 100)) : 0;
@@ -652,6 +568,7 @@
     function meterStart() {
       if (!AIN || !AIN.supported) return;
       if (meterWanted()) {
+        meterHeld = true;
         AIN.hold('settings-meter');
         if (!meterTimer && !document.hidden) meterTimer = setInterval(meterTick, 50);
       } else {
@@ -661,6 +578,7 @@
     }
     function meterStop() {
       if (meterTimer) { clearInterval(meterTimer); meterTimer = null; }
+      meterHeld = false;
       if (AIN) AIN.release('settings-meter');
       meterBar.style.width = '0%';
       pkHold = 0;
@@ -676,51 +594,6 @@
 
     listDevices(false);
     paintAin();
-
-    // ---- plugins ----
-    var plugMsg = document.getElementById('set-plugin-msg');
-    var plugList = document.getElementById('set-plugin-list');
-
-    function paintPlugins() {
-      var l = (window.SoundLab && SoundLab.plugins.list) || [];
-      if (!l.length) { plugList.innerHTML = ''; return; }
-      plugList.innerHTML = l.map(function (p) {
-        return '<div class="row tight" style="margin-top:8px" data-plug="' + p.id + '">' +
-          '<label class="row tight small" style="gap:6px"><input type="checkbox" data-plugon="' + p.id + '"' +
-            (p.on !== false ? ' checked' : '') + '>' + p.name.replace(/</g, '&lt;') + '</label>' +
-          (p.error ? '<span class="small" style="color:var(--red,#d9484a)">error: ' + String(p.error).replace(/</g, '&lt;') + '</span>' : '') +
-          '<button type="button" class="btn sm" data-plugrm="' + p.id + '">Remove</button>' +
-          '</div>';
-      }).join('');
-    }
-
-    document.getElementById('set-plugin-file').addEventListener('change', function () {
-      var f = this.files && this.files[0];
-      this.value = '';
-      if (!f || !window.SoundLab) return;
-      var rd = new FileReader();
-      rd.onload = function () {
-        var res = SoundLab.plugins.add(f.name.replace(/\.js$/i, ''), String(rd.result));
-        plugMsg.textContent = res.ok ? 'loaded and running' : ('failed: ' + res.error);
-        paintPlugins();
-      };
-      rd.readAsText(f);
-    });
-    plugList.addEventListener('click', function (e) {
-      var rm = e.target.closest('[data-plugrm]');
-      if (rm) {
-        SoundLab.plugins.remove(rm.getAttribute('data-plugrm'));
-        plugMsg.textContent = 'removed — fully unloads on the next app start';
-        paintPlugins();
-      }
-    });
-    plugList.addEventListener('change', function (e) {
-      var chk = e.target.closest('[data-plugon]');
-      if (!chk) return;
-      SoundLab.plugins.toggle(chk.getAttribute('data-plugon'), chk.checked);
-      plugMsg.textContent = chk.checked ? 'enabled' : 'disabled — unloads on the next app start';
-    });
-    paintPlugins();
 
     // ---- update check ----
     document.getElementById('set-update').addEventListener('click', function () {
@@ -896,7 +769,7 @@
         var nm = p.name || 'MIDI device', role;
         if (App.midi.selfSounding(nm)) role = App.midi.voice === 'on' ? 'makes its own sound' : 'makes its own sound, so soundLAB stays quiet';
         else if (/lumi/i.test(nm)) role = 'key lights';
-        else if (/helix|stadium|line 6/i.test(nm)) role = 'Helix (use the Helix page)';
+        else if (/helix|stadium|line 6/i.test(nm)) role = 'Helix (in soundLAB Gear)';
         else role = App.midi.voice === 'off' ? 'notes only' : 'plays soundLAB';
         return '<span class="set-chip"><b>' + esc(nm.replace(/\s*MIDI\s*\d*$/i, '').slice(0, 28)) + '</b> ' + esc(role) + '</span>';
       });
@@ -959,6 +832,31 @@
 
     document.getElementById('set-open-lights').addEventListener('click', function () { App.switchTo('lights'); });
 
+    // ---- MIDI Hub rules (js/midirules.js) ----
+    // The Hub's "Apply to what soundLAB hears" box keeps working here, but the
+    // Hub and its Rules editor are in soundLAB Gear (gear.html). While the box
+    // is on and at least one rule is enabled, this line is the one sign in
+    // soundLAB that the incoming notes are being changed. Painted when
+    // Settings opens and on 'midirules:state' (the box was ticked or cleared,
+    // also from a Gear window).
+    var rulesEl = document.getElementById('set-midi-rules');
+    function paintRules() {
+      if (!rulesEl) return;
+      var a = App.midiRules && App.midiRules.active ? App.midiRules.active() : null;
+      var count = a && a.on ? a.rules : 0;
+      rulesEl.hidden = !count;
+      if (rulesEl.getAttribute('data-rules') === String(count)) return; // same line: leave the button alone
+      rulesEl.setAttribute('data-rules', String(count));
+      rulesEl.innerHTML = !count ? '' :
+        'MIDI Hub rules are changing what soundLAB hears (' + count + (count === 1 ? ' rule' : ' rules') + '). Edit them in soundLAB Gear. ' +
+        '<button type="button" class="btn sm" id="set-midi-rules-go">Open the Hub</button>';
+    }
+    // the button leaves for gear.html#midihub (App.goApp: a plain navigation)
+    rulesEl.addEventListener('click', function (e) { if (e.target.closest('#set-midi-rules-go')) App.goApp('gear', 'midihub'); });
+    App.on('midirules:state', paintRules);
+    paintRules();
+    hubRules = { paint: paintRules };
+
     document.getElementById('set-backup-out').addEventListener('click', function () {
       var out = {};
       for (var i = 0; i < localStorage.length; i++) {
@@ -972,6 +870,11 @@
       a.click();
       setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
     });
+    // Phase A (2.0): keys of features that left the app — the Studio and its
+    // prefs, ideas, the plug-in list, the workspace switch, the Pads drum
+    // track. The live app on this origin (2.0.0, the code before the trim) still owns them, so an import
+    // never writes them (a plug-in list is code the live app would run).
+    var DEAD = /^guitarlab\.(st\.|sd\.|ideas\.|song\.|plugins\.|app\.space$|app\.tabStudio$|app\.click$|pads\.track$)/;
     document.getElementById('set-backup-in').addEventListener('change', function () {
       var f = this.files && this.files[0];
       var msg = document.getElementById('set-backup-msg');
@@ -981,11 +884,17 @@
         try {
           var d = JSON.parse(rd.result);
           if (!d || d.app !== 'soundLAB' || !d.keys) throw new Error('not a soundLAB backup');
-          var n = 0;
+          var n = 0, dead = 0;
           Object.keys(d.keys).forEach(function (k) {
-            if (k.indexOf('guitarlab.') === 0) { localStorage.setItem(k, d.keys[k]); n++; }
+            if (k.indexOf('guitarlab.') !== 0) return;
+            if (DEAD.test(k)) { dead++; return; }
+            // an export holds strings only: anything else is not ours to write
+            if (typeof d.keys[k] !== 'string') return;
+            localStorage.setItem(k, d.keys[k]);
+            n++;
           });
-          msg.textContent = n + ' settings restored — reloading…';
+          msg.textContent = n + ' settings restored' +
+            (dead ? ', ' + dead + ' from removed features skipped' : '') + ' — reloading…';
           setTimeout(function () { location.reload(); }, 900);
         } catch (e) {
           msg.textContent = 'Import failed: ' + e.message;
@@ -1004,10 +913,9 @@
     onShow: function () {
       if (audioUI) audioUI.show();
       if (App.remote) App.remote.paint();
-      // dynamic prefs may have changed elsewhere (pads click chip, wake from
-      // code, volume) — re-read them when the page opens
-      var c = document.getElementById('set-click');
-      if (c) c.checked = App.store.get('app.click', false) === true;
+      if (hubRules) hubRules.paint(); // the rules are edited in soundLAB Gear: count them again
+      // dynamic prefs may have changed elsewhere (wake from code, volume) —
+      // re-read them when the page opens
       var w = document.getElementById('set-wake');
       if (w) w.checked = App.store.get('app.keepAwake', true) !== false;
       var v = document.getElementById('set-vol');

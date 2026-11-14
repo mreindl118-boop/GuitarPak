@@ -65,6 +65,34 @@ own and next to FL Studio. The design system is `docs/DESIGN-SYSTEM.md`.
 | I | 2.0 release | tests, docs, main address flips; Android app follows (no new APK) | all |
 | J | After 2.0 | FL plugin shell (VST3 + CLAP, web view), G2 if proven | I |
 
+## Phase A status (Trim)
+
+"Done" means merged into `v2` with the full suite green. Plan: five draft pull requests.
+The step-by-step plan is `docs/plans/phase-a/PLAN.md`.
+
+| Step | What | State | PR |
+|---|---|---|---|
+| A1 | Studio space, sequencer/arranger, sampler and plug-in API removed; synth and drum sounds kept as a library; Pads is play-only | ready to merge | #99 |
+| A2 | Trainer cards on the Plan page; Synth pill = the Sound picker on Piano; LUMI practice = a section under the Keys lessons | ready to merge | #100 |
+| A3a | Score player, synth-out and rule engine are shared files; the main app no longer calls the Hub | ready to merge | #101 |
+| A3b | soundLAB Gear (`gear.html`): Deck, Live sets, MIDI Hub, Helix leave the main app | in review (draft pull request) | #102 |
+| A4 | Storage prefix `soundlab2.*` (beta: `soundlab2-next.*`) with the one-time copy from `guitarlab.*` | planned | — |
+
+Decided while trimming (each takes effect with its step):
+
+- Pads keeps the eight pads, both MIDI maps, Remap and key lights. Record and Play loop return when Phase C
+  rebuilds Pads.
+- The interval ear trainer is Exercises › Intervals › All intervals › Ear. The one-minute chord changes become
+  a real Exercises drill in Phase C.
+- MIDI Hub Thru and key splits run while soundLAB Gear is open.
+- With soundLAB and Gear both visible, a bound pedal acts in soundLAB; Gear answers it when soundLAB is hidden
+  or closed. Hear input sounds in one window.
+- LUMI practice on the Piano page: while its section is open it owns the pedal; starting a lesson closes it.
+- The copy from `guitarlab.*` runs once per browser and never changes or deletes the 1.x data. Items that do
+  not fit are tried again at each start. Studio, sampler and plug-in data is not copied and not deleted.
+
+Removed in 2.0: `js/studio.js`, `js/arrange.js`, `js/plugins.js`, `plugins/`, `PLUGINS.md`.
+
 ## Rules for the build
 
 - One phase = one or more draft pull requests into `v2`; the owner merges.

@@ -1,3 +1,7 @@
+> 2.0: this page lives in soundLAB Gear (gear.html) since Phase A. Menu paths below are from before Phase A (1.x and the live 2.0.0).
+> Here that is the MIDI Hub: the "Hub" rows and `tests/midihub-lock.test.js`. The shared MIDI
+> service and Scale lock are the same in soundLAB and in Gear; the practice synth sound is in soundLAB.
+
 # External MIDI Scale lock coverage
 
 Scope: soundLAB's built-in MIDI ingress and send services, the MIDI Hub and
@@ -32,11 +36,13 @@ before starting an explicit practice route. soundLAB never changes that hardware
 setting. Its filter cannot control independent sequencers, patch tuning or
 audio paths already inside the instrument.
 
-Arbitrary user-loaded JavaScript plugins that create their own `AudioContext`,
-obtain MIDI access and call a physical port directly are outside the shared
-service contract. The bundled lo-fi plugin uses the shared DAW path. The
-stranded Helix branch is not loaded into this integration; no hardware bridge
-or unreviewed plugin is silently enabled.
+The plug-in API was removed in soundLAB 2.0 (Phase A,
+[ROADMAP-2.0.md](ROADMAP-2.0.md)): the app no longer loads or runs user-supplied
+JavaScript, so no plug-in can create its own `AudioContext`, obtain MIDI access
+or call a physical port outside the shared service contract. In 1.x such
+plug-ins were outside this coverage. No hardware bridge is enabled silently:
+the built-in Helix page connects its bridge only after *Connect bridge* was
+pressed, and its output starts disarmed ([HELIX-STADIUM.md](HELIX-STADIUM.md)).
 
 Tests: `tests/midihub-lock.test.js` exercises the actual Hub and MIDI service
 with fake EventTarget ports, including post-rule membership, all channels,

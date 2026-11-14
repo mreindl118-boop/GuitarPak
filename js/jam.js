@@ -343,7 +343,7 @@
     return noiseBuf;
   }
 
-  // ---- drum KITS: the Studio engine's 808/909 synth kit, jam-side ----
+  // ---- drum KITS: the shared 808/909 synth drum kit, jam-side ----
   // DAW.createDrums (js/daw/engine.js) replaces the old fixed kick/snare/hat
   // trio. Each prebuilt is a per-lane {tune (semis), decay 0..1, level} set;
   // 'snare' picks the snare lane (1) or the clap lane (2, the 808 move).

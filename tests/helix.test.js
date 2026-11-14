@@ -8,24 +8,23 @@
 // param / bypass writes, change-stream echoes, presets + loading, ★ favorites
 // from the Helix's numbering) and PORT ISOLATION (never a MODX / LUMI / loopMIDI
 // port), plus the built-in rules: nothing connects at boot, the bridge only
-// after Connect bridge was pressed once, and an old stored copy of the plugin
-// is skipped instead of run.
+// after Connect bridge was pressed once.
+// 2.0 Phase A3b: Helix is a page of soundLAB Gear (gear.html, env.GEAR_URL): its own tab,
+// no pill strip. Gear boots on the Deck, so the page is still closed at boot, and "leaving
+// the page" goes to the Deck.
 const { chromium } = require('playwright');
 const env = require('./env');
 let fails = 0;
 function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console.log('  FAIL', msg); } }
-// what an old stored copy of the plugin looks like to js/plugins.js: it sets window.SLHelix
-const OLD_PLUGIN = "SoundLab.registerPage('helixold', 'Helix', 'practice', { init: function () {} }); window.SLHelix = { old: true };";
 const WRITES = ['/ParamValueSet', '/BlockEnableSet', '/activateSnapshot', '/SetSnapshotName', '/LoadPresetWithCID', '/SavePresetWithCID', '/ModelSet'];
 
 async function newPage(browser, opts) {
   opts = opts || {};
   const ctx = await browser.newContext({ viewport: { width: 1200, height: 900 } });
-  await ctx.addInitScript(([oldCode, outs, ins, bridgeAuto]) => {
+  await ctx.addInitScript(([outs, ins, bridgeAuto]) => {
     ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
     localStorage.setItem('guitarlab.lights.on', 'false');
     if (bridgeAuto) localStorage.setItem('guitarlab.hx.bridgeAuto', 'true');
-    if (oldCode) localStorage.setItem('guitarlab.plugins.list', JSON.stringify([{ id: 'pold', name: 'helix-stadium', code: oldCode, on: true, error: '' }]));
     // ---- fake Web MIDI: every byte sent is recorded with the port it went to
     window.__sent = []; window.__sentTo = []; window.__failNext = false;
     const mkOut = (name, i) => ({ id: 'out' + i, name, state: 'connected', send: b => { if (window.__failNext) { window.__failNext = false; throw new Error('port gone'); } window.__sent.push(Array.from(b)); window.__sentTo.push(name); } });
@@ -35,7 +34,7 @@ async function newPage(browser, opts) {
     navigator.requestMIDIAccess = () => Promise.resolve(access);
     window.__recv = (bytes) => inputs.forEach(p => { const ev = { data: new Uint8Array(bytes) }; p._fns.forEach(fn => fn(ev)); if (p.onmidimessage) p.onmidimessage(ev); });
     window.__since = (n) => window.__sent.slice(n);
-    // ---- fake bridge: the WebSocket the plugin opens answers like the device
+    // ---- fake bridge: the WebSocket the page opens answers like the device
     const EB = { cg__: { asnp: 2, entt: { snps: [{ si__: 7, vald: false }, { si__: 2, name: 'Lead', vald: true }, { si__: 0, name: 'SNAPSHOT 1', vald: true }] } }, pm__: [],
       sfg_: { flow: [{ bcnt: 28, blks: [0, { enbl: 1, type: 8, mdls: [{ id__: 770, parm: [] }] }, 1, { enbl: 1, type: 1, mdls: [{ id__: 268, parm: [{ pid_: 1, valu: 0.45 }, { pid_: 2, valu: true }] }] }, 2, { enbl: 0, type: 1, mdls: [{ id__: 33, parm: [{ pid_: 1, valu: -24.1 }, { pid_: 2, valu: 3 }] }] }] }, { bcnt: 28, blks: [] }] } };
     const DEFS = { 268: { name: 'HD2_VolPanVolMono', category: 'Volume/Pan', params: { Pedal: { id: 1, type: 'f', min: 0, max: 1, def: 1 }, VolumeTaper: { id: 2, type: 'b', def: true } } },
@@ -61,12 +60,12 @@ async function newPage(browser, opts) {
       close() { this.readyState = 3; this.onclose && this.onclose({}); }
     }
     window.WebSocket = FakeWS;
-  }, [opts.oldPlugin ? OLD_PLUGIN : '', opts.outs || ['Helix Stadium MIDI'], opts.ins || ['Helix Stadium MIDI'], opts.bridgeAuto !== false]);
+  }, [opts.outs || ['Helix Stadium MIDI'], opts.ins || ['Helix Stadium MIDI'], opts.bridgeAuto !== false]);
   const page = await ctx.newPage(), errs = [];
   page.on('pageerror', e => errs.push(e.message));
   page.on('dialog', d => d.accept());
-  await page.goto(env.URL);
-  await page.waitForFunction(() => window.App && window.SLHelix && App.midi && App.midi.ready);
+  await page.goto(env.GEAR_URL);
+  await page.waitForFunction(() => window.App && window.SLHelix && App.midi && App.midi.ready && App.active === 'deck');
   return { ctx, page, errs };
 }
 const J = JSON.stringify;
@@ -75,16 +74,14 @@ const armState = (page) => page.evaluate(() => ({ st: document.getElementById('h
 
 (async () => {
   const browser = await chromium.launch({ executablePath: env.CHROMIUM, args: ['--autoplay-policy=no-user-gesture-required'] });
-  const { ctx, page, errs } = await newPage(browser, { oldPlugin: true });
+  const { ctx, page, errs } = await newPage(browser);
 
-  console.log('# built in: boot, nav, the old plugin');
+  console.log('# boot');
   const boot = await page.evaluate(async () => {
     await new Promise(r => setTimeout(r, 300));
-    const p = (SoundLab.plugins.list || [])[0] || {};
-    return { ws: !!window.__ws, builtIn: !!(window.SLHelix && SLHelix.builtIn), old: !!(window.SLHelix && SLHelix.old), err: p.error || '', panels: document.querySelectorAll('#panel-helix').length, oldPage: !!document.getElementById('panel-helixold') };
+    return { ws: !!window.__ws };
   });
   ok(!boot.ws, 'nothing connects at boot: no bridge WebSocket before the page is opened');
-  ok(boot.builtIn && !boot.old && /Built in now/.test(boot.err) && !boot.oldPage && boot.panels === 1, 'an old stored Helix plugin is skipped and flagged, the built-in page stays: ' + boot.err);
 
   console.log('# the page + startup silence');
   const nav = await page.evaluate(async () => {
@@ -93,9 +90,9 @@ const armState = (page) => page.evaluate(() => ({ st: document.getElementById('h
     return { active: App.active, tab: (document.querySelector('#tabbar .tabbar-btn.active') || {}).textContent, views: [...document.querySelectorAll('#hx-views button')].map(b => b.dataset.view).join(','),
       midi: document.getElementById('hx-midist').textContent, mode: SLHelix.midi.mode, bridge: document.getElementById('hx-brst').textContent, dev: document.getElementById('hx-devst').textContent,
       dest: document.getElementById('hx-dest').textContent, sent: window.__sent.length, writes: window.__net.filter(m => m.op === 'rpc').map(m => m.addr),
-      pills: [...document.querySelectorAll('#subnav .subtab')].map(b => b.textContent).join('|') };
+      pills: [...document.querySelectorAll('#subnav .subtab')].map(b => b.textContent).join('|'), strip: !document.getElementById('subnav').hidden };
   });
-  ok(nav.active === 'helix' && /Guitar/.test(nav.tab || '') && nav.pills === 'Neck|Tab|Notation|Helix', 'Helix is the fourth Guitar pill: ' + nav.tab + ' / ' + nav.pills);
+  ok(nav.active === 'helix' && /Helix/.test(nav.tab || '') && nav.pills === '' && !nav.strip, 'Helix is its own tab in soundLAB Gear, with no pill strip: ' + nav.tab + ' / ' + (nav.pills || 'no pills'));
   ok(nav.views === 'rig,blocks,presets,looper,mixer,monitor', 'six views: ' + nav.views);
   ok(nav.mode === 'web' && /Helix Stadium MIDI/.test(nav.midi), 'found the Helix MIDI port itself: ' + nav.midi);
   ok(/Helix at 10\.0\.0\.5/.test(nav.bridge), 'bridge says the Helix is reachable: ' + nav.bridge);
@@ -256,8 +253,8 @@ const armState = (page) => page.evaluate(() => ({ st: document.getElementById('h
   a = await armState(page);
   ok(!a.armed && /focus/i.test(a.msg), 'switching windows disarms: ' + a.msg);
   await page.evaluate(() => SLHelix.arm());
-  a = await page.evaluate(async () => { App.switchTo('quiz'); await new Promise(r => setTimeout(r, 100)); const off = !SLHelix.armed; App.switchTo('helix'); await new Promise(r => setTimeout(r, 300)); return { off, st: document.getElementById('hx-armst').textContent, msg: document.getElementById('hx-armmsg').textContent }; });
-  ok(a.off && a.st === 'DISARMED' && /Press Arm/.test(a.msg), 'leaving the page disarms, and coming back starts disarmed: ' + a.msg);
+  a = await page.evaluate(async () => { App.switchTo('deck'); await new Promise(r => setTimeout(r, 100)); const off = !SLHelix.armed; App.switchTo('helix'); await new Promise(r => setTimeout(r, 300)); return { off, st: document.getElementById('hx-armst').textContent, msg: document.getElementById('hx-armmsg').textContent }; });
+  ok(a.off && a.st === 'DISARMED' && /Press Arm/.test(a.msg), 'leaving the page (for the Deck) disarms, and coming back starts disarmed: ' + a.msg);
   r = await page.evaluate(async () => { SLHelix.arm(); const n = window.__sent.length; window.__failNext = true; document.getElementById('hx-tap').click(); const after = SLHelix.armed; return { sent: window.__since(n), after, msg: document.getElementById('hx-armmsg').textContent }; });
   ok(r.sent.length === 0 && !r.after && /send failed/i.test(r.msg), 'a failed send disarms: ' + r.msg);
   r = await page.evaluate(async () => { const s = document.getElementById('hx-safe'); s.checked = false; s.dispatchEvent(new Event('change')); const n = window.__sent.length; document.getElementById('hx-tap').click(); return { sent: window.__since(n), st: document.getElementById('hx-armst').textContent, armHidden: document.getElementById('hx-arm').hidden, stored: App.store.get('hx.safe') }; });
@@ -284,7 +281,7 @@ const armState = (page) => page.evaluate(() => ({ st: document.getElementById('h
     return { ws: !!window.__ws, mode: SLHelix.midi.mode, appOut: App.midi.outputName, sentTo: window.__sentTo.slice(n0).concat(chan).filter(n => !/^$/.test(n)), status: document.getElementById('hx-midist').textContent,
       allow: [SLHelix.isHelix({ name: 'Helix Stadium MIDI' }), SLHelix.isHelix({ name: 'loopMIDI Helix' }), SLHelix.isHelix({ name: 'Helix MODX virtual' }), SLHelix.isHelix({ name: 'LUMI Keys BLOCK' })] };
   });
-  ok(r.mode === 'none' && /no Helix Stadium MIDI port/.test(r.status), 'with no Helix port the plugin has no MIDI route (soundLAB\'s output is ' + r.appOut + '): ' + r.status);
+  ok(r.mode === 'none' && /no Helix Stadium MIDI port/.test(r.status), 'with no Helix port the page has no MIDI route (soundLAB\'s output is ' + r.appOut + '): ' + r.status);
   ok(!r.sentTo.some(n => /MODX|LUMI|loopMIDI/.test(n)), 'nothing reached the MODX, the LUMI or the loopMIDI port: ' + J(r.sentTo));
   ok(J(r.allow) === J([true, false, false, false]), 'allow-list: Helix Stadium MIDI yes; loopMIDI / MODX / LUMI names no: ' + J(r.allow));
   ok(!r.ws, 'the bridge stays closed on the page until Connect bridge was pressed once');

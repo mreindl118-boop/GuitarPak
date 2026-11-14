@@ -7,24 +7,36 @@
  * gently until you've taken your first tour. First launch shows a welcome
  * card automatically. Nothing here blocks the app — tap anywhere outside the
  * card to leave.
+ *
+ * ONE FILE FOR BOTH APPS (2.0 Phase A3b): index.html (soundLAB) and gear.html
+ * (soundLAB Gear) load it. TOURS is keyed by page id, so each app shows the
+ * tours of its own pages (deck, liveset, midihub and helix are Gear pages)
+ * and the two sheets' tours in both — with GEAR wording where a step names
+ * soundLAB's pages (lessons, Exercises, the Jam band, Settings): Gear has
+ * none of them, so the step says they are in soundLAB. The welcome card is
+ * about soundLAB's pages: Gear never shows it and leaves help.seen alone, so
+ * soundLAB still says hello on its own first start.
  */
 (function () {
   'use strict';
 
+  var GEAR = !!window.App && App.app === 'gear'; // js/app.js is loaded first in both apps
   var TOURS = {
     practiceplan: [
       { t: 'Practice plan', x: 'A short session built from your teacher’s notes. Open Teacher’s lesson notes, paste or import the text, review the mapping and accept it. Each student keeps a separate plan on this device.' },
       { sel: '#pp-today', t: 'One block at a time', x: 'Start opens the linked tool with its supported settings. New lesson runs and recorded playing or answering time measure completion. Old scores and idle page time do not finish today’s blocks. A Next pedal or synth button (Settings › Hands-free control) opens the next unfinished block from here, and Back opens the last one again.' },
-      { sel: '#pp-gaps', t: 'What to build next', x: 'Unmatched assignments and missing setup hooks become module gaps with their original text. Export them to choose future improvements. Google Doc links are bookmarks; no account connection is required.' }
+      { sel: '#pp-gaps', t: 'What to build next', x: 'Unmatched assignments and missing setup hooks become module gaps with their original text. Export them to choose future improvements. Google Doc links are bookmarks; no account connection is required.' },
+      { sel: '#pp-tools', t: 'Free practice', x: 'Under the plan, closed until you open it: a session timer with its log, random practice prompts (Go sets up the Fretboard for the prompt) and one-minute chord changes. In a chord-change minute, Space or a Next pedal counts a change. This timer is separate from the plan’s measured minutes.' }
     ],
     metronome: [
-      { t: 'Metronome', x: 'It opens over whatever page you’re on and keeps clicking after you close it — the icon in the top corner glows and pulses on the beat while it runs. Its tempo is the ONE shared tempo: the Jam band, the practice runners and the Studio all follow it.' },
+      { t: 'Metronome', x: 'It opens over whatever page you’re on and keeps clicking after you close it — the icon in the top corner glows and pulses on the beat while it runs. Its tempo is the ONE shared tempo: ' +
+        (GEAR ? 'the Hub’s MIDI clock runs at it, and in soundLAB the Jam band and the practice runners follow it.' : 'the Jam band and the practice runners follow it.') },
       { sel: '#met-tap', t: 'Tap tempo', x: 'Tap along to a song and the BPM follows your taps. −5 / −1 / +1 / +5 and the slider fine-tune it.' },
       { sel: '#met-dots', t: 'Accents', x: 'Tap a beat dot to cycle it between accent, normal and muted.' },
       { sel: '#met-trbox', t: 'Tempo trainer', x: 'Speeds you up automatically: +N BPM every M bars until the target. Sounds lets you pick each click’s voice.' }
     ],
     fretboard: [
-      { t: 'Fretboard', x: 'Every dot is a note in your key. Its color follows Color notes by (in the Fretboard’s settings, or in Lights & help): by Interval each scale degree has its color and amber is the root; by Note every C is one color in every key. The Piano and the Studio’s note editor use the same colors.' },
+      { t: 'Fretboard', x: 'Every dot is a note in your key. Its color follows Color notes by (in the Fretboard’s settings, or in Lights & help): by Interval each scale degree has its color and amber is the root; by Note every C is one color in every key. The Piano uses the same colors.' },
       { sel: '#ctx-btn', t: 'Pick your key and scale', x: 'Tap the clef for the shared key and scale. Scale Lock blocks out-of-scale pitched notes across tools, playback and MIDI; drums and recorded/live audio keep their own sound. LUMI Display independently shows the selected scale and practice targets on the configured LUMI. Its connection status appears here.' },
       { t: 'Practice runner', x: 'Below the neck: pick a pattern and press play — it walks the scale in time, shows what to play next, and can pause at turnarounds while you catch up.' }
     ],
@@ -40,14 +52,18 @@
     ],
     piano: [
       { t: 'Piano', x: 'The keyboard twin of the fretboard — same key, same note colors. Play it by touch, with your computer keyboard (A W S E D… Z/X shifts octave), or a MIDI keyboard like a ROLI.' },
+      { sel: '#pn-voice', t: 'Sound', x: 'The grand piano or a synth: pick what this keyboard plays. The synth sounds follow pitch bend and pressure from a keyboard like a ROLI.' },
       { sel: '#pn-chseg', t: 'Perform', x: 'Triads or 7ths turn every in-scale key into its chord (+Bass and Strum appear then). Arp plays what you hold as an arpeggio — its speed, direction, range and Hold appear once it’s on.' },
       { sel: '#pn-play', t: 'Practice runner', x: 'Runs scale exercises on the keys with fingering numbers — pick right or left hand and it moves to where that hand plays.' },
       { sel: '#pn-guide', t: 'Guide mode', x: 'Instead of playing FOR you, Guide waits for you to play each lit note — on screen, or lit up on a LUMI’s own keys.' },
       { sel: '#pn-assist', t: 'Help level', x: 'How much the keyboard tells you. Full shows the scale colors, note names, fingers and the next note; Colors drops the names; Target only rings the note to play; Tonic marks home; None is a bare keyboard. Pressed keys always flash their color.' },
-      { sel: '.kl-card', t: 'Scale lessons', x: 'Graded scale lessons played with the click. Every note is checked for the right key and how close it lands to the beat. Score 85 to level up to a faster tempo. Pick ∞ to loop the scale until you stop and go for your longest streak of clean notes. Runs, best scores and streaks are saved here and on the Exercises Progress tab. A Next pedal or synth button (Settings › Hands-free control) starts the lesson and moves on to the next level without touching the screen.' }
+      { sel: '.kl-card', t: 'Scale lessons', x: 'Graded scale lessons played with the click. Every note is checked for the right key and how close it lands to the beat. Score 85 to level up to a faster tempo. Pick ∞ to loop the scale until you stop and go for your longest streak of clean notes. Runs, best scores and streaks are saved here and on the Exercises Progress tab. A Next pedal or synth button (Settings › Hands-free control) starts the lesson and moves on to the next level without touching the screen.' },
+      { sel: '#pn-lumi', t: 'Notes and triads on the LUMI', x: 'Under the lessons, closed until you open it. It shows a note or a triad to play and moves on when you play exactly those notes. It starts with on-screen answers; a connected LUMI or MODX can be the answer keyboard. While the section is open, the pedal works here and the lessons’ double-tap on the lowest key is paused; the double-tap key from Settings › Hands-free control works here too when it is on, in Simulated mode. Starting a lesson or the runner closes it.' }
     ],
     songs: [
-      { t: 'Songs', x: 'Bring your own music: paste an ASCII guitar tab (the six-line kind from any tab site) or import a MIDI file. soundLAB detects the key, and you can loop any bars at your own tempo to practice them.' }
+      { t: 'Songs', x: 'Bring your own music: paste an ASCII guitar tab (the six-line kind from any tab site) or import a MIDI file. soundLAB detects the key, and you can loop any bars at your own tempo to practice them.' },
+      // #sg-player is hidden until a file is sent to it: the step is then a centered card
+      { sel: '#sg-player', t: 'Player', x: 'Choose a file under Open a score, then Play on synth: the Player opens under that card and plays the file on your synth. Change the tempo, cap the loudest note, transpose, or use Change key to move the piece into another key or scale. Only notes and the sustain pedal are sent, so your synth’s sounds stay as they are. No synth listed? Open Settings on the card takes you to where you connect your keyboard.' }
     ],
     jam: [
       { t: 'Jam', x: 'Your backing band. Pick a genre and it writes a whole song — intro, verse, chorus, ending — in YOUR key. Change the key up top and the band re-harmonizes live, even mid-song.' },
@@ -56,15 +72,12 @@
       { sel: '#jam-palette', t: 'The chord palette', x: 'Stopped: tap chords to add them to the selected section. Playing: tap one (or hold a chord on a MIDI keyboard) and the band vamps on it until you hit Resume.' }
     ],
     shed: [
-      { t: 'The Woodshed', x: 'Gamified practice: pick an exercise or song and play it for score — Perfect/Great/Good/Miss timing, combos, stars, XP, streaks. Every run is captured as a take in your Studio Ideas.' },
+      { t: 'The Woodshed', x: 'Gamified practice: pick an exercise or song and play it for score — Perfect/Great/Good/Miss timing, combos, stars, XP, streaks.' },
       { t: 'Four ways to practice', x: 'Run = straight through, no mercy. Phrases = short chunks loop until you nail them twice. Wait = it freezes until you play the right note (great for learning). Ladder = tempo climbs as you pass. A Next pedal or synth button (Settings › Hands-free control) starts the count-in and goes again from the score, Back restarts (in Phrases: the phrase before) and Stop ends the run — Guided performance too.' },
-      { t: 'Feed it music', x: 'Generate scales, Hanon and rudiments; import MIDI files; paste ASCII tab (Wait mode ready instantly); or pull in any Studio track. Generated exercises follow the treble-clef root and scale; MIDI, Studio and generated scores work in either guided mode. PDFs and images are not parsed scores. Calibrate timing once per input so scoring is honest.' }
+      { t: 'Feed it music', x: 'Generate scales, Hanon and rudiments; import MIDI files; or paste ASCII tab (Wait mode ready instantly). Generated exercises follow the treble-clef root and scale; MIDI and generated scores work in either guided mode. PDFs and images are not parsed scores. Calibrate timing once per input so scoring is honest.' }
     ],
     tuner: [
       { t: 'Tuner', x: 'A chromatic tuner using your microphone. Press Start, allow mic access, and play one string at a time — the needle shows how far off you are; green means in tune.' }
-    ],
-    trainer: [
-      { t: 'Trainer', x: 'Practice prompts: it deals you a key, scale and tempo to work on. Hit Go and it sets up the Fretboard for that exact drill — a fresh challenge every time.' }
     ],
     quiz: [
       { t: 'Exercises', x: 'A course in short levels of 10 questions: Notes, Intervals, Chords, Scales and Key signatures. Every right answer earns XP; quick answers and runs of 5 earn more.' },
@@ -76,23 +89,6 @@
     ],
     theory: [
       { t: 'Theory', x: 'The circle of fifths, a guide to what chords live in every key, and an ear quiz for scale degrees. Tap around the circle — the app’s key follows.' }
-    ],
-    song: [
-      { t: 'Your song', x: 'The Studio’s home. There’s always a current song — its key and tempo are whatever the clef at the top says, and everything you capture or build lands in it.' },
-      { sel: '#ctx-btn', t: 'The capture button', x: 'Tap the clef, then the red dot: it works on every Studio page. Tap it, play anything — ROLI, typing keys, touch piano — tap again, and it’s saved in Ideas with the key and tempo you played it in. While it records, the clef shows a red dot.' },
-      { sel: '#sd-gotracks', t: 'Build it in Tracks', x: 'Tracks is the loop workstation: drums, synths and samplers all looping in sync. Ideas can be sent there with one tap.' }
-    ],
-    arrange: [
-      { t: 'Arrange', x: 'The song timeline: every track is a lane, and clips of its pattern (or its audio) sit on a bars-and-beats ruler. Everything you see plays, in sync, through the mixer.' },
-      { sel: '#ar-ruler', t: 'The ruler', x: 'Tap anywhere to jump the playhead there. DRAG along the ruler to draw a loop region — the Loop chip turns it on and off.' },
-      { sel: '#ar-lanes', t: 'Clips', x: 'Tap an empty spot on a lane to place a clip; DOUBLE-TAP a clip to open its notes or drum steps in the editor. Drag clips to move them (up/down hops between lanes of the same kind), Shift-tap to multi-select, right-click or Delete to remove.' },
-      { sel: '#ar-snap', t: 'Snap & zoom', x: 'Snap decides what dragging locks onto — whole bars down to free. Zoom with + and −, and Follow keeps the view chasing the playhead. Space plays and stops.' }
-    ],
-    tracks: [
-      { t: 'Tracks', x: 'A loop workstation: every track loops in sync at the shared tempo. Drums get a step grid, synths and samplers get a piano roll in the app’s note colors (by scale degree or by note, as set on the Fretboard or in Lights & help).' },
-      { sel: '#st-play', t: 'The loop', x: 'Play starts everything together — 1, 2 or 4 bars around. Export WAV renders your loop to a real audio file.' },
-      { sel: '#st-list', t: 'Your tracks', x: 'Each row: arm Live (your MIDI/typing keys play its instrument), rename, Mute / Solo, volume, Edit to open its editor, × to delete.' },
-      { sel: '#st-editor', t: 'The editor', x: 'Whatever’s selected opens here — drum steps (press and drag to paint), the piano roll (press empty space and DRAG to draw a note; drag notes to move, drag their right edge to stretch, tap to remove), synth voice knobs, or the sampler’s file + root note. Every track also has an FX slot.' }
     ],
     deck: [
       { sel: '#st-now', t: 'Your synth, on this screen', x: 'The sound the synth is on, its Part and program. Prev and Next step programs; Save preset keeps the sound, the strips, the buttons, the Scene, the key split and the app’s key as one preset. The grid under it is your Live set page (or your pinned sounds).' },
@@ -107,40 +103,36 @@
       { sel: '.st-lvprof', t: 'Profiles', x: 'A profile is a whole setup: your sounds, sets and Deck settings. Make one per player or per gig, export it as a file, import it on another device.' }
     ],
     midihub: [
-      { sel: '#mh-views', t: 'Player', x: 'Open a MIDI or MusicXML file and play it on your synth: tempo, a loudest-note cap, transpose, and Change key to move a piece into any key or scale. Open as tab turns it into guitar tab on the Songs page.' },
+      { sel: '#mh-views', t: 'Player', x: 'Open a MIDI or MusicXML file and play it on your synth: tempo, a loudest-note cap, transpose, and Change key to move a piece into any key or scale. To see a file as guitar tab, open it on the Songs page in soundLAB.' },
       { sel: '#mh-views', t: 'Control your synth', x: 'Control is the Synth Deck: your current sound at the top, the big knobs (filter, envelope, effects, volume), buttons for scenes, arpeggiator and Motion Sequencer, sounds you save and load with one tap, and a Scope that draws what the synth is playing. Your synth’s own knobs move the ones here too.' },
       { sel: '#sdk-now', t: 'Your current sound', x: 'The name, Part and program the synth is on, and the port it goes to. Prev and Next step through programs, the star pins a sound up here, Save sound keeps the program plus the knobs and buttons as they are now. Nothing is sent until you tap a sound.' },
       { sel: '#sdk-tabs', t: 'Knobs · Buttons · Sounds · Scope · Map', x: 'Knobs adds pages of extra knobs. Buttons has scenes, arp and Motion Sequencer switches, Part mute and the pedals. Sounds is your library and the synth’s banks by name. Scope shows the arpeggiator and sequencer notes against the beat and the controller curves the synth sends. Map is where every number lives: a ? means it came from documentation, so tap Learn and move the control on the synth to make it yours.' },
       { t: 'MIDI Hub', x: 'Everything on the MIDI cable, for any device: a synth, a controller, a DAW port. Connect, pick In and Out, and the Monitor shows every message decoded as you play or turn knobs.' },
       { sel: '#mh-views', t: 'Eight views', x: 'Player plays a MIDI or MusicXML file on the synth. Play sends notes, bend, mod and program changes. Controls is a wall of CC sliders plus transport and clock. Rules reshape messages. SysEx talks to the deep settings. Monitor reads everything. Learn explains it all.' },
-      { sel: '#mh-hear', t: 'Only the device sounds', x: 'While this page is open soundLAB keeps its own piano quiet, so a synth is never doubled. Tick App voice to hear both. For every other page the same switch lives in Settings › MIDI keyboard.' },
-      { sel: '#mh-thru', t: 'Thru and Rules', x: 'Thru passes In to Out through your Rules — remap a knob, transpose, force a channel, block aftertouch. Rules can also change what soundLAB itself hears, on every page.' },
+      { sel: '#mh-thru', t: 'Thru and Rules', x: 'Thru passes In to Out through your Rules — remap a knob, transpose, force a channel, block aftertouch. Thru runs while soundLAB Gear is open: keep this window open to pass your keyboard to the synth. Rules can also change what soundLAB hears, on every page.' },
       { sel: '#mh-profile', t: 'Device profiles', x: 'Generic speaks plain MIDI to anything. A profile adds named knobs and ready-made SysEx builders for that maker (Yamaha MODX/MONTAGE, Roland…) — nothing else changes.' }
     ],
     helix: [
-      { t: 'Helix Stadium', x: 'Control a Line 6 Helix Stadium from soundLAB. Over USB MIDI: presets, snapshots, knobs, pedals, looper and the Matrix mixer. With the bridge on this computer (node tools/helix-bridge.js) it also reads and edits the loaded preset block by block.' },
+      { t: 'Helix Stadium', x: 'Control a Line 6 Helix Stadium from soundLAB Gear. Over USB MIDI: presets, snapshots, knobs, pedals, looper and the Matrix mixer. With the bridge on this computer (node tools/helix-bridge.js) it also reads and edits the loaded preset block by block.' },
       { sel: '#hx-armrow', t: 'Nothing sends until you arm', x: 'Output starts disarmed. Arm opens a 90-second window that every command renews; leaving the page, hiding the app or switching windows disarms it again. Reads never need arming.' },
       { sel: '#hx-views', t: 'Six views', x: 'Rig is the pedalboard: presets, favorites, snapshots, knobs. Blocks edits the loaded preset live (bridge). Presets browses and loads (bridge). Looper & Song, Mixer, and a Monitor of every message.' },
       { sel: '#hx-favs', t: 'Favorites', x: 'Name a preset address once, recall it with one tap. With the bridge running, the star next to a preset fills in its address for you. Saving a favorite never sends anything.' }
     ],
     pads: [
-      { t: 'Drum pads', x: 'Finger drums. Eight pads play your drum track’s kit — tap them, use Z X C V / A S D F, or hit them from MIDI keys with real velocity.' },
-      { sel: '#pd-rec', t: 'Record a beat', x: 'Turn this on while the loop plays and every hit snaps onto the nearest 1/16 of your pattern. Fine-tune the steps afterwards on the Tracks page.' },
-      { sel: '#pd-mode', t: 'MIDI mapping', x: 'ROLI octave maps eight keys from a base note — with key lights showing the kit on a LUMI, flashing with the beat. GM drums speaks the standard drum-pad map.' }
-    ],
-    ideas: [
-      { t: 'Ideas', x: 'Your riff inbox. Everything captured with the red dot lands here, tagged with the key and tempo it was played in.' },
-      { sel: '#sd-retro', t: 'The best takes happen early', x: 'soundLAB always remembers the last little while of your playing. Played something great before hitting record? Grab it here after the fact.' },
-      { t: 'Do things with ideas', x: 'Play them back, rename them, send one To track to edit it in the loop, or Use key to tune the whole app to the idea’s key.' }
+      { t: 'Drum pads', x: 'Finger drums. Eight pads play the drum kit — tap them, use Z X C V / A S D F, or hit them from MIDI keys with real velocity.' },
+      { sel: '#pd-mode', t: 'MIDI mapping', x: 'ROLI octave maps eight keys from a base note — with key lights showing the kit on a LUMI, flashing with every hit. GM drums speaks the standard drum-pad map.' }
     ],
     lights: [
-      { t: 'Lights & help', x: 'One place for how much the app helps you. The Help level is the difficulty: Full shows the scale in color with names, fingers and the next note; None is a bare keyboard. It applies to the Keys page, Scale lessons, Exercises and your keyboard’s own lights.' },
+      { t: 'Lights & help', x: 'One place for how much the app helps you. The Help level is the difficulty: Full shows the scale in color with names, fingers and the next note; None is a bare keyboard. ' +
+        (GEAR ? 'It applies to your keyboard’s own lights and, in soundLAB, to the Keys page, Scale lessons and Exercises.' : 'It applies to the Keys page, Scale lessons, Exercises and your keyboard’s own lights.') },
       { t: 'Your keyboard’s lights', x: 'A LUMI lights every key of the scale in the same color as the screen (Color notes by: Interval = by scale degree, Note = every C one color), and follows the app’s key on every page. Play a note after pressing its octave buttons and the app follows the new octave too.' },
-      { t: 'LUMI Display', x: 'On by default: during a lesson or practice run the LUMI shows only what to play \u2014 the note to play now steady in its color, the next one blinking \u2014 and the full scale comes back when the run ends. Songs and the Woodshed light the notes to play the same way; Woodshed Wait mode holds the light until you play it. Double-tap your keyboard\u2019s lowest key, or the lesson card, to start and stop a lesson.' },
-      { sel: '#lc-remote', t: 'Hands-free', x: 'A pedal, a button on your synth or a page-turner pedal can press Next, Back and Stop on the practice pages, so you never reach for the screen. Set up opens Settings › Hands-free control.' }
+      { t: 'LUMI Display', x: 'On by default: ' + (GEAR ? 'in soundLAB, ' : '') + 'during a lesson or practice run the LUMI shows only what to play \u2014 the note to play now steady in its color, the next one blinking \u2014 and the full scale comes back when the run ends. Songs and the Woodshed light the notes to play the same way; Woodshed Wait mode holds the light until you play it. Double-tap your keyboard\u2019s lowest key, or the lesson card, to start and stop a lesson.' },
+      { sel: '#lc-remote', t: 'Hands-free', x: GEAR
+        ? 'A pedal, a button on your synth or a page-turner pedal can press Next and Back on the Deck and Live sets, so you never reach for the screen. While a soundLAB window is on screen the pedal moves its practice pages on instead. Set up opens Settings › Hands-free control in soundLAB.'
+        : 'A pedal, a button on your synth or a page-turner pedal can press Next, Back and Stop on the practice pages, so you never reach for the screen. Set up opens Settings › Hands-free control.' }
     ],
     settings: [
-      { t: 'Settings', x: 'App-wide preferences, grouped by section: theme and accent color, one master volume for everything, studio capture options, screen wake, MIDI setup, hands-free control and plugins for advanced workflows.' },
+      { t: 'Settings', x: 'App-wide preferences, grouped by section: theme and accent color, one master volume for everything, screen wake, MIDI setup and hands-free control.' },
       { sel: '#set-remote-card', t: 'Hands-free control', x: 'Press Learn beside Next, Back or Stop, then the pedal, synth button or page-turner key. From then on it only moves practice on — it never plays a note, sustains or answers a question. Try it here: the screen says it works.' }
     ]
   };
@@ -229,7 +221,8 @@
     if (App.showBar) App.showBar(); // tours point at the top bar too
     close();
     steps = extraSteps || TOURS[page] || [
-      { t: 'This page', x: 'Explore freely — nothing here can break anything. The clef at the top (key, scale, tempo) is shared by every page, and the gear holds app-wide settings.' }
+      { t: 'This page', x: 'Explore freely — nothing here can break anything. The clef at the top (key, scale, tempo) is shared by every page, and the gear ' +
+        (App.app === 'gear' ? 'opens Settings in soundLAB.' : 'holds app-wide settings.') }
     ];
     idx = 0;
     ov = document.createElement('div');
@@ -248,9 +241,9 @@
 
   function welcome() {
     openTour(null, [
-      { t: 'Welcome to soundLAB', x: 'Start with Exercises: a short theory and ear-training course you answer by playing. Around it are two workspaces: Practice (guitar, keys, jam band, tuner…) and the Studio (record ideas, build loops, finger-drum). The Studio button in the top corner switches between them.' },
-      { t: 'One musical brain', x: 'The clef button at the top opens key, scale and tempo, shared by EVERYTHING. Change it once and the fretboard re-colors, the jam re-harmonizes, and the Studio follows. Its metronome ▶ starts the click from any page.' },
-      { t: 'Sections', x: 'The tabs — Learn, Guitar, Keys, Play, Practice (along the bottom on phones) — are the app’s sections. The pills at the top of the page switch pages inside a section (Neck / Tab / Notation, Piano / Synth / Pads…).' },
+      { t: 'Welcome to soundLAB', x: 'Start with Exercises: a short theory and ear-training course you answer by playing. Around it: guitar, keys, songs, the jam band and the tuner.' },
+      { t: 'One musical brain', x: 'The clef button at the top opens key, scale and tempo, shared by EVERYTHING. Change it once and the fretboard re-colors and the jam re-harmonizes. Its metronome ▶ starts the click from any page.' },
+      { t: 'Sections', x: 'The tabs — Learn, Guitar, Keys, Play, Train (along the bottom on phones) — are the app’s sections. The pills at the top of the page switch pages inside a section (Neck / Tab / Notation, Piano / Charts / Pads…).' },
       { sel: '#met-btn', t: 'The metronome', x: 'Always one tap away in the top corner: it opens over any page and keeps playing when you close it.' },
       { t: 'Whenever you’re lost', x: 'Tap the ? in the top bar — it explains whichever page you’re on, step by step. Try it on every page once.' }
     ]);
@@ -282,10 +275,18 @@
       });
     }
 
-    // fresh install: say hello once
-    if (!store().get('help.seen', false)) {
-      store().set('help.seen', true);
-      setTimeout(welcome, 700);
+    // fresh install: say hello once. Not in soundLAB Gear: the welcome is
+    // about soundLAB's pages, and help.seen stays unset there. Marked as
+    // seen only when the card is really shown: a document that is leaving
+    // for the other app (index.html#deck: boot returned before any page
+    // opened, App.active is still null) is gone before the card, and
+    // soundLAB's own first start must still get it
+    if (App.app !== 'gear' && !store().get('help.seen', false)) {
+      setTimeout(function () {
+        if (!App.active) return;
+        store().set('help.seen', true);
+        welcome();
+      }, 700);
     }
   }
 
