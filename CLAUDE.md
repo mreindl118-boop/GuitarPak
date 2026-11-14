@@ -1317,9 +1317,9 @@ A1 (Studio space, sequencer/arranger, sampler, plug-in API removed):
   are gone, nothing runs stored code. `App.addPage(id, label, sp, mod)` stays
   as an INTERNAL test hook (tests/remote.test.js; `sp` is ignored).
 - sw.js: A1 set `CACHE` to `PREFIX + 'v5'` ('sl2-next-v5' on the beta,
-  'sl2-live-v5' at the live address; A2 v6, A3a v7, A3b v8, A4 v9 = the
-  number now; v4 = the live 2.0.0). The fetch handler looks ONLY in
-  its own cache
+  'sl2-live-v5' at the live address; A2 v6, A3a v7, A3b v8, A4 v9; Phase
+  B1a v10 = the number now; v4 = the live 2.0.0). The fetch handler looks
+  ONLY in its own cache
   (`caches.open(CACHE)` then `match(req, {ignoreSearch: true})`), never the
   global `caches.match`: the live worker's cache on the same origin can hold
   older copies of the same URLs (read from the code, not measured).
@@ -1899,6 +1899,97 @@ the Backup card and one start notice):
   longer deferred: service-worker caches are named by scope and the live
   worker removes the 'guitarlab-*' caches since 2.0.0 (sw.js).
 
+## soundLAB 2.0 Phase B ("Design system + shell") — state on `v2`
+
+OUT OF DATE in the "soundLAB 2.0 (branch `v2`) — read first" paragraph near
+the top (that paragraph is frozen: do not edit it, plan rule 5): "Beta + live
+share `localStorage`" ended with A4 (the beta keeps its own data under
+`soundlab2-next.*`), and "Work = one phase per draft PR" is no longer so (a
+phase is many draft PRs: Phase A five, Phase B 24).
+
+Plan: `docs/plans/phase-b/PLAN.md` (24 draft PRs into `v2`, B0 to B18, at
+most three open at a time; its section 1 = the rules for every Phase B PR,
+section 2 = the decisions D1-D44, section 3 = the order and the cache number
+of each step, Appendix C = every token value; the seven `map-*.md` beside it
+are its evidence). The instrument matrix of Phase B0:
+`docs/INSTRUMENT-MATRIX.md` (four instruments against the practice kit, 56
+cells, 26 task candidates for Phase C; a Phase B step that changes a cell
+updates it). State per step: `docs/ROADMAP-2.0.md` "Phase B status". Phase B
+is NOT a release: never touch `APP_VERSION`, `version.json`,
+`android/AndroidManifest.xml` or `releases/`; in `sw.js` only the `CACHE`
+number and `ASSETS`.
+
+Three rules of the plan, in short (the numbers are the plan's):
+
+- TOKENS ONLY (rule 6): every new component uses only `--sl-*` tokens
+  (css/tokens.css). No raw colour, no old variable (`--bg`, `--card`,
+  `--accent` … of css/style.css), no literal duration or z-index in
+  css/components.css, in a rule under `.sl-skin`, or in a module's CSS once
+  that module's page is re-skinned. Note colours are data, not tokens: they
+  reach an element as an inline custom property (`--c`) set from App.colors.
+  The `tokens` suite counts raw colours and old-variable uses per file and
+  fails when a count rises.
+- GEAR'S PAGES DO NOT CHANGE (rule 11): no rule added, changed or removed in
+  Phase B may change a computed style of an element inside gear.html's
+  `<main>` (Phase H redesigns them). A rule leaves css/style.css only when
+  no element inside `<main>` of either app matches its selector. The `look`
+  suite holds this from B2 on.
+- THE MARKER IS `.sl-skin` (rule 12): a container gets the class in the step
+  that re-skins it, and only inside it do the new looks of the shared
+  classes (`btn`, `card`, `chip`, `seg` …) apply. No Gear panel carries it
+  before Phase H. Whatever a module appends to `<body>` sits inside a
+  container that carries the class, or it keeps the old look.
+
+B1a (tokens that pass, the `tokens` suite, the plan; NO visible change:
+nothing in either app reads a `--sl-*` token yet, `grep -rn "var(--sl-" js
+css index.html gear.html` finds only css/tokens.css):
+
+- css/tokens.css, NEW TOKENS by group. Surfaces: `--sl-surface-sunken`
+  (wells; the old `--inset`), `--sl-stage` (the ground under an instrument,
+  dark in BOTH themes), `--sl-line-control` (a control's boundary). Ink:
+  `--sl-ink-soft` (field labels; the old `--label`). Accent:
+  `--sl-accent-text` (amber as TEXT and as the focus ring),
+  `--sl-accent-deep` (the old `--accent-dim`; never text),
+  `--sl-accent-glow-color`. NAMING TRAP: `--sl-accent-ink` is the text ON
+  the accent; the old `--accent-ink` is the accent AS text, which is
+  `--sl-accent-text`. Status: `--sl-judge-perfect` / `-great` / `-good` /
+  `-miss`. Keys and strings: `--sl-key-line`, `--sl-key-press`, `--sl-nut`,
+  `--sl-ink-on-color`, `--sl-ink-on-color-light`. Type:
+  `--sl-weight-regular` 400, `-medium` 500, `-cond` 600, `-cond-bold` 700
+  (only weights that have a font file). Controls: `--sl-control-h-hero`
+  64px, `--sl-control-h-dense` 36px (48px on touch; the dense tier waits for
+  the owner's yes, plan D9). Layers: `--sl-z-bar` 50, `-pop` 60, `-full`
+  200, `-sheet` 420, `-tour` 500, `-toast` 600, `-drag` 700 (today's
+  numbers; messages above sheets).
+- CHANGED VALUES: in light `--sl-accent-ink` is dark (#1a1206, as in dark)
+  and `--sl-ink-muted` and the four status colours are deeper; the keys are
+  ivory and ebony in both themes (no longer re-inked); `--sl-focus` is an
+  opaque two-layer ring made of `--sl-bg` and `--sl-accent-text`, so it
+  follows the theme by itself; the touch sizes key on `(any-pointer:
+  coarse)`; `--sl-deg-1` … `-7` are DEGREE_DEFAULTS of js/app.js (no rule
+  reads them: a page shows the colours of App.colors).
+- NEW SUITE `tokens` (tests/tokens.test.js, pure Node, 0.2 s, in the one
+  list in tests/run.sh; run `node tests/tokens.test.js` after every commit).
+  T1 the contrast of the pair list in the test (the contract), both themes,
+  computed from css/tokens.css with translucent tokens composited over
+  their surface: text 4.5:1; control boundary, focus ring, key outline,
+  keys and nut on the stage 3:1. T2 every `var(--sl-…)` in css/, js/ and
+  the two HTML files names a token that is defined (CSS ignores a misspelt
+  one without a sign). T3 raw colours (hex, rgb(, hsl() per file only go
+  down: table RAW_CEILING; the note palettes are on DATA_PALETTES. T4 uses
+  of the 29 old variables per file and name only go down: table
+  OLD_CEILING; the seven Gear modules and js/scoreplayer.js are exempt
+  until Phase H. T5 css/tokens.css is the first stylesheet of both pages.
+  T6 both reduced-motion blocks exist. T7 the degree tokens equal
+  DEGREE_DEFAULTS. T3 and T4 count code, not comments; a file that is not
+  in a table has ceiling 0; a count under its ceiling passes with a NOTE,
+  and the step that converts a file lowers its ceilings in the same commit
+  (`node tests/tokens.test.js --tables` prints both tables as they stand).
+- sw.js: `CACHE` = `PREFIX + 'v10'` (B1b leaves it; B2 v11 … B18 v31: plan
+  section 3).
+- Docs: the plan and its maps are under docs/plans/phase-b/ as text. No
+  picture is ever committed: both deploys publish the whole tree.
+
 ## Cross-module conventions
 
 - SECTION TAB BAR (v0.70.0; app.js GROUPS + populateNav): the main nav is a
@@ -2101,6 +2192,11 @@ the Backup card and one start notice):
   listed suites, and that no string in js/ names a key under the deny
   list), storage-import (2.0 Phase A4: the one-time copy of the
   earlier store, the beta scope, a full store, Backup format 2),
+  tokens (2.0 Phase B1a, pure Node: the contrast of the --sl-* token pairs
+  in both themes, every var(--sl-…) names a defined token, raw colours and
+  old variables per file only go down, css/tokens.css loads first, motion
+  can be switched off, the degree tokens = DEGREE_DEFAULTS; see the Phase B
+  section),
   gear (soundLAB Gear:
   boot, its four pages, the links and #page both ways, Hear input with both
   apps open), remote-gear (the remote on Live sets and the Deck, the
