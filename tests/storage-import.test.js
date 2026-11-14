@@ -57,12 +57,12 @@ const ROOM = 200000;    // characters that must still fit when the copy is done
 const KEEP = 190000;
 
 // the notice at each start while something did not fit (js/app.js boot); (1) = the number of items
-const NOTICE = /Some of your 1\.x data did not fit in this browser's storage \((\d+) items?\)\. soundLAB tries again each time it starts\. Details: soundLAB › Settings › Backup\./;
+const NOTICE = /Some of your earlier soundLAB data did not fit in this browser's storage \((\d+) items?\)\. soundLAB tries again each time it starts\. Details: soundLAB › Settings › Backup\./;
 // Settings › Backup, the status block #set-backup-info (js/settings.js)
-const INFO_COPIED = /^Copied your 1\.x data on .+?: (\d+) items?\./;
-const INFO_FAILED = /\b(\d+) items? did not fit in this browser's storage and (?:is|are) tried again at each start: (.+?)\. Your 1\.x data is untouched\./;
-const INFO_KEPT = /\b(\d+) items? (?:was|were) not copied because 2\.0 already has its own data there: (.+?)\. Copy again would replace it\./;
-const AGAIN = 'Copy my 1.x data again', AGAIN_BETA = 'Copy from the live app again', AGAIN_SURE = 'Tap again: this overwrites 2.0 settings';
+const INFO_COPIED = /^Copied your earlier soundLAB data on .+?: (\d+) items?\./;
+const INFO_FAILED = /\b(\d+) items? did not fit in this browser's storage and (?:is|are) tried again at each start: (.+?)\. Your earlier data is untouched\./;
+const INFO_KEPT = /\b(\d+) items? (?:was|were) not copied because this version already has its own data there: (.+?)\. Copy again would replace it\./;
+const AGAIN = 'Copy my earlier data again', AGAIN_BETA = 'Copy from the live app again', AGAIN_SURE = 'Tap again: this overwrites the settings here';
 
 // ---- what a 1.x profile holds ----
 // Raw strings, as the live 1.x app stored them. Some are oddly spaced on purpose: a copy that parsed the

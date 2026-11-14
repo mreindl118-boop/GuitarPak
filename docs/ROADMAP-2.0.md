@@ -88,10 +88,10 @@ Decided while trimming (each takes effect with its step):
 - With soundLAB and Gear both visible, a bound pedal acts in soundLAB; Gear answers it when soundLAB is hidden
   or closed. Hear input sounds in one window.
 - LUMI practice on the Piano page: while its section is open it owns the pedal; starting a lesson closes it.
-- The copy from `guitarlab.*` runs once per browser and never changes or deletes the 1.x data. Items that do
+- The copy from `guitarlab.*` runs once per browser and never changes or deletes the live app's data (2.0.0 still stores under `guitarlab.*`). Items that do
   not fit are tried again at each start. Studio, sampler and plug-in data is not copied and not deleted.
 - The beta has its own data (`soundlab2-next.*`). Practice done in the beta does not flow into the live app at
-  the release: the live address copies its own 1.x data then. Settings › Backup offers to copy again, and a
+  the next release: the live address copies its own earlier data then. Settings › Backup offers to copy again, and a
   backup file from the beta restores on the live address.
 
 Removed in 2.0: `js/studio.js`, `js/arrange.js`, `js/plugins.js`, `plugins/`, `PLUGINS.md`.
@@ -105,8 +105,8 @@ Removed in 2.0: `js/studio.js`, `js/arrange.js`, `js/plugins.js`, `plugins/`, `P
 - Beta caveats: the beta and the live app share the browser origin. The
   shared-`localStorage` caveat of Phase 0 ended with Phase A (step A4): the
   beta keeps its data under `soundlab2-next.*`, 2.0 at the live address will
-  use `soundlab2.*`, and neither writes, deletes or changes the live 1.x
+  use `soundlab2.*`, and neither writes, deletes or changes the live
   app's `guitarlab.*` data (it is copied across once). What stays shared is
-  the browser's storage budget for the origin. The cache caveat stays: the
-  live service worker clears the beta's cache whenever the live app updates
-  (the beta refills on the next visit).
+  the browser's storage budget for the origin. The cache caveat ended with 2.0.0: service-worker
+  caches are named by scope (`sl2-live-*` / `sl2-next-*`), so the live app and
+  the beta no longer clear each other's.

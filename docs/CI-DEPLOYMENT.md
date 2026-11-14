@@ -154,7 +154,7 @@ bare repositories, with no network.
 
 Sharing one origin. Storage is no longer shared between the beta and the live
 app (roadmap Phase A, step A4): the beta keeps its data under
-`soundlab2-next.*`, the live 1.x app under `guitarlab.*`, and 2.0 at the live
+`soundlab2-next.*`, the live app (2.0.0) under `guitarlab.*`, and 2.0 at the live
 address will use `soundlab2.*`. The beta copies the live app's data across once,
 at its first start in a browser, and never writes, deletes or changes a
 `guitarlab.*` key; a change made in one app no longer shows in the other. The

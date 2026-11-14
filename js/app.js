@@ -1921,8 +1921,9 @@ window.App = (function () {
     // only place boot() touches the copy (importOnce, at the store)
     var copyInfo = store.importInfo(), copyNote = !!(copyInfo && copyInfo.failed.length);
     if (copyNote) {
-      // on the beta the copy can come from the live 2.0 app instead of the 1.x store
-      notes.push('Some of your ' + (copyInfo.from === STORE_LEGACY ? '1.x data' : 'data from the live app') +
+      // on the beta both sources are the live app's data: its own store ('guitarlab.*',
+      // which the live 2.0.0 still writes) or, after a later release, the live 2.0 scope
+      notes.push('Some of your ' + (copyInfo.from === STORE_LEGACY && !STORE_BETA ? 'earlier soundLAB data' : 'data from the live app') +
         ' did not fit in this browser\'s storage (' + copyInfo.failed.length + (copyInfo.failed.length === 1 ? ' item' : ' items') +
         '). soundLAB tries again each time it starts. Details: soundLAB › Settings › Backup.');
     }

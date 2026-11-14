@@ -5,7 +5,8 @@ WebView wrapper. GitHub: https://github.com/mreindl118-boop/GuitarPak
 Branded **soundLAB** (formerly GuitarLab) since v0.43.0 — the rename is
 user-facing ONLY: the APK ships as soundLAB-alpha.apk (a GuitarLab-alpha.apk
 copy keeps old links alive), and internal ids/comments are untouched.
-STORAGE: the 1.x app (branch main) keeps its data under 'guitarlab.*'. 2.0
+STORAGE: the live app on branch main (2.0.0, the code before Phase A) keeps
+its data under 'guitarlab.*'. 2.0
 (branch v2, since Phase A4) keeps its own under 'soundlab2.*'
 ('soundlab2-next.*' on the beta under /next/). For 2.0 'guitarlab.*' is the
 1.x store: copied across ONCE at the first start and never written, deleted
@@ -86,7 +87,7 @@ js/app.js         shell: module registry, tab switching, shared AudioContext +
                   address, the test server, file://, the artifact).
                   App.store.legacy = 'guitarlab.' = the 1.x store: READ by
                   the copy below, never written, deleted or changed (the
-                  live 1.x app on the same origin still uses it). get(key,
+                  live app on the same origin still uses it). get(key,
                   fallback) / set(key, value) = JSON, as always (a refused
                   write is swallowed); keys() = this scope's keys WITHOUT
                   the prefix; raw(key) = the stored string as it is, or
@@ -140,7 +141,7 @@ js/app.js         shell: module registry, tab switching, shared AudioContext +
                   once. START NOTICE: boot(), both apps, after the start
                   tab is shown, App.toast at EVERY start while failed is
                   not empty (8 s; joined with the other start notices when
-                  there are any): "Some of your 1.x data did not fit in
+                  there are any): "Some of your earlier soundLAB data did not fit in
                   this browser's storage (N items). soundLAB tries again
                   each time it starts. Details: soundLAB › Settings ›
                   Backup." ("data from the live app" on the beta when its
@@ -328,7 +329,7 @@ js/audioin.js     SOUND INPUT (App.audioIn): the ONE shared live-input service.
                   step with a press made in the other window; it never
                   routes, opens or steals (Chromium can deliver the lock
                   news before the stored value). Since 2.0 Phase A4 only
-                  THIS scope's key counts: the live 1.x app and the beta
+                  THIS scope's key counts: the live app and the beta
                   keep the same switch under their own prefix on the same
                   origin, and a write there is not this app's. No Web
                   Locks, or a refused request (the claude.ai viewer, old
@@ -415,7 +416,7 @@ js/midirules.js   MIDI RULES (App.midiRules, 2.0 Phase A3a): the MIDI Hub's
                   store): the box ticked in ANOTHER window of this app; the
                   window that ticks it calls install() itself (the Hub's
                   installFilter). Since 2.0 Phase A4 only THIS scope's key
-                  counts (the live 1.x app and the beta keep the same box
+                  counts (the live app and the beta keep the same box
                   under their own prefix on the same origin).
                   active() -> {on, rules} (rules = enabled count; soundLAB's
                   Settings line #set-midi-rules shows it). Bus
@@ -644,14 +645,14 @@ js/settings.js    ┘ (settings: app-level prefs — theme dark/light/auto; MIDI
                      2.0 Phase A4 BACKUP CARD (all through App.store, no
                      localStorage here): #set-backup-info = what the
                      one-time copy did, from App.store.importInfo()
-                     ("Copied your 1.x data on <date>: N items." + the
+                     ("Copied your earlier soundLAB data on <date>: N items." + the
                      keys that did not fit and are tried again at each
                      start + the keys left alone because 2.0 has its own
                      data there; painted at init and on show).
-                     #set-copy-again "Copy my 1.x data again" (on the beta
+                     #set-copy-again "Copy my earlier data again" (on the beta
                      "Copy from the live app again"): TWO taps within 3 s,
-                     the second labelled "Tap again: this overwrites 2.0
-                     settings", then App.store.copyAgain() and a reload;
+                     the second labelled "Tap again: this overwrites the
+                     settings here", then App.store.copyAgain() and a reload;
                      no confirm() (the artifact frame refuses it). EXPORT
                      = format 2: {app: 'soundLAB', format: 2, from:
                      App.version, scope: App.store.prefix, keys:
@@ -1638,7 +1639,7 @@ nothing on screen changes except the Backup card and one start notice):
   released there (Phase I).
 - 'guitarlab.*' IS THE 1.X STORE, READ-ONLY FOR 2.0: no 2.0 code writes,
   removes or changes a 'guitarlab.*' key (removed feature or not), and none
-  opens or deletes the IndexedDB 'guitarlab-daw'. The live 1.x app on the
+  opens or deletes the IndexedDB 'guitarlab-daw'. The live app on the
   same origin still uses both. Deleting them is an explicit Settings action
   in a release after 2.0, never a side effect.
 - EVERYTHING GOES THROUGH App.store: no file but js/app.js calls
@@ -1695,7 +1696,7 @@ nothing on screen changes except the Backup card and one start notice):
 - 'storage' EVENTS: js/midirules.js (midihub.rulesIn) and js/audioin.js
   (audio.monitor) take a key only when it is App.store.prefix + that name
   (or null = the store was cleared). A3a / A3b matched by suffix; with
-  three prefixes on one origin that would react to the live 1.x app's or
+  three prefixes on one origin that would react to the live app's or
   the beta's switch. A new 'storage' listener matches the same way.
 - BACKUP (js/settings.js, layout entry above): the EXPORT is format 2,
   {app: 'soundLAB', format: 2, from: <app version>, scope: <prefix>, keys:
@@ -1706,7 +1707,7 @@ nothing on screen changes except the Backup card and one start notice):
   THIS scope, string values only, skips the deny list and
   reports "N settings restored, M from removed features skipped". It never
   writes a 'guitarlab.' key. #set-backup-info shows what the copy did
-  (copied / did not fit / left alone); #set-copy-again = "Copy my 1.x data
+  (copied / did not fit / left alone); #set-copy-again = "Copy my earlier data
   again" (beta: "Copy from the live app again"), two taps within 3 s, no
   confirm(), then App.store.copyAgain() (overwrites 2.0's values) and a
   reload. The other export files carry no prefix and are unchanged (the
@@ -1739,13 +1740,13 @@ nothing on screen changes except the Backup card and one start notice):
 - OTHER ORIGINS (read from the code, not run): the claude.ai artifact and
   a file:// copy have their own localStorage; the same code copies that
   origin's 'guitarlab.*' at the first 2.0 start. The Android app loads the
-  live address, so its copy happens there at the flip, without a new APK.
+  live address, so its copy happens there at the next release to main, without a new APK.
 - NOT SOLVED IN PHASE A: localStorage has ONE budget per origin and nothing
-  here frees space ('guitarlab.*' is never deleted, the live 1.x app keeps
+  here frees space ('guitarlab.*' is never deleted, the live app keeps
   writing it). An origin that is already full keeps an incomplete copy
-  until the user frees space; the 1.x data is untouched throughout and the
-  notice and the Settings line say so. After the flip the origin holds
-  three copies of the kept data (1.x, beta, live). The sizes of a real 1.x
+  until the user frees space; the live app's data is untouched throughout and the
+  notice and the Settings line say so. After that release the origin holds
+  three copies of the kept data ('guitarlab.*', beta, live). The sizes of a real 1.x
   profile were NOT measured: on the owner's profile note the total size of
   'guitarlab.*' once (DevTools › Application).
 - DEFERRED, do not build in Phase A (PLAN.md section 9): whether the live

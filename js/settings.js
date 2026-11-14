@@ -889,7 +889,7 @@
     var backupMsg = document.getElementById('set-backup-msg');
     var infoEl = document.getElementById('set-backup-info');
     var againBtn = document.getElementById('set-copy-again');
-    var AGAIN = onBeta ? 'Copy from the live app again' : 'Copy my 1.x data again';
+    var AGAIN = onBeta ? 'Copy from the live app again' : 'Copy my earlier data again';
     function items(n) { return n + (n === 1 ? ' item' : ' items'); }
     // a list of key names for a sentence; a long one is cut (a full store can fail hundreds)
     function names(list) {
@@ -900,18 +900,18 @@
       var info = App.store.importInfo();
       infoEl.hidden = !info;
       if (!info) { infoEl.textContent = ''; return; } // no copy yet in this browser (storage is blocked)
-      var old = info.from === App.store.legacy; // the 1.x store; on the beta it can be the live 2.0 app instead
+      var old = info.from === App.store.legacy && !onBeta; // the earlier store; on the beta every source is the live app's data
       var day = '';
       try { day = info.at ? new Date(info.at).toLocaleDateString() : ''; } catch (e) { day = ''; }
-      var t = (old ? 'Copied your 1.x data' : 'Copied your data from the live app') + (day ? ' on ' + day : '') + ': ' + items(info.copied) + '.';
+      var t = (old ? 'Copied your earlier soundLAB data' : 'Copied your data from the live app') + (day ? ' on ' + day : '') + ': ' + items(info.copied) + '.';
       if (info.failed.length) {
         t += ' ' + items(info.failed.length) + ' did not fit in this browser\'s storage and ' +
           (info.failed.length === 1 ? 'is' : 'are') + ' tried again at each start: ' + names(info.failed) + '. ' +
-          (old ? 'Your 1.x data is untouched.' : 'The live app\'s data is untouched.');
+          (old ? 'Your earlier data is untouched.' : 'The live app\'s data is untouched.');
       }
       if (info.kept.length) {
         t += ' ' + items(info.kept.length) + (info.kept.length === 1 ? ' was' : ' were') +
-          ' not copied because 2.0 already has its own data there: ' + names(info.kept) + '. Copy again would replace it.';
+          ' not copied because this version already has its own data there: ' + names(info.kept) + '. Copy again would replace it.';
       }
       if (infoEl.textContent !== t) infoEl.textContent = t;
     }
@@ -929,7 +929,7 @@
     againRest();
     againBtn.addEventListener('click', function () {
       if (!againT) {
-        againBtn.textContent = 'Tap again: this overwrites 2.0 settings';
+        againBtn.textContent = 'Tap again: this overwrites the settings here';
         againBtn.classList.add('primary');
         againT = setTimeout(againRest, 3000);
         return;
