@@ -193,6 +193,12 @@
     App.store.set('midihub.' + name, blobOf(name));
   }
   function flushAll() { ['deck', 'decklib', 'deckvals', 'names'].forEach(flushOne); }
+  // persist() for what the user did NOT edit: the sub-tab that was looked at,
+  // what the synth just sent. While the blob still waits for its copy (2.0
+  // Phase A4, App.store.waiting: the earlier map / values did not fit yet) it
+  // stays in memory: once stored, the next start would take the default blob
+  // around it for the user's own data and stop trying
+  function persistLook(name) { if (!App.store.waiting('midihub.' + name)) persist(name); }
 
   // ---- the effective map: defaults ⊕ overrides ⊕ custom controls/pages ----
   function profileKey() { return api ? api.profileKey() : 'generic'; }
@@ -538,7 +544,7 @@
     return deck.tab;
   }
   function showTab(name, first) {
-    if (deck.tab !== name) { deck.tab = name; persist('deck'); }
+    if (deck.tab !== name) { deck.tab = name; persistLook('deck'); }
     if (!mounted) return;
     qa('button', els.tabs).forEach(function (b) { var on = b.dataset.tab === name; b.classList.toggle('active', on); b.setAttribute('aria-pressed', String(on)); });
     qa('.sdk-tab', box2).forEach(function (p) { p.hidden = p.dataset.tab !== name; });
@@ -1081,16 +1087,16 @@
     if (learning) onLearnFrame(b, d.portId);
     if (readJob && b[0] === 0xF0) onReadFrame(b);
     if (st === 0xB0 && b.length > 2) {
-      if (b[1] === 0 || b[1] === 32) { var lb = vals.lastBank || { msb: 0, lsb: 0, pc: 1, ch: c, t: 0 }; lb[b[1] === 0 ? 'msb' : 'lsb'] = b[2]; lb.ch = c; lb.t = Date.now(); vals.lastBank = lb; persist('deckvals'); if (c === api.ch()) paintNowSoon(); }
+      if (b[1] === 0 || b[1] === 32) { var lb = vals.lastBank || { msb: 0, lsb: 0, pc: 1, ch: c, t: 0 }; lb[b[1] === 0 ? 'msb' : 'lsb'] = b[2]; lb.ch = c; lb.t = Date.now(); vals.lastBank = lb; persistLook('deckvals'); if (c === api.ch()) paintNowSoon(); }
       else if (c === api.ch() && !api.allKnobs().some(function (k) { return k.cc === b[1]; })) {
         // a page knob the Hub card does not show: mirror it (the Hub mirrors its own)
         var hit = false;
         map().controls.forEach(function (ctl) { if (ctl.ui === 'knob' && ctl.kind === 'cc' && ctl.num === b[1] && chOf(ctl) === c) hit = true; });
-        if (hit) { api.setKv(b[1], b[2]); qa('.mh-knob[data-ctl][data-kind="cc"][data-cc="' + b[1] + '"]', els.pages).forEach(function (k) { api.paintKnobEl(k, b[2]); }); }
+        if (hit) { api.setKv(b[1], b[2], null, true); qa('.mh-knob[data-ctl][data-kind="cc"][data-cc="' + b[1] + '"]', els.pages).forEach(function (k) { api.paintKnobEl(k, b[2]); }); }
       }
     } else if (st === 0xC0 && b.length > 1) {
       var lb2 = vals.lastBank || { msb: hubProg().msb, lsb: hubProg().lsb, pc: 1, ch: c, t: 0 };
-      lb2.pc = b[1] + 1; lb2.ch = c; lb2.t = Date.now(); vals.lastBank = lb2; persist('deckvals');
+      lb2.pc = b[1] + 1; lb2.ch = c; lb2.t = Date.now(); vals.lastBank = lb2; persistLook('deckvals');
       if (c === api.ch()) paintNowSoon();
     }
   }

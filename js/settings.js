@@ -885,7 +885,10 @@
       var old = info.from === App.store.legacy && !onBeta; // the earlier store; on the beta every source is the live app's data
       var day = '';
       try { day = info.at ? new Date(info.at).toLocaleDateString() : ''; } catch (e) { day = ''; }
-      var t = (old ? 'Copied your earlier soundLAB data' : 'Copied your data from the live app') + (day ? ' on ' + day : '') + ': ' + items(info.copied) + '.';
+      // nothing copied and nothing left behind (a browser that never ran soundLAB before): say that, not "0 items"
+      var none = !info.copied && !info.failed.length && !info.kept.length;
+      var t = none ? 'Looked for ' + (old ? 'earlier soundLAB data' : 'data from the live app') + ' in this browser' + (day ? ' on ' + day : '') + ': there was nothing to copy.'
+        : (old ? 'Copied your earlier soundLAB data' : 'Copied your data from the live app') + (day ? ' on ' + day : '') + ': ' + items(info.copied) + '.';
       if (info.failed.length) {
         t += ' ' + items(info.failed.length) + ' did not fit in this browser\'s storage and ' +
           (info.failed.length === 1 ? 'is' : 'are') + ' tried again at each start: ' + names(info.failed) + '. ' +
@@ -901,8 +904,11 @@
     paintBackup();
 
     // Copy again: the same copy, but it overwrites what 2.0 has. Two taps
-    // within 3 s instead of a confirm() (the claude.ai frame refuses those)
-    var againT = null;
+    // within 3 s instead of a confirm() (the claude.ai frame refuses those).
+    // A second tap in the first AGAIN_MIN ms does not count: the two clicks
+    // of a double-click would otherwise pass before the label could be read
+    var AGAIN_MIN = 600;
+    var againT = null, againAt = 0;
     function againRest() {
       if (againT) { clearTimeout(againT); againT = null; }
       againBtn.textContent = AGAIN;
@@ -913,9 +919,11 @@
       if (!againT) {
         againBtn.textContent = 'Tap again: this overwrites the settings here';
         againBtn.classList.add('primary');
+        againAt = Date.now();
         againT = setTimeout(againRest, 3000);
         return;
       }
+      if (Date.now() - againAt < AGAIN_MIN) return; // a double-click: still asking
       againRest();
       againBtn.disabled = true;
       var info = App.store.copyAgain();

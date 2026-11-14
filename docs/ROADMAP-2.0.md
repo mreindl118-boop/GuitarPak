@@ -38,7 +38,8 @@ own and next to FL Studio. The design system is `docs/DESIGN-SYSTEM.md`.
 - **Shipping:** 2.0 grows on branch `v2`, published to the beta address
   `https://mreindl118-boop.github.io/GuitarPak/next/` by
   `.github/workflows/pages-next.yml` after the full test suite passes. The live
-  app stays on `main`. The main address flips at the release.
+  app is `main` (2.0.0 since 2026-11-11: `v2` as it was then). What is built on
+  `v2` after that reaches the live address at the next release to `main`.
 
 - **Added 2026-11-10 (Matt):** scales on the Keys page show as ONE colored dot
   per key (the LUMI colors) instead of whole painted keys ("Whole keys" stays
@@ -52,7 +53,7 @@ own and next to FL Studio. The design system is `docs/DESIGN-SYSTEM.md`.
 | # | Phase | Scope | Needs |
 |---|---|---|---|
 | 0 | Set up | `v2` branch, beta workflow, design tokens, this roadmap | — |
-| A | Trim | remove the Studio space, sequencer, sampler, plug-in API; fold Trainer, Synth pill, LUMI pill; move Synth tab + Helix behind `gear.html`; storage prefix for 2.0 (`soundlab2.*`, one-time import of `guitarlab.*` at the flip) | 0 |
+| A | Trim | remove the Studio space, sequencer, sampler, plug-in API; fold Trainer, Synth pill, LUMI pill; move Synth tab + Helix behind `gear.html`; storage prefix for 2.0 (`soundlab2.*`, one-time copy of `guitarlab.*`: on the beta at its first start, at the live address at the next release to `main`) | 0 |
 | B | Design system + shell | components, key bar, new home, nav, sheets; every kept page re-skinned; light theme | A |
 | B0 | Instrument matrix | gap list per instrument × kit item; each gap becomes a Phase C task | A |
 | C | Education core | bass lessons, drum rudiments (Pads + Woodshed drums), Keys + Exercises upgrades, next-chord lights, slim Jam, degree colors default | B, B0 |
@@ -62,7 +63,7 @@ own and next to FL Studio. The design system is `docs/DESIGN-SYSTEM.md`.
 | G | Songs library | library schema, PDF viewer, MusicXML/MIDI → Woodshed, per-song progress | C |
 | G2 | Sheet-music recognition | research prototype; never blocks 2.0 | G |
 | H | Gear app | `gear.html`: MODX live control, Helix page, Hub tools; same design system | A, B |
-| I | 2.0 release | tests, docs, main address flips; Android app follows (no new APK) | all |
+| I | 2.0 release | tests, docs, the release to `main` (the live address takes the work of phases A-H); Android app follows (no new APK) | all |
 | J | After 2.0 | FL plugin shell (VST3 + CLAP, web view), G2 if proven | I |
 
 ## Phase A status (Trim)
@@ -104,9 +105,9 @@ Removed in 2.0: `js/studio.js`, `js/arrange.js`, `js/plugins.js`, `plugins/`, `P
 - Private songs, teacher material and signing keys never enter the repo.
 - Beta caveats: the beta and the live app share the browser origin. The
   shared-`localStorage` caveat of Phase 0 ended with Phase A (step A4): the
-  beta keeps its data under `soundlab2-next.*`, 2.0 at the live address will
-  use `soundlab2.*`, and neither writes, deletes or changes the live
-  app's `guitarlab.*` data (it is copied across once). What stays shared is
+  beta keeps its data under `soundlab2-next.*`, the live address will use
+  `soundlab2.*` from the next release to `main` on, and neither writes, deletes
+  or changes the live app's `guitarlab.*` data (it is copied across once). What stays shared is
   the browser's storage budget for the origin. The cache caveat ended with 2.0.0: service-worker
   caches are named by scope (`sl2-live-*` / `sl2-next-*`), so the live app and
   the beta no longer clear each other's.

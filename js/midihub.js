@@ -148,7 +148,7 @@
   function g(k, d) { var v = App.store.get('midihub.' + k, d); return v === null ? d : v; }
   function set(k, v) {
     if (['rules', 'rulesApp', 'ch', 'outId', 'profile'].indexOf(k) >= 0 || (k === 'thru' && !v)) flushHub('MIDI Hub routing/rules changed');
-    if (k === 'kv') { kvCache = v && typeof v === 'object' ? v : null; if (kvTimer) { clearTimeout(kvTimer); kvTimer = 0; } }
+    if (k === 'kv') { kvCache = v && typeof v === 'object' ? v : null; kvNew = false; if (kvTimer) { clearTimeout(kvTimer); kvTimer = 0; } }
     App.store.set('midihub.' + k, v);
   }
   function profile() { return PROFILES[g('profile', 'generic')] || PROFILES.generic; }
@@ -352,14 +352,23 @@
   // kv is cached and written at most once per 200 ms burst: a Super Knob
   // sweep or a Motion Sequencer echo arrives at 100+ messages a second and
   // used to re-serialise the whole object on every one. Flushed on hide.
-  var kvCache = null, kvTimer = 0;
+  // Only a cache that CHANGED is written (kvNew): painting a knob makes an
+  // empty cache, and an empty object stored under a key that still waits for
+  // its copy (2.0 Phase A4, App.store.waiting: the earlier values did not fit
+  // yet) would end the retry. For the same reason a value the SYNTH sent
+  // (echo) stays in memory while the key waits: only a knob turned here is
+  // the user's own data.
+  var kvCache = null, kvTimer = 0, kvNew = false;
   function kvAll() { if (!kvCache) { var o = g('kv', null); kvCache = o && typeof o === 'object' ? o : {}; } return kvCache; }
   function kvGet(cc, c) { var a = kvAll()[String(c == null ? ch() : c)]; var v = a && a[cc]; return typeof v === 'number' ? v : null; }
   function kv(cc, c) { var v = kvGet(cc, c); return v == null ? knobDef(cc) : v; }
-  function kvFlush() { if (kvTimer) { clearTimeout(kvTimer); kvTimer = 0; } if (kvCache) App.store.set('midihub.kv', kvCache); }
-  function setKv(cc, v, c) {
+  function kvStore() { if (kvCache && kvNew) { kvNew = false; App.store.set('midihub.kv', kvCache); } }
+  function kvFlush() { if (kvTimer) { clearTimeout(kvTimer); kvTimer = 0; } kvStore(); }
+  function setKv(cc, v, c, echo) {
     var a = kvAll(), k = String(c == null ? ch() : c); a[k] = a[k] || {}; a[k][cc] = v;
-    if (!kvTimer) kvTimer = setTimeout(function () { kvTimer = 0; App.store.set('midihub.kv', kvCache); }, 200);
+    if (echo && App.store.waiting('midihub.kv')) return;
+    kvNew = true;
+    if (!kvTimer) kvTimer = setTimeout(function () { kvTimer = 0; kvStore(); }, 200);
   }
   var ARC0 = -135, ARC1 = 135;
   function arcPath(v) {
@@ -514,7 +523,7 @@
     var b = d && d.bytes; if (!b || !b.length) return;
     logMsg('in', b);
     // two-way: the synth's own knobs / program changes on this Part move the screen
-    if ((b[0] & 0xF0) === 0xB0 && (b[0] & 15) === ch() && b.length > 2 && allKnobs().some(function (k) { return k.cc === b[1]; })) { setKv(b[1], b[2]); paintKnob(b[1]); }
+    if ((b[0] & 0xF0) === 0xB0 && (b[0] & 15) === ch() && b.length > 2 && allKnobs().some(function (k) { return k.cc === b[1]; })) { setKv(b[1], b[2], null, true); paintKnob(b[1]); }
     if ((b[0] & 0xF0) === 0xC0 && (b[0] & 15) === ch() && b.length > 1) { set('prog', b[1] + 1); if (els.prog) els.prog.value = b[1] + 1; paintProg(); }
     if ((b[0] & 0xF0) === 0xB0 && (b[0] & 15) === ch() && b.length > 2 && (b[1] === 0 || b[1] === 32)) { var bk = b[1] === 0 ? 'msb' : 'lsb'; set(bk, b[2]); if (els[bk]) els[bk].value = b[2]; paintProg(); }
     if (b[0] === 0xF0 && els.rx) {

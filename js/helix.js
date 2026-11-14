@@ -123,7 +123,9 @@
       else if (s === 0xB0) {
         if (b[1] === CC.SNAP && b[2] <= 7) { st.snap = b[2]; paintSnaps(); }
         else if (b[1] === CC.SETLIST) { st.setlist = b[2]; set('setlist', st.setlist); paintPreset(); }
-        else if (b[1] >= CC.KNOB1 && b[1] < CC.KNOB1 + 8) { st.kv[b[1] - CC.KNOB1] = b[2]; set('kv', st.kv); paintKnob(b[1] - CC.KNOB1); }
+        // the pedal's own knob: all eight values are one key, so while the earlier ones still wait for their
+        // copy (2.0 Phase A4, App.store.waiting) this one stays in memory (turn() below is the user's edit)
+        else if (b[1] >= CC.KNOB1 && b[1] < CC.KNOB1 + 8) { st.kv[b[1] - CC.KNOB1] = b[2]; if (!A.store.waiting('hx.kv')) set('kv', st.kv); paintKnob(b[1] - CC.KNOB1); }
         else if (b[1] === CC.EXP1 || b[1] === CC.EXP2) { st.exp[b[1] - 1] = b[2]; paintExp(); }
       }
     }

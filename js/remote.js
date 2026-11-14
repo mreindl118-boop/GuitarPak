@@ -30,9 +30,9 @@
  * load this file, read the same bindings and both claim a bound message. The
  * Settings card (mount) is in soundLAB only. With both open, ONE APP acts
  * on a MIDI press: soundLAB while one of its windows is visible, Gear when
- * none is (Web Lock 'soundlab-remote-main' — see ONE WINDOW ACTS ON A PEDAL
- * near the end; App.remote.holdsMain). Within one app every visible window
- * acts, as two windows always did.
+ * none is (Web Lock 'soundlab-remote-main:<store prefix>' — see ONE WINDOW
+ * ACTS ON A PEDAL near the end; App.remote.holdsMain). Within one app every
+ * visible window acts, as two windows always did.
  */
 (function () {
   'use strict';
@@ -46,7 +46,11 @@
   var DBL_MS = 350, DEBOUNCE_MS = 250, LEARN_MS = 20000, TRIGGER_GAP_MS = 400;
   // which app this document is (js/app.js APPS): no App.app = soundLAB
   var GEAR = App.app === 'gear';
-  var LOCK = 'soundlab-remote-main', LOCK_MS = 1000; // the Web Lock both apps ask; the longest a press waits for its answer
+  // the Web Lock both apps ask; the longest a press waits for its answer. The
+  // name carries the store prefix (2.0 Phase A4): the beta under /next/ has
+  // its own bindings (remote.map under its prefix), so a visible beta
+  // soundLAB must not take the pedal from a Gear window of the live app
+  var LOCK = 'soundlab-remote-main:' + App.store.prefix, LOCK_MS = 1000;
   var MIDI_VIA = ['cc', 'pc', 'note', 'dbltap']; // a press that came from MIDI (every window hears it)
 
   function g(k, d) { return App.store.get('remote.' + k, d); }

@@ -129,8 +129,10 @@ press never reaches the Hub's Thru, the Deck or the Live page as an ordinary mes
 - **Keys** (a page-turner pedal, a learned key) go to the window that has the keyboard focus, as any
   key does.
 
-How it works: soundLAB holds a Web Lock (`soundlab-remote-main`, shared) while its document is visible
-and lets it go when hidden. For each MIDI press Gear asks the browser whether that lock is held
+How it works: soundLAB holds a Web Lock (`soundlab-remote-main:` followed by the store prefix, so
+`soundlab-remote-main:soundlab2.` at the live address; shared) while its document is visible
+and lets it go when hidden. The beta under `/next/` has its own bindings and its own lock: a beta
+window never takes the pedal from a window of the live app, or the other way round. For each MIDI press Gear asks the browser whether that lock is held
 (`navigator.locks.query()`) and acts only when it is not, so in Gear a MIDI press acts a moment after
 the message. Gear never takes the lock itself: an earlier version did, for an instant per press, and
 two Gear windows then shut each other out (the press acted in one of them, at random). Nothing is
@@ -161,9 +163,9 @@ themselves. To check on the owner's Windows PC with the LUMI and the MODX:
   - All three are included in Settings › Backup. A 2.0 backup file holds them under that prefix
     (`"soundlab2.remote.map"`); an import puts them into the store of the app that reads the file,
     whether the file came from the live address, the beta or an older build.
-  - Bindings learned in the beta before the 2.0 prefix existed were stored under `guitarlab.*`. They
-    are copied across once with the rest of that data, at the first start; the `guitarlab.*`
-    originals are left as they are.
+  - Bindings learned in the live app (2.0.0), or in the beta before the 2.0 prefix existed, are
+    stored under `guitarlab.*`. They are copied across once with the rest of that data, at the
+    first start; the `guitarlab.*` originals are left as they are.
 - **API:** `App.remote` exposes `learn`, `cancelLearn`, `clear`, `setLatch`, `setPageTurner`,
   `setDoubleTap`, `map`, `summary`, `bindingText`, `fire(action, via)`, `mount`, `paint` and
   `holdsMain` (this document holds the shared lock: a visible soundLAB window; always false in Gear).

@@ -27,7 +27,8 @@ const near = (a, b) => Math.abs(a-b)<0.00001;
   const initial=await page.evaluate(()=>({legacy:SLXP.legacy(),scoped:SLXP.forInstrument('piano').total(),stored:Object.fromEntries(Object.keys(__legacy).map(k=>[k,localStorage.getItem('soundlab2.'+k)])),original:__legacy}));
   ok(initial.legacy.total===321&&initial.legacy.label==='Legacy / unassigned','historical global XP is explicitly legacy/unassigned');
   ok(initial.scoped===0,'new piano balance does not inherit historical global XP');
-  ok(JSON.stringify(initial.stored)===JSON.stringify(initial.original),'startup preserves every seeded historical key bytewise, including ancient days');
+  // every value must be a stored string: read under the wrong prefix both sides would be null and "equal"
+  ok(Object.keys(initial.original).length===11&&Object.values(initial.stored).every(v=>typeof v==='string')&&JSON.stringify(initial.stored)===JSON.stringify(initial.original),'startup preserves every seeded historical key bytewise, including ancient days');
   const knowledge=await page.evaluate(()=>{
    SLXP.beginSession({id:'knowledge-one',instrument:'piano',source:'quiz'});__step(1000);__answer('knowledge-one','a');__step(60000);__answer('knowledge-one','b');
    __answer('knowledge-one','b');const done=SLXP.finishLevel({sessionId:'knowledge-one',instrument:'piano',passed:true,perfect:true});
@@ -89,7 +90,7 @@ const near = (a, b) => Math.abs(a-b)<0.00001;
    for(let i=0;i<200;i++)SLXP._tick();SLXP.refresh();App.xp.practice(600,'Guitar');
    return {keys:Object.fromEntries(Object.keys(__legacy).map(k=>[k,localStorage.getItem('soundlab2.'+k)])),original:__legacy,legacy:SLXP.legacy().total};
   });
-  ok(JSON.stringify(preserved.keys)===JSON.stringify(preserved.original)&&preserved.legacy===321,'wake ticks, refresh and retired anonymous practice cannot alter any historical key');
+  ok(Object.values(preserved.keys).every(v=>typeof v==='string')&&JSON.stringify(preserved.keys)===JSON.stringify(preserved.original)&&preserved.legacy===321,'wake ticks, refresh and retired anonymous practice cannot alter any historical key');
   console.log('# explicit shared-keyboard source context and cancellation');
   const lesson=await page.evaluate(()=>{
    App.emit('learn:lesson',{instrument:'synth',kind:'keys'});App.switchTo('piano');App.keysLessons.start(false);

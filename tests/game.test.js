@@ -48,7 +48,9 @@ const PLAY = async (right) => {
   const browser = await chromium.launch({ executablePath: env.CHROMIUM, args: ['--autoplay-policy=no-user-gesture-required'] });
 
   console.log('# canonical instrument XP and preserved legacy data');
-  let { ctx, page, errs } = await newPage(browser);
+  // one legacy key is seeded so that the two key listings below are never both empty: a listing that looked
+  // under the wrong prefix would find nothing before and nothing after, and pass for any behaviour
+  let { ctx, page, errs } = await newPage(browser, { 'xp.total': 5 });
   const rules = await page.evaluate(() => {
     let tick = Date.parse('2026-10-23T12:00:00Z');
     App.practiceProgress = new PracticeProgress({ store: App.store, now: () => tick, timezone: () => 'UTC' });
@@ -83,7 +85,7 @@ const PLAY = async (right) => {
   ok(rules.summary.sessionCount === 1 && rules.summary.matched === 0 && rules.summary.expected === 0 && rules.summary.timingSamples === 0, 'knowledge sessions do not invent musical note or timing observations');
   ok(rules.repeated.sessionCount === 1 && rules.repeated.lifetimeEarnedXP === rules.summary.lifetimeEarnedXP, 'repeated finish cannot duplicate the award');
   ok(rules.selectedTotal === 0 && rules.pianoTotal === rules.xp, 'changing the viewed instrument does not move an earlier award');
-  ok(rules.noPassive === 0 && rules.legacyKeys.length === rules.oldKeys.length, 'wake ticks and passive practice calls create no new session or legacy XP');
+  ok(rules.noPassive === 0 && rules.oldKeys.length === 1 && rules.legacyKeys.length === rules.oldKeys.length, 'wake ticks and passive practice calls create no new session or legacy XP (the seeded xp.total is still the only legacy key): ' + JSON.stringify([rules.oldKeys, rules.legacyKeys]));
   ok(rules.level.title === 'Consistency' && rules.level.lv === 1 && rules.level.need === 100, 'the course displays the canonical consistency level');
   ok(rules.streak.n === 0 && !rules.streak.today && rules.streak.freezes === 0, 'a short completed lesson does not fabricate a qualifying daily goal or freeze');
   ok(errs.length === 0, 'no page errors (canonical rules)' + (errs.length ? ': ' + errs.join(' | ') : ''));

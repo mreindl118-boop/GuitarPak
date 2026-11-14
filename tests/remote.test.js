@@ -358,7 +358,7 @@ const BOUND = { next: { midi: { t: 'cc', n: 86, ch: null, port: 'MODX-1' }, key:
     o.back = App.remote.holdsMain;
     return o;
   });
-  ok(hm0 && hm.locks && hm.visible === true, 'App.remote.holdsMain is true while soundLAB is visible (it holds the Web Lock soundlab-remote-main): ' + J([hm0, hm.locks, hm.visible]));
+  ok(hm0 && hm.locks && hm.visible === true, 'App.remote.holdsMain is true while soundLAB is visible (it holds the Web Lock soundlab-remote-main:<store prefix>): ' + J([hm0, hm.locks, hm.visible]));
   ok(hm.hidden === false, 'and false after a stubbed hide (document.hidden + visibilitychange): the lock is let go');
   ok(hm.back === true, 'visible again: it holds the lock again');
   ok(!errs.length, 'no page errors: ' + J(errs)); await ctx.close();

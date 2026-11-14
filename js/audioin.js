@@ -27,10 +27,11 @@
  * sounds).
  * ONE WINDOW PLAYS HEAR INPUT (2.0): soundLAB (index.html) and soundLAB Gear
  * (gear.html) both load this file and read the same audio.monitor. Only the
- * document that holds the Web Lock 'soundlab-hear-input' connects the input
- * to the speakers; another one holds with why 'other' until On or Off is
- * pressed in it (the press takes the lock) or the owner closes. The rule is
- * spelled out above the lock code, near the end of this file.
+ * document that holds the Web Lock 'soundlab-hear-input:<store prefix>'
+ * connects the input to the speakers; another one holds with why 'other'
+ * until On or Off is pressed in it (the press takes the lock) or the owner
+ * closes. The rule is spelled out above the lock code, near the end of this
+ * file.
  * App.audioIn.mountSwitch(el) = Off / On + a status line for a page without
  * the Settings card (Gear's Hub header).
  * THE CHOSEN OUTPUT (audio.outId) is applied to the shared AudioContext here
@@ -70,8 +71,13 @@
   var lastList = [];      // last enumerated audio inputs
   var prevIds = null;     // the input ids at the previous devicechange
   var hint = null;        // the "tap to start sound" note while the context is locked
-  // ONE WINDOW PLAYS HEAR INPUT (the rule is above askLock, near the end)
-  var LOCK = 'soundlab-hear-input';
+  // ONE WINDOW PLAYS HEAR INPUT (the rule is above askLock, near the end).
+  // The lock carries the store prefix (2.0 Phase A4): the beta under /next/
+  // and the live app keep audio.monitor under their own prefix, so they are
+  // two apps here too. With ONE lock name for the origin, Off pressed in the
+  // beta took the lock from the live window, which then read ITS switch
+  // (still on), stopped and said another window had Hear input
+  var LOCK = 'soundlab-hear-input:' + App.store.prefix;
   var OTHER = 'Your other soundLAB window has Hear input. Press On to hear it here instead.';
   var owner = false;      // this document has the lock (or there are no Web Locks here): only then is the input routed
   var lockN = 0;          // lock requests made so far (each gets a number)
@@ -769,8 +775,9 @@
 
   // audio.monitor changed in another window of this app (key null = the
   // store was cleared). Only this scope's key counts (App.store.prefix): the
-  // 1.x app and the beta share the origin and keep the same switch under
-  // their own prefix, and a write there is not this app's business
+  // live app and the beta share the origin and keep the same switch under
+  // their own prefix, and a write there is not this app's business (the
+  // lock is named per scope for the same reason, see LOCK)
   function storeChanged(e) {
     var k = e ? e.key : null;
     if (k != null && k !== App.store.prefix + 'audio.monitor') return;

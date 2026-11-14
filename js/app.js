@@ -767,9 +767,11 @@ window.App = (function () {
       return m;
     },
     // true while this key still waits for its copy: it did not fit, and the
-    // copy tries again at each start. A page that fills an EMPTY key with a
-    // default asks first and keeps that default in memory: once stored, the
-    // next start would take it for 2.0's own data and stop trying (`kept`)
+    // copy tries again at each start. Code that stores what the user did NOT
+    // make asks first and keeps it in memory (a page's default under an
+    // EMPTY key, a blob written because of a look or of what the synth sent,
+    // a Jam value that was not changed): once stored, the next start would
+    // take it for 2.0's own data and stop trying (`kept`)
     waiting: function (key) { return !!storeInfo && storeInfo.failed.indexOf(key) !== -1; },
     // Settings › Backup "Copy again": the same copy, but it replaces what
     // this scope has; then a fresh marker

@@ -154,12 +154,14 @@ bare repositories, with no network.
 
 Sharing one origin. Storage is no longer shared between the beta and the live
 app (roadmap Phase A, step A4): the beta keeps its data under
-`soundlab2-next.*`, the live app (2.0.0) under `guitarlab.*`, and 2.0 at the live
-address will use `soundlab2.*`. The beta copies the live app's data across once,
-at its first start in a browser, and never writes, deletes or changes a
-`guitarlab.*` key; a change made in one app no longer shows in the other. The
-browser still gives the origin ONE `localStorage` budget, so that copy counts
-against the same limit as the live app's data. One caveat remains: the live
-service worker deletes every cache it does not own when it updates, so the beta
-(caches `soundlab2-*`) refills on its next visit. The beta's worker only ever
-deletes `soundlab2-*` caches.
+`soundlab2-next.*`, the live app (2.0.0, the code before Phase A) under
+`guitarlab.*`, and the live address will use `soundlab2.*` from the next release
+to `main` on. The beta copies the live app's data across once, at its first
+start in a browser, and never writes, deletes or changes a `guitarlab.*` key; a
+change made in one app no longer shows in the other. The browser still gives the
+origin ONE `localStorage` budget, so that copy counts against the same limit as
+the live app's data. The service-worker caches are separate as well: each worker
+names its caches by where it runs (`sl2-live-vN` at the live address,
+`sl2-next-vN` on the beta, `sw.js`) and deletes only its own old ones, plus the
+beta's earlier `soundlab2-*` caches and, at the live address, the 1.x
+`guitarlab-*` caches. A live update no longer empties the beta's cache.

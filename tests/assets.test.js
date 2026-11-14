@@ -191,7 +191,7 @@ ok(/App\.boot\(\);/.test(bootOf(GEAR) || '') && /serviceWorker\.register\('sw\.j
 
 // ---- storage: the 1.x prefix is spelled in one place (plan 8.4, risk 21) ----
 // 2.0 keeps its data under its own prefix (App.store.prefix) and reads the 1.x store once, at the first start.
-// The live 1.x app on the same origin still owns that store. So:
+// The live app on the same origin (2.0.0, the code before Phase A) still owns that store. So:
 //   js/     a line of code that spells the old prefix would read or write the live app's data past App.store.
 //           Allowed: the one line of js/app.js that defines STORE_LEGACY. Comments do not count.
 //   tests/  a suite that spells it seeds or reads keys the app no longer looks at, and passes while testing
@@ -255,6 +255,25 @@ ok(testFiles.length > 60 && testStray.length === 0, 'no file in tests/ spells th
 // (a listed suite that is missing shows up in tests/run.sh, which runs every suite by name)
 const idle = Object.keys(OLD_STORE_SUITES).filter(name => isFile('tests/' + name) && spellings('tests/' + name, false).length === 0);
 ok(idle.length === 0, 'each suite on that list still needs to be on it' + list(idle.map(name => name + ': ' + OLD_STORE_SUITES[name])));
+
+// ---- storage: no key of this app is named like a removed feature's ----
+// The deny list (STORE_DENY in js/app.js = App.store.deny) is applied to EVERY source: the one-time copy, the
+// beta's copy from the live 2.0 scope and the Backup import, 2.0 files included. A new key named under it
+// (song.recent, say) would be exported but never imported and never copied to the beta, and no browser suite
+// would notice. So: no string in a line of code of js/ may start with a key the list matches. A string that
+// only begins like a key (the 'midihub.' in 'midihub.' + k) is tested as it stands, which covers the list's
+// own name spaces (st., ideas., song., sd., plugins.).
+console.log('# storage: no string in js/ names a key under the deny list');
+const denyLine = /var STORE_DENY\s*=\s*\/(.+)\/;/.exec(read('js/app.js'));
+let DENY = null;
+try { DENY = denyLine ? new RegExp(denyLine[1]) : null; } catch (e) { DENY = null; }
+ok(!!DENY && DENY.test('st.tracks') && DENY.test('plugins.list') && !DENY.test('fb.root') && !DENY.test('synthtab.live'),
+  'the deny list is read from js/app.js (STORE_DENY): it matches st.tracks and plugins.list, not fb.root or synthtab.live');
+// the start of every string on a line, up to the first character a store key cannot have
+const keyStarts = l => (l.match(/['"`][A-Za-z][\w.\-]*/g) || []).map(s => s.slice(1)).filter(s => s.indexOf('.') > 0);
+const denied = !DENY ? [] : [].concat(...jsFiles.map(f => read(f).split('\n').map((l, i) => ({ file: f, n: i + 1, text: codeOf(l).trim().slice(0, 140), keys: keyStarts(codeOf(l)).filter(s => DENY.test(s)) }))
+  .filter(x => x.keys.length)));
+ok(denied.length === 0, 'no line of code in js/ has a string that the deny list matches: a key named there is never copied and never imported' + list(denied.map(h => at(h) + '   <- ' + h.keys.join(', '))));
 
 console.log(fails ? 'FAILED ' + fails : 'ALL PASS');
 process.exit(fails ? 1 : 0);

@@ -2,9 +2,11 @@
 // Plan: docs/plans/phase-a/PLAN.md, section 8 (8.5 lists these ten cases), decisions D32-D37 and D46.
 //
 // 2.0 keeps its data under its own prefix: 'soundlab2.' at the live address and everywhere else (the test
-// server included), 'soundlab2-next.' on the beta under /next/. The first start copies the 1.x data
+// server included), 'soundlab2-next.' on the beta under /next/. The first start copies the earlier data
 // ('guitarlab.*') across once. From then on 2.0 never writes, removes or changes a 'guitarlab.*' key: the
-// live 1.x app on the same origin still uses them.
+// live app on the same origin (2.0.0, the code before Phase A) still uses them.
+// WORDS: this suite calls 'guitarlab.*' "the 1.x store" and its content "1.x data" or "a 1.x profile", after
+// the app that first wrote it. The live 2.0.0 writes there too, which is why no text ON SCREEN says "1.x".
 //
 // The ten cases, each in a fresh browser context (= a fresh browser profile; a case with several parts
 // uses one per part):
@@ -14,10 +16,11 @@
 //   4  the 1.x store is untouched and no database is opened, in soundLAB and in soundLAB Gear
 //   5  the copy runs once
 //   6  the copy never overwrites
-//   7  the beta under /next/ has its own scope (the app is served there by a route)
+//   7  the beta under /next/ has its own scope (the app is served there by a route), its own words for the
+//      copy and its own Web Locks
 //   8  refused writes and a full store: copy order, headroom, retry, the start notice, a page's default
-//      under a key that still waits, blocked storage
-//   9  Settings › Backup: export, an old 1.x file, a beta file, Copy again
+//      under a key that still waits, a look in soundLAB Gear or a change in Jam under such a key, blocked storage
+//   9  Settings › Backup: export, an old 1.x file, a beta file, Copy again (two taps, not a double-click)
 //   10 soundLAB Gear opened first
 //
 // How a case sets its scene: the init script below runs in the page before any script of the app. It seeds
@@ -62,7 +65,15 @@ const NOTICE = /Some of your earlier soundLAB data did not fit in this browser's
 const INFO_COPIED = /^Copied your earlier soundLAB data on .+?: (\d+) items?\./;
 const INFO_FAILED = /\b(\d+) items? did not fit in this browser's storage and (?:is|are) tried again at each start: (.+?)\. Your earlier data is untouched\./;
 const INFO_KEPT = /\b(\d+) items? (?:was|were) not copied because this version already has its own data there: (.+?)\. Copy again would replace it\./;
+// a browser that had nothing to copy (no "0 items")
+const INFO_NONE = /^Looked for earlier soundLAB data in this browser on .+?: there was nothing to copy\.$/;
 const AGAIN = 'Copy my earlier data again', AGAIN_BETA = 'Copy from the live app again', AGAIN_SURE = 'Tap again: this overwrites the settings here';
+// the same on the beta: there every source is the live app's data ('guitarlab.*' today, the live 2.0 scope after the next release)
+const NOTICE_BETA = /Some of your data from the live app did not fit in this browser's storage \((\d+) items?\)\. soundLAB tries again each time it starts\. Details: soundLAB › Settings › Backup\./;
+const INFO_COPIED_BETA = /^Copied your data from the live app on .+?: (\d+) items?\./;
+const INFO_FAILED_BETA = /\b(\d+) items? did not fit in this browser's storage and (?:is|are) tried again at each start: (.+?)\. The live app's data is untouched\./;
+// Copy again: a second tap sooner than this after the first is a double-click and does not count (js/settings.js AGAIN_MIN)
+const AGAIN_MIN = 600;
 
 // ---- what a 1.x profile holds ----
 // Raw strings, as the live 1.x app stored them. Some are oddly spaced on purpose: a copy that parsed the
@@ -190,6 +201,7 @@ function INIT(o) {
   }
   // what the storage refuses, from this load on and after the next one:
   //   { refuse: [full keys] }  setItem throws for these keys
+  //   { drop: [full keys] }    setItem returns for these keys as if all were well, and stores nothing
   //   { refuseAll: true }      every setItem throws (the store is full to the last character)
   //   { cap: n }               the store holds at most n characters, keys and values together
   let ctl = {};
@@ -208,6 +220,7 @@ function INIT(o) {
     const w = { op: 'set', key: k, len: v.length, val: v.length <= o.keep ? v : null, refused: '' };
     window.__writes.push(w);
     if (ctl.refuseAll || (ctl.refuse || []).indexOf(k) !== -1) { w.refused = 'refused'; throw full(); }
+    if ((ctl.drop || []).indexOf(k) !== -1) { w.refused = 'dropped'; return; }
     if (ctl.cap && used(k) + k.length + v.length > ctl.cap) { w.refused = 'full'; throw full(); }
     return real.set.call(this, k, v);
   };
@@ -401,6 +414,7 @@ async function section(title, fn) {
       (J(api.keys) === J(api.scope) ? '' : '\n    keys(): ' + J(api.keys) + '\n    stored: ' + J(api.scope)));
     const c = await backupCard(page);
     ok(c.info && c.again !== null, 'Settings › Backup has its status block #set-backup-info and the button #set-copy-again: ' + J([c.info, c.again]));
+    ok(c.seen && INFO_NONE.test(c.text) && !/\b0 items\b/.test(c.text), 'with nothing to copy the block says so in words, not "0 items": "' + c.text + '"');
     quiet(w, 'a first visit');
   });
 
@@ -565,6 +579,7 @@ async function section(title, fn) {
     ok(clean(a), 'the rest is copied: ' + rest.length + ' keys, byte for byte' + told(a));
     const m = s.mark.m;
     ok(markerOk(m) && m.copied === rest.length && m.failed.length === 0, 'the marker counts ' + rest.length + ' copied and nothing failed: the two keys 2.0 already had are not counted as copied: ' + counts(m));
+    ok(!!m && m.skipped === 2 && m.copied + m.skipped === nKept, 'they are counted as skipped (left alone): copied + skipped = the ' + nKept + ' keys of the source: ' + J(m && [m.copied, m.skipped]));
     ok(s.root === 2 && s.bar === '2', 'the app runs on its own value, the key D, not on the G of 1.x: ' + J([s.root, s.bar]));
     quiet(w, 'a profile that already has 2.0 data');
   });
@@ -590,6 +605,10 @@ async function section(title, fn) {
       ok(markerOk(s.mark.m) && s.mark.m.from === OLD && s.mark.m.copied === nKept && s.mark.m.failed.length === 0, 'the beta has its own marker, ' + BETA + MARK + ', from the 1.x store: ' + counts(s.mark.m));
       ok(s.live.length === 0 && s.liveWrites.length === 0, 'nothing is stored under the live prefix ' + LIVE + '*, and no write named such a key' + lines(s.live.concat(s.liveWrites)));
       ok(diff(old, s.old).length === 0 && s.oldWrites.length === 0, 'the 1.x store is untouched' + lines(diff(old, s.old).concat(s.oldWrites)));
+      // on the beta guitarlab.* is the LIVE app's data (the live app still stores there): the card says "from the live app"
+      const bc = await backupCard(page), bn = INFO_COPIED_BETA.exec(bc.text);
+      ok(bc.seen && !!bn && +bn[1] === nKept && bc.again === AGAIN_BETA && !/earlier soundLAB data/.test(bc.text),
+        'Settings › Backup on the beta calls the source the live app, in the line and on the button: "' + bc.text + '" / ' + J(bc.again));
       await toRoot(page, 11);
       const wr = await page.evaluate(([LIVE, BETA]) => [__store.raw(BETA + 'fb.root'), __store.raw(LIVE + 'fb.root')], [LIVE, BETA]);
       ok(wr[0] === '11' && wr[1] === null, 'a key change on the beta is stored under the beta prefix only: ' + J(wr));
@@ -609,6 +628,18 @@ async function section(title, fn) {
         'the live address (' + l.path + ') then makes its own first copy of the 1.x data, under ' + LIVE + '*: ' + counts(l.mark.m) + told(la));
       ok(l.root === 7, 'a page at the live path does not see the beta\'s write: its key is the G of 1.x, not the beta\'s B: ' + J(l.root));
       ok(l.betaMark === betaMark && l.betaRoot === '11' && l.betaWrites.length === 0, 'and it leaves the beta scope alone: same marker, same key, no write there' + lines(l.betaWrites));
+      // two apps, two sets of Web Locks: the beta and the live app keep the Hear input switch and the pedal bindings
+      // under their own prefix, so neither may take the other's lock (one name for the origin let Off in the beta
+      // silence the live window, and a visible beta soundLAB keep a live Gear window from answering the pedal)
+      const lockOf = p => p.evaluate(async () => {
+        const t0 = Date.now();
+        while (!(App.audioIn && App.audioIn._t().owner && App.remote && App.remote.holdsMain) && Date.now() - t0 < 3000) await __wait(30);
+        return { owner: !!(App.audioIn && App.audioIn._t().owner), main: !!(App.remote && App.remote.holdsMain), held: (await navigator.locks.query()).held.map(x => x.name).sort() };
+      });
+      const lb = await lockOf(page), ll = await lockOf(lp);
+      const want = ['soundlab-hear-input:' + BETA, 'soundlab-hear-input:' + LIVE, 'soundlab-remote-main:' + BETA, 'soundlab-remote-main:' + LIVE];
+      ok(lb.owner && ll.owner && lb.main && ll.main, 'side by side, each window has its own Hear input lock and its own pedal lock: neither waits for the other: ' + J([lb.owner, ll.owner, lb.main, ll.main]));
+      ok(J(ll.held) === J(want), 'the four locks held on this origin carry their scope\'s prefix: ' + J(ll.held));
       await lp.evaluate(async () => { const el = document.getElementById('cx-bpm'); el.value = '150'; el.dispatchEvent(new Event('change', { bubbles: true })); await __wait(120); });
       const back = await page.evaluate(([LIVE, BETA]) => [__store.raw(LIVE + 'met.bpm'), __store.raw(BETA + 'met.bpm'), App.store.get('met.bpm', null)], [LIVE, BETA]);
       ok(back[0] === '150' && back[1] === KEPT['met.bpm'] && back[2] === 96, 'a tempo change at the live address stays out of the beta scope: ' + J(back));
@@ -652,6 +683,30 @@ async function section(title, fn) {
       ok(l.prefix === LIVE && l.root === 5, 'a page at the live path does not see the beta\'s key change (B): it still has F: ' + J([l.prefix, l.root]));
       ok(l.mark === liveMark && l.markWrites.length === 0, 'and its marker is the one it had: the live scope does not copy again');
       ok(w.errs.length === 0 && lw.errs.length === 0, 'no page error (beta next to a live 2.0)' + lines(w.errs.concat(lw.errs)));
+    }
+
+    console.log('  - a beta copy from the live 2.0 scope that left one key behind');
+    {
+      // kl.prog exists in both sources with different values; the beta's first write of it is refused
+      const liveMark = J({ v: 1, from: OLD, at: 1790000000000, copied: 7, skipped: 0, failed: [], kept: [] });
+      const src = Object.assign({}, FLAGS, { 'fb.root': '5', 'kl.prog': '{ "g-r": { "step": 6 } }' });
+      const live = Object.assign({}, src); live[MARK] = liveMark;
+      const ctx = await profile(browser, { old: KEPT, live, next: true, ctl: { refuse: [BETA + 'kl.prog'] } });
+      const w = await open(ctx, NEXT + 'index.html'), page = w.page;
+      const s = await page.evaluate(BETA => ({ toast: __toast(), mark: __mark(BETA), now: __store.raw(BETA + 'kl.prog') }), BETA);
+      const m = s.mark.m, nb = NOTICE_BETA.exec(s.toast);
+      ok(markerOk(m) && m.from === LIVE && J(m.failed) === J(['kl.prog']) && s.now === null, 'first start: the copy came from ' + LIVE + '* and kl.prog did not fit: ' + counts(m));
+      ok(!!nb && +nb[1] === 1 && !NOTICE.test(s.toast), 'the start notice on the beta says "data from the live app": "' + s.toast + '"');
+      const c = await backupCard(page), f = INFO_FAILED_BETA.exec(c.text);
+      ok(c.seen && INFO_COPIED_BETA.test(c.text) && !!f && +f[1] === 1 && f[2] === 'kl.prog' && !/earlier/.test(c.text),
+        'Settings › Backup there names the key and says the live app\'s data is untouched: "' + c.text + '"');
+      // room again: the retry must read the source the copy came from, the live 2.0 scope, not guitarlab.*
+      await page.evaluate(() => __ctl({}));
+      await reload(page);
+      const t = await page.evaluate(([OLD, LIVE, BETA]) => ({ toast: __toast(), mark: __mark(BETA), now: __store.raw(BETA + 'kl.prog'), liveWrites: __store.touched(LIVE), oldWrites: __store.touched(OLD) }), [OLD, LIVE, BETA]);
+      ok(t.now === src['kl.prog'] && t.now !== KEPT['kl.prog'], 'the next start copies kl.prog from the live scope (the live app\'s value, not the older one under guitarlab.*): ' + short(t.now));
+      ok(markerOk(t.mark.m) && t.mark.m.from === LIVE && t.mark.m.failed.length === 0 && t.mark.m.kept.length === 0 && !NOTICE_BETA.test(t.toast), 'nothing is left behind and the notice is gone: ' + counts(t.mark.m));
+      ok(t.liveWrites.length === 0 && t.oldWrites.length === 0 && w.errs.length === 0, 'neither source was written, no page error' + lines(t.liveWrites.concat(t.oldWrites, w.errs)));
     }
   });
 
@@ -708,7 +763,32 @@ async function section(title, fn) {
       ok(again.tries.length > 0 && again.tries.every(t => /refused/.test(t)) && again.now === null, 'the next start tries the key again (refused again): ' + J(again.tries));
       ok(again.mark.raw === s.mark.raw && again.markWrites.length === 0, 'nothing changed, so the marker is not rewritten: ' + counts(again.mark.m) + lines(again.markWrites));
       ok(noticed(again.toast, 1), 'and the notice is shown again: at each start while something is missing: "' + again.toast + '"');
-      ok(w.errs.length === 0, 'no page error (a refused key, two starts)' + lines(w.errs));
+      // a start where the key fits but the MARKER cannot be written: a copy the marker does not record must be
+      // taken back, or the next start would find the key there, take it for 2.0's own data and move it to kept
+      await page.evaluate(([LIVE, MARK]) => __ctl({ refuse: [LIVE + MARK] }), [LIVE, MARK]);
+      await reload(page);
+      const one = {}; one[LIB] = seed[LIB];
+      const look = () => page.evaluate(([LIVE, MARK, one]) => ({ toast: __toast(), rep: __copied(LIVE, one), mark: __mark(LIVE), info: App.store.importInfo(), markTries: __store.touched(LIVE + MARK) }), [LIVE, MARK, one]);
+      let nm = await look();
+      ok(nm.rep[LIB].first === 'same' && nm.rep[LIB].removed && nm.rep[LIB].now === 'missing' && nm.markTries.length > 0 && nm.markTries.every(t => /refused/.test(t)),
+        'a start where ' + LIB + ' fits but the marker cannot be written: the copy is taken back (written, then removed again): ' + J(nm.rep[LIB]) + ' ' + J(nm.markTries));
+      ok(nm.mark.raw === s.mark.raw && !!nm.info && J(nm.info.failed) === J([LIB]) && nm.info.kept.length === 0 && noticed(nm.toast, 1), 'the stored marker is as it was, the key still waits, and the notice is shown: ' + counts(nm.info));
+      await page.evaluate(() => __ctl({}));
+      await reload(page);
+      nm = await look();
+      ok(nm.rep[LIB].now === 'same' && markerOk(nm.mark.m) && nm.mark.m.failed.length === 0 && nm.mark.m.kept.length === 0 && nm.mark.m.copied === m.copied + 1 && !NOTICE.test(nm.toast),
+        'the start after that, with room for both: the key is copied, nothing failed and nothing kept: ' + counts(nm.mark.m));
+      ok(w.errs.length === 0, 'no page error (a refused key, four starts)' + lines(w.errs));
+    }
+
+    console.log('  (a2) a write that is dropped without an error: setItem returns, nothing is stored');
+    {
+      const ctx = await profile(browser, { old: KEPT, ctl: { drop: [LIVE + 'sg.lib'] } });
+      const w = await open(ctx, env.URL), page = w.page;
+      const s = await first(page, KEPT), m = s.mark.m;
+      ok(s.rep['sg.lib'].writes > 0 && s.rep['sg.lib'].now === 'missing', 'sg.lib was written and is not there (the browser stored nothing and said nothing): ' + J(s.rep['sg.lib']));
+      ok(markerOk(m) && J(m.failed) === J(['sg.lib']) && m.copied === nKept - 1, 'every write is read back: the key is listed as failed, not counted as copied: ' + counts(m));
+      ok(noticed(s.toast, 1) && w.errs.length === 0, 'and the start notice says so: "' + s.toast + '"' + lines(w.errs));
     }
 
     console.log('  (b) a full store: everything fits except the largest library; then (c) the next start with room again');
@@ -738,6 +818,21 @@ async function section(title, fn) {
       ok(room.wrote, 'a write of ' + num(ROOM) + ' characters still succeeds afterwards (' + num(room.used) + ' of ' + num(cap) + ' characters used)' + (room.err ? ': ' + room.err : ''));
       ok(noticed(s.toast, 1), 'the start notice is shown, for 1 item: "' + s.toast + '"');
       ok(diff(seed, s.old).length === 0 && s.oldWrites.length === 0, 'the 1.x store is untouched' + lines(diff(seed, s.old).concat(s.oldWrites)));
+
+      // (b2) the next start with the store as full as before: the retry is held to the same headroom
+      await reload(page);
+      const lib = {}; lib[LIB] = seed[LIB];
+      const b2 = await page.evaluate(([LIVE, MARK, lib, n]) => {
+        const o = { toast: __toast(), rep: __copied(LIVE, lib), mark: __mark(LIVE), markWrites: __store.touched(LIVE + MARK), wrote: false };
+        const k = LIVE + 'zz.room', pad = new Array(n + 1).join('r');
+        try { localStorage.setItem(k, pad); o.wrote = (localStorage.getItem(k) || '').length === n; } catch (e) { o.wrote = false; }
+        __store.drop(k);
+        return o;
+      }, [LIVE, MARK, lib, ROOM]);
+      ok(b2.rep[LIB].first === 'same' && b2.rep[LIB].removed && b2.rep[LIB].now === 'missing',
+        '(b2) the next start, the store as full as before: the retry writes ' + LIB + ' and takes it back again to keep the headroom: ' + J(b2.rep[LIB]));
+      ok(b2.mark.raw === s.mark.raw && b2.markWrites.length === 0 && noticed(b2.toast, 1) && b2.wrote,
+        '(b2) the marker is as it was (the key still waits), the notice is shown again, and ' + num(ROOM) + ' characters still fit: ' + counts(b2.mark.m) + ' ' + J(b2.wrote));
 
       // (c) the user made room: the cap is lifted, the app starts again
       await page.evaluate(() => __ctl({}));
@@ -778,6 +873,23 @@ async function section(title, fn) {
       ok(w.errs.length === 0, 'no page error (2.0 took the key)' + lines(w.errs));
     }
 
+    console.log('  (d2) instead of (c): the live app removes that key before the next start');
+    {
+      const seed = bigProfile(false);
+      const ctx = await profile(browser, { old: seed, ctl: { refuse: [LIVE + LIB] } });
+      const w = await open(ctx, env.URL), page = w.page;
+      const s = await first(page, seed);
+      ok(markerOk(s.mark.m) && J(s.mark.m.failed) === J([LIB]), 'first start: ' + LIB + ' did not fit: ' + counts(s.mark.m));
+      // room again, but the source is gone (the user deleted those scores in the live app)
+      await page.evaluate(([OLD, LIB]) => { __ctl({}); __store.drop(OLD + LIB); }, [OLD, LIB]);
+      await reload(page);
+      const t = await page.evaluate(([LIVE, LIB]) => ({ toast: __toast(), now: __store.raw(LIVE + LIB), tries: __store.touched(LIVE + LIB), mark: __mark(LIVE) }), [LIVE, LIB]);
+      ok(t.now === null && t.tries.length === 0, 'nothing is left to copy: no write to ' + LIVE + LIB + ', and it is not there' + lines(t.tries));
+      ok(markerOk(t.mark.m) && t.mark.m.failed.length === 0 && t.mark.m.kept.length === 0 && t.mark.m.copied === s.mark.m.copied,
+        'the key leaves the failed list: it is not kept and not counted as copied: ' + counts(t.mark.m));
+      ok(!NOTICE.test(t.toast) && w.errs.length === 0, 'so the notice stops: "' + t.toast + '"' + lines(w.errs));
+    }
+
     console.log('  (e) storage fully blocked');
     {
       // the browser refuses site data: touching localStorage throws
@@ -803,6 +915,8 @@ async function section(title, fn) {
       h = await health(page);
       const s = await page.evaluate(([OLD, LIVE]) => ({ live: Object.keys(__store.dump(LIVE)), old: __store.dump(OLD), tried: __writes.filter(x => x.refused).length, info: App.store.importInfo(), toast: __toast() }), [OLD, LIVE]);
       ok(w.errs.length === 0 && healthy(h), 'every write refused (' + s.tried + ' tried): the app still starts with a visible panel: ' + said(h) + lines(w.errs));
+      ok(!!s.info && s.info.copied === 0 && s.info.failed.length === nKept && noticed(s.toast, nKept),
+        'the marker could not be stored either, yet the app knows what its copy did (importInfo, from memory): all ' + nKept + ' items wait, and the start notice says so: ' + (s.info ? s.info.failed.length + ' failed' : 'no info'));
       ok(s.live.length === 0 && diff(KEPT, s.old).length === 0, 'nothing is stored under the 2.0 prefix, and the 1.x data is all there (what the app knows of its copy: ' + counts(s.info) + '; notice: "' + s.toast + '")' +
         lines(s.live.concat(diff(KEPT, s.old))));
     }
@@ -861,6 +975,149 @@ async function section(title, fn) {
       ok(clean(a) && markerOk(t.mark.m) && t.mark.m.failed.length === 0 && t.mark.m.kept.length === 0, 'the next start copies all three, byte for byte: nothing failed, nothing kept: ' + counts(t.mark.m) + told(a));
       ok(t.charts === 15 && t.students === 14 && !NOTICE.test(t.toast), 'and the pages show the 1.x data: 15 charts, 14 students, no notice: ' + J([t.charts, t.students]) + ' "' + t.toast + '"');
       ok(w.errs.length === 0, 'no page error (defaults under waiting keys)' + lines(w.errs));
+    }
+
+    console.log('  (g) a look is not an edit: soundLAB Gear and Jam under keys that still wait');
+    {
+      // Gear stores whole blobs as it goes: the Deck's settings with the sub-tab last looked at (midihub.deck), its
+      // button states with the bank and program the synth sent last (midihub.deckvals), the knob values per Part
+      // (midihub.kv, also flushed whenever the window is hidden), the Helix knobs (hx.kv). Jam saves all of its
+      // keys on any change. None of that is the user's data while the key still waits for its copy.
+      const KV = {}; for (let p = 0; p < 16; p++) { KV[p] = {}; [74, 71, 73, 72, 91, 93, 7, 10].forEach((cc, i) => { KV[p][cc] = (p * 7 + i * 5) % 128; }); }
+      const DECK = { v: 1, tab: 'knobs', settleMs: 300, pace: 2, maps: { generic: { ctl: {}, custom: Array.from({ length: 12 }, (_, i) => ({ id: 'u' + i, name: 'My control ' + i, kind: 'cc', scope: 'part', num: 20 + i, conf: 'learned', min: 0, max: 127 })), pages: [], banks: [] } } };
+      const VALS = { v: 1, ctl: { 'generic/0': { sustain: 127 } }, lastBank: null };
+      const SONG = [{ id: 'a', on: true, repeats: 2, barsPerChord: 1, chords: [{ d: 6 }, { d: 4 }, { d: 1 }, { d: 5 }] }];
+      const GEAR = { 'midihub.kv': J(KV), 'midihub.deck': J(DECK), 'midihub.deckvals': J(VALS), 'hx.kv': J([10, 20, 30, 40, 50, 60, 70, 80]) };
+      const JAM = { 'jam2.sections': J(SONG) };
+      const GKEYS = Object.keys(GEAR), WAIT = GKEYS.concat(Object.keys(JAM));
+      const base = Object.assign({}, FLAGS, { 'gear.told': 'true', 'jam2.migr': 'true', 'jam2.energy': '2' });
+      // a look around Gear: every Deck sub-tab, what a synth and the Helix send by themselves (a sound chosen and a knob
+      // turned on the instrument), the Hub and the Helix page, then another browser tab in front and the page closed
+      const lookGear = page => page.evaluate(async () => {
+        const raw = bytes => App.emit('midi:raw', { bytes: bytes, portId: 'in-test' });
+        const o = { tabs: 0 };
+        App.switchTo('deck'); await __wait(250);
+        for (const b of Array.from(document.querySelectorAll('#sdk-tabs button'))) { b.click(); o.tabs++; await __wait(80); }
+        raw([0xB0, 0, 63]); raw([0xB0, 32, 5]); raw([0xC0, 7]); raw([0xB0, 74, 90]);
+        App.switchTo('midihub'); await __wait(250);
+        raw([0xB0, 74, 91]); raw([0xC0, 8]);
+        App.switchTo('helix'); await __wait(250);
+        if (window.SLHelix) SLHelix.onMidiIn([0xB0, 38, 77]);
+        await __wait(450); // the write timers of the Hub (200 ms) and the Deck (300 ms)
+        Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+        Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+        document.dispatchEvent(new Event('visibilitychange'));
+        window.dispatchEvent(new Event('pagehide'));
+        await __wait(150);
+        o.knob = window.SLMidiHub ? SLMidiHub.api.kv(74) : null; o.helix = window.SLHelix ? SLHelix.st.kv[0] : null;
+        return o;
+      });
+      // one change in Jam that is not the song: the energy, Push
+      const jamEnergy = page => page.evaluate(async () => {
+        App.switchTo('jam'); await __wait(250);
+        const b = document.querySelector('#panel-jam button[data-jen="3"]');
+        if (b) b.click();
+        await __wait(120);
+        return !!b && App.active === 'jam';
+      });
+      const stored = (page, keys) => page.evaluate(([LIVE, keys]) => keys.filter(k => __store.raw(LIVE + k) !== null), [LIVE, keys]);
+
+      // the control: with nothing waiting, the same look and the same change DO store all five
+      let ctx = await profile(browser, { live: base });
+      let g = await open(ctx, env.GEAR_URL);
+      const seen0 = await lookGear(g.page), st0 = await stored(g.page, GKEYS);
+      ok(seen0.tabs >= 4 && J(st0) === J(GKEYS), 'control: with nothing waiting, a look around Gear (' + seen0.tabs + ' Deck tabs, a synth\'s and the Helix\'s own messages, the window hidden) stores ' + GKEYS.join(', ') + ': ' + J(st0));
+      let m0 = await open(ctx, env.URL);
+      const none0 = await stored(m0.page, ['jam2.sections']), jam0 = await jamEnergy(m0.page), sj0 = await stored(m0.page, ['jam2.sections']);
+      ok(jam0 && none0.length === 0 && J(sj0) === J(['jam2.sections']), 'control: and one tap on Jam\'s energy stores the whole Jam state, the song included (jam2.sections was not stored before it): ' + J([none0, sj0]));
+
+      // a profile whose five values did not fit at the first start (soundLAB Gear is opened first)
+      const seed = Object.assign({}, base, GEAR, JAM);
+      ctx = await profile(browser, { old: seed, ctl: { refuse: WAIT.map(k => LIVE + k) } });
+      g = await open(ctx, env.GEAR_URL);
+      const s = await first(g.page, seed);
+      ok(markerOk(s.mark.m) && J(s.mark.m.failed.slice().sort()) === J(WAIT.slice().sort()), 'first start, in Gear: the five did not fit: ' + counts(s.mark.m));
+      await g.page.evaluate(() => __ctl({})); // room again from here on
+      const seen = await lookGear(g.page);
+      const after = await g.page.evaluate(([LIVE, GKEYS]) => ({ stored: GKEYS.filter(k => __store.raw(LIVE + k) !== null),
+        sets: GKEYS.map(k => __writes.filter(x => x.op === 'set' && x.key === LIVE + k).map(x => x.refused || 'stored')) }), [LIVE, GKEYS]);
+      ok(seen.tabs >= 4 && seen.knob === 91 && seen.helix === 77, 'the same look: the pages work on what the instruments sent (the Hub\'s knob shows 91, the Helix knob 77): ' + J(seen));
+      ok(after.stored.length === 0 && after.sets.every(x => J(x) === J(['refused'])), 'but none of it was stored: the four Gear keys are still empty, and the only write ever tried was the copy\'s own: ' + J(after.sets) +
+        lines(after.stored.map(k => 'stored: ' + k)));
+      // soundLAB in the same browser. Opening it is a start, so the copy is tried again: still no room at that moment, room after it
+      const full = WAIT.map(k => LIVE + k);
+      await g.page.evaluate(full => __ctl({ refuse: full }), full);
+      m0 = await open(ctx, env.URL);
+      await m0.page.evaluate(() => __ctl({}));
+      const jam = await jamEnergy(m0.page);
+      const sj = await m0.page.evaluate(LIVE => ({ energy: __store.raw(LIVE + 'jam2.energy'), song: __store.raw(LIVE + 'jam2.sections') }), LIVE);
+      ok(jam && sj.energy === '3' && sj.song === null, 'in Jam the energy is stored (what the user changed) and the song is not (the default it shows meanwhile is not the user\'s): ' + J(sj));
+      // the next start: all five arrive
+      await reload(m0.page);
+      const src = Object.assign({}, GEAR, JAM);
+      const t = await m0.page.evaluate(([LIVE, src]) => ({ toast: __toast(), rep: __copied(LIVE, src), mark: __mark(LIVE) }), [LIVE, src]);
+      const a = arrived(t.rep, WAIT);
+      ok(clean(a) && markerOk(t.mark.m) && t.mark.m.failed.length === 0 && t.mark.m.kept.length === 0 && !NOTICE.test(t.toast),
+        'the next start copies all five, byte for byte: nothing failed, nothing kept, no notice: ' + counts(t.mark.m) + told(a));
+      ok(g.errs.length === 0 && m0.errs.length === 0, 'no page error (Gear and Jam under waiting keys)' + lines(g.errs.concat(m0.errs)));
+
+      // what the user DOES change is 2.0's own data, as before: a knob turned on screen, another style picked in Jam
+      ctx = await profile(browser, { old: seed, ctl: { refuse: WAIT.map(k => LIVE + k) } });
+      g = await open(ctx, env.GEAR_URL);
+      await g.page.evaluate(async () => { __ctl({}); App.switchTo('midihub'); await __wait(250); SLMidiHub.api.turn(74, 101); await __wait(350); });
+      await g.page.evaluate(full => __ctl({ refuse: full }), full); // soundLAB's start tries the copy again: no room at that moment
+      m0 = await open(ctx, env.URL);
+      const picked = await m0.page.evaluate(async () => {
+        __ctl({});
+        App.switchTo('jam'); await __wait(250);
+        const sel = document.getElementById('jam-genre'), other = Array.from(sel.options).map(x => x.value).filter(v => v !== sel.value)[0];
+        sel.value = other; sel.dispatchEvent(new Event('change', { bubbles: true }));
+        await __wait(120);
+        return other;
+      });
+      const own = await m0.page.evaluate(LIVE => ({ kv: __store.raw(LIVE + 'midihub.kv'), song: __store.raw(LIVE + 'jam2.sections') }), LIVE);
+      ok(typeof own.kv === 'string' && /"74":101/.test(own.kv) && typeof own.song === 'string' && own.song !== JAM['jam2.sections'],
+        'an edit is stored at once: the knob the user turned (midihub.kv) and the song of the style picked in Jam (' + picked + '): ' + short(own.kv, 40) + ' / ' + short(own.song, 40));
+      await reload(m0.page);
+      const k = await m0.page.evaluate(LIVE => ({ mark: __mark(LIVE), kv: __store.raw(LIVE + 'midihub.kv'), song: __store.raw(LIVE + 'jam2.sections') }), LIVE);
+      ok(markerOk(k.mark.m) && J(k.mark.m.kept.slice().sort()) === J(['jam2.sections', 'midihub.kv']) && k.mark.m.failed.length === 0 && k.kv === own.kv && k.song === own.song,
+        'and at the next start those two are kept as 2.0\'s own (not overwritten), the other three are copied: ' + counts(k.mark.m));
+    }
+
+    console.log('  (h) a store with no room for the headroom at all: the small keys stay');
+    {
+      const seed = bigProfile(true);
+      const small = keysOf(seed).filter(k => groupOf(k, seed[k]) === 1), large = keysOf(seed).filter(k => groupOf(k, seed[k]) > 1);
+      const smallOnly = {}; small.forEach(k => { smallOnly[k] = seed[k]; });
+      // room for the 1.x data, for the small values and a little more: far less than the 200,000 characters the copy wants free
+      const cap = sizeOf(OLD, seed) + sizeOf(LIVE, smallOnly) + 30000;
+      const ctx = await profile(browser, { old: seed, ctl: { cap } });
+      const w = await open(ctx, env.URL), page = w.page;
+      const s = await first(page, seed), h = await health(page), m = s.mark.m;
+      const a = arrived(s.rep, small), left = large.filter(k => s.rep[k].now !== 'missing');
+      ok(w.errs.length === 0 && healthy(h) && clean(a), 'every small key (' + small.length + ') arrived and stays, byte for byte: the headroom is never bought by undoing a small copy' + told(a) + lines(w.errs));
+      ok(markerOk(m) && J(m.failed.slice().sort()) === J(large.slice().sort()) && m.copied === small.length && left.length === 0,
+        'all ' + large.length + ' large values are in failed and none is left in the 2.0 store: ' + counts(m) + lines(left.map(k => 'still stored: ' + k)));
+      ok(noticed(s.toast, large.length), 'the start notice counts them: "' + s.toast + '"');
+    }
+
+    console.log('  (i) Copy again in a store with no room to spare: nothing that was there is taken away');
+    {
+      const seed = bigProfile(false), n = keysOf(seed).length;
+      const ctx = await profile(browser, { old: seed });
+      const w = await open(ctx, env.URL), page = w.page;
+      const s = await first(page, seed);
+      ok(markerOk(s.mark.m) && s.mark.m.failed.length === 0 && s.mark.m.copied === n, 'first start, no limit: all ' + n + ' keys are copied: ' + counts(s.mark.m));
+      // the origin fills up afterwards (the live app keeps writing): hardly any room left, then Copy again
+      const r = await page.evaluate(([LIVE, seed]) => {
+        __ctl({ cap: __store.used() + 20000 });
+        const from = __writes.length, info = App.store.copyAgain();
+        return { info, removed: __writes.slice(from).filter(x => x.op === 'remove' && x.key.indexOf(LIVE) === 0 && x.key !== LIVE + 'store.probe').map(x => x.key),
+          lost: Object.keys(seed).filter(k => __store.raw(LIVE + k) !== seed[k]) };
+      }, [LIVE, seed]);
+      ok(r.lost.length === 0 && r.removed.length === 0, 'every key holds the source string afterwards and none was removed: the headroom is never bought with a key that was there before the run' +
+        lines(r.lost.map(k => 'lost: ' + k).concat(r.removed.map(k => 'removed: ' + k))));
+      ok(!!r.info && r.info.failed.length === 0 && r.info.copied === n && w.errs.length === 0, 'the fresh marker counts all ' + n + ' as copied, nothing failed: ' + counts(r.info) + lines(w.errs));
     }
   });
 
@@ -970,14 +1227,20 @@ async function section(title, fn) {
       ok(one.label === AGAIN_SURE && J(one.state) === untouched, 'one tap only asks: the button reads "' + AGAIN_SURE + '" and nothing is copied: ' + J([one.label, one.state.slice(0, 2)]));
       ok(one.later === AGAIN && J(one.stateLater) === untouched, 'with no second tap within 3 s it goes back to "' + AGAIN + '", still nothing copied: ' + J(one.later));
       const reloaded = page.waitForEvent('load', { timeout: 8000 }).then(() => true, () => false);
-      const two = await page.evaluate(([OLD, LIVE, removed]) => {
-        const b = document.getElementById('set-copy-again'), from = __writes.length;
-        b.click(); const mid = b.textContent.replace(/\s+/g, ' ').trim(); b.click();
-        return { mid, root: __store.raw(LIVE + 'fb.root'), bpm: __store.raw(LIVE + 'met.bpm'), own: __store.raw(LIVE + 'zz.own'), mark: __mark(LIVE),
+      const two = await page.evaluate(async ([OLD, LIVE, MARK, removed, wait]) => {
+        const b = document.getElementById('set-copy-again'), from = __writes.length, label = () => b.textContent.replace(/\s+/g, ' ').trim();
+        const state = () => [__store.raw(LIVE + 'fb.root'), __store.raw(LIVE + 'met.bpm'), __store.raw(LIVE + MARK)];
+        // a double-click: the second click comes before anybody could have read the new label
+        b.click(); const mid = label(); b.click();
+        const dbl = { label: label(), state: state(), busy: b.disabled };
+        await __wait(wait);
+        b.click(); // the answer to the label
+        return { mid, dbl, root: __store.raw(LIVE + 'fb.root'), bpm: __store.raw(LIVE + 'met.bpm'), own: __store.raw(LIVE + 'zz.own'), mark: __mark(LIVE),
           dead: removed.filter(k => __store.raw(LIVE + k) !== null), old: __store.dump(OLD), oldWrites: __store.touched(OLD, from) };
-      }, [OLD, LIVE, Object.keys(REMOVED)]);
+      }, [OLD, LIVE, MARK, Object.keys(REMOVED), AGAIN_MIN + 100]);
       const m = two.mark.m;
-      ok(two.mid === AGAIN_SURE && two.root === KEPT['fb.root'] && two.bpm === '141', 'two taps overwrite: the key is the G of 1.x again, the tempo is the 141 that 1.x has by now: ' + J([two.mid, two.root, two.bpm]));
+      ok(two.dbl.label === AGAIN_SURE && J(two.dbl.state) === untouched && !two.dbl.busy, 'a double-click does not pass for the two taps: the button still asks and nothing is copied: ' + J([two.dbl.label, two.dbl.state.slice(0, 2)]));
+      ok(two.mid === AGAIN_SURE && two.root === KEPT['fb.root'] && two.bpm === '141', 'a second tap after the label could be read overwrites: the key is the G of 1.x again, the tempo is the 141 that 1.x has by now: ' + J([two.mid, two.root, two.bpm]));
       ok(markerOk(m) && m.from === OLD && m.copied === nKept && m.failed.length === 0 && m.at >= before.m.at && two.mark.raw !== before.raw, 'a fresh marker: ' + nKept + ' copied: ' + counts(m));
       ok(two.own === J('made in 2.0') && two.dead.length === 0, 'it is a copy: a key only 2.0 has stays, and removed features are still left behind: ' + J(two.own) + lines(two.dead));
       ok(diff(old, two.old).length === 0 && two.oldWrites.length === 0, 'the 1.x store is untouched' + lines(diff(old, two.old).concat(two.oldWrites)));

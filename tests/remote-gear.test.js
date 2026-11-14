@@ -413,7 +413,8 @@ const until = (page, fn) => page.waitForFunction(fn, null, { polling: 50, timeou
   ok(liveActed === ROUNDS && lastSlot === 3, 'the Gear window on Live sets steps on EVERY press (' + liveActed + ' of ' + ROUNDS + '; the set ends on slot ' + (lastSlot + 1) + '): ' + J(rounds.map(r => r[0].steps)));
   ok(hubActed === ROUNDS, 'and the Gear window on the Hub answers every press too ("Nothing to move on here"): ' + hubActed + ' of ' + ROUNDS + ' ' + J(rounds.map(r => r[1].ev)));
   ok(rounds.every(r => r[0].raw === 0 && r[1].raw === 0), 'both still claim the bound CC (no "midi:raw" in either)');
-  const holdsG = await Promise.all([g1w, g2w].map(pg => pg.evaluate(async () => (await navigator.locks.query()).held.filter(l => l.name === 'soundlab-remote-main').length)));
+  // the pedal lock carries the store prefix (soundlab-remote-main:soundlab2.): matched by its start, so a renamed lock cannot slip past
+  const holdsG = await Promise.all([g1w, g2w].map(pg => pg.evaluate(async () => (await navigator.locks.query()).held.filter(l => l.name.indexOf('soundlab-remote-main') === 0).length)));
   ok(holdsG.join() === '0,0', 'Gear leaves the pedal lock alone: nobody holds it afterwards');
   // a soundLAB window beside them: the pedal is soundLAB's, in neither Gear window
   const sl = await ctx.newPage();

@@ -115,7 +115,7 @@
   document.addEventListener('visibilitychange', function () { if (!document.hidden) install(); });
   // another window of this app ticked or cleared the box (or the store was
   // cleared: key null). Only this scope's key counts (App.store.prefix): the
-  // 1.x app and the beta share the origin and keep the same switch under
+  // live app and the beta share the origin and keep the same switch under
   // their own prefix, and a write there is not this app's business
   window.addEventListener('storage', function (e) {
     var k = e ? e.key : null;

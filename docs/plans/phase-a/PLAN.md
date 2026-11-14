@@ -1453,3 +1453,33 @@ letter, did not do what it says it means. The code now differs from these lines 
 Known and left: On in one window and Off in the other within about 3 ms of each other can end with Hear input
 stored on and no window playing (one more press recovers); a typed hash with nothing to step back to (`#quiz` on
 Exercises, a hash that is no page) still costs one extra Back.
+
+## Changes after the A4 review
+
+The review of A4 (draft pull request #103) and the release of 2.0.0 at the live address changed these points.
+The code differs from the lines above on purpose:
+
+- **8.2, 8.3, the words on screen.** No text says "1.x data": the live app is 2.0.0 (the code before Phase A)
+  and still stores under `guitarlab.*`. At the live address the copy's source is "your earlier soundLAB data",
+  on the beta every source is "your data from the live app". The buttons read "Copy my earlier data again" /
+  "Copy from the live app again", the second tap "Tap again: this overwrites the settings here". A browser
+  with nothing to copy reads "Looked for earlier soundLAB data in this browser on <date>: there was nothing
+  to copy." instead of "0 items".
+- **8.3, Copy again.** A second tap sooner than 0.6 s after the first does not count: the two clicks of a
+  double-click passed the confirmation before the label could be read.
+- **8.2, the order.** `STORE_PROGRESS` also has `lesson.` (`lesson.observations.v1`, `lesson.pending.v1` of
+  `js/xp.js`).
+- **8.2, `App.store.waiting(key)` (not in the plan).** A key that did not fit must not be filled by something
+  the user did not make, or the next start takes it for 2.0's own data and stops trying. Guarded: the Charts
+  page's blank first chart, the Plan page's starter student and today's empty session; in soundLAB Gear the
+  Deck's sub-tab (`midihub.deck`), what the synth sent (`midihub.deckvals`, `midihub.kv`, `hx.kv`) and the
+  flush of unchanged knob values when the window is hidden; in Jam every `jam2.*` value that was not changed.
+  An edit by the user is stored as before and moves the key to `kept`.
+- **8.3, the deny list** is applied to every source: old `guitarlab.` files, 2.0 files and the beta's copy
+  from the live 2.0 scope. So no key of the app may be named under it; `tests/assets.test.js` checks `js/`.
+- **7.3, D44, D45, the two Web Locks.** Their names end in the store prefix (`soundlab-remote-main:soundlab2.`,
+  `soundlab-hear-input:soundlab2-next.`). With one name for the origin and one switch per prefix, Off pressed
+  in the beta silenced the live window, and a visible beta soundLAB kept a live Gear window from answering the
+  pedal. The beta and the live app are two apps: each can play Hear input, each answers its own bindings.
+- **D38, 8.4, `sw.js`.** The cache is `PREFIX + 'v9'` (`sl2-next-v9` / `sl2-live-v9`), as rule 13 says for a
+  merged PR #98.
