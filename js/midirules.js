@@ -16,8 +16,9 @@
  *       the tab becomes visible and on a 'storage' event for midihub.rulesIn
  *       (the box was ticked in another window); the window that ticks the
  *       box calls it directly.
- *   active() -> { on, rules }   is the filter switched on, and how many rules
- *       are enabled (for a status line).
+ *   active() -> { on, rules }   is the filter switched on, and how many
+ *       enabled rules can change what the app hears (for a status line). A
+ *       rule for one keyboard (m.port) is Thru's only and is not counted.
  * Bus: 'midirules:state' { on, rules } when the installed state changed.
  * Store: midihub.rules, midihub.rulesIn (the Hub writes them).
  * Loaded right after js/remote.js (needs App.midi.setInputFilter).
@@ -95,8 +96,10 @@
   // the Hub; a blocked message is dropped
   function filter(b) { var r = apply(b); return r.length ? r[0] : null; }
   var installed = false;
+  // rules = the enabled ones the filter above can match (matches(): no port
+  // name here, so a rule with m.port never does)
   function active() {
-    return { on: rulesIn(), rules: rules().filter(function (r) { return !!(r && r.on); }).length };
+    return { on: rulesIn(), rules: rules().filter(function (r) { return !!(r && r.on && !(r.m && r.m.port)); }).length };
   }
   function install() {
     var m = App.midi;

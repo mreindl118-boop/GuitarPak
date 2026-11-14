@@ -15,12 +15,18 @@
 //
 // TWO WINDOWS (plan D44, "one window acts on a pedal"): soundLAB and Gear
 // open side by side in one browser context, each page with its own fake MIDI
-// ports and the same bound CC. Both claim the message; ONE acts on it:
+// ports and the same bound CC. Both claim the message; ONE APP acts on it:
 //   1. both visible: soundLAB acts, Gear does nothing (no 'remote' event, no
 //      Bank Select or Program Change to the synth, the Live slot stays)
 //   2. soundLAB hidden: the next press steps the Live slot in Gear
-//   3. no Web Locks (navigator.locks hidden): Gear acts while it has the
-//      focus and not while it has not
+//   3. no Web Locks (navigator.locks hidden), or Web Locks that cannot be
+//      asked (no locks.query): Gear acts while it has the focus and not
+//      while it has not
+//   4. TWO GEAR WINDOWS, both visible, no soundLAB: the press reaches both
+//      at the same instant and BOTH act on every press (Gear asks whether
+//      the lock is held, it never takes it: two Gear windows used to shut
+//      each other out and the Live set skipped steps); with a visible
+//      soundLAB window beside them neither Gear window acts
 // The test sets each page's visibility and focus itself (__vis / __focus), so
 // it does not depend on how headless Chromium reports a background page.
 const { chromium } = require('playwright');
@@ -104,6 +110,20 @@ async function twoPages(browser, seed) {
   const main = await open(env.URL, MAIN_UP, 'soundLAB');
   const gear = await open(env.GEAR_URL, GEAR_UP, 'Gear');
   return { ctx, main, gear, errs };
+}
+// several pages in ONE context, opened in this order: [url, up, who]
+async function pagesIn(browser, seed, list) {
+  const ctx = await browser.newContext({ viewport: { width: 1200, height: 900 }, serviceWorkers: 'block' });
+  await ctx.addInitScript(INIT, seed || {});
+  const errs = [], pages = [];
+  for (const [url, up, who] of list) {
+    const p = await ctx.newPage();
+    p.on('pageerror', e => errs.push(who + ': ' + e.message));
+    await p.goto(url);
+    await p.waitForFunction(up, null, { polling: 50 });
+    pages.push(p);
+  }
+  return { ctx, pages, errs };
 }
 // a timer poll, not the default animation-frame poll: a page that is not the front one may not paint
 const until = (page, fn) => page.waitForFunction(fn, null, { polling: 50, timeout: 5000 }).then(() => true, () => false);
@@ -346,6 +366,67 @@ const until = (page, fn) => page.waitForFunction(fn, null, { polling: 50, timeou
   const f3 = await press(page, 86);
   ok(f3.slot === 1 && f3.steps === 1 && f3.ev.join() === 'next:cc:1', 'focused again: the next press steps on (slot 2): ' + J([f3.slot, f3.steps, f3.ev]));
   ok(!errs.length, 'no page errors: ' + errs.join(' | '));
+  await ctx.close();
+
+  console.log('# Web Locks that cannot be asked (no locks.query): the same rule, by focus');
+  const NO_QUERY = () => { try { Object.defineProperty(LockManager.prototype, 'query', { configurable: true, value: undefined }); } catch (e) { /* no Web Locks at all */ } };
+  ({ ctx, page, errs } = await newPage(browser, { 'remote.map': MAP, 'synthtab.live': LIVE }, NO_QUERY));
+  await page.evaluate(async () => { App.switchTo('liveset'); __vis(true); __focus(true); await __wait(300); });
+  const nq = await page.evaluate(() => ({ request: typeof (navigator.locks && navigator.locks.request), query: typeof (navigator.locks && navigator.locks.query) }));
+  const q1 = await press(page, 86);
+  await page.evaluate(() => { __focus(false); });
+  const q2 = await press(page, 86);
+  ok(nq.request === 'function' && nq.query === 'undefined' && q1.slot === 0 && q1.steps === 1 && q1.ev.join() === 'next:cc:1',
+    'locks.request without locks.query: focused, the press steps the Live slot: ' + J([nq, q1.slot, q1.ev]));
+  ok(q2.slot === 0 && q2.steps === 0 && q2.ev.length === 0 && loads(q2).length === 0, 'and not focused, Gear does nothing with it: ' + J([q2.slot, q2.steps, q2.ev]));
+  ok(!errs.length, 'no page errors: ' + errs.join(' | '));
+  await ctx.close();
+
+  console.log('# two Gear windows, both visible, no soundLAB: both answer every press');
+  // one press of the CC into every page at the same instant (a MIDI message reaches every window together)
+  const pressAll = async (pages, cc) => {
+    await Promise.all(pages.map(pg => pg.evaluate(async () => {
+      const hudEl = document.getElementById('remote-hud');
+      if (hudEl) hudEl.classList.remove('show');
+      __clearToast(); await __wait(320);
+      __ev.length = 0; __raw.length = 0; __by.modx1.length = 0; __by.lumi.length = 0; window.__s0 = __slots;
+    })));
+    const at = Date.now() + 150; // the pages share this machine's clock
+    return Promise.all(pages.map(pg => pg.evaluate(async ([cc, at]) => {
+      await __wait(Math.max(0, at - Date.now()));
+      __press(cc); await __wait(250);
+      return { ev: __ev.slice(), raw: __raw.filter(b => b.indexOf('176 ' + cc + ' ') === 0).length, bytes: __by.modx1.slice(),
+        slot: SLSynthLive.slot(), steps: __slots - __s0, hud: __hud(), toast: __toast() };
+    }, [cc, at])));
+  };
+  let pages;
+  ({ ctx, pages, errs } = await pagesIn(browser, { 'remote.map': MAP, 'synthtab.live': LIVE }, [[env.GEAR_URL, GEAR_UP, 'Gear 1'], [env.GEAR_URL, GEAR_UP, 'Gear 2']]));
+  const [g1w, g2w] = pages;
+  // window 1 on Live sets, window 2 on the Hub (nothing to move on there: it still answers, and says so)
+  await g1w.evaluate(async () => { App.switchTo('liveset'); __vis(true); await __wait(300); });
+  await g2w.evaluate(async () => { App.switchTo('midihub'); __vis(true); await __wait(300); });
+  const ROUNDS = 6, rounds = [];
+  for (let i = 0; i < ROUNDS; i++) rounds.push(await pressAll([g1w, g2w], 86));
+  const liveActed = rounds.filter(r => r[0].steps === 1 && r[0].ev.join() === 'next:cc:1').length;
+  const hubActed = rounds.filter(r => r[1].ev.join() === 'next:cc:0' && /Nothing to move on here/.test(r[1].toast)).length;
+  const lastSlot = rounds[ROUNDS - 1][0].slot; // slots 1, 2 and 4 are filled: six steps end on slot 4 (index 3)
+  ok(liveActed === ROUNDS && lastSlot === 3, 'the Gear window on Live sets steps on EVERY press (' + liveActed + ' of ' + ROUNDS + '; the set ends on slot ' + (lastSlot + 1) + '): ' + J(rounds.map(r => r[0].steps)));
+  ok(hubActed === ROUNDS, 'and the Gear window on the Hub answers every press too ("Nothing to move on here"): ' + hubActed + ' of ' + ROUNDS + ' ' + J(rounds.map(r => r[1].ev)));
+  ok(rounds.every(r => r[0].raw === 0 && r[1].raw === 0), 'both still claim the bound CC (no "midi:raw" in either)');
+  const holdsG = await Promise.all([g1w, g2w].map(pg => pg.evaluate(async () => (await navigator.locks.query()).held.filter(l => l.name === 'soundlab-remote-main').length)));
+  ok(holdsG.join() === '0,0', 'Gear leaves the pedal lock alone: nobody holds it afterwards');
+  // a soundLAB window beside them: the pedal is soundLAB's, in neither Gear window
+  const sl = await ctx.newPage();
+  sl.on('pageerror', e => errs.push('soundLAB: ' + e.message));
+  await sl.goto(env.URL);
+  await sl.waitForFunction(MAIN_UP, null, { polling: 50 });
+  await sl.evaluate(async () => { App.switchTo('chords'); __vis(true); await __wait(200); });
+  const heldToo = await until(sl, () => App.remote.holdsMain === true);
+  const [a3, b3, c3] = await pressAll([g1w, g2w], 86).then(async r => r.concat([await press(sl, 86)]));
+  ok(heldToo && a3.ev.length === 0 && a3.steps === 0 && loads(a3).length === 0 && b3.ev.length === 0 && !b3.toast,
+    'with a visible soundLAB window beside them neither Gear window acts (no event, no step, nothing to the synth): ' + J([a3.ev, a3.steps, b3.ev, b3.toast]));
+  ok(c3.ev.length === 1 && /^next:cc:/.test(c3.ev[0]), 'and soundLAB does: ' + J(c3.ev));
+  ok(!errs.length, 'no page errors in any window: ' + errs.join(' | '));
   await ctx.close();
 
   await browser.close();

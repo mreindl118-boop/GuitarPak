@@ -8,8 +8,10 @@
 //   - the removed controls and globals are gone, the sound library is kept
 //   - a stored 1.x plug-in is never run; the sampler database is never opened
 //   - stored Studio / plug-in / workspace keys are byte-identical after every
-//     page was visited and the kept sounds were played (the live 1.x app on
-//     this origin still owns them)
+//     page was visited and the kept sounds were played (the live app on this
+//     origin still owns them) — and after the same profile opened soundLAB
+//     Gear and its four pages (A3b: they were soundLAB pages when A1 wrote
+//     this guard)
 //   - a stale workspace or page id lands on Exercises, never on a blank page
 //   - Backup import skips the keys of removed features and says so
 // A4 = 2.0 keeps its data in its own store, 'soundlab2.*' at the address the
@@ -43,10 +45,11 @@
 //   - the Hub's "Apply rules to what soundLAB hears" still works here: a
 //     stored rule shapes what the Piano page receives, and Settings › MIDI
 //     keyboard says so with the rule count (hidden when the box is off or no
-//     rule is enabled); its button opens the Hub in Gear
+//     rule is enabled; a rule for one keyboard only, m.port, is Thru's and is
+//     not counted); its button opens the Hub in Gear
 //   - a stored last page that is a Gear page boots to Exercises without
 //     leaving soundLAB and says once where those pages are; Thru left on is
-//     said once too
+//     said once too; both at one start are said in ONE notice
 //   - App.switchTo('midihub') leaves for gear.html#midihub
 // No hardware: no microphone; the one MIDI keyboard (A3b) is a fake Web MIDI
 // port. Sound runs into a muted context.
@@ -333,8 +336,9 @@ const lines = a => a.length ? '\n    ' + a.join('\n    ') : '';
     ok(m.stored === m.to, 'App.switchTo("' + m.id + '") is not stored as the last page (app.tab = ' + J(m.stored) + ')');
   }
 
-  console.log('# A1 + A4 the 1.x data on this origin is untouched, and removed features were not copied');
-  const data = await page.evaluate(([keys, dead]) => {
+  // what this document did to the 1.x data since it loaded (the init script starts __writes and __idb afresh
+  // in every document; the seed is written once per tab, so a second document finds what the first left)
+  const dataOf = () => page.evaluate(([keys, dead]) => {
     const re = new RegExp(dead), now = {};
     // the 1.x store, where the keys were seeded
     keys.forEach(k => { now[k] = __old.raw(k); });
@@ -350,24 +354,53 @@ const lines = a => a.length ? '\n    ' + a.join('\n    ') : '';
       tabs: __writes.filter(w => w[1] === 'soundlab2.app.tab').map(w => w[2]),
       all: __writes.length, idb: __idb.slice() };
   }, [Object.keys(OLD), DEAD]);
-  ok(data.ran === undefined, 'a stored 1.x plug-in is never run (its code would set a global): ' + J(data.ran));
-  const daw = data.idb.filter(x => /guitarlab-daw/.test(x));
-  ok(daw.length === 0, 'the sampler database guitarlab-daw is never opened or deleted (databases touched: ' + (data.idb.join(', ') || 'none') + ')');
-  const changed = Object.keys(OLD).filter(k => data.now[k] !== OLD[k]), nOld = Object.keys(OLD).length;
-  ok(changed.length === 0 && data.count === nOld, 'the 1.x store still holds ' + Object.keys(OLD).join(', ') + ' byte for byte, and nothing else (' + data.count + ' keys), after every page, the sounds and a pad hit' +
-    (changed.length ? '\n    changed: ' + J(changed.map(k => k + ' = ' + data.now[k])) : ''));
-  // the copy did run here and looked at all of them: without that, "not copied" would say nothing
-  const info = data.info;
-  ok(!!info && info.from === data.legacy && info.copied === 0 && info.skipped === nOld && info.failed.length === 0,
-    'the one-time copy ran at this start, read the 1.x store and skipped all ' + nOld + ' as removed features: ' + J(info && { copied: info.copied, skipped: info.skipped, failed: info.failed }));
-  ok(data.copied.length === 0, 'none of them is in the 2.0 store (soundlab2.*)' + (data.copied.length ? '\n    copied: ' + data.copied.join(', ') : ''));
-  ok(data.all > 0 && data.old.length === 0, 'no write, removal or clear of any 1.x key (guitarlab.*), removed feature or not (' + data.all + ' other writes seen)' + lines(data.old));
-  ok(data.dead.length === 0, 'no removed-feature key is written or removed in the 2.0 store either' + lines(data.dead));
+  // what no page of either app may do to it, and what the one-time copy must have done with it
+  const untouched = (d, after) => {
+    ok(d.ran === undefined, 'a stored 1.x plug-in is never run (its code would set a global): ' + J(d.ran));
+    const daw = d.idb.filter(x => /guitarlab-daw/.test(x));
+    ok(daw.length === 0, 'the sampler database guitarlab-daw is never opened or deleted (databases touched: ' + (d.idb.join(', ') || 'none') + ')');
+    const changed = Object.keys(OLD).filter(k => d.now[k] !== OLD[k]), nOld = Object.keys(OLD).length;
+    ok(changed.length === 0 && d.count === nOld, 'the 1.x store still holds ' + Object.keys(OLD).join(', ') + ' byte for byte, and nothing else (' + d.count + ' keys), after ' + after +
+      (changed.length ? '\n    changed: ' + J(changed.map(k => k + ' = ' + d.now[k])) : ''));
+    // the copy did run on this profile and looked at all of them: without that, "not copied" would say nothing
+    const info = d.info;
+    ok(!!info && info.from === d.legacy && info.copied === 0 && info.skipped === nOld && info.failed.length === 0,
+      'the one-time copy read the 1.x store and skipped all ' + nOld + ' as removed features: ' + J(info && { copied: info.copied, skipped: info.skipped, failed: info.failed }));
+    ok(d.copied.length === 0, 'none of them is in the 2.0 store (soundlab2.*)' + (d.copied.length ? '\n    copied: ' + d.copied.join(', ') : ''));
+    ok(d.all > 0 && d.old.length === 0, 'no write, removal or clear of any 1.x key (guitarlab.*), removed feature or not (' + d.all + ' other writes seen)' + lines(d.old));
+    ok(d.dead.length === 0, 'no removed-feature key is written or removed in the 2.0 store either' + lines(d.dead));
+  };
+
+  console.log('# A1 + A4 the 1.x data on this origin is untouched, and removed features were not copied');
+  const data = await dataOf();
+  untouched(data, 'every page, the sounds and a pad hit');
   const pageOf = v => { try { return JSON.parse(v); } catch (e) { return v; } };
   const badTabs = data.tabs.filter(v => !PAGES.includes(pageOf(v)));
   ok(data.tabs.length > 0 && badTabs.length === 0, 'app.tab only ever held a page of this app (' + data.tabs.length + ' writes)' + lines(badTabs));
   ok(errs.length === 0, 'no uncaught page error on a 1.x profile' + lines(errs));
   ok(logs.length === 0, 'no console error on a 1.x profile (a module that fails in init / onShow prints here)' + lines(logs));
+
+  // the Deck, Live sets, the Hub and Helix were soundLAB pages when this guard was written; they are
+  // soundLAB Gear now, on the same origin and the same store: the same profile, the same instruments
+  console.log('# A3b the same 1.x profile in soundLAB Gear: its four pages leave that data alone too');
+  await page.goto(env.GEAR_URL);
+  const gearUp = await page.waitForFunction(() => window.App && App.app === 'gear' && App.active === 'deck', null, { timeout: 10000 }).then(() => true, () => false);
+  await page.waitForTimeout(250);
+  const gtour = gearUp ? await page.evaluate(async (ids) => {
+    const seen = [];
+    for (const id of ids) { App.switchTo(id); await __wait(250); seen.push({ id, active: App.active, shown: __shown(), seen: __seen(id) }); }
+    App.switchTo('deck'); await __wait(150);
+    return seen;
+  }, GEAR_PAGES) : [];
+  const glost = gtour.filter(x => x.active !== x.id || x.shown !== x.id || !x.seen);
+  ok(gearUp && gtour.length === GEAR_PAGES.length && glost.length === 0, 'soundLAB Gear boots on this profile and each of its ' + GEAR_PAGES.length + ' pages opens with its own panel visible' +
+    (glost.length ? '\n    not shown: ' + J(glost) : ''));
+  if (gearUp) {
+    const gdata = await dataOf();
+    untouched(gdata, 'Deck, Live sets, the Hub and Helix were opened in soundLAB Gear');
+    ok(gdata.tabs.length === 0, 'and Gear never writes soundLAB\u2019s last page (app.tab): ' + gdata.tabs.length + ' writes');
+  }
+  ok(errs.length === 0 && logs.length === 0, 'no page or console error on a 1.x profile in soundLAB Gear' + lines(errs.concat(logs)));
   await ctx.close();
 
   console.log('# A1 a stored last page that is no longer a page');
@@ -493,6 +526,8 @@ const lines = a => a.length ? '\n    ' + a.join('\n    ') : '';
   // what the Hub stores (js/midihub.js newRule): notes +12 and aftertouch blocked are on, a CC remap is off
   const rule = (name, on, m, a) => ({ id: 'r-' + name, on, name, m: Object.assign({ type: 'cc', ch: 0, lo: 0, hi: 127 }, m), a: Object.assign({ block: false, ch: 0, num: '', add: 0, scale: 100, to: 'same' }, a) });
   const RULES = [rule('up', true, { type: 'note' }, { add: 12 }), rule('at', true, { type: 'at' }, { block: true }), rule('cc', false, { lo: 74, hi: 74 }, { num: 1 })];
+  // a key split made while a LUMI is listed (js/midihub.js): for that one keyboard, so only Thru can use it
+  const PORT_RULE = rule('split', true, { type: 'note', lo: 0, hi: 127, port: 'LUMI' }, { ch: 2, add: 12 });
   // one keyboard on a fake Web MIDI port; midi.wanted connects it at the start, as for a returning user
   const keyboard = c => c.addInitScript(() => {
     const inp = { id: 'kb-in', name: 'Test keyboard', state: 'connected', type: 'input', onmidimessage: null };
@@ -514,7 +549,7 @@ const lines = a => a.length ? '\n    ' + a.join('\n    ') : '';
   });
   ({ ctx, page, errs, logs } = await newPage(browser, {}, { 'midi.wanted': true, 'lights.on': false, 'midihub.rulesIn': true, 'midihub.rules': RULES }, keyboard));
   await page.waitForFunction(() => App.midi && App.midi.ready);
-  const shaped = await page.evaluate(async () => {
+  const shaped = await page.evaluate(async ([portRule, atRule]) => {
     const o = { hub: typeof window.SLMidiHub, filter: !!App.midi.inputFilter, active: App.midiRules.active() };
     __listen();
     App.switchTo('piano'); await __wait(250);
@@ -535,8 +570,21 @@ const lines = a => a.length ? '\n    ' + a.join('\n    ') : '';
     o.noneFilter = !!App.midi.inputFilter; o.noneActive = App.midiRules.active(); o.noneLine = __rulesLine();
     App.switchTo('piano'); await __wait(200);
     o.none = await __playKey(o.note);
+    // the box on and ONE enabled rule, but for one keyboard only (m.port): the filter gets no port name, so
+    // it cannot touch what soundLAB hears, and the line must not say it does
+    App.store.set('midihub.rules', [portRule]);
+    App.switchTo('settings'); await __wait(200);
+    o.portActive = App.midiRules.active(); o.portLine = __rulesLine();
+    o.portThru = App.midiRules.apply([0x90, o.note, 100], 'LUMI Keys BLOCK').map(b => b.join(' ')).join('|'); // the rule itself works, where a port name comes with the message
+    App.switchTo('piano'); await __wait(200);
+    o.port = await __playKey(o.note);
+    // a second enabled rule without a port: that one is counted
+    App.store.set('midihub.rules', [portRule, atRule]);
+    App.switchTo('settings'); await __wait(200);
+    o.mixActive = App.midiRules.active(); o.mixLine = __rulesLine();
+    App.switchTo('piano'); await __wait(150); // Settings paints the line when it opens: the next check opens it again
     return o;
-  });
+  }, [PORT_RULE, RULES[1]]);
   ok(shaped.hub === 'undefined' && shaped.filter && shaped.active.on === true && shaped.active.rules === 2,
     'with no Hub in soundLAB, the stored box (midihub.rulesIn) installs the input filter at the start: 2 of 3 rules are enabled: ' + J([shaped.hub, shaped.filter, shaped.active]));
   ok(shaped.note > 0 && shaped.on.heard === (shaped.note + 12) + ':1,' + (shaped.note + 12) + ':0', 'a key played into the Piano page arrives an octave up and its aftertouch is dropped (key ' + shaped.note + '): ' + shaped.on.heard);
@@ -548,6 +596,11 @@ const lines = a => a.length ? '\n    ' + a.join('\n    ') : '';
     'the box cleared in a Gear window: the line is hidden at once and the key arrives as played: ' + J([shaped.offFilter, shaped.offLine.seen, shaped.off.heard]));
   ok(shaped.noneFilter && shaped.noneActive.rules === 0 && !shaped.noneLine.seen && shaped.none.heard === shaped.note + ':1,pressure,' + shaped.note + ':0',
     'the box on with no rule enabled: nothing is changed and the line stays hidden: ' + J([shaped.noneActive, shaped.noneLine.seen, shaped.none.heard]));
+  ok(shaped.portActive.on === true && shaped.portActive.rules === 0 && !shaped.portLine.seen && shaped.port.heard === shaped.note + ':1,pressure,' + shaped.note + ':0',
+    'the box on with one enabled rule for one keyboard only (m.port): the key arrives as played, so no rule is counted and the line stays hidden: ' + J([shaped.portActive, shaped.portLine.seen, shaped.port.heard]));
+  ok(shaped.portThru === (0x91) + ' ' + (shaped.note + 12) + ' 100', 'that rule still works where the message comes with its port name (Thru in Gear): ' + shaped.portThru);
+  ok(shaped.mixActive.rules === 1 && shaped.mixLine.seen && /\(1 rule\)\. Edit them in soundLAB Gear\./.test(shaped.mixLine.text),
+    'with a second enabled rule that has no port, the line counts that one: "' + shaped.mixLine.text + '"');
   // the rules come back on in Gear; Settings counts them again when it is opened, and its button goes to the Hub
   let urls = [];
   page.on('framenavigated', f => { if (f === page.mainFrame()) urls.push(f.url()); });
@@ -597,13 +650,27 @@ const lines = a => a.length ? '\n    ' + a.join('\n    ') : '';
   }
   st = await restart({ 'app.tab': 'helix', 'gear.told': null });
   ok(home(st) && st.toast === TOLD_GEAR, 'app.tab = helix in a profile that was not told yet: Exercises and the notice: "' + st.toast + '"');
-  // MIDI Hub Thru left on in 1.x: it only runs while Gear is open now, said once; the setting itself is Gear's
+  // MIDI Hub Thru left on before Phase A (1.x, the live 2.0.0): it only runs while Gear is open now, said once; the setting itself is Gear's
   st = await restart({ 'midihub.thru': true });
   ok(home(st) && st.toast === TOLD_THRU && st.thruTold === true, 'midihub.thru stored on: soundLAB says once that Thru runs in Gear: "' + st.toast + '"');
   ok(st.thru === 'true', 'and leaves the setting as it is (Gear reads it): midihub.thru = ' + st.thru);
   st = await restart();
   ok(home(st) && st.toast === '', 'the next start says nothing about Thru either: ' + J(st.toast));
+  // what a Hub user of the old app most likely brings: the last page was a Gear page AND Thru was left on
+  st = await restart({ 'app.tab': 'midihub', 'midihub.thru': true, 'gear.told': null, 'gear.thruTold': null });
+  ok(home(st) && st.toast === TOLD_GEAR + ' ' + TOLD_THRU, 'a Gear page stored AND Thru left on: ONE notice carries both sentences (the second does not replace the first): "' + st.toast + '"');
+  ok(st.told === true && st.thruTold === true && st.tab === 'quiz', 'and both are marked as said: ' + J([st.told, st.thruTold, st.tab]));
+  st = await restart();
+  ok(home(st) && st.toast === '', 'the start after that says nothing: ' + J(st.toast));
   ok(urls.every(u => /\/index\.html$/.test(u)), 'none of these starts left index.html (' + urls.length + ' navigations seen)' + lines(urls.filter(u => !/\/index\.html$/.test(u))));
+  // an old page id in the address at such a start: the sentence about where it went comes first and is kept
+  await page.evaluate(() => { localStorage.removeItem('soundlab2.gear.thruTold'); history.replaceState(null, '', '#trainer'); });
+  await page.reload(); // a start on index.html#trainer (the hash alone would not load the document again)
+  await page.waitForFunction(() => window.App && App.active);
+  await page.waitForTimeout(250);
+  st = await startOf();
+  ok(st.active === 'practiceplan' && st.toast === 'The Trainer cards are on the Plan page now, under Free practice. ' + TOLD_THRU && st.thruTold === true,
+    'index.html#trainer with Thru left on: the sentence about the Trainer stays, in front of the Thru notice: "' + st.toast + '"');
 
   console.log('# A3b a Gear page asked for inside soundLAB opens in Gear');
   await page.evaluate(async () => { App.switchTo('songs'); await __wait(150); __hideToast(); });

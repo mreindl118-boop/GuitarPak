@@ -28,6 +28,19 @@
 //     either stops both; closing the owner hands it over
 //   - Hear input left on but waiting for the browser's permission: Gear says
 //     once that the switch is on the Hub page
+//   - what Gear says about soundLAB's pages: the clef dropdown's LUMI note
+//     and the two sheets' help tours name them as being in soundLAB
+//   - a #page typed into the address of the open app (hashchange): the page
+//     changes in place or the other app opens, and the hash is used up
+//   - Back: after a typed #page and after coming back from the other app the
+//     "Press Back again to leave" hint shows once, then Back leaves
+//   - a first start that carries a #page (the gear icon from Gear, a link):
+//     the page asked for stays, soundLAB's one-time landing on Exercises does
+//     not replace it, and the next plain start brings that page back
+//   - the sound output chosen in soundLAB's Settings (audio.outId) is the
+//     output in Gear too: applied at the first press, again after a re-plug,
+//     never for a device the browser does not list, and nothing asks the
+//     browser for a permission at boot
 //
 // No hardware: fake Web MIDI ports record every byte, the audio input is
 // Chromium's fake device. Service workers are blocked (one variable less).
@@ -48,6 +61,8 @@ const ORIGIN = env.GEAR_URL.replace(/^([a-z]+:\/\/[^/]+).*$/i, '$1');
 //   first     true = a first visit: nothing seeded at all (no help.seen either)
 //   ports     'none' (no device listed) | 'modx' (MODX-1, in and out) | 'two' (MODX-1 and a LUMI)
 //   mic       what permissions.query says for the microphone: 'granted' | 'prompt' ('' = the browser's answer)
+//   out       an id: the browser lists a sound output with that id (Chromium's fake device has none), and
+//             every setSinkId call is recorded in __sink; __outThere = false + __plug() unplugs it
 //   viewport, touch, mobile
 let contexts = [];
 async function newContext(browser, opts) {
@@ -86,6 +101,26 @@ async function newContext(browser, opts) {
       navigator.permissions.query = d => d && d.name === 'midi' ? Promise.resolve({ state: 'prompt' })
         : d && d.name === 'microphone' && o.mic ? Promise.resolve({ state: o.mic }) : q(d);
     }
+    // the audio input: every request for it is counted (the browser would ask the user)
+    window.__gum = 0;
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      const gum = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+      navigator.mediaDevices.getUserMedia = c => { window.__gum++; return gum(c); };
+    }
+    // the sound output (o.out): listed by the browser, setSinkId recorded; every context that makes a node is noted
+    if (o.out && window.AudioContext) {
+      window.__sink = []; window.__outThere = true; window.__ctxs = [];
+      AudioContext.prototype.setSinkId = function (id) {
+        window.__sink.push(id);
+        Object.defineProperty(this, 'sinkId', { value: id, configurable: true });
+        return Promise.resolve();
+      };
+      const mkGain = AudioContext.prototype.createGain;
+      AudioContext.prototype.createGain = function () { if (window.__ctxs.indexOf(this) === -1) window.__ctxs.push(this); return mkGain.apply(this, arguments); };
+      const md = navigator.mediaDevices, list = md.enumerateDevices.bind(md);
+      md.enumerateDevices = () => list().then(l => window.__outThere ? l.concat([{ deviceId: o.out, kind: 'audiooutput', label: 'Speakers (MODX)', groupId: 'g-out' }]) : l);
+      window.__plug = () => md.dispatchEvent(new Event('devicechange'));
+    }
     // the header: the link across is shown, the corner tools stay inside the screen and clear of the logo
     window.__head = () => {
       const r = s => document.querySelector(s).getBoundingClientRect();
@@ -97,7 +132,7 @@ async function newContext(browser, opts) {
         fits: document.documentElement.scrollWidth <= window.innerWidth, w: window.innerWidth, scroll: document.documentElement.scrollWidth
       };
     };
-  }, { seed: opts.seed || {}, first: !!opts.first, ports: opts.ports || 'none', mic: opts.mic || '' });
+  }, { seed: opts.seed || {}, first: !!opts.first, ports: opts.ports || 'none', mic: opts.mic || '', out: opts.out || '' });
   return ctx;
 }
 // page errors and error statuses for this app's own files, kept across navigations of the page
@@ -523,6 +558,23 @@ const noErrs = (errs, what) => ok(errs.length === 0, 'no page errors (' + what +
     const backG = await until(gear.page, () => App.audioIn._t().monOn === true);
     const backA = await until(main.page, () => { const s = App.audioIn.state; return !App.audioIn._t().monOn && s.held && s.why === 'other'; });
     ok(backG && backA, 'and On in Gear plays there again, soundLAB waiting');
+
+    // the browser declines the input in the window that is NOT playing (its Settings meter asks for it;
+    // browsers that ask per window can do this): that must not switch off what the other window plays
+    await main.page.evaluate(() => {
+      const md = navigator.mediaDevices;
+      window.__gumReal = md.getUserMedia;
+      md.getUserMedia = () => Promise.reject(new DOMException('declined in this window', 'NotAllowedError'));
+      App.switchTo('settings');
+    });
+    const declined = await until(main.page, () => /declined/.test(App.audioIn.state.error || ''));
+    await gear.page.waitForTimeout(400);
+    a = await hearing(main.page); g = await hearing(gear.page);
+    const sw = await gear.page.evaluate(() => ({ on: document.querySelector('#mh-hearin button[data-hear="on"]').getAttribute('aria-pressed'), stored: App.store.get('audio.monitor', null) }));
+    ok(declined && !a.routed && !a.stream, 'the input declined in soundLAB (not the window that plays): soundLAB says so and opens nothing: ' + J(await main.page.evaluate(() => App.audioIn.state.error)));
+    ok(g.routed && g.on && sw.stored === true && sw.on === 'true' && /Hearing .+ through this computer\./.test(await hearSwitch(gear.page)),
+      'Gear keeps playing and Hear input stays on in the store and on the Hub\'s switch: ' + J({ routed: g.routed, stored: sw.stored, onPressed: sw.on }));
+    await main.page.evaluate(() => { navigator.mediaDevices.getUserMedia = window.__gumReal; App.switchTo('quiz'); });
     noErrs(gear.errs, 'Gear, two windows');
     await gear.page.close();
     const took = await until(main.page, () => App.audioIn._t().monOn === true && !App.audioIn.state.held);
@@ -556,6 +608,249 @@ const noErrs = (errs, what) => ok(errs.length === 0, 'no page errors (' + what +
     const stopped = await until(page, () => !App.audioIn._t().monOn && App.audioIn.monitor === false);
     ok(stopped && (await page.evaluate(() => App.store.get('audio.monitor', null))) === false && /Off\./.test(await hearSwitch(page)), 'Off switches it off for good (audio.monitor is false): ' + await hearSwitch(page));
     noErrs(errs, 'Hear input in Gear');
+
+    console.log('# a slow first load: the hold is reported before the Hub is up');
+    // the launch restore runs 500 ms after js/audioin.js; here a later script arrives 1.5 s late, so the
+    // hold is already there (and reported) when the Hub's init adds its listener
+    const HEAR = { 'audio.monitor': true, 'midi.wanted': true, 'lights.on': false };
+    const slow = async seed => {
+      const c = await newContext(browser, { seed, ports: 'modx', mic: 'prompt' });
+      await c.route('**/js/helix.js', async r => { await new Promise(x => setTimeout(x, 1500)); await r.continue(); });
+      return c;
+    };
+    const toastOf = pg => pg.evaluate(() => { const t = document.getElementById('app-toast'); return t && !t.hidden ? t.textContent : ''; });
+    let late = await open(await slow(HEAR), env.GEAR_URL, gearMidi);
+    const lateTold = await until(late.page, () => { const t = document.getElementById('app-toast'); return !!t && !t.hidden && /Hub page/.test(t.textContent); }, null, 4000);
+    h = await hearing(late.page);
+    ok(h.held && h.why === 'perm' && lateTold, 'Gear still says where the switch is: ' + await toastOf(late.page));
+    noErrs(late.errs, 'a slow load');
+    // the same slow start, on the Hub page itself: the line beside the switch says it, no toast
+    late = await open(await slow(Object.assign({ 'gear.tab': 'midihub' }, HEAR)), env.GEAR_URL, () => !!(window.App && App.app === 'gear' && App.active === 'midihub' && App.midi && App.midi.ready));
+    await late.page.waitForTimeout(600);
+    h = await hearing(late.page);
+    const quietToast = await toastOf(late.page);
+    ok(h.held && h.why === 'perm' && !/Hub page/.test(quietToast) && /press On to start it/.test(await hearSwitch(late.page)), 'a slow start on the Hub page says it beside the switch, with no toast' + (quietToast ? ': ' + quietToast : ''));
+    noErrs(late.errs, 'a slow load, on the Hub');
+  });
+
+  await section('what Gear says about soundLAB\'s pages', async () => {
+    // LUMI Display switched on, no LUMI chosen: the clef dropdown says where to choose one
+    const ctx = await newContext(browser, { seed: { 'lights.displayEnabled': true } });
+    const words = pg => pg.evaluate(async () => {
+      document.getElementById('ctx-btn').click(); await __wait(150);
+      const o = { note: document.getElementById('cx-tnote').textContent, noteSeen: __seen(document.getElementById('cx-tnote')), piano: !!document.getElementById('panel-piano') };
+      document.getElementById('ctx-btn').click(); await __wait(100);
+      const steps = id => Help.TOURS[id].map(x => x.x).join(' ');
+      o.met = steps('metronome'); o.lights = steps('lights');
+      // the sheet's own ? button opens that tour
+      document.getElementById('lights-btn').click(); await __wait(200);
+      document.querySelector('#sheet-lights [data-sheet-help="lights"]').click(); await __wait(200);
+      o.card = (document.querySelector('#hp-ov .hp-card') || {}).textContent || '';
+      Help.close(); App.closeSheet();
+      return o;
+    });
+    const g = await open(ctx, env.GEAR_URL, gearUp);
+    const gw = await words(g.page);
+    ok(!gw.piano && gw.noteSeen && /Choose a LUMI display output on the Piano page in soundLAB, under Notes and triads on the LUMI/.test(gw.note),
+      'the clef dropdown\'s LUMI note in Gear sends you to the Piano page IN SOUNDLAB (Gear has no Piano page): ' + gw.note);
+    ok(/the Hub’s MIDI clock runs at it, and in soundLAB the Jam band and the practice runners follow it\./.test(gw.met), 'the metronome tour in Gear names the Hub\'s clock, and the Jam band as soundLAB\'s');
+    ok(/in soundLAB, to the Keys page, Scale lessons and Exercises/.test(gw.lights) && /in soundLAB, during a lesson or practice run/.test(gw.lights) &&
+      /Next and Back on the Deck and Live sets/.test(gw.lights) && /Set up opens Settings › Hands-free control in soundLAB\./.test(gw.lights),
+      'the Lights & help tour in Gear says which parts are soundLAB\'s, what the pedal does here, and that Set up opens Settings in soundLAB');
+    ok(/Lights & help/.test(gw.card) && /in soundLAB/.test(gw.card), 'the Lights & help sheet\'s ? button shows that wording: ' + gw.card.replace(/\s+/g, ' ').slice(0, 160));
+    noErrs(g.errs, 'Gear\'s words');
+    const m = await open(ctx, env.URL, () => !!(window.App && App.app === 'main' && App.active));
+    const mw = await words(m.page);
+    ok(mw.piano && /on the Piano page, under Notes and triads on the LUMI/.test(mw.note) && !/in soundLAB/.test(mw.note + mw.met + mw.lights),
+      'soundLAB keeps its own wording (its pages are right there): ' + mw.note);
+    noErrs(m.errs, 'soundLAB\'s words');
+  });
+
+  await section('a #page typed into the open app; Back: one hint, then out', async () => {
+    const ctx = await newContext(browser, {});
+    const { page, errs } = await open(ctx, env.GEAR_URL, gearUp); // this tab's history: about:blank, then Gear
+    const type = (pg, h) => pg.evaluate(h => { location.hash = h; }, h); // what typing #page into the address does
+    const back = async pg => { await pg.evaluate(() => { history.back(); }); await pg.waitForTimeout(300); };
+    const at = pg => pg.evaluate(() => { const h = document.getElementById('back-hint');
+      return { hint: h ? h.textContent : '', state: (history.state || {}).sl || '', active: App.active, file: location.pathname.split('/').pop(), doc: window.__doc || '' }; });
+    // one more Back, and did it leave the app (for the page this tab started on)? The document goes while it is asked
+    const leaves = async pg => {
+      await pg.evaluate(() => { history.back(); }).catch(() => {});
+      try { await pg.waitForURL('about:blank', { timeout: 4000 }); return true; } catch (e) { return false; }
+    };
+
+    await page.evaluate(() => { window.__doc = 'first'; }); // gone when the document is loaded again
+    await type(page, '#liveset');
+    const live = await arrive(page, /\/gear\.html/, 'gear', 'liveset');
+    let w = await where(page), a = await at(page);
+    ok(live && a.doc === 'first' && w.gearTab === 'liveset', '#liveset typed into open Gear: Live sets opens in the same document (no reload): ' + J([a.active, a.doc, w.gearTab]));
+    ok(w.hash === '' && w.clean, 'and the hash is used up (a reload would not apply it again): ' + w.file + w.hash);
+
+    console.log('# Back after a typed #page');
+    await back(page);
+    a = await at(page);
+    ok(a.active === 'deck' && !a.hint, 'Back returns to the page before the typed one (the Deck), no hint yet: ' + J(a));
+    await back(page);
+    a = await at(page);
+    ok(a.active === 'deck' && a.hint === 'Press Back again to leave soundLAB Gear.' && a.state === 'base', 'the next Back says once that one more leaves soundLAB Gear: ' + J(a));
+    ok(await leaves(page), 'and that one leaves (the typed #page left no second hint behind)');
+
+    console.log('# a typed #page of the other app, and Settings');
+    await page.goto(env.GEAR_URL);
+    await page.waitForFunction(gearUp);
+    await page.evaluate(() => { window.__doc = 'again'; });
+    await type(page, '#nosuchpage');
+    await page.waitForTimeout(250);
+    a = await at(page);
+    ok(a.active === 'deck' && a.doc === 'again' && (await page.evaluate(() => location.hash)) === '#nosuchpage', 'a hash that is no page is left alone: the Deck stays, nothing is loaded: ' + J(a));
+    await type(page, '#piano');
+    ok(await arrive(page, /\/index\.html/, 'main', 'piano'), '#piano typed into open Gear opens Piano in soundLAB');
+    w = await where(page);
+    ok(w.hash === '' && w.clean && w.file === 'index.html', 'the hash is used up there: ' + w.file + w.hash);
+    await page.evaluate(() => { window.__doc = 'main'; });
+    await type(page, '#settings');
+    const set = await arrive(page, /\/index\.html/, 'main', 'settings');
+    a = await at(page); w = await where(page);
+    ok(set && a.doc === 'main' && w.hash === '', '#settings typed into open soundLAB opens Settings in the same document: ' + J([a.active, a.doc, w.hash]));
+    await type(page, '#helix');
+    ok(await arrive(page, /\/gear\.html/, 'gear', 'helix'), '#helix typed into open soundLAB opens Helix in Gear');
+    noErrs(errs, 'typed #pages');
+
+    console.log('# Back across the two apps');
+    const ctx2 = await newContext(browser, {}); // a profile whose soundLAB opens on its home page
+    const p2 = await ctx2.newPage(), w2 = watch(p2); // this tab's history: about:blank, then soundLAB
+    await p2.goto(env.URL);
+    await p2.waitForFunction(() => !!(window.App && App.app === 'main' && App.active === 'quiz'));
+    await p2.locator('#app-switch').click();
+    const over = await arrive(p2, /\/gear\.html/, 'gear', 'deck');
+    await back(p2);
+    a = await at(p2);
+    ok(over && a.file === 'gear.html' && a.hint === 'Press Back again to leave soundLAB Gear.', 'in Gear, Back at the Deck says the next one leaves soundLAB Gear: ' + J(a));
+    await p2.evaluate(() => { history.back(); }).catch(() => {}); // leaves Gear: soundLAB is loaded again on the entry it was left on
+    const home = await arrive(p2, /\/index\.html/, 'main', 'quiz');
+    await p2.waitForTimeout(300);
+    await back(p2);
+    a = await at(p2);
+    ok(home && a.file === 'index.html' && a.active === 'quiz' && a.hint === 'Press Back again to leave soundLAB.' && a.state === 'base',
+      'back in soundLAB, Back at Exercises shows the hint (on the base entry): ' + J(a));
+    const out = await leaves(p2);
+    ok(out, 'and the next Back leaves: the hint was shown once, not twice' + (out ? '' : ' (still on ' + p2.url() + ')'));
+    noErrs(w2.errs, 'Back across the two apps');
+  });
+
+  await section('a first start that carries a #page: the page asked for stays', async () => {
+    // nothing stored but "the welcome was seen": qz.landed is unset, so quiz.js would land on Exercises once
+    const fresh = () => newContext(browser, { first: true, seed: { 'help.seen': true, 'help.done': true } });
+    const landed = page => page.evaluate(() => ({ active: App.active, shown: [...document.querySelectorAll('main > .panel.active')].map(el => el.id).join(), hash: location.hash, landed: App.store.get('qz.landed', null), tab: App.store.get('app.tab', null) }));
+    // Gear first, then its gear icon: the first soundLAB document this profile ever loads is index.html#settings
+    let ctx = await fresh();
+    const { page, errs } = await open(ctx, env.GEAR_URL, gearUp);
+    ok((await page.evaluate(() => App.store.get('qz.landed', null))) !== true, 'Gear leaves soundLAB\'s one-time landing alone (qz.landed is not set there)');
+    await page.locator('#settings-btn').click();
+    const there = await arrive(page, /\/index\.html/, 'main', 'settings');
+    await page.waitForTimeout(400); // past the landing's own timer (0 ms after boot)
+    let w = await landed(page);
+    ok(there && w.active === 'settings' && w.shown === 'panel-settings' && w.hash === '', 'a first soundLAB start from Gear\'s gear icon stays on Settings: ' + J(w));
+    ok(w.landed === true, 'and that start counts as the one-time landing (qz.landed is stored)');
+    noErrs(errs, 'Gear, then Settings in soundLAB');
+    // a link to a page, on a profile that has never seen soundLAB
+    ctx = await fresh();
+    const p2 = await ctx.newPage(), w2 = watch(p2);
+    await deepLink(p2, env.URL + '#piano');
+    const onPiano = await arrive(p2, /\/index\.html/, 'main', 'piano');
+    await p2.waitForTimeout(400);
+    w = await landed(p2);
+    ok(onPiano && w.active === 'piano' && w.shown === 'panel-piano' && w.tab === 'piano' && w.hash === '', 'index.html#piano on a first start opens Piano and stays there: ' + J(w));
+    await deepLink(p2, env.URL); // the next start, no #page
+    const back = await arrive(p2, /\/index\.html/, 'main', 'piano');
+    await p2.waitForTimeout(400);
+    w = await landed(p2);
+    ok(back && w.active === 'piano', 'the next plain start brings Piano back (no late "first" landing on Exercises): ' + J(w));
+    // an old id travels the same way: the Plan page with its sentence, not Exercises
+    ctx = await fresh();
+    const p3 = await ctx.newPage();
+    await deepLink(p3, env.URL + '#trainer');
+    const onPlan = await arrive(p3, /\/index\.html/, 'main', 'practiceplan');
+    await p3.waitForTimeout(400);
+    w = await landed(p3);
+    ok(onPlan && w.active === 'practiceplan', 'index.html#trainer (an old page id) on a first start stays on the Plan page: ' + J(w));
+    // without a #page nothing changes: the first start lands on Exercises once, whatever page was stored
+    ctx = await newContext(browser, { first: true, seed: { 'help.seen': true, 'help.done': true, 'app.tab': 'piano' } });
+    const p4 = await ctx.newPage();
+    await p4.goto(env.URL);
+    const home = await arrive(p4, /\/index\.html/, 'main', 'quiz');
+    w = await landed(p4);
+    ok(home && w.active === 'quiz' && w.landed === true, 'a first start WITHOUT a #page still lands on Exercises once (stored page: Piano): ' + J(w));
+    noErrs(w2.errs, 'a first start on a #page');
+
+    console.log('# the welcome card waits for soundLAB\'s own first start');
+    // nothing stored at all; the first address ever opened is a Gear page under soundLAB's name
+    ctx = await newContext(browser, { first: true });
+    const p5 = await ctx.newPage(), w5 = watch(p5);
+    await deepLink(p5, env.URL + '#deck');
+    const inGear = await arrive(p5, /\/gear\.html/, 'gear', 'deck');
+    await p5.waitForTimeout(1000); // past the welcome's delay (700 ms)
+    const g5 = await p5.evaluate(() => ({ seen: App.store.get('help.seen', null), tour: !!(window.Help && Help.isOpen()) }));
+    ok(inGear && g5.seen !== true && !g5.tour, 'index.html#deck on a fresh profile opens Gear, and the soundLAB document that passed it on did not mark the welcome as seen: ' + J(g5));
+    await deepLink(p5, env.URL);
+    const first = await arrive(p5, /\/index\.html/, 'main', 'quiz');
+    const hello = await until(p5, () => !!(window.Help && Help.isOpen()) && /Welcome to soundLAB/.test((document.querySelector('#hp-ov .hp-card') || {}).textContent || ''), null, 5000);
+    ok(first && hello && (await p5.evaluate(() => App.store.get('help.seen', null))) === true, 'soundLAB\'s own first start then shows the welcome card, and marks it seen when it is shown');
+    await p5.reload();
+    await p5.waitForFunction(() => !!(window.App && App.app === 'main' && App.active));
+    await p5.waitForTimeout(1000);
+    ok(!(await p5.evaluate(() => !!(window.Help && Help.isOpen()))), 'the start after that shows no second welcome');
+    noErrs(w5.errs, 'the welcome card');
+  });
+
+  await section('the sound output chosen in soundLAB is Gear\'s output too', async () => {
+    // Output = "Speakers (MODX)" was picked in soundLAB › Settings; Hear input is off; the browser has not granted the input
+    let ctx = await newContext(browser, { seed: { 'audio.outId': 'out-x' }, out: 'out-x', mic: 'prompt' });
+    let { page, errs } = await open(ctx, env.GEAR_URL, gearUp);
+    await page.waitForTimeout(900); // past the Hear-input restore (500 ms)
+    const boot = await page.evaluate(() => ({ gum: __gum, midi: __asks, settings: typeof App.settings, card: !!document.getElementById('set-audio-out') }));
+    ok(boot.gum === 0 && boot.midi === 0, 'nothing asks the browser for a permission at boot (no audio-input request, no MIDI request): ' + J(boot));
+    await page.mouse.click(3, 500); // a press on empty page margin: the first gesture
+    const applied = await until(page, () => __sink.length >= 1, null, 4000);
+    const s1 = await page.evaluate(() => ({ sink: __sink.slice(), ctx: App.getAudio().sinkId, gum: __gum }));
+    ok(applied && s1.sink.join() === 'out-x' && s1.ctx === 'out-x', 'the stored output is put on Gear\'s audio context at the first press: ' + J(s1));
+    ok(s1.gum === 0, 'still without asking for the audio input');
+    const met = await page.evaluate(async () => {
+      let running = false; App.on('met:state', d => { running = !!d.running; });
+      App.emit('met:toggle'); await __wait(400);
+      const o = { running, ctxs: __ctxs.length, same: __ctxs[0] === App.getAudio(), sink: App.getAudio().sinkId, calls: __sink.length };
+      App.emit('met:toggle'); await __wait(100);
+      return o;
+    });
+    ok(met.running && met.ctxs === 1 && met.same && met.sink === 'out-x', 'the metronome in Gear plays through that one context (out-x): ' + J(met));
+    const replug = await page.evaluate(async () => {
+      window.__outThere = false; __plug(); await __wait(400);
+      const gone = __sink.length;
+      window.__outThere = true; __plug(); await __wait(400);
+      return { gone, back: __sink.slice() };
+    });
+    ok(replug.gone === 1 && replug.back.length === 2 && replug.back[1] === 'out-x', 'unplugged: nothing new is applied; plugged back in: the output is applied again: ' + J(replug));
+    noErrs(errs, 'the output in Gear');
+
+    console.log('# Hear input in Gear comes out of the same device');
+    ctx = await newContext(browser, { seed: { 'audio.outId': 'out-x', 'audio.monitor': true }, out: 'out-x', mic: 'granted' });
+    ({ page, errs } = await open(ctx, env.GEAR_URL, gearUp));
+    const routed = await until(page, () => App.audioIn._t().monOn === true);
+    await page.mouse.click(3, 500);
+    const heard = await until(page, () => __sink.length >= 1, null, 4000);
+    const h = await page.evaluate(() => { const t = App.audioIn._t(); return { routed: !!t.monOn, same: !!t.gain && t.gain.context === App.getAudio(), sink: App.getAudio().sinkId, calls: __sink.slice(), ctxs: __ctxs.length }; });
+    ok(routed && heard && h.routed && h.same && h.sink === 'out-x' && h.ctxs === 1, 'Hear input is routed inside the context that plays on out-x: ' + J(h));
+    ok(h.calls.every(x => x === 'out-x'), 'only the stored output was ever applied: ' + J(h.calls));
+    noErrs(errs, 'Hear input and the output');
+
+    console.log('# an output the browser does not list is left alone');
+    ctx = await newContext(browser, { seed: { 'audio.outId': 'not-listed' }, out: 'out-x', mic: 'prompt' });
+    ({ page, errs } = await open(ctx, env.GEAR_URL, gearUp));
+    await page.mouse.click(3, 500);
+    await page.waitForTimeout(600);
+    const none = await page.evaluate(() => ({ sink: __sink.slice(), stored: App.store.get('audio.outId', null), gum: __gum }));
+    ok(none.sink.length === 0 && none.stored === 'not-listed' && none.gum === 0, 'no setSinkId for it, the choice stays stored, nothing is asked: ' + J(none));
+    noErrs(errs, 'an output that is not listed');
   });
 
   await browser.close();

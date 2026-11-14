@@ -1265,12 +1265,18 @@
     // on this page, where the line beside the switch already says why.
     if (inGear()) {
       var hearTold = false;
-      App.on('audioin:state', function (d) {
+      var hearSay = function (d) {
         if (hearTold || !d || !d.want || !d.held || ['perm', 'mic', 'fell'].indexOf(d.why) === -1) return;
         if (App.active === 'midihub') return;
         hearTold = true;
         App.toast((d.msg || 'Hear input is on, but it is waiting.') + ' The switch is on the Hub page.', 8000);
-      });
+      };
+      App.on('audioin:state', hearSay);
+      // the launch restore (js/audioin.js, 500 ms after that file ran) may
+      // have reported the hold before this listener existed: a slow load,
+      // nothing cached yet. Read it once, a task later: boot has opened the
+      // start page by then, so a start on the Hub still says nothing
+      setTimeout(function () { if (App.audioIn) hearSay(App.audioIn.state); }, 0);
     }
     document.addEventListener('keyup', function (e) {
       if (App.active !== 'midihub') return;

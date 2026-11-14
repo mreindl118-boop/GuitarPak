@@ -299,6 +299,19 @@ js/audioin.js     SOUND INPUT (App.audioIn): the ONE shared live-input service.
                   MONTAGE hint + auto-pick only while no input was ever chosen
                   (audio.inPicked); a missing chosen input/output is kept, and
                   audio.outId is re-applied (setSinkId) when it is listed again.
+                  THE OUTPUT IS APPLIED HERE, FOR BOTH APPS (A3b review):
+                  App.audioIn.applySink(force, refused) puts audio.outId on
+                  the shared AudioContext (at the first gesture; force = it
+                  was missing at the last look). soundLAB: the Settings card
+                  (the picker) calls it from its device list, as before.
+                  soundLAB Gear has no Settings page, so audioin.js looks at
+                  the list itself there (sinkWatch: at load, on devicechange,
+                  after an input was granted): Gear's metronome, the Player
+                  and Hear input play on the output chosen in soundLAB.
+                  Listing asks for no permission; an output the browser does
+                  not list is not applied. Not followed: an Output changed
+                  in soundLAB while a Gear window is already open (Gear
+                  takes it at its next start or device change).
                   Suite tests/audioin.test.js (Chromium fake media device).
                   2.0 Phase A3b ONE WINDOW ROUTES HEAR INPUT: soundLAB and
                   soundLAB Gear both load this file and read the same
@@ -375,14 +388,20 @@ js/remote.js      CONTROLLER REMOTE (App.remote, 2.0 beta / v2; docs/CONTROLLER-
                   go on hide and pagehide) and fire() is unchanged there:
                   visible = it acts, focused or not (FL Studio may have the
                   focus). In Gear a press with a MIDI via (cc / pc / note /
-                  dbltap) runs only inside locks.request(LOCK, {ifAvailable:
-                  true}) = only while no soundLAB window is visible; ONE
+                  dbltap) first ASKS whether that lock is held (locks.query())
+                  and acts only when it is not = only while no soundLAB
+                  window is visible. Gear NEVER TAKES the lock (the plan's
+                  locks.request({ifAvailable}) made two visible Gear windows
+                  shut each other out: a press acted in one of them, at
+                  random), so EVERY visible Gear window acts, as every
+                  visible soundLAB window does. ONE
                   question at a time (presses that arrive meanwhile join it
                   and act in order; one older than LOCK_MS 1000 never acts);
                   a press Gear did not take puts the debounce back; fire()
                   returns null for a MIDI via in Gear and acts a task later.
                   Keys and direct calls ('key', 'test') stay synchronous. No
-                  Web Locks or a refused request: Gear acts on a MIDI press
+                  Web Locks, no locks.query or a refused question: Gear acts
+                  on a MIDI press
                   only while document.hasFocus(). No sound hint in Gear (a
                   step sounds on the synth). App.remote.holdsMain (getter:
                   this document holds the shared lock; always false in Gear).
@@ -418,8 +437,11 @@ js/midirules.js   MIDI RULES (App.midiRules, 2.0 Phase A3a): the MIDI Hub's
                   installFilter). Since 2.0 Phase A4 only THIS scope's key
                   counts (the live app and the beta keep the same box
                   under their own prefix on the same origin).
-                  active() -> {on, rules} (rules = enabled count; soundLAB's
-                  Settings line #set-midi-rules shows it). Bus
+                  active() -> {on, rules} (rules = the enabled rules the
+                  filter can match: one with m.port, a rule for one keyboard
+                  such as a key split made with a LUMI listed, is Thru's only
+                  and is not counted; soundLAB's Settings line
+                  #set-midi-rules shows the number). Bus
                   'midirules:state' {on, rules} when the installed state
                   changed (the Hub's box #mh-rulesin and that Settings line
                   listen, so each shows what THIS window has installed after
@@ -628,7 +650,8 @@ js/settings.js    ┘ (settings: app-level prefs — theme dark/light/auto; MIDI
                      are not listed.
                      2.0 Phase A3b: #set-midi-rules (MIDI keyboard card,
                      after the Connect row; hidden unless App.midiRules.
-                     active() reports the box on AND >= 1 enabled rule) reads
+                     active() reports the box on AND >= 1 enabled rule that
+                     can change what soundLAB hears, i.e. without m.port) reads
                      "MIDI Hub rules are changing what soundLAB hears (N
                      rules). Edit them in soundLAB Gear." + #set-midi-rules-go
                      "Open the Hub" -> App.goApp('gear', 'midihub'); painted
@@ -779,14 +802,21 @@ js/help.js        (?) button + guided page tours (TOURS per page id, spotlight
                   ring + card overlay, first-run welcome; help.seen/help.done)
                   ONE FILE FOR BOTH APPS (2.0 Phase A3b): TOURS is keyed by
                   page id, so each app shows the tours of its own pages and
-                  the two sheets' tours in both. The welcome is about
+                  the two sheets' tours in both (GEAR wording where a step
+                  names soundLAB's pages: lessons, Exercises, the Jam band,
+                  Settings "in soundLAB"). The welcome is about
                   soundLAB's pages: soundLAB Gear never shows it and leaves
-                  help.seen alone. The Hub tour has no App voice step and
+                  help.seen alone; help.seen is stored when the card is
+                  SHOWN (700 ms after init, only with App.active set), so a
+                  soundLAB document that only passes on to Gear
+                  (index.html#deck) does not use the welcome up. The Hub tour
+                  has no App voice step and
                   says Thru runs while Gear is open; the Songs tour has a
                   step on #sg-player.
 js/helix.js       soundLAB Gear — HELIX STADIUM page ('helix': Gear's own
-                  "Helix" tab, group ghelix, one page so no pill strip; in
-                  1.x the Guitar group's "Helix" pill;
+                  "Helix" tab, group ghelix, one page so no pill strip;
+                  before Phase A (1.x, the live 2.0.0) the Guitar group's
+                  "Helix" pill;
                   0.82.0; prefix hx-, store hx.*; built in — it began as a
                   plug-in, before 2.0 removed the plug-in API).
                   NOTHING CONNECTS AT BOOT: init builds the
@@ -891,7 +921,15 @@ js/scoreplayer.js SCORE PLAYER (window.SLScorePlayer, 2.0 Phase A3a): the
                   index.html: the three "Open a score" routes and the Songs
                   mount with its per-mount options, MIDI connected after
                   boot through Settings).
-                  Neither proves the REPAINT PATH; tests/midihub.test.js does:
+                  THE REPAINT PATH: since A3b both exercise it with MIDI
+                  connected after boot. oneopen proves the module's own
+                  'midi:state' repaint on the Songs mount (soundLAB has no
+                  Hub hook: the card names MODX-1 before the Songs page is
+                  shown again); midihub-player a repaint on the Hub's mount
+                  (it cannot tell which of the two paths did it). oneopen
+                  also presses Play on the Songs card and leaves the page
+                  (for Piano, and by pagehide): paused, nothing held.
+                  tests/midihub.test.js tells the two paths apart:
                   the Hub's hook (a Part button and the header's Synth out
                   select reach the card) and, with that hook stubbed, the
                   module's own 'midi:state' / 'lights' listeners. NOT LANDED
@@ -990,7 +1028,11 @@ js/midihub.js     soundLAB Gear — MIDI HUB page ('midihub', the "Hub" pill of
                   held with why perm | mic | fell: "<msg> The switch is on
                   the Hub page." (8 s; why 'other' needs no word, and nothing
                   is said while the Hub page itself is open: the line beside
-                  the switch says why). On, but held = the Settings card's
+                  the switch says why). The hold may be reported BEFORE init
+                  has added that listener (the launch restore runs 500 ms
+                  after js/audioin.js; a slow, uncached load), so init also
+                  reads App.audioIn.state once, a task later (boot has opened
+                  the start page by then). On, but held = the Settings card's
                   held look (`#mh-hearin button.held`). TRAP: #mh-ports is
                   `hidden` until MIDI is ready, but `.row`'s display:flex
                   beats the attribute, so the row (and the switch in it) is
@@ -1336,7 +1378,8 @@ A2 (the three folds: the Trainer page, the Synth pill, the LUMI pill):
 - TEXTS name the new places: the Settings hands-free list, the help welcome
   and the Piano / Plan tours in js/help.js (the 'trainer' tour is gone), the
   js/midi.js status "Choose a LUMI display output on the Piano page, under
-  Notes and triads on the LUMI".
+  Notes and triads on the LUMI" (A3b: "...on the Piano page in soundLAB, ..."
+  when soundLAB Gear shows it in its clef dropdown).
 - sw.js: A2 set `CACHE` to `PREFIX + 'v6'`; ASSETS unchanged.
 - No new suite. `trim` also checks the three redirects, that no pill reads
   Trainer, Synth or LUMI, and #tr-ear-go (Piano and Drums); the fold checks
@@ -1417,9 +1460,12 @@ controls and what it sends are as before):
   card mounted with ports / noOut / connect (the ports row is not on screen
   before MIDI is ready, the two texts that name the host, MIDI connected
   after boot; since A3b that card is the Songs page's own mount);
-  `midihub-player` runs unchanged through the aliases. It is
-  NOT the proof of the repaint path: its fake MIDI is ready before boot and
-  its Part check clicks the Channels switch, which repaints the card itself.
+  `midihub-player` runs unchanged through the aliases. AT A3a it was
+  NOT the proof of the repaint path: its fake MIDI was ready before boot and
+  its Part check clicks the Channels switch, which repaints the card itself
+  (since A3b it has a case with MIDI connected after boot on the Hub's
+  mount, and `oneopen` proves the module's own 'midi:state' repaint on the
+  Songs mount; see the js/scoreplayer.js entry).
   `midihub` proves it: #mh-plpartlab follows a Part button and #mh-plout the
   header's Synth out select (the Hub's hook), and with SLScorePlayer.paint
   stubbed the card still repaints on 'midi:state' and on 'lights' (the
@@ -1476,7 +1522,13 @@ today's look and behaviour on both sides):
   location.replace(<url>#<page>) at the very top of boot(), before anything
   initialises; a page of this app or an old MOVED id = the start tab (it
   wins over the stored tab); #settings (soundLAB) opens Settings after the
-  start tab, so the gear toggles back to it. A hash that was used is cleared
+  start tab, so the gear toggles back to it. A #page that soundLAB uses at
+  boot also COUNTS AS THE ONE-TIME LANDING on Exercises (boot stores
+  qz.landed before the modules init, soundLAB only): js/quiz.js would
+  otherwise replace the page one tick later on a first start (Gear's gear
+  icon on a fresh profile opened Exercises), and the next plain start brings
+  the last page back instead of landing "for the first time". A hash that
+  was used is cleared
   (wireBack's history.replaceState gets the clean URL); any other hash is
   left in the address, unused. WHILE THE APP IS OPEN wireHash does the same
   on 'hashchange' (across: location.replace; here: clean the address, then
@@ -1576,8 +1628,10 @@ today's look and behaviour on both sides):
   SL_URL's index.html; plain string work, never `new URL()`: three suites
   shadow the global URL). ON GEAR.HTML: midihub, midihub-wheel,
   midihub-lock, midihub-player, synthdeck, synthdeck-scope, synthtab,
-  synthconn, synthconnect, helix (boot wait `App.active === 'deck'`;
-  "another page" is a Gear page; a suite that emits fb:set by hand writes
+  synthconn, synthconnect, helix (boot wait `App.active === 'deck'` in nine
+  of them; synthconnect waits for SLSynthTab and SLSynthLive instead, as it
+  always did; "another page" is a Gear page; a suite that emits fb:set by
+  hand writes
   fb.* first, there is no Fretboard to do it). NEW, in the one list in
   tests/run.sh: `gear` (boots on the Deck with no error and no 404, exactly
   the four panels, tabs Synth | Helix, none of soundLAB's modules, no MIDI
@@ -1588,17 +1642,35 @@ today's look and behaviour on both sides):
   kept apart, phone width, the context-bar matrix of the four pages, Hear
   input with both apps open (one window plays, On moves it, Off in either
   stops both and also frees an input soundLAB's Settings meter held, the
-  owner closing hands over), the one toast that names the Hub page) and
+  owner closing hands over; the input declined in the window that is not
+  playing leaves the other playing), the one toast that names the Hub page
+  (also when the hold was reported before the Hub was up: a slow load),
+  Gear's own wording where a text names soundLAB's pages, a #page typed
+  into the open app (hashchange), Back = one hint then out (after a typed
+  #page, after coming back from the other app), a FIRST start on a #page
+  (the gear icon from Gear, index.html#piano, #trainer: the page stays, no
+  late landing; index.html#deck leaves the welcome for soundLAB's own first
+  start), and the sound output chosen in soundLAB applied in Gear
+  (audio.outId: first press, re-plug, metronome and Hear input on that one
+  context, never an unlisted device, no permission asked at boot)) and
   `remote-gear` (the Live sets and Deck halves of remote-runners, moved as
   they were, plus the two-window pedal cases: both visible, soundLAB hidden,
-  no Web Locks; it sets each page's visibility and focus itself). CHANGED on
+  no Web Locks, no locks.query, and TWO GEAR WINDOWS both visible: both act
+  on every press, neither while a soundLAB window is visible; it sets each
+  page's visibility and focus itself). CHANGED on
   index.html: remote-runners (runner, Songs, Plan cards only), remote (a
   bound CC fires without the focus; holdsMain follows visibility), oneopen
-  (the Songs mount of the Player), nav (five tabs), context-global (14
+  (the Songs mount of the Player; Play, then leaving the page), nav (five
+  tabs), context-global (14
   pages), multiin (the Hub picker moved to `gear`), trim (the six gear
   globals are undefined, stored Hub rules still shape the Piano page and
-  show #set-midi-rules, stored app.tab = a Gear page boots to Exercises
-  with the notice, App.switchTo('midihub') leaves for gear.html#midihub),
+  show #set-midi-rules (a rule for one port is not counted), stored app.tab
+  = a Gear page boots to Exercises
+  with the notice (with Thru left on: both sentences in ONE notice),
+  App.switchTo('midihub') leaves for gear.html#midihub; and THE REMOVED-
+  FEATURE DATA GUARD ALSO RUNS IN GEAR: the same seeded profile opens
+  gear.html and its four pages under the same recorders, since those pages
+  left the tour of soundLAB's pages),
   smoke (a Gear pass over its four pages) and assets (both HTML files <->
   disk <-> ASSETS, no gear module in index.html, the shell comparison).
 - NOT CHECKED ON HARDWARE (the owner's Windows PC with the LUMI and the
@@ -1812,6 +1884,14 @@ nothing on screen changes except the Backup card and one start notice):
   pointerdown re-arms it. Pages with sub-views should implement onBack.
   A popstate WITHOUT our state ({sl}) is not a Back press: a #page typed
   into the address makes such an entry, and wireHash handles it (A3b).
+  ONE HINT, THEN OUT (A3b): a document loaded again on its own guard entry
+  (history.state.sl === 'top': Back from the other app, a reload) keeps that
+  entry as the guard, it does not turn it into a second base; and a Back
+  that lands on an older guard (a typed #page leaves one below) stays
+  guarded, so the step uses that entry up. Before, the hint showed twice
+  after a visit to the other app and once more per typed #page. Left as it
+  is: a typed hash with nothing to unwind (#quiz on Exercises, a hash that is
+  no page) still costs one extra Back.
 - Context bar (#ctxbar in index.html and gear.html, wired in app.js): the
   single home for key/scale/mode/BPM/time signature. Since v0.78.0 it is a
   DROPDOWN behind the
@@ -1952,8 +2032,9 @@ nothing on screen changes except the Backup card and one start notice):
   apps open), remote-gear (the remote on Live sets and the Deck, the
   two-window pedal cases). TEN SUITES RUN ON GEAR_URL since 2.0 Phase A3b:
   midihub, midihub-wheel, midihub-lock, midihub-player, synthdeck,
-  synthdeck-scope, synthtab, synthconn, synthconnect, helix: they wait for
-  `App.active === 'deck'`, and "another page" there must be a Gear page
+  synthdeck-scope, synthtab, synthconn, synthconnect, helix: nine of them
+  wait for `App.active === 'deck'` (synthconnect waits for SLSynthTab and
+  SLSynthLive), and "another page" there must be a Gear page
   (App.switchTo('piano') would leave the document). A two-app case opens
   two pages in ONE browser context (same store, same Web Locks) and sets
   each page's visibility / focus itself: headless Chromium reports every

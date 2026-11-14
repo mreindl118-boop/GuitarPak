@@ -114,12 +114,14 @@ only: in Gear a step sounds on the synth, so there is nothing to wake).
 
 soundLAB and soundLAB Gear can be open at the same time: the link at the top of each opens the other,
 and it can be opened in a second window. Both windows hear the same pedal and both claim it, so a bound
-press never reaches the Hub's Thru, the Deck or the Live page as an ordinary message. One of them acts:
+press never reaches the Hub's Thru, the Deck or the Live page as an ordinary message. One app acts:
 
 - **The pedal belongs to soundLAB while a soundLAB window is visible**, focused or not. It keeps
   answering while another program (FL Studio) has the focus. Two soundLAB windows both act, as before.
 - **Gear answers when no soundLAB window is visible**: soundLAB is minimised, on a hidden tab or closed.
   While a soundLAB window is visible, Gear shows nothing for a bound press: no HUD, no toast, no step.
+  Two Gear windows that are both on screen both act, as two soundLAB windows do (one on Live sets
+  steps the set; one on the Hub says "Nothing to move on here").
 - **Live sets have their own foot switch** (*Foot switch › Learn* on the Live page, stored as
   `synthtab.fsCC`). The remote does not touch it. To step Live sets while soundLAB is visible, give that
   foot switch a CC that is not bound to the remote. A CC that is bound to the remote cannot be learned
@@ -128,10 +130,13 @@ press never reaches the Hub's Thru, the Deck or the Live page as an ordinary mes
   key does.
 
 How it works: soundLAB holds a Web Lock (`soundlab-remote-main`, shared) while its document is visible
-and lets it go when hidden. For each MIDI press Gear asks for that lock for an instant and acts only if
-it gets it, so in Gear a MIDI press acts a moment after the message. Nothing is stored. Where the
-browser has no Web Locks, Gear acts on a MIDI press only while its window has the focus; soundLAB is
-unchanged. A binding changed in soundLAB works in an open Gear window at once on the keyboard Gear
+and lets it go when hidden. For each MIDI press Gear asks the browser whether that lock is held
+(`navigator.locks.query()`) and acts only when it is not, so in Gear a MIDI press acts a moment after
+the message. Gear never takes the lock itself: an earlier version did, for an instant per press, and
+two Gear windows then shut each other out (the press acted in one of them, at random). Nothing is
+stored. Where the browser has no Web Locks, or cannot be asked, Gear acts on a MIDI press only while
+its window has the focus; soundLAB is unchanged. A binding changed in soundLAB works in an open Gear
+window at once on the keyboard Gear
 listens to (or with *All keyboards*); a pedal on a port Gear has not opened is picked up when Gear next
 refreshes its ports (reload, reconnect, a device plugged in).
 
