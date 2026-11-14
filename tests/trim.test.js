@@ -37,7 +37,7 @@ const PAGES = ['quiz', 'practiceplan', 'fretboard', 'tab', 'notation', 'helix', 
   'deck', 'liveset', 'midihub', 'songs', 'jam', 'shed', 'tuner', 'theory'];
 // pages that left the app (MOVED in js/app.js): App.switchTo(id) goes to the page that took the feature in,
 // or home, and says why. there = what the sentence names, on the page it lands on.
-const STUDIO = /Studio is not part of soundLAB 2\.0/;
+const STUDIO = /Studio is no longer part of soundLAB\./;
 const MOVED = {
   arrange: { to: 'quiz', say: STUDIO }, tracks: { to: 'quiz', say: STUDIO }, song: { to: 'quiz', say: STUDIO }, ideas: { to: 'quiz', say: STUDIO },
   trainer: { to: 'practiceplan', say: /^The Trainer cards are on the Plan page now, under Free practice\.$/, there: '#panel-practiceplan #pp-tools #tr-cc-start' },
