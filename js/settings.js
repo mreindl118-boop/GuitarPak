@@ -890,7 +890,7 @@
     });
     // Phase A (2.0): keys of features that left the app — the Studio and its
     // prefs, ideas, the plug-in list, the workspace switch, the Pads drum
-    // track. The live 1.x app on this origin still owns them, so an import
+    // track. The live app on this origin (2.0.0, the code before the trim) still owns them, so an import
     // never writes them (a plug-in list is code the live app would run).
     var DEAD = /^guitarlab\.(st\.|sd\.|ideas\.|song\.|plugins\.|app\.space$|app\.tabStudio$|app\.click$|pads\.track$)/;
     document.getElementById('set-backup-in').addEventListener('change', function () {

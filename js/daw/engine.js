@@ -8,7 +8,7 @@
  * The file keeps its 1.x path and the global name window.DAW until Phase C
  * rebuilds Pads and the Woodshed drums (docs/ROADMAP-2.0.md). The Studio
  * parts that lived here in 1.x (sampler, FX slots, WAV export, the session
- * and song sequencer) are not part of soundLAB 2.0; they are on main.
+ * and song sequencer) left soundLAB in 2.0 Phase A; they are on main (the live 2.0.0).
  *
  * Exposed on window.DAW (js/daw/synth.js adds the synth; either may load first):
  *   DAW.DRUM_LANES                      the 8 lane names
