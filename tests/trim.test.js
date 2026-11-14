@@ -24,8 +24,8 @@ const J = JSON.stringify;
 const PAGES = ['quiz', 'practiceplan', 'fretboard', 'tab', 'notation', 'helix', 'chords', 'piano', 'chart', 'synth', 'pads',
   'deck', 'liveset', 'midihub', 'lumipractice', 'songs', 'jam', 'shed', 'tuner', 'trainer', 'theory'];
 // pages that left the app: App.switchTo(id) goes home and says why (MOVED in js/app.js)
-const MOVED = { arrange: /Studio is not part of soundLAB 2\.0/, tracks: /Studio is not part of soundLAB 2\.0/,
-  song: /Studio is not part of soundLAB 2\.0/, ideas: /Studio is not part of soundLAB 2\.0/ };
+const MOVED = { arrange: /Studio is no longer part of soundLAB\./, tracks: /Studio is no longer part of soundLAB\./,
+  song: /Studio is no longer part of soundLAB\./, ideas: /Studio is no longer part of soundLAB\./ };
 // a tab or pill with one of these names would be a way into a removed page ("Songs" is not "Song")
 const GONE_LABELS = /^(studio|sketch|timeline|editor|song|ideas)$/i;
 // controls that went with the Studio, the capture, the sequencer and the plug-in API

@@ -87,7 +87,7 @@ window.App = (function () {
   //            when an APK is actually built. Older APKs read nothing else, so
   //            this must never run ahead of the real file: when it did, the
   //            Android app kept downloading the same old APK in a loop.
-  var APP_VERSION = '1.4.1';
+  var APP_VERSION = '2.0.0';
   var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
 
   function verNum(v) {
@@ -726,10 +726,10 @@ window.App = (function () {
 
   // pages that left this app: where they went and what to say (docs/ROADMAP-2.0.md, Phase A)
   var MOVED = {
-    arrange: { say: 'The Studio is not part of soundLAB 2.0.' },
-    tracks:  { say: 'The Studio is not part of soundLAB 2.0.' },
-    song:    { say: 'The Studio is not part of soundLAB 2.0.' },
-    ideas:   { say: 'The Studio is not part of soundLAB 2.0.' }
+    arrange: { say: 'The Studio is no longer part of soundLAB.' },
+    tracks:  { say: 'The Studio is no longer part of soundLAB.' },
+    song:    { say: 'The Studio is no longer part of soundLAB.' },
+    ideas:   { say: 'The Studio is no longer part of soundLAB.' }
   };
   // an id that is not a page of this app (an old link, a stored tab) goes
   // where MOVED says, and otherwise to the home page — never to a blank screen
