@@ -21,16 +21,20 @@ black keys on amber) rendered to icons/icon-192/512.png.
 
 ## soundLAB 2.0 (branch `v2`) — read first
 
-2.0 is being built on branch `v2` and published to the BETA address
+2.0.0 WENT LIVE (2026-11-11): `main` = v2 at that point (1.4.1 + scale dots,
+Keys > Charts, the controller remote), served at /GuitarPak/. Work continues on
+branch `v2`, published to the BETA address
 https://mreindl118-boop.github.io/GuitarPak/next/ by
 `.github/workflows/pages-next.yml` (full suite first; replaces only `next/` on
-gh-pages; `pages.yml` carries `next/` over on live deploys). The live 1.x app
-stays on `main` until the 2.0 release. Plan: `docs/ROADMAP-2.0.md` (decisions +
-phases). Look: `docs/DESIGN-SYSTEM.md` ("E · Stage"), tokens in `css/tokens.css`
-(every new 2.0 component uses only `--sl-*`). Work = one phase per draft PR into
-`v2`; the owner merges. Known Phase 0 caveats: beta + live share `localStorage`
-(prefix `soundlab2.*` comes in Phase A) and the live service worker clears the
-beta's `soundlab2-*` caches when it updates. 2.0 cuts the Studio/DAW, sampler and
+gh-pages; `pages.yml` carries `next/` over on live deploys); a later live release
+= a PR v2 -> main. Plan: `docs/ROADMAP-2.0.md` (decisions + phases; Phase A and
+later not started at the flip). Look: `docs/DESIGN-SYSTEM.md` ("E · Stage"),
+tokens in `css/tokens.css` (every new 2.0 component uses only `--sl-*`). Work =
+one phase per draft PR into `v2`; the owner merges. Beta + live share
+`localStorage` (same `guitarlab.*` keys, so progress carries over; prefix
+`soundlab2.*` comes in Phase A). Service-worker caches are named by scope
+(`sl2-live-*` / `sl2-next-*`, sw.js) so live and beta never clear each other's.
+2.0 cuts the Studio/DAW, sampler and
 plug-in API and splits gear control into `gear.html` (soundLAB Gear) — see the
 roadmap before touching those areas.
 
@@ -1228,8 +1232,8 @@ A1 (Studio space, sequencer/arranger, sampler, plug-in API removed):
   `Woodshed.importTrack` stays (tests/remote-shed.test.js).
 - #cx-met drives ONLY the metronome (`met:toggle`); transport owners are met,
   jam, keys, quiz, chart.
-- REMOVED-FEATURE DATA IS NEVER WRITTEN OR DELETED (the live 1.x app shares the
-  origin and still uses it): st.*, ideas.list, song.name, sd.*, plugins.list,
+- REMOVED-FEATURE DATA IS NEVER WRITTEN OR DELETED (the live app, 2.0.0 = the
+  code before the trim, shares the origin and still uses it): st.*, ideas.list, song.name, sd.*, plugins.list,
   app.space, app.tabStudio, app.click, pads.track have no reader and no
   writer; the IndexedDB 'guitarlab-daw' is never opened. Settings › Backup
   import skips those keys, writes string values only and says how many it
@@ -1239,8 +1243,9 @@ A1 (Studio space, sequencer/arranger, sampler, plug-in API removed):
 - NO PLUG-IN API: js/plugins.js, plugins/, PLUGINS.md and the Settings card
   are gone, nothing runs stored code. `App.addPage(id, label, sp, mod)` stays
   as an INTERNAL test hook (tests/remote.test.js; `sp` is ignored).
-- sw.js: A1 set `CACHE` to 'soundlab2-v5' (A2 v6, A3a v7, A3b v8, A4 v9 =
-  the number now; v4 is skipped on purpose). The fetch handler looks ONLY in
+- sw.js: A1 set `CACHE` to `PREFIX + 'v5'` ('sl2-next-v5' on the beta,
+  'sl2-live-v5' at the live address; A2 v6, A3a v7, A3b v8, A4 v9 = the
+  number now; v4 = the live 2.0.0). The fetch handler looks ONLY in
   its own cache
   (`caches.open(CACHE)` then `match(req, {ignoreSearch: true})`), never the
   global `caches.match`: the live worker's cache on the same origin can hold
@@ -1331,7 +1336,7 @@ A2 (the three folds: the Trainer page, the Synth pill, the LUMI pill):
   and the Piano / Plan tours in js/help.js (the 'trainer' tour is gone), the
   js/midi.js status "Choose a LUMI display output on the Piano page, under
   Notes and triads on the LUMI".
-- sw.js: A2 set `CACHE` to 'soundlab2-v6'; ASSETS unchanged.
+- sw.js: A2 set `CACHE` to `PREFIX + 'v6'`; ASSETS unchanged.
 - No new suite. `trim` also checks the three redirects, that no pill reads
   Trainer, Synth or LUMI, and #tr-ear-go (Piano and Drums); the fold checks
   are in nav, smoke, context-global, keys, learn-instruments, practiceplan,
@@ -1400,7 +1405,7 @@ controls and what it sends are as before):
   1200 and 390 px, checked against the pre-A3a tree).
 - index.html: js/midirules.js right after js/remote.js, js/scoreplayer.js
   right before js/midihub.js (since A3b: after js/pads.js there, and before
-  js/midihub.js in gear.html). sw.js: A3a set `CACHE` to 'soundlab2-v7';
+  js/midihub.js in gear.html). sw.js: A3a set `CACHE` to `PREFIX + 'v7'`;
   ASSETS gained the two files.
 - No new suite. `midihub` also checks App.midiRules.apply against
   SLMidiHub.applyRules, the 'storage' install (and the Hub's box following
@@ -1545,7 +1550,7 @@ today's look and behaviour on both sides):
   receive the keyboard.
 - ONE WORKER, ONE MANIFEST: gear.html registers the same sw.js and links
   the same manifest.webmanifest (no `shortcuts` entry, no separate install:
-  Phase H). sw.js: A3b set `CACHE` to 'soundlab2-v8'; ASSETS gained
+  Phase H). sw.js: A3b set `CACHE` to `PREFIX + 'v8'`; ASSETS gained
   'gear.html'; the
   gear js files and data/ stay listed (one worker serves both pages). Both
   Pages workflows publish the whole tree, so gear.html needs no workflow
@@ -1706,9 +1711,9 @@ nothing on screen changes except the Backup card and one start notice):
   confirm(), then App.store.copyAgain() (overwrites 2.0's values) and a
   reload. The other export files carry no prefix and are unchanged (the
   Hub, the Deck library, Live profiles, chord charts, practice progress).
-- sw.js: A4 set `CACHE` to 'soundlab2-v9'; ASSETS unchanged (no file added
-  or removed). Cache names ('soundlab2-v9') and storage keys
-  ('soundlab2.fb.root') only look alike.
+- sw.js: A4 set `CACHE` to `PREFIX + 'v9'`; ASSETS unchanged (no file added
+  or removed). Cache names ('sl2-next-v9' / 'sl2-live-v9') and storage keys
+  ('soundlab2.fb.root') are unrelated.
 - SUITES: every browser suite seeds and reads back 'soundlab2.*' (index.html
   and gear.html on the test server are the live scope). Seed under the 2.0
   prefix BEFORE the app starts (the copy never overwrites, so such a seed
