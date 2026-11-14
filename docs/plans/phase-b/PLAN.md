@@ -2550,3 +2550,30 @@ the matrix has 26 candidates and a path from every gap cell (section 5).
 | F28 | minor | The chip can read "Guitar" on the Keys tab | — | **Taken** ("Practising"; drawn in B1b; D23, B8) |
 | F29 | minor | Streak and goal are on the home and on Exercises; two of Phase D's home words arrive in B | `docs/ROADMAP-2.0.md:60` | **Taken** (B9.6, Appendix E) |
 | F30 | minor | The row's check state has no name and no test | `docs/DESIGN-SYSTEM.md:45` | **Taken** (`.sl-row.is-done`, B3, the gallery's L13) |
+
+---
+
+## Changes made while building
+
+What a step changed against this plan's letter, so that the later steps read the tree and not only the tables
+above. Each step that departs from the plan adds its lines here in its own pull request.
+
+### B1a (from its review)
+
+- **`--sl-ink-on-stage`** (`#cbc3c9`, one value in both themes; 11.5:1 on the dark stage, 8.8:1 on the light
+  theme's stage) is a new token that Appendix C and table B1a.2 do not list. No ink token read on the stage in
+  light. Text drawn on an instrument's stage takes it: the octave names and the range label of the Piano (B12),
+  the string names and fret numbers of the neck (B13), and the same texts in `js/hero.js` (B3). T1 holds the pair.
+- **Strings and fret wires.** `--sl-string` is no longer re-inked in light (`#b9bccb` in both themes) and the
+  light `--sl-fret` is `#4b4e61`. Both were inked for a light ground, but the stage is dark in both themes (D31),
+  so in light the fret wires were brighter than the strings. A check of the `tokens` suite holds it: a string has
+  3:1 on the stage and a fret wire is quieter than a string.
+- **The seven `--sl-deg-*` tokens are the stored colours, not the shown ones.** They equal `DEGREE_DEFAULTS`
+  (T7), which is what the app stores. A page shows them after `App.colors` has snapped them to the LUMI's table:
+  `#ffaa2e #ffd429 #7dfc74 #41eab4 #439af5 #7e58f5 #ff6460` (`tests/colors.test.js:16`). A drawing that shows
+  "today's colours" (B1b `instruments.html`, the gallery of B3) uses the snapped seven.
+- **`css/tokens.css` may hold four rules only** (the list `PLACES` in `tests/tokens.test.js`: the two theme
+  blocks, the touch block, the reduced-motion block). A step that adds a rule to the file adds it to that list.
+- **T2 also reads `index.html` and `gear.html`**, not only `css/` and `js/`.
+- **Counts.** The suite's own counter is the contract: 220 raw colours in 27 files of `js/` after the allow list
+  (this plan says 239 before it); `--teal` has 11 uses in soundLAB's files (this plan says 9).
