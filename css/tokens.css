@@ -9,13 +9,16 @@
  * Note colours are not tokens: App.colors hands them to an element as --c.
  * tests/tokens.test.js computes the contrast of the pairs it lists from this
  * file (text 4.5:1, control boundaries and the focus ring 3:1), in both themes.
+ * It reads the :root block and the light block, so this file holds no other
+ * rule that sets a colour: a rule new to the file is first added to the list
+ * PLACES in that test.
  */
 
 :root {
   color-scheme: dark;
 
   /* ---- surfaces ---------------------------------------------------- */
-  --sl-bg: #0f0d10;             /* the stage */
+  --sl-bg: #0f0d10;             /* the page's ground (an instrument stands on --sl-stage) */
   --sl-bg-raised: #161317;      /* header, footer, sheets */
   --sl-surface: #1c191d;        /* cards */
   --sl-surface-2: #262128;      /* rows inside cards, inputs */
@@ -54,11 +57,16 @@
   --sl-judge-good: #ffd166;
   --sl-judge-miss: var(--sl-bad);
 
-  /* ---- scale-degree colors: the palette's default colours, for documents
-          and drawings. No rule reads these: a page shows the colours of
-          App.colors, which the user can change (plan D12). They are
-          DEGREE_DEFAULTS of js/app.js; tests/tokens.test.js keeps the two
-          equal. ---------------------------------------------------------- */
+  /* ---- scale-degree colors: the palette's default colours as they are
+          stored, for documents and drawings. No rule reads these: a page
+          shows the colours of App.colors, which the user can change and
+          which are snapped to the LUMI's colour table first (plan D12).
+          They are the source array DEGREE_DEFAULTS of js/app.js;
+          tests/tokens.test.js keeps the two equal. On screen and on a LUMI
+          today's seven defaults are #ffaa2e #ffd429 #7dfc74 #41eab4 #439af5
+          #7e58f5 #ff6460 (mapped() of js/note-palette.js, pinned by
+          tests/colors.test.js): a drawing of today's palette takes those,
+          not these tokens. ------------------------------------------------ */
   --sl-deg-1: #ffab47;
   --sl-deg-2: #e8d44d;
   --sl-deg-3: #7ad97a;
@@ -73,9 +81,11 @@
   --sl-key-black: #1b171c;
   --sl-key-line: #6b6168;       /* a key's outline */
   --sl-key-press: #cfc5b6;      /* a pressed key without a note colour */
-  --sl-string: #b9bccb;
-  --sl-fret: #3a3c4d;
+  --sl-string: #b9bccb;         /* a string, on the stage */
+  --sl-fret: #3a3c4d;           /* a fret wire, on the stage: quieter than a string */
   --sl-nut: #d8cdb8;            /* the neck's nut, on the stage */
+  --sl-ink-on-stage: #cbc3c9;   /* text drawn on the stage: octave names, string
+                                   names, fret numbers */
   --sl-ink-on-color: #1a1206;        /* a label on a note colour */
   --sl-ink-on-color-light: #ffffff;  /* the same on a dark note colour */
 
@@ -143,8 +153,12 @@
 }
 
 /* Light theme: same tokens re-inked so every text pairing keeps ≥ 4.5:1 and
-   every control boundary ≥ 3:1. Not re-inked: the keys, their outline, the nut
-   and the inks on a note colour (the instrument looks the same in both themes). */
+   every control boundary ≥ 3:1. Not re-inked: the keys, their outline, the
+   strings, the nut, the ink on the stage and the inks on a note colour (the
+   instrument stands on --sl-stage, which is dark in both themes, and looks the
+   same in both). The one exception is the fret wire: the light theme's stage is
+   a little lighter, so the wire is lifted to keep its weight (1.85:1 there,
+   1.83:1 in dark). */
 :root[data-theme="light"] {
   color-scheme: light;
   --sl-bg: #f5f1ea;
@@ -176,8 +190,7 @@
   --sl-judge-perfect: #12806b;
   --sl-judge-great: #3f7a14;
   --sl-judge-good: #8a6300;
-  --sl-string: #6f7384;
-  --sl-fret: #c9ccd8;
+  --sl-fret: #4b4e61;           /* the same weight on the lighter stage as in dark */
   --sl-shadow-1: 0 1px 3px rgba(0, 0, 0, 0.1);
   --sl-shadow-2: 0 10px 30px rgba(23, 26, 31, 0.08);
 }

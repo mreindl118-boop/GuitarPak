@@ -1946,15 +1946,22 @@ css index.html gear.html` finds only css/tokens.css):
 
 - css/tokens.css, NEW TOKENS by group. Surfaces: `--sl-surface-sunken`
   (wells; the old `--inset`), `--sl-stage` (the ground under an instrument,
-  dark in BOTH themes), `--sl-line-control` (a control's boundary). Ink:
-  `--sl-ink-soft` (field labels; the old `--label`). Accent:
-  `--sl-accent-text` (amber as TEXT and as the focus ring),
-  `--sl-accent-deep` (the old `--accent-dim`; never text),
-  `--sl-accent-glow-color`. NAMING TRAP: `--sl-accent-ink` is the text ON
-  the accent; the old `--accent-ink` is the accent AS text, which is
-  `--sl-accent-text`. Status: `--sl-judge-perfect` / `-great` / `-good` /
-  `-miss`. Keys and strings: `--sl-key-line`, `--sl-key-press`, `--sl-nut`,
-  `--sl-ink-on-color`, `--sl-ink-on-color-light`. Type:
+  dark in BOTH themes), `--sl-line-control` (a control's boundary). TWO
+  GROUNDS, ONE WORD: `--sl-bg` is the page's ground, light in the light
+  theme; the plan calls it "the stage colour" in D13 and B6 (#0f0d10) and
+  means `--sl-stage` wherever something is "on the stage" (D31, B12, T1).
+  Ivory keys on the light `--sl-bg` have 1.11:1. Ink: `--sl-ink-soft`
+  (field labels; the old `--label`). Accent: `--sl-accent-text` (amber as
+  TEXT and as the focus ring), `--sl-accent-deep` (the old `--accent-dim`;
+  never text), `--sl-accent-glow-color`. NAMING TRAP: `--sl-accent-ink` is
+  the text ON the accent; the old `--accent-ink` is the accent AS text,
+  which is `--sl-accent-text`. Status: `--sl-judge-perfect` / `-great` /
+  `-good` / `-miss`. Keys and strings: `--sl-key-line`, `--sl-key-press`,
+  `--sl-nut`, `--sl-ink-on-stage` (text drawn on the stage: octave names,
+  string names, fret numbers; one value in both themes, because `--sl-ink`,
+  `-soft` and `-muted` are inked for the light theme's light surfaces and
+  have 1.1 to 2.3:1 on its stage; added in the B1a review, not in the
+  plan's Appendix C), `--sl-ink-on-color`, `--sl-ink-on-color-light`. Type:
   `--sl-weight-regular` 400, `-medium` 500, `-cond` 600, `-cond-bold` 700
   (only weights that have a font file). Controls: `--sl-control-h-hero`
   64px, `--sl-control-h-dense` 36px (48px on touch; the dense tier waits for
@@ -1963,28 +1970,44 @@ css index.html gear.html` finds only css/tokens.css):
   numbers; messages above sheets).
 - CHANGED VALUES: in light `--sl-accent-ink` is dark (#1a1206, as in dark)
   and `--sl-ink-muted` and the four status colours are deeper; the keys are
-  ivory and ebony in both themes (no longer re-inked); `--sl-focus` is an
-  opaque two-layer ring made of `--sl-bg` and `--sl-accent-text`, so it
-  follows the theme by itself; the touch sizes key on `(any-pointer:
-  coarse)`; `--sl-deg-1` … `-7` are DEGREE_DEFAULTS of js/app.js (no rule
-  reads them: a page shows the colours of App.colors).
+  ivory and ebony in both themes (no longer re-inked); `--sl-string` is no
+  longer re-inked either and the light `--sl-fret` is #4b4e61 (B1a review,
+  beyond the plan's Appendix C: the neck stands on `--sl-stage`, and the
+  old light values, made for a light board, drew the fret wires louder
+  than the strings there; now string 8.0:1 and fret 1.85:1 in light, 10.5
+  and 1.83 in dark); `--sl-focus` is an opaque two-layer ring made of
+  `--sl-bg` and `--sl-accent-text`, so it follows the theme by itself; the
+  touch sizes key on `(any-pointer: coarse)`; `--sl-deg-1` … `-7` are the
+  source array DEGREE_DEFAULTS of js/app.js, the colours BEFORE the LUMI
+  snap (no rule reads them: a page shows the colours of App.colors, which
+  are snapped to the LUMI's table. On screen today's seven defaults are
+  #ffaa2e #ffd429 #7dfc74 #41eab4 #439af5 #7e58f5 #ff6460, the values
+  tests/colors.test.js pins: a drawing of today's palette takes those, or
+  runs the tokens through `mapped()` of js/note-palette.js).
 - NEW SUITE `tokens` (tests/tokens.test.js, pure Node, 0.2 s, in the one
   list in tests/run.sh; run `node tests/tokens.test.js` after every commit).
   T1 the contrast of the pair list in the test (the contract), both themes,
   computed from css/tokens.css with translucent tokens composited over
-  their surface: text 4.5:1; control boundary, focus ring, key outline,
-  keys and nut on the stage 3:1. T2 every `var(--sl-…)` in css/, js/ and
-  the two HTML files names a token that is defined (CSS ignores a misspelt
-  one without a sign). T3 raw colours (hex, rgb(, hsl() per file only go
-  down: table RAW_CEILING; the note palettes are on DATA_PALETTES. T4 uses
-  of the 29 old variables per file and name only go down: table
-  OLD_CEILING; the seven Gear modules and js/scoreplayer.js are exempt
-  until Phase H. T5 css/tokens.css is the first stylesheet of both pages.
-  T6 both reduced-motion blocks exist. T7 the degree tokens equal
-  DEGREE_DEFAULTS. T3 and T4 count code, not comments; a file that is not
-  in a table has ceiling 0; a count under its ceiling passes with a NOTE,
-  and the step that converts a file lowers its ceilings in the same commit
-  (`node tests/tokens.test.js --tables` prints both tables as they stand).
+  their surface: text 4.5:1 (a label on the stage too); control boundary,
+  focus ring, key outline, keys and nut on the stage 3:1; a string has 3:1
+  on the stage and a fret wire is quieter than it. The suite reads the
+  `:root` block and the light block and nothing else, so css/tokens.css
+  may hold only the four rules of the list PLACES in the test (those two,
+  and `:root` under the any-pointer and the reduced-motion query with
+  their own names): any other rule fails. T2 every `var(--sl-…)`, in any
+  letter case, in css/, js/ and the two HTML files names a token that is
+  defined (CSS ignores a misspelt one without a sign). T3 raw colours
+  (hex, rgb(, hsl() per file only go down: table RAW_CEILING; the note
+  palettes are on DATA_PALETTES. T4 uses of the 29 old variables per file
+  and name only go down: table OLD_CEILING; the seven Gear modules and
+  js/scoreplayer.js are exempt until Phase H. T5 css/tokens.css is the
+  first stylesheet of both pages.
+  T6 both reduced-motion blocks exist. T7 the degree tokens equal the
+  source array DEGREE_DEFAULTS. T3 and T4 count code, not comments; a file
+  that is not in a table has ceiling 0; a count under its ceiling passes
+  with a NOTE, and the step that converts a file lowers its ceilings in
+  the same commit (`node tests/tokens.test.js --tables` prints both tables
+  as they stand).
 - sw.js: `CACHE` = `PREFIX + 'v10'` (B1b leaves it; B2 v11 … B18 v31: plan
   section 3).
 - Docs: the plan and its maps are under docs/plans/phase-b/ as text. No

@@ -10,7 +10,9 @@
 //
 //   T1  contrast in both themes, computed from the two blocks of css/tokens.css
 //       (a translucent token is composited over what it lies on). The pair
-//       list PAIRS below is the contract: text 4.5:1, graphics 3:1
+//       list PAIRS below is the contract: text 4.5:1, graphics 3:1. Nothing
+//       but those two blocks may set a colour: the list PLACES holds the
+//       rules the file may have
 //   T2  every var(--sl-…) in css/, js/ and the two pages names a token that
 //       css/tokens.css defines
 //   T3  raw colours only go down: the hex, rgb( and hsl( literals of each file
@@ -19,7 +21,8 @@
 //       against OLD_CEILING, for the 29 names that css/style.css defines
 //   T5  css/tokens.css is the first stylesheet of both pages
 //   T6  motion can be switched off: both reduce blocks exist
-//   T7  --sl-deg-1 … -7 are DEGREE_DEFAULTS of js/app.js
+//   T7  --sl-deg-1 … -7 are DEGREE_DEFAULTS of js/app.js (the colours as they
+//       are stored, before App.colors snaps them to the LUMI's table)
 //
 // T3 and T4 count code, not comments. The ceilings are the counts of the day a
 // file was last converted: a count over its ceiling fails; a count under it
@@ -73,7 +76,8 @@ const PAIRS = [
   [FOCUS, GRAPHIC, SURFACES, 'the outer colour of --sl-focus'],
   ['--sl-key-line', GRAPHIC, ['--sl-key-white'], 'a key’s outline on an ivory key'],
   ['--sl-key-white', GRAPHIC, ['--sl-stage'], 'an ivory key on the stage'],
-  ['--sl-nut', GRAPHIC, ['--sl-stage'], 'the neck’s nut on the stage']
+  ['--sl-nut', GRAPHIC, ['--sl-stage'], 'the neck’s nut on the stage'],
+  ['--sl-ink-on-stage', TEXT, ['--sl-stage'], 'a label drawn on the stage']
 ];
 
 // ---- the ceilings of T3: raw colours per file (hex, rgb(, hsl(), comments and DATA_PALETTES left out) ----
@@ -320,6 +324,24 @@ const lightStray = Object.keys(lightOnly).filter(k => !Object.prototype.hasOwnPr
 ok(lightStray.length === 0, 'every token the light block sets is also set on :root (a token of one theme only would be empty in the other)' + list(lightStray));
 const notSl = [...new Set([].concat(...tokenRules.map(r => r.decls.map(d => d[0]))).filter(k => /^--/.test(k) && !/^--sl-/.test(k)))];
 ok(notSl.length === 0, 'every custom property of ' + TOKENS + ' is named --sl-…' + list(notSl));
+// T1, T2 and T7 are computed from the two blocks read above and from nothing else, so nothing else may set a
+// token: these are the rules the file may have (null = any name), and the two media blocks set only the names
+// they are for. A browser would obey any other rule (a dark-only block, a second light selector, a colour inside
+// a media block) and this suite would not see it. A step that needs another rule adds it here, with its reason.
+const PLACES = {
+  ':root': null,
+  ':root[data-theme="light"]': null,
+  '@media (any-pointer: coarse) :root': ['--sl-control-h', '--sl-control-h-dense'],
+  '@media (prefers-reduced-motion: reduce) :root': ['--sl-dur-fast', '--sl-dur']
+};
+const strayRules = [];
+for (const r of tokenRules) {
+  const at = (r.media + ' ' + r.selector).trim(), may = Object.prototype.hasOwnProperty.call(PLACES, at) ? PLACES[at] : undefined;
+  if (may === undefined) strayRules.push(at + ': not a rule this file may have');
+  else if (may) { const more = r.decls.map(d => d[0]).filter(k => !may.includes(k)); if (more.length) strayRules.push(at + ': sets ' + more.join(', ') + ' (it may set ' + may.join(', ') + ')'); }
+}
+ok(tokenRules.length >= Object.keys(PLACES).length && strayRules.length === 0, TOKENS + ' has no rule but ' + Object.keys(PLACES).join(' | ') +
+  ', and the two media blocks set only their own names (the contrast and the degree colours are computed from the first two)' + list(strayRules));
 
 const scripts = jsFiles.filter(f => { try { new vm.Script(code(f), { filename: f }); return false; } catch (e) { return true; } });
 ok(jsFiles.length > 30 && scripts.length === 0, 'the scripts of js/ were read without their comments, and what is left of each still compiles (' + jsFiles.length + ' files)' +
@@ -348,12 +370,19 @@ for (const [theme, T] of [['dark', dark], ['light', light]]) {
         : 'on ' + x.on + ': ' + x.r.toFixed(3) + ' to 1 is under ' + need + ' to 1')));
   }
 }
-ok(pairCount === 146, 'the pair list is whole: ' + pairCount + ' pairs were computed (73 in each theme)');
+ok(pairCount === 148, 'the pair list is whole: ' + pairCount + ' pairs were computed (74 in each theme)');
+// not a pair with a bar: a fret wire is quiet on purpose (under 3:1). What must hold is the order of the two
+for (const [theme, T] of [['dark', dark], ['light', light]]) {
+  const S = ground(T, '--sl-stage'), on = name => { const c = tokenColour(T, name); return c && S ? contrast(over(c, S), S) : null; };
+  const str = on('--sl-string'), fret = on('--sl-fret');
+  ok(str != null && fret != null && str >= GRAPHIC && fret < str, theme + ': --sl-string on stage ' + (str == null ? '?' : str.toFixed(2)) + ', --sl-fret on stage ' +
+    (fret == null ? '?' : fret.toFixed(2)) + '  (a string needs ' + GRAPHIC + ', and a fret wire is quieter than a string: the neck reads the same way in both themes)');
+}
 
 // ---- T2 ----
 console.log('# T2 every var(--sl-…) names a token that ' + TOKENS + ' defines');
 const readers = cssFiles.concat(jsFiles, PAGES.filter(isFile));
-const uses = [].concat(...readers.map(f => [...code(f).matchAll(/var\(\s*(--sl-[\w-]*)/g)].map(m => ({ file: f, name: m[1], n: lineOf(code(f), m.index) }))));
+const uses = [].concat(...readers.map(f => [...code(f).matchAll(/var\(\s*(--sl-[\w-]*)/gi)].map(m => ({ file: f, name: m[1], n: lineOf(code(f), m.index) }))));
 const unknown = uses.filter(u => !defined.has(u.name));
 ok(defined.size > 60 && uses.length > 0 && unknown.length === 0, 'every var(--sl-…) in css/, js/ and the two pages names one of the ' + defined.size + ' tokens (' + uses.length + ' uses in ' +
   new Set(uses.map(u => u.file)).size + ' file(s)): CSS ignores a misspelt token without a sign' + list(unknown.map(u => u.file + ':' + u.n + ': var(' + u.name + ')')));
@@ -420,7 +449,7 @@ const off = prop => oldReduce.some(r => r.decls.some(d => d[0] === prop && /^non
 ok(off('animation') && off('transition'), OLD_SHEET + ': under prefers-reduced-motion every element has animation: none and transition: none, both !important');
 
 // ---- T7 ----
-console.log('# T7 the degree tokens are the app’s default colours');
+console.log('# T7 the degree tokens are DEGREE_DEFAULTS of js/app.js (the stored colours, before the LUMI snap)');
 const degLine = /\bvar DEGREE_DEFAULTS\s*=\s*\[([^\]]*)\]/.exec(isFile('js/app.js') ? code('js/app.js') : '');
 const defaults = degLine ? (degLine[1].match(/#[0-9a-f]{6}\b/gi) || []).map(s => s.toLowerCase()) : [];
 ok(defaults.length === 7, 'DEGREE_DEFAULTS was read from js/app.js: ' + (defaults.join(' ') || 'not found'));

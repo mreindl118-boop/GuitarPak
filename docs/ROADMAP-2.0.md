@@ -107,7 +107,7 @@ The owner's questions and the four drawings that open B5a, B6, B9 and B16: `docs
 
 | Step | What | Pull request | State |
 |---|---|---|---|
-| B0 | The instrument matrix | #105 | in review (draft pull request #105) |
+| B0 | The instrument matrix | #105 | in review (pull request #105, ready for review) |
 | B1a | Tokens that pass, the `tokens` suite, the plan | # | in review (draft pull request) |
 | B1b | The specification, the drawings, the wording list | # | |
 | B2 | Colour bridge, `look` suite, screenshot tool | # | |

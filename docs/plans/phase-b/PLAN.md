@@ -16,9 +16,9 @@ Inputs: the seven maps in this folder (`map-design.md`, `map-shell.md`, `map-pag
 `map-pages-instr.md`, `map-overlays.md`, `map-tests.md`, `map-matrix.md`) and `docs/INSTRUMENT-MATRIX.md`. Where the
 maps disagreed, Appendix F says which reading won and why.
 
-The working files and screenshots this document names (work-…/, shots/…) were scratch files of the planning
-session. They are not in the repository: pictures are never committed, because both deploys publish the whole
-tree.
+The working files (work-…/), the screenshots (shots/…) and the two critiques (`review-completeness.md`,
+`review-fidelity.md`) this document names were scratch files of the planning session. They are not in the
+repository: pictures are never committed, because both deploys publish the whole tree.
 
 **Every `file:line` in this plan is a line of `a914df2`.** Lines move after the first merge, so every edit also
 names the function, id, selector or table it changes. Find by name once the numbers have drifted. One map
