@@ -1,14 +1,13 @@
 // Real shell, simulated browser only: one musical context on every built-in
-// page, including both workspaces, Learn, Settings and modal utilities.
+// page, including Learn, Settings and modal utilities.
 const { chromium } = require('playwright');
 const fs = require('fs'), path = require('path'), env = require('./env');
 let checks = 0;
 function ok(value, message) { if (!value) throw new Error(message); checks++; console.log('  PASS', message); }
-const practice = ['quiz', 'practiceplan', 'fretboard', 'tab', 'notation', 'helix', 'chords', 'piano', 'chart', 'synth', 'pads', 'deck', 'liveset', 'midihub', 'lumipractice', 'songs', 'jam', 'shed', 'tuner', 'trainer', 'theory', 'settings']; // 1.3: deck + liveset = the Synth tab
-const studio = ['arrange', 'tracks', 'song', 'ideas', 'settings'];
+const pages = ['quiz', 'practiceplan', 'fretboard', 'tab', 'notation', 'helix', 'chords', 'piano', 'chart', 'pads', 'deck', 'liveset', 'midihub', 'songs', 'jam', 'shed', 'tuner', 'theory', 'settings']; // 1.3: deck + liveset = the Synth tab; 2.0: the Synth, LUMI and Trainer pages are folded into Piano and Plan
 async function switchTo(page, name) {
   await page.evaluate(name => App.switchTo(name), name);
-  await page.waitForFunction(name => App.active === name && !document.documentElement.classList.contains('space-wiping'), name);
+  await page.waitForFunction(name => App.active === name, name);
   await page.waitForTimeout(70);
 }
 async function shot(page, name) {
@@ -58,14 +57,14 @@ async function contextSnapshot(page) {
       await page.evaluate(() => { App.setTheme('dark'); App.scaleLock.set(false); App.midi.setDisplayEnabled(false); });
       console.log('# ' + viewport.width + 'px global context across all built-in pages');
       const registered = await page.evaluate(() => [...document.querySelectorAll('main > .panel[id^="panel-"]')].map(el => el.id.slice(6)).sort());
-      ok(registered.join('|') === [...new Set([...practice, ...studio])].sort().join('|'), 'matrix covers every registered built-in page');
-      for (const [space, pages] of [['Practice', practice], ['Studio', studio]]) for (const name of pages) {
+      ok(registered.join('|') === [...pages].sort().join('|'), 'matrix covers every registered built-in page');
+      for (const name of pages) {
         await switchTo(page, name);
         await page.locator('#ctx-btn').click();
         const s = await contextSnapshot(page);
         ok(s.active === name && s.visible && s.enabled && s.open && s.expanded === 'true' && s.width >= 34 && s.height >= 34 && s.likePeers && s.noHeaderOverlap && s.inBounds && s.unique && s.targets,
-          `${space}/${name}: visible clef sized like its neighbours (>= 34 px), reachable disclosure, one shared set of controls`);
-        ok(s.controls === 'ctxbar' && s.region === 'region' && s.labelled && /Key, scale/.test(s.label) && s.icon === 'true', `${space}/${name}: labelled disclosure and decorative SVG`);
+          `${name}: visible clef sized like its neighbours (>= 34 px), reachable disclosure, one shared set of controls`);
+        ok(s.controls === 'ctxbar' && s.region === 'region' && s.labelled && /Key, scale/.test(s.label) && s.icon === 'true', `${name}: labelled disclosure and decorative SVG`);
         await page.keyboard.press('Escape');
       }
       await switchTo(page, 'quiz');
@@ -86,9 +85,7 @@ async function contextSnapshot(page) {
       ok(await page.evaluate(() => /unconfigured|select|configured|connect/i.test(document.getElementById('cx-tnote').textContent) && __midiRequests === 0), 'display enabled without hardware has an honest status and makes no permission request');
       await page.mouse.click(viewport.width - 12, viewport.height - 80);
       ok(await page.evaluate(() => !App.ctx()), 'pointer outside closes the disclosure');
-      await switchTo(page, 'arrange'); await page.locator('#ctx-btn').click();
-      const shared = await contextSnapshot(page);
-      ok(shared.root === selected.root && shared.scale === selected.scale && shared.lock === selected.lock && shared.display === selected.display && shared.colors === selected.colors, 'Studio shares Practice key, scale, lock, display and palette state');
+      await switchTo(page, 'fretboard'); await page.locator('#ctx-btn').click(); // open on another page: the next check needs it open
       await page.evaluate(() => App.switchTo('settings'));
       ok(await page.evaluate(() => !App.ctx()), 'page navigation closes the disclosure');
       await page.locator('#ctx-btn').click();
@@ -116,7 +113,7 @@ async function contextSnapshot(page) {
       await page.waitForFunction(() => window.App && App.midi && App.colors && App.active);
       await page.locator('#ctx-btn').click();
       const persisted = await contextSnapshot(page);
-      ok(persisted.root === '2' && persisted.scale === 'dorian' && persisted.lock === 'true' && persisted.display === 'true' && persisted.colors === 'note', 'reload preserves one authoritative context across workspaces');
+      ok(persisted.root === '2' && persisted.scale === 'dorian' && persisted.lock === 'true' && persisted.display === 'true' && persisted.colors === 'note', 'reload preserves one authoritative context');
       for (const theme of ['dark', 'light']) {
         await page.evaluate(theme => App.setTheme(theme), theme);
         await page.waitForTimeout(180);

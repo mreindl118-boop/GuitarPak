@@ -5,9 +5,9 @@
 // dots + legend, Keys data-dc, Chords, Theory, the LUMI's per-key colors with
 // out-of-scale keys still dark), a key other than C (pitch class, not the
 // interval above the root), chord tones outside the key, the blinking next
-// note off the scale, the Studio piano roll, a page that owns the keybed
-// (Pads), storage that refuses writes, persistence, a custom note color,
-// reset, and switching back. Fake LUMI as in lights.test.js.
+// note off the scale, a page that owns the keybed (Pads), storage that
+// refuses writes, persistence, a custom note color, reset, and switching
+// back. Fake LUMI as in lights.test.js.
 const { chromium } = require('playwright');
 const env = require('./env');
 let fails = 0;
@@ -210,33 +210,9 @@ const litMatches = (lit, vel) => {
   ok(chd.note[0] === NOTE[2] && chd.note[1] === NOTE[6] && chd.iiN === NOTE[2], 'Note mode: D7’s F# (out of the key) in F#’s note color, D and the ii chip in D’s: ' + chd.note.join(' '));
   ok(chd.int[0] === DEG[1] && chd.int[1] === '#2fbced' && chd.iiI === DEG[1], 'Interval mode: F# uses the chromatic flat-five blend, D = degree 2: ' + chd.int.join(' '));
 
-  // Studio piano roll: the same service (a fresh install now gets the degree
-  // defaults there too — before v0.79 it had its own fallback palette)
-  // across workspaces = the screen wipe; asks again until it lands (app.js
-  // setSpace drops a switch that starts < ~0.8 s after the last one began:
-  // that wipe's stale safety timer ends the new one before it swaps)
-  const goTo = id => page.waitForFunction(id => {
-    if (App.active !== id) App.switchTo(id);
-    const w = document.getElementById('wipe');
-    return App.active === id && (!w || w.style.display === 'none');
-  }, id, { polling: 100 });
-  await goTo('tracks');
-  const roll = await page.evaluate(() => {
-    const t = { id: 'tcolors', name: 'Colors', kind: 'synth', voice: 'keys', synth: { cutoff: 0, attack: null, release: null, glide: null },
-      sampler: { rootNote: 60, loop: false, name: '' }, steps: null, notes: [{ m: 62, t: 0, d: 0.25 }, { m: 66, t: 0.5, d: 0.25 }],
-      fx: { type: 'none', mix: 0.3 }, mix: { vol: 80, mute: false, solo: false } };
-    DAW.engine.tracks.push(t);
-    App.emit('st:edit', { trackId: t.id });
-    const fills = () => Array.from(document.querySelectorAll('.st-note')).map(x => x.getAttribute('fill'));
-    const o = { note: fills() };
-    App.colors.setMode('interval'); o.int = fills();
-    App.colors.setMode('note');
-    DAW.engine.tracks.splice(DAW.engine.tracks.indexOf(t), 1);
-    return o;
-  });
-  await goTo('fretboard');
-  ok(roll.note.join() === [NOTE[2], NOTE[6]].join(), 'Studio piano roll, Note mode: D and F# in their note colors: ' + roll.note.join(' '));
-  ok(roll.int.join() === [DEG[1], '#2fbced'].join(), 'Interval mode: D = degree 2, F# uses the same chromatic blend as every other view: ' + roll.int.join(' '));
+  // on to the Fretboard, still in Note mode (the settings editor below reads both)
+  await page.evaluate(() => { App.colors.setMode('note'); App.switchTo('fretboard'); });
+  await page.waitForFunction(() => App.active === 'fretboard');
 
   console.log('# Fretboard settings editor');
   const ed = await page.evaluate(() => {

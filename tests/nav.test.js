@@ -36,16 +36,18 @@ const tabs = sel => [...document.querySelectorAll(sel + ' .tabbar-btn')].map(b =
   ok(d1.topShown && !d1.botShown && d1.noSelect && !d1.metTab, 'top tab bar on desktop, no drop-down, no metronome tab: ' + JSON.stringify(d1));
   const clickTab = async (label, sel) => { await page.click((sel || '#tabbar') + ' .tabbar-btn:has-text("' + label + '")'); await page.waitForTimeout(120); return page.evaluate(() => App.active); };
   ok(await clickTab('Keys') === 'piano', 'Keys tab opens the piano');
-  ok((await page.evaluate(() => [...document.querySelectorAll('#subnav .subtab')].map(b => b.textContent).join('|'))) === 'Piano|Charts|Synth|Pads|LUMI', 'Keys pills: Piano, Charts (2.0), Synth, Pads, LUMI (the MIDI Hub moved to the Synth tab)');
+  ok((await page.evaluate(() => [...document.querySelectorAll('#subnav .subtab')].map(b => b.textContent).join('|'))) === 'Piano|Charts|Pads', 'Keys pills: Piano | Charts | Pads (2.0: synth sounds are the Sound picker on Piano, LUMI practice a section under its lessons)');
   ok(await clickTab('Synth') === 'deck' && (await page.evaluate(() => [...document.querySelectorAll('#subnav .subtab')].map(b => b.textContent).join('|'))) === 'Deck|Live|Hub' && (await page.evaluate(() => window.SLSynthTab && SLSynthTab.borrowed())), 'Synth tab opens the Deck with pills Deck|Live|Hub, borrowing the Hub Control view');
   ok((await page.evaluate(async () => { App.switchTo('midihub'); await new Promise(r => setTimeout(r, 150)); return [App.active, !!document.querySelector('#panel-midihub .mh-view[data-view="control"]'), SLSynthTab.borrowed()].join(); })) === 'midihub,true,false', 'leaving the Deck gives the Control view back to the Hub');
   await clickTab('Keys'); // back from the Synth tab to the Keys pills
-  await page.click('#subnav .subtab:has-text("Synth")'); await page.waitForTimeout(150);
+  await page.click('#subnav .subtab:has-text("Charts")'); await page.waitForTimeout(150);
+  ok(await page.evaluate(() => App.active) === 'chart', 'Charts is a page under Keys');
   ok(await clickTab('Guitar') === 'fretboard', 'Guitar tab opens the neck');
   ok((await page.evaluate(() => [...document.querySelectorAll('#subnav .subtab')].map(b => b.textContent).join('|'))) === 'Neck|Tab|Notation|Helix', 'Guitar pills: Neck | Tab | Notation | Helix');
-  ok(await clickTab('Keys') === 'synth', 'Keys remembers the last page (Synth)');
+  ok(await clickTab('Keys') === 'chart', 'Keys remembers the last page (Charts)');
+  await page.click('#subnav .subtab:has-text("Piano")'); await page.waitForTimeout(150); // the scroll check below wants the tall Piano page
   ok(await clickTab('Train') === 'shed', 'Train opens the Woodshed');
-  ok((await page.evaluate(() => [...document.querySelectorAll('#subnav .subtab')].map(b => b.textContent).join('|'))) === 'Woodshed|Trainer|Tuner', 'Train pills: Woodshed | Trainer | Tuner');
+  ok((await page.evaluate(() => [...document.querySelectorAll('#subnav .subtab')].map(b => b.textContent).join('|'))) === 'Woodshed|Tuner', 'Train pills: Woodshed | Tuner (2.0: the Trainer cards are on the Plan page)');
   await page.click('#subnav .subtab:has-text("Tuner")'); await page.waitForTimeout(200);
   ok(await page.evaluate(() => App.active) === 'tuner', 'Tuner is a page under Train');
   await clickTab('Keys'); await page.evaluate(() => window.scrollTo(0, 600)); await page.waitForTimeout(150);
@@ -150,26 +152,6 @@ const tabs = sel => [...document.querySelectorAll(sel + ' .tabbar-btn')].map(b =
   const ov = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
   ok(!ov, 'phone: no sideways scroll');
   ok(errs.length === 0, 'no page errors (phone)' + (errs.length ? '\n    ' + errs.join('\n    ') : ''));
-  await ctx.close();
-
-  console.log('# studio space');
-  ({ ctx, page, errs } = await open(b, { width: 1280, height: 800 }));
-  await page.click('#space-btn'); await page.waitForTimeout(900);
-  const st = await page.evaluate(() => ({ space: App.space, tabs: [...document.querySelectorAll('#tabbar .tabbar-btn')].map(b => b.textContent).join('|'), active: App.active }));
-  ok(st.space === 'studio' && st.tabs === 'Studio|Sketch', 'studio tabs: ' + JSON.stringify(st));
-  // a second switch started right after the first finished must not be eaten
-  // by the first wipe's leftover safety timers (it used to land nowhere)
-  const quick = await page.evaluate(async () => {
-    const wipe = document.getElementById('wipe'), t0 = performance.now();
-    App.setSpace('practice');
-    while (performance.now() - t0 < 2000 && (App.space !== 'practice' || wipe.style.display !== 'none')) await new Promise(r => setTimeout(r, 10));
-    const firstMs = Math.round(performance.now() - t0);
-    App.setSpace('studio');
-    await new Promise(r => setTimeout(r, 1500));
-    return { firstMs, space: App.space, curtain: wipe.style.display };
-  });
-  ok(quick.space === 'studio' && quick.curtain === 'none', 'a quick second workspace switch lands: ' + JSON.stringify(quick));
-  ok(errs.length === 0, 'no page errors (studio)' + (errs.length ? '\n    ' + errs.join('\n    ') : ''));
   await ctx.close();
   await b.close();
   console.log(fails ? '\nFAILED: ' + fails : '\nALL PASS');

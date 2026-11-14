@@ -19,12 +19,18 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
   await p.mouse.click(640, 860);
   const pages = await p.evaluate(async () => {
     const wait = ms => new Promise(r => setTimeout(r, ms));
-    const ids = ['quiz', 'chords', 'theory', 'fretboard', 'tab', 'notation', 'piano', 'synth', 'pads', 'songs', 'jam', 'shed', 'trainer', 'tuner', 'arrange', 'tracks', 'song', 'ideas', 'quiz'];
+    const ids = ['quiz', 'chords', 'theory', 'fretboard', 'tab', 'notation', 'piano', 'pads', 'songs', 'jam', 'shed', 'tuner', 'quiz'];
     const seen = [];
-    for (const id of ids) { App.switchTo(id); await wait(id === 'arrange' || id === 'quiz' ? 900 : 250); seen.push(App.active + ':' + App.space); }
+    for (const id of ids) {
+      App.switchTo(id); await wait(250);
+      const panel = document.getElementById('panel-' + id);
+      seen.push({ id, active: App.active, shown: !!panel && panel.classList.contains('active') });
+    }
     return seen;
   });
-  ok(pages.every(x => !/undefined/.test(x)), 'visited: ' + pages.join(' '));
+  // a page that is not there must fail here: the id is the active page and its panel is the one shown
+  const lost = pages.filter(x => x.active !== x.id || !x.shown);
+  ok(lost.length === 0, 'visited, each one the active page with its panel shown: ' + pages.map(x => x.id).join(' ') + (lost.length ? '\n    not shown: ' + JSON.stringify(lost) : ''));
   // MIDI into the piano: sound first, then key lights
   await p.evaluate(async () => {
     await App.midi.enable();

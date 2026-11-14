@@ -84,8 +84,9 @@ js/midi.js        MIDI service (App.midi: in/out ports, note/bend/pressure
                   backends) before dispatch, 'midi:out' {bytes} after every
                   successful send, App.midi.send(bytes) (any bytes to the
                   output) and App.midi.setInputFilter(fn) — ONE fn(bytes) ->
-                  bytes|null run before dispatch (null drops it); the Hub
-                  installs its rules there when midihub.rulesIn is on.
+                  bytes|null run before dispatch (null drops it); the Hub's
+                  rules are installed there while midihub.rulesIn is on (by
+                  js/midirules.js since 2.0 Phase A3a, not by the Hub page).
                   1.4.1 PORTS BY NAME: Chrome on Windows ids are positional
                   (output-N) and reorder when another app (FL Studio) frees
                   a device. midi.outputName / lights.outputName are saved
@@ -124,6 +125,19 @@ js/midi.js        MIDI service (App.midi: in/out ports, note/bend/pressure
                   calls guide only when its now/next targets change, so the
                   blink keeps time; Wait mode lights the first note at Go).
                   Nothing calls App.midi.light/dark for practice any more.
+                  2.0 Phase A3a SYNTH OUT: App.midi.synthOut {id(), name(),
+                  has(), set(v)} = which output is the synth, moved here from
+                  js/midihub.js so the score player needs no Hub; the Hub and
+                  js/scoreplayer.js read this ONE copy. Still stored as
+                  midihub.outId: a port id | 'shared' = the key-light output
+                  | unset = auto (a synth-named port, port 1 first, never a
+                  LUMI / Microsoft GS Wavetable). id() = a port id for
+                  App.midi.sendTo / bindMusicalOutput, or null ('shared', a
+                  native bridge = one route, no synth port found, MIDI not
+                  ready), which both of them read as the selected (key-light)
+                  output; name() = the name of the port that is used; has() =
+                  MIDI ready and a synth port or a selected output exists;
+                  set(v) stores v ('' / null = 'shared').
 js/tonein.js      1/4"/audio-in TONE-IN: pitch-detects the selected audio
                   input (audio.inId; toggle audio.tonein in Settings) and
                   emits midi:note {silent:true} — instrument pages show the
@@ -197,10 +211,36 @@ js/remote.js      CONTROLLER REMOTE (App.remote, 2.0 beta / v2; docs/CONTROLLER-
                   any octave; more: white keys up from range().lo's C), badge
                   .kb on each choice while a keyboard is in; the right key
                   after a miss moves on; remoteKey is false there.
+js/midirules.js   MIDI RULES (App.midiRules, 2.0 Phase A3a): the MIDI Hub's
+                  rule engine + its input-filter install, cut out of
+                  js/midihub.js so "Apply to what soundLAB hears (every page)"
+                  needs no Hub. The Rules EDITOR, Learn and decode stay in
+                  the Hub. apply(bytes, port) -> [bytes...]: one channel
+                  message through midihub.rules (read on EVERY call): match
+                  type / channel / number range / source port (m.port, a
+                  substring of `port`: Thru passes the port name, the input
+                  filter passes none), then block / convert / set ch / set
+                  number / add / value %; [] = blocked, [bytes] = untouched;
+                  0xF0 and up always pass. Its own small classifier (kind, ch,
+                  num, val, on), not the Hub's decode (monitor text).
+                  install(): App.midi.setInputFilter(fn) while midihub.rulesIn
+                  is on, null while it is off (the ONE filter slot stays free;
+                  tests/midihub.test.js asserts both). Runs at load, when the
+                  tab becomes visible again and on a 'storage' event whose key
+                  ENDS in midihub.rulesIn (or is null = a cleared store): the
+                  box ticked in ANOTHER window of the origin; the window that
+                  ticks it calls install() itself (the Hub's installFilter).
+                  active() -> {on, rules} (rules = enabled count; for the
+                  Settings status line A3b adds). Bus 'midirules:state' {on,
+                  rules} when the installed state changed (the Hub's box
+                  #mh-rulesin listens, so it shows what THIS window has
+                  installed after another window switched it). Reads
+                  midihub.rules / midihub.rulesIn, never writes. Loaded right
+                  after remote.js. Checks live in tests/midihub.test.js.
 js/metronome.js   ┐ feature modules; each registers (metronome = the corner
                   │  sheet, not a page — see OVERLAY SHEETS)
 js/fretboard.js   │ App.register(name, {init, onShow, onHide, onKey})
-js/chords.js      │ DOM ids/CSS prefixed met-/fb-/ch-/jam-/tun-/tr-
+js/chords.js      │ DOM ids/CSS prefixed met-/fb-/ch-/jam-/tun-
                   │ (chords: chord-explorer neck + theory panel + progression
                   │  player; the neck follows the sounding chord live)
                   │ (fretboard.js also registers the 'tab' and 'notation'
@@ -215,6 +255,17 @@ js/piano.js       │ (piano: keyboard twin of the fretboard — degree-colored
                   │  keys flash data-dc (their degree color) at every level;
                   │  key-aware fingering cycleFingers/fingering, 1-2 octaves;
                   │  App.keys = the API keylessons.js drives)
+                  │  SOUND PICKER (2.0 Phase A2; there is no 'synth' page any
+                  │  more): the select #pn-voice, labelled "Sound" = Grand
+                  │  piano or one DAW.SYNTH_PRESETS sound, stored in pn.voice;
+                  │  pn.synthPreset = the last synth sound. applyVoice(id) is
+                  │  the one place the sound changes; App.keys.setVoice(id)
+                  │  picks it from outside the page ('piano' or a preset id;
+                  │  false for an unknown id, nothing changes) — the Learn
+                  │  bar's "Synth keyboard" entry calls it. The sampled piano
+                  │  tones are not in this list (one merged list: Phase B/C).
+                  │  App.keys.stopRunner() stops the scale runner. The page
+                  │  also hosts the LUMI section #pn-lumi (lumi-practice.js).
 js/keylessons.js  │ SCALE LESSONS on the Keys page (mounted into #pn-lessons
                   │  by piano.js init): LESSONS (25, tiers start/build/
                   │  stretch) x STEPS (10 speed levels, quarters@60 ->
@@ -264,18 +315,50 @@ js/songs.js       │ (songs: user-imported ASCII tab / MIDI parsed on-device,
                   │  bar-loop player at shared tempo, key detect → fb:set)
                   │  1.3 ONE OPEN: the "Open a score" card above Add a song
                   │  takes .mid/.midi/.musicxml/.xml/.mxl/.txt and routes it:
-                  │  Play on synth (SLMidiHub.player.loadFile/loadScore + show),
+                  │  Play on synth (SLScorePlayer.loadFile/loadScore + show;
+                  │  js/scoreplayer.js since 2.0 Phase A3a, the Hub is not
+                  │  called; MusicXML reaches the other two as MIDI through
+                  │  SLScorePlayer.toMidiBytes),
                   │  Practice (window.Woodshed.importMidi + addScore -> shed),
                   │  Open as tab (App.songs.fromMidi/load, text -> the paste
                   │  box). Suite tests/oneopen.test.js.
-js/lumi-practice.js LUMI note/triad practice under Keys (selectively recovered
-                  from b8ccb55; see docs/LUMI-PRACTICE.md). Session-only
-                  simulated answers by default; optional exact LUMI/MODX
-                  input and LUMI output through additive Web MIDI subscriptions.
-                  App.midi.leaseKeybedOutput pauses the shared LED painter
-                  on the same selected output during test/armed guidance;
-                  cleanup restores its current layout. Native independent
-                  routes unsupported. Tests: lumi-practice, midi-ports.
+js/lumi-practice.js LUMI note/triad practice (selectively recovered from
+                  b8ccb55; see docs/LUMI-PRACTICE.md). Since 2.0 Phase A2 a
+                  SECTION ON THE PIANO PAGE, not a page: piano.js init mounts
+                  it into <details class="card" id="pn-lumi"> ("Notes and
+                  triads on the LUMI", after #pn-lessons, closed by default;
+                  body #pn-lumi-body) and drives it through App.lumiPractice
+                  = {init, show, hide, close(msg), stop, remote, remoteKey,
+                  open (getter), running (getter)}. `open` = the fold state
+                  alone (true also while another page shows); the module's
+                  `visible` = Piano page shown AND section open.
+                  OPEN = OWNER, one owner at a time: opening the section or
+                  starting a session stops a lesson run (App.keysLessons.
+                  halt(): like stop, but keeps the entry instrument) and the
+                  runner (App.keys.stopRunner); a lesson starting, a lesson
+                  opened from the Plan or the Learn bar (keylessons start /
+                  releaseRunner) and the runner starting (ppStart) call
+                  close(msg) = fold the section + stop + disarm. While open
+                  the section ALONE answers the pedal (piano.js onRemote
+                  returns its answer, no fall-through to the lessons or the
+                  runner), the lessons' lowest-key double-tap stands down (a
+                  touch double-tap on the lesson card still starts a lesson,
+                  which closes the section), and with remote.dbl in
+                  simulated mode the lowest key is reserved
+                  (the Piano module's remoteKey). Closed = nothing changes
+                  for lessons, runner, pedal and double-tap. Leaving the
+                  Piano page, folding the section, window blur and app hide
+                  stop + disarm a session. Unchanged: the 42 lp- ids, the
+                  window.SLLumiPractice hook, the lease owner tag
+                  'lumipractice', the LUMI display output choice (#lp-output,
+                  still only here). CSS scope #pn-lumi (css/lumi-practice.
+                  css). Session-only simulated answers by default; optional
+                  exact LUMI/MODX input and LUMI output through additive Web
+                  MIDI subscriptions. App.midi.leaseKeybedOutput pauses the
+                  shared LED painter on the same selected output during
+                  test/armed guidance; cleanup restores its current layout.
+                  Native independent routes unsupported. Tests:
+                  lumi-practice, midi-ports, remote-plan, remote-keys, keys.
 js/practice-router.js Scale-locked external synth sound for LUMI practice:
                   explicit synth input/sound output, separate display output;
                   reuses App.scaleLock.contains, blocks out-of-scale notes,
@@ -293,7 +376,16 @@ js/jam.js         │ (jam: auto-band — genre presets write an intro/A/B/endin
                   │  BANDS chips = kit+bass+comp combos, samples preload on
                   │  page show)
 js/tuner.js       │
-js/trainer.js     │
+js/trainer.js     │ (NOT a page since 2.0 Phase A2: a CARD LIBRARY mounted by
+                  │  the Plan page into #pp-tools-body, its "Free practice"
+                  │  section. App.trainerCards = {mount, show, hide, key,
+                  │  remote}. Cards: session log (tr.sessions), random
+                  │  prompts ("Go" emits fb:practice), one-minute chord
+                  │  changes (tr.ccA / tr.ccB / tr.best.<A>-<B>) and
+                  │  #tr-ear-go -> Exercises › Intervals › All intervals ›
+                  │  Ear. The interval ear trainer is gone: tr.earBest /
+                  │  tr.earHarm are never read or written. Ids keep tr-, CSS
+                  │  via App.injectCSS('trainer').)
 js/theorytab.js   │ (theory: circle of fifths + key guide + degree ear quiz)
 js/settings.js    ┘ (settings: app-level prefs — theme dark/light/auto; MIDI
                      ports + bend; lighting moved to Lights & help)
@@ -318,12 +410,6 @@ js/lights.js      LIGHTS & HELP control center (sheet 'lights', header
                   #lights-btn): Help level + key lights (on/off, LUMI colors,
                   brightness, keyboard type, status/range, test) — the same
                   settings every page reads.
-js/studio.js      STUDIO workspace (DAW phase one): registers 'song' (sketch-
-                  book home) + 'ideas' (capture inbox) pages and the app-wide
-                  capture service behind #cx-rec (header ● on every page).
-                  Captures midi:note + note:input into ideas (notes tagged
-                  key/bpm/date, store ideas.list, song.name); 30s retro buffer
-                  ("keep what I just played"); playback via the studio synth.
 js/quiz.js        EXERCISES ('quiz', the practice HOME since v0.69.0): Musicca-
                   style course — COURSE topic > unit > mode (treble/bass/staff,
                   piano, neck, ear, theory) > levels of 10 questions, 8 = pass,
@@ -338,7 +424,8 @@ js/quiz.js        EXERCISES ('quiz', the practice HOME since v0.69.0): Musicca-
                   re-renders ONE card) / run (a fixed shell — #qz-runshell —
                   whose question area #qz-q is swapped with a fade; one footer
                   action #qz-act: Show answer -> Next) / done. onShow claims
-                  the transport (silences met/jam/loops).
+                  the transport (silences the metronome, Jam, a Keys lesson
+                  run and chart playback).
                   Stores qz.prog / qz.items (weak items picked more) /
                   qz.sound / qz.landed (one-time landing) / qz.home (home tab).
                   GAME LAYER (v0.71.0, Duolingo-style): home = stats strip
@@ -405,20 +492,27 @@ js/practiceplan.js PRACTICE PLAN ('practiceplan', Learn group pill "Plan",
                   pp.active / pp.sessions (90 days) / pp.history / pp.running
                   / pp.gaps. App.practicePlan test hook. Suite
                   tests/practiceplan.test.js.
+                  FREE PRACTICE (2.0 Phase A2, the former Trainer page):
+                  <details class="pp-tools" id="pp-tools"> ("Free practice:
+                  timer, prompts, one-minute chord changes", closed by
+                  default) is appended AFTER .pp-wrap — never inside it and
+                  never class card: the Plan's .pp-wrap form rules would
+                  restyle the cards. init calls App.trainerCards.mount
+                  (#pp-tools-body); onShow / onHide call .show() / .hide();
+                  onKey offers the key to .key(e) first (Space counts a
+                  chord change during a run); remote() asks .remote(action)
+                  first (NEXT = count a change, BACK = held while a run goes,
+                  STOP = cancel the run or pause the timer), then launches
+                  blocks as before. Folding #pp-tools cancels a chord run
+                  (a 'toggle' listener in trainer.js). The timer is
+                  self-timed (tr.sessions), pauses when the page is left and
+                  never enters the plan's measured minutes.
 js/help.js        (?) button + guided page tours (TOURS per page id, spotlight
                   ring + card overlay, first-run welcome; help.seen/help.done)
-js/plugins.js     window.SoundLab plugin API v1: registerPage (App.addPage),
-                  registerFx (DAW.fxPlugins, checked first by buildFx — must
-                  work on OfflineAudioContext too), registerSynthPreset, bus +
-                  app/daw/theory access. Stored plugins (plugins.list, 100KB
-                  cap, per-plugin enable/error) run right after boot; loaded
-                  from Settings > Plugins. Docs PLUGINS.md; sample plugin
-                  plugins/sample-lofi.js (Lo-fi fx + Glass bell voice).
 js/helix.js       HELIX STADIUM page ('helix', Guitar group pill "Helix",
-                  0.82.0; prefix hx-, store hx.*; built in from the former
-                  plugin, plugins/helix-stadium.js is now a stub and
-                  js/plugins.js skips an old stored copy whose code sets
-                  window.SLHelix). NOTHING CONNECTS AT BOOT: init builds the
+                  0.82.0; prefix hx-, store hx.*; built in — it began as a
+                  plug-in, before 2.0 removed the plug-in API).
+                  NOTHING CONNECTS AT BOOT: init builds the
                   DOM only; Web MIDI on show only once midi.wanted is set
                   (the Hub's rule: no permission prompt by itself); the bridge only
                   after Connect bridge was pressed once (hx.bridgeAuto,
@@ -449,6 +543,74 @@ js/helix.js       HELIX STADIUM page ('helix', Guitar group pill "Helix",
                   docs/HELIX-STADIUM.md, suite tests/helix.test.js (fake MIDI
                   ports + fake bridge, incl. port isolation), hook
                   window.SLHelix.
+js/scoreplayer.js SCORE PLAYER (window.SLScorePlayer, 2.0 Phase A3a): the
+                  MIDI Hub's v1.1.0 Player, cut out of js/midihub.js so Songs'
+                  "Open a score" needs no Hub. Logic MOVED, not rewritten:
+                  ids stay mh-pl*, settings stay midihub.pl*. Opens .mid/
+                  .midi (own reader: tempo map, running status; program/
+                  other CC/SysEx dropped + reported), MusicXML (.musicxml/
+                  .xml: parts -> channels skipping 10, chords, ties, rests,
+                  backup/forward, tempo marks; grace/unpitched/repeats
+                  reported) and .mxl (zip, stored or deflate-raw via
+                  DecompressionStream). Plays through App.midi.
+                  bindMusicalOutput(App.midi.synthOut.id()) - notes + CC64
+                  only - so Pause / Stop, a host's pause() (the Hub: Panic,
+                  onHide, pagehide) and flushMusicalOutputs release
+                  everything; 8 ms ticker. midihub.plTempo (%), plVel (cap),
+                  plRoute 'file' | 'part' (the Part = midihub.ch, its word
+                  Part / Ch from midihub.profile, both read from the store),
+                  plLoop, plTrans (-12..12), plShift {on, fr, fs, tr, ts} =
+                  KEY SHIFTER by scale degree over ten 7-note Theory scales
+                  (shiftMap; the source key is guessed by detectSongKey on
+                  load); changing either while playing pauses/resumes so
+                  every Note Off matches its Note On. Messages go to
+                  App.toast (the Hub's #mh-toast shows only on the Hub page;
+                  there a Hub message hides an older app-wide one, see the
+                  Hub's toast()).
+                  API: mount(el, opts) = render + wire + paint the card into
+                  el. ONE MOUNT PER DOCUMENT, idempotent: song, transport and
+                  the one ticker are module state, a remount only swaps the
+                  DOM. opts {show = what show() calls; ports: true = own
+                  "Synth out" + "Channel" selects writing midihub.outId /
+                  midihub.ch, for a host with no Hub header (the row is
+                  display:none until MIDI is ready; with ports the two texts
+                  that name the Hub change too: the tips line says "the
+                  Channel picked above", Open as tab files the song as "from
+                  the Player"); noOut = the line
+                  while there is no synth output (default "No synth output
+                  yet — connect MIDI above"); connect {label, run} = a
+                  .btn.sm after it}; the Hub passes only show. paint() = the
+                  REPAINT PATH: the host calls it when ports, Part or profile
+                  change, the module calls it itself on 'midi:state' and
+                  'lights' (what a mount without a Hub relies on); returns at
+                  once while nothing is mounted. loadFile(name, ArrayBuffer),
+                  loadScore(score = the 1.1 reviewed practice score {bpm,
+                  len, notes:[{t, d, m, rest, partId, v}]}), play, pause,
+                  stop, seek, shiftNote, key, openAsTab, toMidiBytes, state,
+                  scoreToMidi(score) = format-1 MIDI (tempo track + one track
+                  per part), show(). OPEN AS TAB: songToMidi (format 0 at the
+                  song's own tempo, notes shifted as set) -> App.songs.
+                  fromMidi -> load -> the Songs page (js/songs.js: App.songs
+                  {fromMidi, load, toAscii, current} + an Export tab button);
+                  where App.songs is absent (Gear, A3b) one line stands in
+                  for the button. CSS App.injectCSS('scoreplayer') = the
+                  .mh-pl* rules + the Hub classes the card uses (.mh-cv-head,
+                  .mh-mono, .mh-chk, .mh-warn), so the card is styled where
+                  the Hub's CSS is absent. In A3a the one mount is the Hub's
+                  Player view; A3b mounts it on the Songs page in soundLAB
+                  (the Hub's mount goes to Gear).
+                  Loaded before js/midihub.js. Suites tests/midihub-player.
+                  test.js (through the SLMidiHub aliases) + tests/oneopen.
+                  test.js (also the per-mount options, on a card mounted with
+                  ports / noOut / connect while MIDI connects after boot).
+                  Neither proves the REPAINT PATH; tests/midihub.test.js does:
+                  the Hub's hook (a Part button and the header's Synth out
+                  select reach the card) and, with that hook stubbed, the
+                  module's own 'midi:state' / 'lights' listeners. NOT LANDED
+                  YET: feat/review-to-synth (Score review, tests/review-to-
+                  synth.test.js) calls SLMidiHub.player / SLMidiHub.scoreToMidi
+                  and must call SLScorePlayer / SLScorePlayer.scoreToMidi
+                  instead.
 js/midihub.js     MIDI HUB page ('midihub', Keys group, pill "MIDI", v0.78.0;
                   prefix mh-): read / write / reshape plain MIDI for ANY
                   device on App.midi's ports — device-AGNOSTIC by design,
@@ -464,14 +626,20 @@ js/midihub.js     MIDI HUB page ('midihub', Keys group, pill "MIDI", v0.78.0;
                   Thru (midihub.thru: 'midi:raw' -> rules -> App.midi.send,
                   never 0xFE), optionally on what the app hears (rulesIn ->
                   App.midi.setInputFilter) and on the Hub's own controls
-                  (rulesApp); Learn = next incoming message fills a match),
+                  (rulesApp); Learn = next incoming message fills a match;
+                  since 2.0 Phase A3a the Hub is the EDITOR only: the ENGINE
+                  is js/midirules.js (applyRules(bytes) = App.midiRules.apply
+                  (bytes, rulePort), installFilter() = App.midiRules.install(),
+                  which also runs at load, on return to the tab and on a
+                  'storage' event for midihub.rulesIn; the box #mh-rulesin
+                  follows 'midirules:state')),
                   SysEx (identity request + reply decode, profile builders:
                   Yamaha F0 43 1n 7F 1C mm addr(3) data F7 / 2n bulk,
                   Roland DT1/RQ1 with checksum; raw hex; last received),
                   Monitor ('midi:raw' + 'midi:out' rows, rAF-batched, 800
                   cap, clock/active-sensing filters, export), Learn (cheat
                   sheet + profile notes, export/import/reset). Keys played
-                  here emit note:input {src:'midihub'} (capture). Warns when
+                  here emit note:input {src:'midihub'}. Warns when
                   key lights are on for a non-LUMI output (a synth would
                   play the "lights"). Panic = 123/120/64/bend on 16 chans.
                   window.SLMidiHub = test hook (decode, applyRules,
@@ -481,7 +649,10 @@ js/midihub.js     MIDI HUB page ('midihub', Keys group, pill "MIDI", v0.78.0;
                   output | unset = auto: a synth-named port, port 1 first,
                   never LUMI / Microsoft GS Wavetable) via App.midi.sendTo
                   (portId, bytes) - Web MIDI only; native = send(). The
-                  header's 'Synth out' select sets it. New first view
+                  header's 'Synth out' select sets it. WHICH port that is =
+                  App.midi.synthOut in js/midi.js since 2.0 Phase A3a
+                  (hubOutId / hubOutName / hasOut, the names HUB_API hands
+                  out, are one-line delegates). New first view
                   'control' (default): Part 1-16 buttons (= midihub.ch),
                   big SVG knobs (drag / wheel ONLY when focused - a page scroll
                   over a knob never turns it (v0.81.1) / arrows / dblclick = start
@@ -501,33 +672,21 @@ js/midihub.js     MIDI HUB page ('midihub', Keys group, pill "MIDI", v0.78.0;
                   / CCs (ids unchanged). The MIDI Hub is the 'Hub' pill of
                   the SYNTH group (app.js GROUPS gsynth: deck, liveset,
                   midihub), no longer under Keys.
-                  v1.1.0 PLAYER view ('player', after Control): opens .mid/
-                  .midi (own reader: tempo map, running status; program/
-                  other CC/SysEx dropped + reported), MusicXML (.musicxml/
-                  .xml: parts -> channels skipping 10, chords, ties, rests,
-                  backup/forward, tempo marks; grace/unpitched/repeats
-                  reported) and .mxl (zip, stored or deflate-raw via
-                  DecompressionStream). Plays through App.midi.
-                  bindMusicalOutput(hubOutId()) - notes + CC64 only - so
-                  Pause/Stop/Panic/onHide/pagehide/flushMusicalOutputs
-                  release everything; 8 ms ticker. midihub.plTempo (%),
-                  plVel (cap), plRoute 'file' | 'part', plLoop, plTrans
-                  (-12..12), plShift {on, fr, fs, tr, ts} = KEY SHIFTER by
-                  scale degree over ten 7-note Theory scales (shiftMap; the
-                  source key is guessed by detectSongKey on load); changing
-                  either while playing pauses/resumes so every Note Off
-                  matches its Note On. SLMidiHub.player {loadFile(name,
-                  ArrayBuffer), loadScore(score = the 1.1 reviewed practice
-                  score {bpm, len, notes:[{t, d, m, rest, partId, v}]}),
-                  show, play, pause, stop, seek, shiftNote, key, openAsTab,
-                  toMidiBytes, state}; SLMidiHub.scoreToMidi(score) = format-1
-                  MIDI (tempo track + one track per part). OPEN AS TAB:
-                  songToMidi (format 0 at the song's own tempo, notes
-                  shifted as set) -> App.songs.fromMidi -> load -> the Songs
-                  page (js/songs.js: App.songs {fromMidi, load, toAscii,
-                  current} + an Export tab button). Suite
-                  tests/midihub-player.test.js; tests/review-to-synth.test.js
-                  (on feat/review-to-synth) drives Score review -> all three.
+                  v1.1.0 PLAYER view ('player', after Control). Since 2.0
+                  Phase A3a the Player is js/scoreplayer.js (the entry above):
+                  the view is only its host #mh-player, and render() calls
+                  SLScorePlayer.mount(host, {show: switch to the Hub + its
+                  Player view}) (render() re-runs on Import / Reset Hub; mount
+                  is idempotent). The Hub REPAINTS the card through
+                  SLScorePlayer.paint() in paintCvOut = ports changed
+                  (midi:state / lights -> paintPorts), Hub shown, Part or
+                  profile changed (renderControl), and pauses it
+                  (SLScorePlayer.pause()) on Panic, onHide and pagehide.
+                  SLMidiHub.player and SLMidiHub.scoreToMidi are ALIASES
+                  (getters) of SLScorePlayer / SLScorePlayer.scoreToMidi,
+                  kept so tests/midihub-player.test.js runs unchanged; new
+                  code calls SLScorePlayer. No reader, key shifter, transport
+                  or paint code of the Player is left in this file.
 js/synthdeck.js   SYNTH DECK (v1.2.0): the MIDI Hub's Control view as a real
                   control surface for the synth on the cable (built around the
                   owner's MODX8+, device-agnostic by design). Mounted by
@@ -595,52 +754,41 @@ js/synthlive.js   page 'liveset': Live sets in pages of 16 (presets or MODX
                   fold away, keep-awake, Lock = press-and-hold, Panic),
                   PROFILES (whole setups: library + sets + settings; export /
                   import JSON). SLSynthLive hook; suite tests/synthtab.test.js.
-js/pads.js        drum-pad controller page ('pads', PRACTICE Instrument group
-                  since v0.64.0; still records to st.tracks + studio-armed
-                  MIDI works): 8 velocity pads on the pad drum track's live
-                  channel; touch + ZXCV/ASDF + MIDI (pads.mode 'roli' =
-                  WHITE-KEY layout C..B->7 lanes + black=crash, any octave |
-                  'gm' drum map); auto-creates its drum track on open;
-                  Record quantizes hits to nearest 1/16 vs st:step heartbeat;
-                  LUMI lights the 8 mapped keys, flashes on every hit incl.
-                  loop playback. Drums-armed MIDI is handled HERE, not by
-                  studio.js liveRoute (which skips kind==='drums').
-js/arrange.js     Arrange page ('arrange', studio) — the STUDIO HOME (v0.61.0):
-                  lane timeline over song mode with per-lane ARM chips +
-                  RECORD-TO-CLIP (rec captures midi:note/note:input at
-                  DAW.engine.position(), commits a pattern clip; busy armed
-                  tracks spawn 'Take n' lanes; engine.freeRun keeps the
-                  transport rolling past songEnd while recording) — DOM clip divs, CSS-gradient grid, rAF-transform
-                  playhead + follow, per-channel analyser meters (only while
-                  playing), waveform peaks cached per buffer, ruler tap=seek /
-                  drag=loop region, snap/zoom stores st.zoomX/st.snap/st.loop/
-                  st.follow, Space/Delete via onKey. Perf pattern: never
-                  rebuild DOM per frame; drags mutate style only, commit on up.
-js/daw/engine.js  studio engine (OpenStudio ports): DrumKit (8-lane 808/909
-                  synth kit), Sampler (pitch-shifted one-sample instrument,
-                  buffers in DAW.samples — context-independent, raw bytes in
-                  IndexedDB 'guitarlab-daw'), FX (reverb/delay/drive wet-dry),
-                  WAV encode/download, and the LOOP ENGINE: DAW.engine —
-                  groovebox session loop (bars 1/2/4, st.tracks store) —
-                  scheduled per-16th in a ~150ms rolling window reading live
-                  track data, so edits/preset swaps land mid-cycle (v0.55.0;
-                  scheduleLoop whole-loop path kept for the offline render),
-                  st:step/st:state bus events, live-play
-                  channels (armed track st.armed), OfflineAudioContext render.
-                  SONG MODE (OpenStudio transport port): beat-domain origin
-                  rebase scheduler, t.clips [{start,len,src}] pattern/audio,
-                  loop region, position()/setPosition, songPlay/songStop
-                  ('st:tr' event), renderSong; stats.stalls counts scheduler
-                  catch-ups; per-channel analyser for meters. ONE engine —
-                  session loop + song share channels/mixer/FX.
-                  The 'tracks' page in studio.js is its UI (step grid, piano
-                  roll degree-colored via fb.colors, mixer rows, FX slot,
-                  idea→track, Export WAV).
-js/daw/synth.js   MPE poly synth ported from the OpenStudio DAW repo
-                  (Sampler-DAW src/audio/synth.ts): 2 osc + noise + filter/amp
-                  envelopes, unison, glide, LFO, per-channel bend/pressure/
-                  timbre. window.DAW.createSynth/defaultSynth/SYNTH_PRESETS.
-                  More of that engine lands here as the studio grows.
+js/pads.js        drum pads page ('pads', Keys group pill "Pads"; prefix pd-).
+                  PLAY-ONLY since 2.0 Phase A, until Phase C rebuilds it as
+                  rhythm practice: Record, Play loop, Click, Clear and the
+                  drum-track picker went with the Studio sequencer. 8 velocity
+                  pads on the default kit (drumKit() = DAW.createDrums(ctx)
+                  -> ctx.destination, built on the first hit: the Woodshed's
+                  wiring); touch + ZXCV/ASDF + MIDI while the page is open
+                  (pads.mode 'roli' = WHITE-KEY layout C..B->7 lanes +
+                  black=crash, any octave, from pads.base | 'gm' drum map;
+                  tone-in notes never drum), Remap (pads.map); the page
+                  claims the keybed (App.midi.claim 'pads'), a LUMI lights
+                  the 8 mapped keys and flashes them on every hit (pads.leds).
+                  Stores pads.mode / base / leds / map ONLY: never st.*,
+                  pads.track or app.click.
+js/daw/engine.js  SOUND LIBRARY: DRUM KIT (2.0 Phase A slimmed the 1.x studio
+                  engine to this; the sampler + its IndexedDB, FX slots, WAV
+                  export, the loop engine, song mode and DAW.engine are gone
+                  and live on main). DAW.DRUM_LANES (8 lanes: kick, snare,
+                  clap, hat, open hat, low tom, hi tom, crash) and
+                  DAW.createDrums(ctx, params?) = the synthesized 808/909 kit
+                  ported from OpenStudio (no params = default kit): output
+                  (GainNode), noteOn(lane, vel, time), allNotesOff, update,
+                  dispose. For Jam (its kits), the Woodshed and Pads. Needs
+                  only its ctx: no App, no store, no bus. The path and the
+                  global window.DAW stay until Phase C.
+js/daw/synth.js   SOUND LIBRARY: SYNTH VOICES. MPE poly synth ported from the
+                  OpenStudio DAW repo (Sampler-DAW src/audio/synth.ts): 2 osc
+                  + noise + filter/amp envelopes, unison, glide, LFO, per-
+                  channel bend/pressure/timbre. window.DAW.createSynth/
+                  defaultSynth/SYNTH_PRESETS (never reorder or remove a
+                  preset: the Woodshed and the guided performance player pick
+                  SYNTH_PRESETS[2] by index) + DAW.guardPitched (createSynth
+                  returns its instrument behind Scale Lock). The synth voice
+                  of Piano (pn.voice), the Woodshed and the guided
+                  performance player.
 samples/          MIT FluidR3 instrument MP3s (see samples/CREDITS.md)
 android/          APK project — build.ps1 (no Gradle: javac→d8→aapt→zipalign→
                   apksigner); keystore is gitignored, do NOT commit it.
@@ -677,32 +825,249 @@ tools/artifact_build.py  stages the multi-file claude.ai artifact (see below)
 version.json      auto-update feed (source of truth for latest version)
 ```
 
+## soundLAB 2.0 Phase A ("Trim") — state on `v2`
+
+Plan: `docs/plans/phase-a/PLAN.md` (five draft PRs into `v2`: A1 Studio /
+sequencer / sampler / plug-in API out, A2 the three folds, A3a + A3b
+`gear.html`, A4 storage prefix; its section 1 = the rules for every Phase A PR,
+Appendix C = words that look like a cut feature and are not). State per step:
+`docs/ROADMAP-2.0.md` "Phase A status". Phase A is NOT a release: never touch
+`APP_VERSION`, `version.json`, `android/AndroidManifest.xml` or `releases/`; in
+`sw.js` only the `CACHE` number, `ASSETS` and (A1) the fetch lookup. Today's
+look, no new
+components.
+
+A1 (Studio space, sequencer/arranger, sampler, plug-in API removed):
+
+- ONE PAGE SET (js/app.js): `PAGES` = the one flat page list, `HOME =
+  PAGES[0]` ('quiz'), `GROUPS` = a plain array of the six tab groups, the last
+  page is stored in `app.tab` (`TAB_KEY`). Gone: SPACES, App.space,
+  App.setSpace, the `space` event, #space-btn, #wipe, <html data-space>,
+  #cx-rec, the pages 'arrange' / 'tracks' / 'song' / 'ideas', js/studio.js,
+  js/arrange.js. SPACE_LABELS keeps its name (page labels).
+- MOVED + resolvePage(name) (js/app.js; the first step of App.switchTo and of
+  the boot start tab): an id that is not a page of this app (an old link, a
+  stored tab) goes to `MOVED[id].to`, else HOME, and `MOVED[id].say` is shown
+  with App.toast — never a blank panel, never saved as the last tab. A page
+  that leaves the app gets its MOVED row in the same commit (the four Studio
+  ids and A2's three are in; A3b adds rows).
+- A PAGE IS THREE THINGS changed in ONE commit: its id in PAGES (+ GROUPS),
+  its `<section class="panel" id="panel-…">` and its `<script>` tag in
+  index.html (boot writes `Module "<id>" failed to load` into a panel that
+  has no module). A deleted file leaves sw.js ASSETS in the same commit:
+  install is cache.addAll, one missing file fails the whole install.
+- SOUND LIBRARY: window.DAW is only js/daw/synth.js (createSynth,
+  defaultSynth, SYNTH_PRESETS, guardPitched) + js/daw/engine.js (DRUM_LANES,
+  createDrums), for Piano, Jam, the Woodshed, the guided performance player
+  and Pads. No DAW.engine, sampler, FX, WAV export, loop or song mode.
+- PADS IS PLAY-ONLY until Phase C rebuilds it as rhythm practice: eight pads
+  by touch, Z X C V / A S D F and MIDI, both MIDI maps, Remap, key lights. No
+  Record, Play loop, Click, Clear or drum-track picker (see js/pads.js above).
+  The Woodshed lost "+ From Studio track" and the run-into-Ideas capture;
+  `Woodshed.importTrack` stays (tests/remote-shed.test.js).
+- #cx-met drives ONLY the metronome (`met:toggle`); transport owners are met,
+  jam, keys, quiz, chart.
+- REMOVED-FEATURE DATA IS NEVER WRITTEN OR DELETED (the live app, 2.0.0 = the
+  code before the trim, shares the origin and still uses it): st.*, ideas.list, song.name, sd.*, plugins.list,
+  app.space, app.tabStudio, app.click, pads.track have no reader and no
+  writer; the IndexedDB 'guitarlab-daw' is never opened. Settings › Backup
+  import skips those keys (`DEAD` in js/settings.js), writes string values
+  only and says how many it skipped; the export is unchanged until A4.
+- NO PLUG-IN API: js/plugins.js, plugins/, PLUGINS.md and the Settings card
+  are gone, nothing runs stored code. `App.addPage(id, label, sp, mod)` stays
+  as an INTERNAL test hook (tests/remote.test.js; `sp` is ignored).
+- sw.js: A1 set `CACHE` to `PREFIX + 'v5'` ('sl2-next-v5' on the beta,
+  'sl2-live-v5' at the live address; A2 v6, A3a v7 = the number now, A3b v8,
+  A4 v9; v4 = the live 2.0.0). The fetch handler looks ONLY in
+  its own cache
+  (`caches.open(CACHE)` then `match(req, {ignoreSearch: true})`), never the
+  global `caches.match`: the live worker's cache on the same origin can hold
+  older copies of the same URLs (read from the code, not measured).
+- Suites added to the one list in tests/run.sh: `trim` (browser: what is gone
+  stays gone, stored Studio data is byte-identical after a visit to every
+  page, a stale stored space/tab boots to Exercises and App.switchTo('arrange')
+  lands there with the toast, the kept sounds play, the Backup skip) and
+  `assets` (pure Node: index.html scripts + stylesheets <-> disk <-> sw.js
+  ASSETS).
+- NEVER DELETE BY PREFIX: `st-` ids and classes are also the Synth tab's
+  (js/synthtab.js, js/synthlive.js); "Studio" in Jam is a drum kit id
+  (jam2.kit = 'studio'); `addPage` in js/synthdeck.js is the Deck's own.
+
+A2 (the three folds: the Trainer page, the Synth pill, the LUMI pill):
+
+- 18 PAGES: Learn (quiz, chords, theory, practiceplan) · Guitar (fretboard,
+  tab, notation, helix) · Keys (piano, chart, pads) · Synth (deck, liveset,
+  midihub) · Play (songs, jam) · Train (shed, tuner). The ids 'trainer',
+  'synth' and 'lumipractice' are in js/app.js ONLY as MOVED rows: no PAGES
+  entry, no label, no panel in index.html. No file was deleted or added:
+  js/trainer.js, js/lumi-practice.js, css/lumi-practice.css and
+  js/practice-router.js keep their paths, their tags in index.html and their
+  sw.js ASSETS rows.
+- THREE MOVED REDIRECTS: trainer -> 'practiceplan' ("The Trainer cards are on
+  the Plan page now, under Free practice."), synth -> 'piano' ("Synth sounds
+  are in the Sound picker on the Piano page."), lumipractice -> 'piano'
+  ("LUMI practice is on the Piano page now, under the lessons.").
+  App.switchTo(<old id>) or a stored app.tab lands there with the sentence;
+  a stored group member (app.gtab.gkeys = 'synth', app.gtab.gprac =
+  'trainer') falls back to the group's first page (Piano, Woodshed). No new
+  store keys, no migration.
+- SYNTH PILL = THE SOUND PICKER on Piano (js/piano.js): #pn-voice is labelled
+  "Sound"; App.keys.setVoice(id) ('piano' or a DAW.SYNTH_PRESETS id; false
+  for an unknown id). pn.voice is unchanged, pn.synthPreset = the last synth
+  sound. The Learn bar's "Synth keyboard" entry (js/learn-instruments.js,
+  `voice: 'synth'`) opens Piano and calls setVoice with pn.synthPreset
+  (default 'saw'). `synth` as a Learn instrument CATEGORY id stays. Keys
+  lessons are credited to the entry instrument, else to Piano, never to a
+  page id. The entry instrument is set only by the 'learn:lesson' event (the
+  Learn bar's "Keys scale lessons" entry, Exercises' "Open Keys lessons") or
+  App.keysLessons.open(id, instrument) (a Plan block), and is cleared on
+  leaving the Piano page or changing the Learn instrument. "Synth keyboard"
+  sets none: a lesson started after it is credited to Piano.
+- TRAINER = FREE PRACTICE on the Plan page: js/trainer.js is a card library,
+  App.trainerCards = {mount, show, hide, key, remote}. js/practiceplan.js
+  appends <details class="pp-tools" id="pp-tools"> AFTER .pp-wrap, mounts
+  the cards into #pp-tools-body and forwards show / hide / key / remote.
+  Cards: session log, random prompts, one-minute chord changes; ids keep
+  tr-, stores tr.sessions / tr.ccA / tr.ccB / tr.best.<A>-<B>. The interval
+  ear trainer is GONE: #tr-ear-go opens Exercises › Intervals › All
+  intervals › Ear (SLQuiz.start('intervals/iall/ear/1')) and says why when
+  the selected Learn instrument has no ear mode (Drums). tr.earBest /
+  tr.earHarm are never read, written or turned into Exercises records
+  (xp.js forbids seeding history). Remote on the Plan page: the cards are
+  asked first (NEXT counts a change during a run and answers "Time's up" for
+  1.5 s after it; STOP cancels the run, else pauses the timer; BACK is HELD
+  during a run, answering "Chord changes running", because the plan's BACK
+  is "Again: <block>", which leaves the page and cancels the run; with no
+  run BACK is false), then the plan's own blocks. Folding the section
+  cancels a run, so a hidden run never takes the pedal or Space.
+- LUMI PILL = A SECTION under the Keys lessons: <details id="pn-lumi">
+  ("Notes and triads on the LUMI", closed by default, body #pn-lumi-body),
+  driven through App.lumiPractice = {init, show, hide, close, stop, remote,
+  remoteKey, open, running}. OPEN = OWNER, ONE OWNER AT A TIME: opening the
+  section or starting a session stops a lesson run (App.keysLessons.halt(),
+  which keeps the entry instrument) and the runner (App.keys.stopRunner);
+  a lesson starting, a lesson opened from a Plan block or the Exercises
+  Progress tab (App.keysLessons.open(id)) or from the Learn bar (the
+  'learn:lesson' event; both go through keylessons releaseRunner), and the
+  runner starting call App.lumiPractice.close(msg) (fold + stop + disarm).
+  While it is open the section ALONE answers the pedal (piano.js onRemote:
+  no fall-through to the lessons or the runner), the lessons' lowest-key
+  double-tap stands down (a touch double-tap on the lesson card still starts
+  a lesson, which closes the section), and with remote.dbl in simulated mode
+  the lowest key is reserved (the Piano module's remoteKey). Closed, nothing
+  changes for lessons, runner, pedal or double-tap. NEVER add a state in
+  which the section is open while a lesson run or the runner is active.
+  Guard every call across these modules (`if (App.lumiPractice) …`,
+  `App.keysLessons && App.keysLessons.halt`): tests/lumi-practice.test.js
+  loads the file alone into a mock App. css/lumi-practice.css is scoped to
+  #pn-lumi; the focus mode html.kl-running hides the section.
+- TEXTS name the new places: the Settings hands-free list, the help welcome
+  and the Piano / Plan tours in js/help.js (the 'trainer' tour is gone), the
+  js/midi.js status "Choose a LUMI display output on the Piano page, under
+  Notes and triads on the LUMI".
+- sw.js: `CACHE` = `PREFIX + 'v6'`; ASSETS unchanged.
+- No new suite. `trim` also checks the three redirects, that no pill reads
+  Trainer, Synth or LUMI, and #tr-ear-go (Piano and Drums); the fold checks
+  are in nav, smoke, context-global, keys, learn-instruments, practiceplan,
+  remote-keys, remote-runners, remote-plan, lumi-practice, display-master.
+- NOT THE TRAINER (PLAN.md Appendix C): the metronome's tempo trainer
+  (met.trainer) and the Circle page's degree ear quiz are other features.
+  DEFERRED, do not build in Phase A (PLAN.md section 9): one merged sound
+  list (piano tones + synths), LUMI targets as lesson types, the chord
+  changes as a real Exercises drill, a home for the LUMI display-output
+  choice in Lights & help.
+
+A3a (the main app stops depending on the Hub; a refactor: every page, its
+controls and what it sends are as before):
+
+- END STATE: NOTHING OUTSIDE THE SEVEN GEAR FILES (js/midihub.js,
+  js/synthtab.js, js/synthlive.js, js/synthdeck.js, js/synthdeck-maps.js,
+  js/synthdeck-scope.js, js/helix.js) calls into js/midihub.js, or names
+  SLMidiHub, SLSynthTab / Live / Deck / Scope, SLHelix or App.synthDeck (the
+  grep in PLAN.md 6.8 has no hits). Keep it so: it is what makes A3b a move
+  instead of a rewrite. Everything still loads in index.html, the 18 pages
+  are unchanged, and "Play on synth" still opens the Hub's Player view.
+- THREE PIECES OF THE HUB ARE SHARED (layout entries above): the Player =
+  js/scoreplayer.js, window.SLScorePlayer {mount(el, opts), paint(),
+  loadFile, loadScore, play, pause, stop, seek, shiftNote, openAsTab,
+  toMidiBytes, key, state, scoreToMidi, show()}, opts {show, ports, noOut,
+  connect}; the rule engine + the input-filter install = js/midirules.js,
+  App.midiRules {apply(bytes, port), install(), active()} + the
+  'midirules:state' event; "which output is the synth" = App.midi.synthOut
+  {id(), name(), has(), set(v)} in js/midi.js. The Hub uses all three like
+  any other page: applyRules / installFilter / hubOutId / hubOutName / hasOut
+  are one-line delegates, and SLMidiHub.player / SLMidiHub.scoreToMidi are
+  aliases of SLScorePlayer / SLScorePlayer.scoreToMidi.
+- CODE WAS MOVED, NOT REWRITTEN: the Player's ids stay mh-pl*, every store
+  key stays (midihub.outId, midihub.ch, midihub.profile, midihub.pl*,
+  midihub.rules, midihub.rulesIn), no migration. The Rules editor, Learn,
+  decode, Thru and the key splits stay in js/midihub.js.
+- THE PLAYER'S REPAINT PATH: the card is mounted at boot, before MIDI is
+  ready, and it names the synth output and the Hub's Part. Two things keep
+  that current: the Hub's paintCvOut calls SLScorePlayer.paint() (ports
+  changed, Hub shown, Part or profile changed), and the module calls paint()
+  itself on 'midi:state' and 'lights'. A new host must call paint() whenever
+  something the card names changes. ONE mount per document (in A3a the
+  Hub's #mh-player; render() remounts it on Import / Reset Hub).
+- THE INPUT FILTER FOLLOWS THE STORE: App.midiRules.install() runs at load,
+  when the tab becomes visible again and on a 'storage' event for
+  midihub.rulesIn (the box ticked in another window; the key is matched by
+  suffix, so A4's prefix change does not break it). The filter slot is null
+  while the box is off: never install a filter that is always on. The Hub's
+  box (#mh-rulesin) listens to 'midirules:state', so it shows what this
+  window has installed and one click switches it off again.
+- SONGS "Open a score" (js/songs.js) calls SLScorePlayer only; its missing-
+  module text is "The score player is not loaded".
+- ON SCREEN, THE TWO PLANNED DIFFERENCES: the Player's messages ("Ready:",
+  "Finished:", "No synth output ...") show in the app-wide #app-toast, not in
+  the Hub's #mh-toast, and the "Play on synth" tooltip on Songs no longer
+  names the Hub. At 900 px and below the two toasts sit at the same place,
+  so the Hub's toast() hides #app-toast first while the Hub page is on screen
+  (one message at a time there, as before; never off the Hub page, where the
+  Deck and Live pages call into the Hub and its toast is not shown). The
+  other order needs nothing: #app-toast is drawn above #mh-toast. The Player
+  card itself is pixel-identical (same markup, boxes and computed styles at
+  1200 and 390 px, checked against the pre-A3a tree).
+- index.html: js/midirules.js right after js/remote.js, js/scoreplayer.js
+  right before js/midihub.js. sw.js: `CACHE` = `PREFIX + 'v7'`; ASSETS gained
+  the two files.
+- No new suite. `midihub` also checks App.midiRules.apply against
+  SLMidiHub.applyRules, the 'storage' install (and the Hub's box following
+  it), the one-message-at-a-time toast rule, App.midi.synthOut, and that
+  Reset Hub (render() again = a second mount) leaves ONE Player card wired
+  once (one click = one action);
+  `oneopen` waits on SLScorePlayer and checks the per-mount options on a
+  card mounted with ports / noOut / connect (the ports row is not on screen
+  before MIDI is ready, the two texts that name the host, MIDI connected
+  after boot); `midihub-player` runs unchanged through the aliases. It is
+  NOT the proof of the repaint path: its fake MIDI is ready before boot and
+  its Part check clicks the Channels switch, which repaints the card itself.
+  `midihub` proves it: #mh-plpartlab follows a Part button and #mh-plout the
+  header's Synth out select (the Hub's hook), and with SLScorePlayer.paint
+  stubbed the card still repaints on 'midi:state' and on 'lights' (the
+  module's own listeners).
+- LANDING feat/review-to-synth LATER: that branch calls SLMidiHub.player and
+  SLMidiHub.scoreToMidi from Score review. It must call SLScorePlayer and
+  SLScorePlayer.scoreToMidi instead: after A3b the Hub is not loaded in
+  soundLAB, so the aliases do not exist there.
+
 ## Cross-module conventions
 
-- BACK TO BASICS (v0.68.0): the app ALWAYS boots into the practice space
-  (stored app.space is ignored at launch); the capture dot #cx-rec is CSS-
-  hidden outside the studio. 'synth' is a page registered by piano.js: it
-  BORROWS the Keys page's DOM (children reparented on show/hide) with the
-  voice forced to a synth preset (pn.synthPreset) — one keyboard, two pills.
-- WORKSPACES (app.js): two page sets over one app — SPACES.practice (the 12
-  original tabs) and SPACES.studio ('song', 'ideas' — the DAW side). #space-btn
-  in the header switches via a screen-wipe (#wipe overlay); App.setSpace/
-  App.switchTo cross spaces automatically; per-space last tab in app.tab /
-  app.tabStudio, current space in app.space, <html data-space>. The context
-  bar, clock, key and MIDI service are shared across both — that's the point.
 - SECTION TAB BAR (v0.70.0; app.js GROUPS + populateNav): the main nav is a
-  tab bar of GROUPS (icon + label), not a drop-down — practice: Learn
-  (quiz=Exercises HOME/chords/theory), Guitar (fretboard/tab/notation/helix), Keys
-  (piano/synth/pads/lumipractice), SYNTH (1.3: deck/liveset/midihub), Play (songs/jam), Train (shed/trainer/tuner; 1.3: the Practice tab became Train, the space keeps the name);
-  studio: Studio (arrange=Timeline HOME / tracks=Editor), Sketch (song/ideas).
+  tab bar of GROUPS (icon + label), not a drop-down — Learn (quiz=Exercises
+  HOME/chords/theory/practiceplan), Guitar (fretboard/tab/notation/helix),
+  Keys (piano/chart/pads), SYNTH (1.3: deck/liveset/midihub), Play
+  (songs/jam), Train (shed/tuner; 1.3: the Practice tab became Train).
   Rendered twice: #tabbar inside the top bar (> 900px) and #tabbar-m fixed
   along the bottom (<= 900px) — #tabbar-m sits OUTSIDE <header> because the
   header's backdrop-filter / auto-hide transform would trap a fixed child.
   Tapping the open tab scrolls to top. Members show as the pill strip
   (#subnav, .subtab); single-page groups hide it; each group remembers its
   last member (app.gtab.<gid>). NAVIGATION ONLY — page ids unchanged, so
-  App.switchTo(pageId) and every bus cross-link still work, and
-  App.addPage wraps plugin pages in their own gpl-<id> group (icon 'plus').
+  App.switchTo(pageId) and every bus cross-link still work.
+  App.addPage(id, label, sp, mod) = an INTERNAL test hook (tests/remote.test.js
+  builds its test page with it; `sp` is ignored): the page gets its own
+  gpl-<id> group (icon 'plus').
 - HELP LEVEL (v0.74.0; app.js App.help {NAMES, level, set}, store
   help.level, falls back to v0.73 pn.assist; 'help:level' event): the one
   practice difficulty — Keys page colors/labels/rings, scale lessons,
@@ -720,15 +1085,16 @@ version.json      auto-update feed (source of truth for latest version)
 - QUIET CHROME (v0.69.1): the whole .topbar (nav + context bar + pill strip)
   auto-hides while the window scrolls DOWN and returns on any scroll up / at
   the top (app.js wireAutoHideBar; .bar-hidden; App.showBar() forces it back
-  — help tours call it). Pages in app.js NO_CTX (quiz, settings) hide the
-  context bar via html.noctx. Show a control only when it does something
+  — help tours call it). There is no NO_CTX list any more (1.0): the context
+  bar belongs to every page, Exercises and Settings included (paintChrome only
+  clears the old html.noctx class). Show a control only when it does something
   (e.g. Keys: +Bass/Strum only with Triads/7ths, arp rate/dir/oct/Hold only
   with Arp on — paintPerf toggles `hidden`, scoped `#pn-perf [hidden]`).
 - BACK (v0.72.0; app.js wireBack/backStep): Android Back (MainActivity
   goBack) and browser Back walk back through the app: help tour, sheet,
   settings, module.onBack() (return true when handled — quiz: run -> path,
-  node card, tab), the page stack (cleared on reaching the space's home),
-  the practice home. One {sl:'top'} history guard is re-pushed after each
+  node card, tab), the page stack (cleared on reaching the home page),
+  the home page (HOME). One {sl:'top'} history guard is re-pushed after each
   handled Back; at the very start it stays down, #back-hint says the next
   Back leaves, and any pointerdown re-arms it. Pages with sub-views should
   implement onBack.
@@ -738,29 +1104,33 @@ version.json      auto-update feed (source of truth for latest version)
   html.ctx-open shows it; a tap outside, the clef again, Esc, Back, a page
   switch or the bar auto-hiding tuck it away (app.js setCtx/closeCtx,
   App.ctx(on)); the button's title/aria-label names the key + BPM; the clef
-  is hidden on NO_CTX pages; a red dot on it = Studio capture running. Its
+  is on every page and only disabled while a sheet, a help tour or a modal
+  dialog is open (contextBlocked / syncContextAvailability). Its
   two toggles (v0.82.0): LED SCALE (#cx-led -> App.midi.setLedMode; midi.js
   ledMode() lights.led 'auto' = lights.on + Help level, 'scale' = the keybed
   always shows the selected scale (Display aid off, guides white on top),
   'off' = dark incl. a LUMI (night mode, no lumiNative); the Lights & help
   sheet's On/Off resets to 'auto') and SCALE LOCK (#cx-lock -> App.scaleLock
-  {on, active, set, allows(midi)}, store scale.lock, 'scale:lock' event):
-  out-of-scale note-ONs are dropped in midi.js dispatch, the Hub's thru, the
-  Keys page touch/QWERTY and fretboard taps (note-offs always pass); the Hub
-  checks it AFTER its rules; paused on LOCK_FREE pages (quiz, settings, pads,
-  shed, songs: they judge their own material) and while a Studio drum track
-  is armed; html.scale-locked dims the
-  unplayable on-screen keys. It reads the
+  {on, active, set, allows(midi), contains(midi)}, store scale.lock,
+  'scale:lock' event): GLOBAL since 1.0 — no page pauses it (there is no
+  LOCK_FREE list; active === on). Out-of-scale note-ONs never sound: midi.js
+  dispatch marks them blocked + mute:true (midi:note still fires, so graders
+  and visuals see the raw note); musical MIDI output, the Hub's thru, the Keys
+  page touch/QWERTY, fretboard taps, Jam and the synth voices
+  (DAW.guardPitched) drop them (note-offs always pass); the Hub checks it
+  AFTER its rules; drums, clicks and recorded/live audio are outside it; a
+  key or scale change while it is on, or switching it, emits 'scale:boundary'
+  (sounding voices stop); html.scale-locked dims the unplayable on-screen
+  keys. The bar reads the
   shared stores (fb.root/fb.scale/fb.mode, met.bpm, met.sig) and pushes changes
   over the bus; pages must NOT grow their own duplicate selects for these.
-  Also hosts #cx-met (transport) and #cx-rec (studio capture ●).
-- Settings is a SPACELESS overlay page: opened by #settings-btn (gear, header,
-  ever-present in both spaces), toggles back to the previous tab, never in the
-  nav select. App-level prefs live there: theme, accent (App.setAccent —
+  Also hosts #cx-met (the metronome's start/stop).
+- Settings is an OVERLAY page outside PAGES: opened by #settings-btn (gear,
+  header, on every page), toggles back to the previous tab, never in the
+  nav. App-level prefs live there: theme, accent (App.setAccent —
   inline --accent vars, amber default), master volume (App.setVolume — a
   master GainNode shadows ctx.destination so every module obeys), keep-awake
-  (app.keepAwake gates App.wake), studio prefs (sd.retroSecs, sd.playVoice —
-  'sd:prefs' bus event).
+  (app.keepAwake gates App.wake).
 - LATENCY RULES (v0.69.0): the master chain is masterGain -> 0.5 pre-gain ->
   WaveShaper soft clipper (oversample 'none' = zero delay) -> speakers; do NOT
   put a DynamicsCompressor on the master path (fixed ~6ms lookahead). Sample
@@ -782,33 +1152,31 @@ version.json      auto-update feed (source of truth for latest version)
   a toast element inside a page that may be hidden (the Hub's #mh-toast only
   shows on the Hub page; the Synth Deck routes its refusals here off it).
 - New bus events: `note:input` {on, midi, vel, src, dur?} — user played a note
-  on an on-screen instrument (piano QWERTY/touch emit it; capture listens
-  alongside midi:note), `space` {space} after a workspace switch.
+  on an on-screen instrument (piano QWERTY/touch emit it; the Keys lessons,
+  the Woodshed and the fretboard listen alongside midi:note).
 - TRANSPORT EXCLUSIVITY (v0.65.0): `transport:claim` {owner: 'met'|'jam'|
-  'loop'|'song'} — every transport emits it before starting and stops itself
-  on any foreign claim; #cx-met drives the space's transport (met in
-  practice; loop, or the song on arrange, in studio) and pulses on met:beat
-  + st:step. Studio/jam are 4/4-hardcoded (noted in Settings).
+  'keys'|'quiz'|'chart'} — every transport emits it before starting and stops
+  itself on any foreign claim (each listener compares only its own owner
+  name); #cx-met drives the metronome (`met:toggle`) and pulses on met:beat.
+  Jam is 4/4-hardcoded (noted in Settings).
 - Event bus: `App.on/emit`. New: `sig` {sig, source} (time signature changed —
   metronome and the bar mirror each other), `met:toggle` (request start/stop
   from anywhere), `met:state` {running}, `met:beat` {beat} (context-bar
   transport button + pulse). Events: `tempo` {bpm, source} (met.bpm is the ONE
   shared tempo — always guard against echo via `source`), `jam:chord`,
-  `jam:stopped`, `fb:practice` {root?, scale?, bpm?} (Trainer prompt "Go" —
-  fretboard applies it, switches tabs, starts the runner), `fb:scale`
+  `jam:stopped`, `fb:practice` {root?, scale?, bpm?} (a Practice plan block,
+  a Free practice prompt's "Go" — fretboard applies it, switches tabs, starts
+  the runner), `fb:scale`
   {root, scale} (fretboard scale changed — chords page follows 7-note scales),
   `fb:set` {source, root?, scale?, mode?, pattern?, dir?} (Tab page pushes
   linked practice state; fretboard applies without switching tabs). The
   exercise engine (path/sequence math) lives in theory.js as
   Theory.exercisePath / Theory.exerciseSeq / Theory.pickDirs (pick strokes:
   alt | eco | down | up), shared by fretboard and tab.
-- Drag interactions are POINTER-EVENT based (no HTML5 dnd except the file
-  drop): piano roll draw/move/resize/right-erase, step-grid painting, track
-  row reorder (.st-drag handle), jam palette->section + chord reorder (ghost
-  chip, click suppressed after a real drag). Synthetic-event friendly: every
-  setPointerCapture is try/caught; hit-testing via elementFromPoint. Audio
-  file drop on #panel-tracks -> sampler (loadSampleFile shared with the
-  file input).
+- Drag interactions are POINTER-EVENT based (no HTML5 dnd): jam
+  palette->section + chord reorder (ghost chip, click suppressed after a real
+  drag). Synthetic-event friendly: every setPointerCapture is try/caught;
+  hit-testing via elementFromPoint.
 - Audio schedulers (metronome/practice/jam): 25 ms setInterval + lookahead on
   the AudioContext clock, with a catch-up guard (`if nextT < currentTime →
   jump forward`) so stalls never schedule past-dated (silent) notes. Keep this
@@ -844,7 +1212,9 @@ version.json      auto-update feed (source of truth for latest version)
   LUMI via a stubbed requestMIDIAccess), keys, practice,
   game, quiz, nav, smoke, taps, update, midihub (a fake synth port: raw tap,
   rules on Thru / input filter, profiles + SysEx builders, clock), audioin
-  (fake media device), btmidi (a fake Android MidiBridge). Run them
+  (fake media device), btmidi (a fake Android MidiBridge), trim (2.0 Phase
+  A: what left the app stays gone, 1.x data untouched), assets (pure Node:
+  index.html scripts <-> disk <-> sw.js ASSETS). Run them
   before every release and add a suite or checks for new features.
   `SL_LOG_DIR` keeps concurrent baseline/feature test logs separate. The
   quiz-correction suite covers fresh corrections after a miss and held-note
@@ -880,7 +1250,8 @@ When rebuilding a native wrapper, also complete the native release checklist:
    checkForUpdate reads `web` for web builds, `version` vs
    GuitarLabHost.shellVersion() inside the Android app).
 3. `android/AndroidManifest.xml` versionCode (+1) and versionName
-4. `sw.js` CACHE bump (guitarlab-vN+1); add any new files to ASSETS
+4. `sw.js`: bump the number in `CACHE`; add any new files to ASSETS (and take
+   deleted files out)
 5. Build APK: `android\build.ps1` (outputs to releases/; sets JAVA_HOME itself;
    toolchain lives in C:\Users\mrein\AndroidBuildTools)
 
@@ -906,7 +1277,7 @@ font/icon/sample file at its real path. Build + publish from any session:
    A session that didn't create it must `action: "read"` the URL first.
 
 Inside the viewer: mic (tuner, tone-in, Woodshed audio), Web MIDI, file
-downloads (backup export, WAV export), offline/service worker and confirm()
+downloads (backup export), offline/service worker and confirm()
 dialogs are refused by the frame — everything else runs. `tools/bundle.py`
 (old single-file build) is superseded.
 

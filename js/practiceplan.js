@@ -191,15 +191,20 @@
   // block not measured complete: the first one after the block last opened
   // from here, else the first one (casual tools never complete, so 'the first
   // not done' alone would reopen the same Tuner block forever). BACK opens
-  // the last block again. No Stop: the plan has no run of its own. Typed
-  // text a launch would wipe (paint() refills the fields on return) holds
-  // the pedal back: a foot bumped while writing lesson notes loses nothing.
+  // the last block again. The Free practice cards (js/trainer.js) are asked
+  // first: while a one-minute chord run goes NEXT counts a change and BACK is
+  // held (it must not relaunch a block: leaving the page cancels the run),
+  // and STOP cancels that run or else pauses the Free practice timer. The
+  // plan has no run of its own, so STOP does nothing else. Typed text a
+  // launch would wipe (paint() refills the fields on return) holds the pedal
+  // back: a foot bumped while writing lesson notes loses nothing.
   function unsaved(s) {
     if (el('pp-notes') && el('pp-notes').value !== (s.plan.source || '')) return (pending ? 'Accept' : 'Review') + ' or clear your lesson notes first';
     if (el('pp-link') && el('pp-link').value.trim() !== (s.student.docUrl || '')) return 'Review or clear the Google Doc link first';
     return '';
   }
   function remote(action) {
+    var t = App.trainerCards && App.trainerCards.remote(action); if (t) return t;
     var s = state(), items = s.availableItems, last = -1, item = null;
     items.forEach(function (i, n) { if (i.id === s.session.last) last = n; });
     if (action === 'next') {
@@ -289,7 +294,12 @@
   function error(e) { message = e.message || String(e); el('pp-status').textContent = message; }
   function init(box) {
     rootEl = box; App.injectCSS('practiceplan', CSS);
-    box.innerHTML = '<div class="pp-wrap"><div class="pp-heading"><div><span class="pp-kicker">A little, every day</span><h1>Practice plan</h1><p class="pp-muted">Turn lesson notes into a clear next step.</p></div><button type="button" class="btn sm" id="pp-help">Lights & help</button></div><div class="pp-profile card"><label>Student <select id="pp-student"></select></label><label>New student <input id="pp-name" maxlength="60" placeholder="Name"></label><button type="button" class="btn" id="pp-add">Add student</button></div><div id="pp-today" class="card"></div><div id="pp-week" class="card"></div><details class="card pp-notes"><summary>Teacher’s lesson notes</summary><div class="pp-fields"><label>Current Learn instrument <select id="pp-instrument" disabled>' + INSTRUMENTS.map(function (id) { return '<option value="' + id + '">' + esc(label(id)) + '</option>'; }).join('') + '</select></label><label>Google Doc link (optional, saved locally)<input id="pp-link" type="url" placeholder="https://docs.google.com/document/d/…"></label><a id="pp-doc" target="_blank" rel="noopener noreferrer" hidden>Open saved lesson Doc</a><label>Paste notes, one assignment per line<textarea id="pp-notes" rows="7" placeholder="G major scale, hands separate, 5 min&#10;Practice your piece, 5 min&#10;Intervals, 3 min"></textarea></label><div class="pp-actions"><button type="button" class="btn primary" id="pp-review">Review mapping</button><label class="pp-import">Import text / Docs JSON <input id="pp-file" type="file" accept=".txt,.md,.json,text/plain,application/json"></label></div><p class="pp-muted">The link is a bookmark. Paste or export the Doc’s text to import it. Notes stay in this browser; nothing is fetched or uploaded.</p><div id="pp-preview" hidden></div></div></details><div id="pp-gaps" class="card"></div><p id="pp-status" role="status" aria-live="polite"></p></div>';
+    box.innerHTML = '<div class="pp-wrap"><div class="pp-heading"><div><span class="pp-kicker">A little, every day</span><h1>Practice plan</h1><p class="pp-muted">Turn lesson notes into a clear next step.</p></div><button type="button" class="btn sm" id="pp-help">Lights & help</button></div><div class="pp-profile card"><label>Student <select id="pp-student"></select></label><label>New student <input id="pp-name" maxlength="60" placeholder="Name"></label><button type="button" class="btn" id="pp-add">Add student</button></div><div id="pp-today" class="card"></div><div id="pp-week" class="card"></div><details class="card pp-notes"><summary>Teacher’s lesson notes</summary><div class="pp-fields"><label>Current Learn instrument <select id="pp-instrument" disabled>' + INSTRUMENTS.map(function (id) { return '<option value="' + id + '">' + esc(label(id)) + '</option>'; }).join('') + '</select></label><label>Google Doc link (optional, saved locally)<input id="pp-link" type="url" placeholder="https://docs.google.com/document/d/…"></label><a id="pp-doc" target="_blank" rel="noopener noreferrer" hidden>Open saved lesson Doc</a><label>Paste notes, one assignment per line<textarea id="pp-notes" rows="7" placeholder="G major scale, hands separate, 5 min&#10;Practice your piece, 5 min&#10;Intervals, 3 min"></textarea></label><div class="pp-actions"><button type="button" class="btn primary" id="pp-review">Review mapping</button><label class="pp-import">Import text / Docs JSON <input id="pp-file" type="file" accept=".txt,.md,.json,text/plain,application/json"></label></div><p class="pp-muted">The link is a bookmark. Paste or export the Doc’s text to import it. Notes stay in this browser; nothing is fetched or uploaded.</p><div id="pp-preview" hidden></div></div></details><div id="pp-gaps" class="card"></div><p id="pp-status" role="status" aria-live="polite"></p></div>' +
+      // Free practice: the former Trainer page's cards (js/trainer.js), mounted
+      // below. The section sits AFTER .pp-wrap and is not a .card, so the
+      // plan's own form rules (.pp-wrap input / select / .card / li / h2) never
+      // restyle the cards and they do not sit inside a card.
+      '<details class="pp-tools" id="pp-tools"><summary>Free practice: timer, prompts, one-minute chord changes</summary><p class="pp-muted">The timer pauses when you leave this page; it is separate from the plan’s measured minutes.</p><div id="pp-tools-body"></div></details>';
     box.addEventListener('click', function (e) {
       var target = e.target.closest('button'); if (!target) return;
       try {
@@ -321,14 +331,25 @@
     });
     document.addEventListener('visibilitychange', function () { refresh(); });
     paint();
+    // js/trainer.js loads before this file; a card that fails to build must not take the plan down
+    if (App.trainerCards) { try { App.trainerCards.mount(el('pp-tools-body')); } catch (err) { console.error('practiceplan: Free practice cards', err); } }
   }
   var CSS = '.pp-wrap{max-width:960px;margin:0 auto;display:grid;gap:14px}.pp-wrap h1{margin:0;font-size:38px}.pp-wrap h2,.pp-wrap h3{margin:0 0 6px}.pp-wrap p{margin:5px 0}.pp-wrap .card{margin:0}.pp-heading,.pp-profile,.pp-actions{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}.pp-kicker{font-size:12px;text-transform:uppercase;letter-spacing:1.2px;color:var(--accent)}.pp-muted{color:var(--muted);font-size:14px}.pp-profile label,.pp-fields label{display:grid;gap:6px;min-width:0;flex:1}.pp-wrap input,.pp-wrap select,.pp-wrap textarea{font:inherit;color:var(--text);background:var(--inset);border:1px solid var(--line);border-radius:8px;padding:10px;max-width:100%;min-width:0;width:100%;box-sizing:border-box}.pp-wrap textarea{resize:vertical;line-height:1.5}.pp-blocks{list-style:none;padding:0;margin:14px 0;display:grid;gap:10px}.pp-block{display:flex;gap:12px;align-items:center;border-top:1px solid var(--line);padding:15px 0 4px;overflow-wrap:anywhere}.pp-body{flex:1;min-width:0}.pp-number{display:grid;place-items:center;width:32px;height:32px;flex:none;border:1px solid var(--accent);border-radius:50%;color:var(--accent)}.pp-done .pp-number{background:var(--accent);color:var(--bg)}.pp-block h3{font-size:19px;margin-top:4px}.pp-source{font-size:14px;line-height:1.4}.pp-evidence{font-size:12px;color:var(--muted)}.pp-week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;margin:14px 0}.pp-week>div{display:grid;gap:7px;background:var(--inset);border:1px solid var(--line);border-radius:8px;padding:10px 2px;text-align:center;font-size:13px}.pp-week small{font-size:11px;color:var(--muted)}.pp-notes summary{cursor:pointer;font-weight:600}.pp-fields{display:grid;gap:14px;padding-top:16px}.pp-import{font-size:13px;color:var(--muted);max-width:300px}.pp-wrap li{margin-bottom:10px}.pp-wrap a{color:var(--accent);overflow-wrap:anywhere}#pp-preview{border-top:1px solid var(--line);padding-top:15px}#pp-gaps{overflow-wrap:anywhere}#pp-status{font-size:14px;color:var(--accent);min-height:1em}@media(max-width:600px){.pp-wrap h1{font-size:30px}.pp-block{flex-wrap:wrap;gap:10px}.pp-block .btn{margin-left:42px;min-height:42px}.pp-block .pp-body{flex-basis:calc(100% - 44px)}.pp-week{gap:3px}.pp-week>div{font-size:11px;padding:8px 0}.pp-profile{align-items:end}.pp-profile label{flex-basis:100%}.pp-heading .btn{min-height:40px}.pp-wrap .card{padding:16px}}';
   // Keep this page's expanded Learn strip on one row on small screens. Scope
   // the integration style to the group containing this module; other groups
   // retain the shell's normal pill spacing and labels.
   CSS += '@media(max-width:600px){#subnav:has(.subtab[data-page="practiceplan"]) .subtab{padding-left:9px;padding-right:9px}}';
+  // Free practice sits outside .pp-wrap (see init): the page's width and the
+  // look of the notes summary, nothing else.
+  CSS += '.pp-tools{max-width:960px;margin:14px auto 0}.pp-tools>summary{cursor:pointer;font-weight:600;padding:6px 2px 12px}';
   App.practicePlan = { rules: RULES, preview: preview, accept: accept, state: state, refresh: refresh, launch: launch };
-  App.register('practiceplan', { init: init, onShow: function () { paint(); if (!uiTimer) uiTimer = setInterval(paintProgress, 3000); }, onHide: function () { refresh(); clearInterval(uiTimer); uiTimer = null; }, onKey: function (e) { if (e.key === 'Escape' && pending) { pending = null; paintPreview(); } },
+  // The Free practice cards live on this page: they are shown and hidden with
+  // it (hide pauses their timer and cancels a chord run) and get each key
+  // first (Space counts a change while a one-minute chord run goes).
+  App.register('practiceplan', { init: init,
+    onShow: function () { paint(); if (!uiTimer) uiTimer = setInterval(paintProgress, 3000); if (App.trainerCards) App.trainerCards.show(); },
+    onHide: function () { refresh(); clearInterval(uiTimer); uiTimer = null; if (App.trainerCards) App.trainerCards.hide(); },
+    onKey: function (e) { if (App.trainerCards) App.trainerCards.key(e); if (e.key === 'Escape' && pending) { pending = null; paintPreview(); } },
     onRemote: function (action) { return remote(action); },
     remoteKey: true // nothing on this page listens to the keys
   });

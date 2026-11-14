@@ -1,6 +1,7 @@
 # Synth sound and the shared Scale lock
 
-The LUMI practice page has three independent routes: the selected keyboard
+LUMI practice (the section *Notes and triads on the LUMI* on the Piano page,
+below the lessons) has three independent routes: the selected keyboard
 answer input, the LUMI target/feedback display output, and an optional synth
 sound output. Display notes never become answers or synth sound. The sound
 route follows the existing **Scale lock** switch in the treble-clef dropdown.
@@ -16,7 +17,7 @@ substitute note. With the switch off, original note pitches pass unchanged.
    Android/iOS bridges do not support these independent routes.
 2. Turn **Local Control OFF on the synth**, disable external MIDI Thru/echo
    routing, turn soundLAB's MIDI Hub Thru off, and release keys and sustain
-   pedal. Acknowledge these prerequisites on the practice page. The app never
+   pedal. Acknowledge these prerequisites in the practice section. The app never
    changes the synth's Local Control setting. Without Local Control OFF the
    instrument's internal keyboard-to-voice path can still sound blocked keys.
 3. Start the practice session, then deliberately start the scale-locked sound
@@ -47,7 +48,8 @@ note, and channel pressure requires a forwarded note on that channel. Pitch
 bend is suppressed for this strict note-key lockout. Other CCs, program
 changes, SysEx and realtime messages are not forwarded by this route.
 
-Stop, page leave, app hiding, window blur, port/inventory changes and a changed
+Stop, closing the practice section, leaving the Piano page, a scale lesson or
+the runner starting, app hiding, window blur, port/inventory changes and a changed
 root, scale or master lock stop input subscription and disarm the route. Cleanup attempts
 the original note-offs and CC64=0 only on channels used by this route. The
 output lease pins the actual Web MIDI port object as well as its ID/name; a

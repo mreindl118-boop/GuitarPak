@@ -37,7 +37,6 @@
   </div>
   <nav class="tabbar tabbar-top" id="tabbar" aria-label="Sections"></nav>
   <div class="tb-tools" id="tabs">
-    <button type="button" class="btn sm" id="space-btn" aria-label="Switch workspace"></button>
     <button type="button" class="btn sm icon-btn" id="help-btn" aria-label="Help for this page" title="What is this page?"></button>
     <button type="button" class="btn sm icon-btn" id="settings-btn" aria-label="Settings" title="Settings"></button>
     <button type="button" class="btn sm icon-btn" id="ctx-btn" aria-label="Key, scale and tempo" title="Key, scale &amp; tempo" aria-expanded="false" aria-controls="ctxbar"></button>
@@ -51,8 +50,6 @@
     <label class="cx-field">BPM<input id="cx-bpm" type="number" min="30" max="280" step="1"></label>
     <label class="cx-field">Time<select id="cx-sig"></select></label>
     <button type="button" class="btn sm" id="cx-met" title="Start / stop the metronome (works on every tab)" aria-label="Start or stop the metronome"></button>
-    <button type="button" class="btn sm" id="cx-rec" aria-label="Capture what you play into the current song"></button>
-    <span id="cx-rec-msg" style="display:none" role="status"></span>
     <div class="cx-toggles">
       <button type="button" class="chip" id="cx-led" aria-pressed="false" title="Show the selected scale and practice targets on the configured LUMI; independent of Scale Lock"></button>
       <button type="button" class="chip" id="cx-lock" aria-pressed="false" title="Block out-of-scale pitched notes across instruments, playback and musical MIDI output; drums and recorded/live audio are separate"></button>
@@ -82,11 +79,6 @@
     <section class="sheet-body" id="panel-lights"></section>
   </div>
 </div>
-<div id="wipe" aria-hidden="true" style="display:none">
-  <svg viewBox="0 0 512 512" width="120" height="120">
-    <path d="M118 96 H206 V308 A44 44 0 0 1 118 308 Z M212 96 H300 V372 A44 44 0 0 1 212 372 Z M306 96 H394 V308 A44 44 0 0 1 306 308 Z" fill="#ffab47" opacity="0.9"/>
-  </svg>
-</div>
 <main>
   <section class="panel" id="panel-quiz"></section>
   <section class="panel" id="panel-practiceplan"></section>
@@ -97,23 +89,16 @@
   <section class="panel" id="panel-chords"></section>
   <section class="panel" id="panel-piano"></section>
   <section class="panel" id="panel-chart"></section>
-  <section class="panel" id="panel-synth"></section>
   <section class="panel" id="panel-songs"></section>
   <section class="panel" id="panel-jam"></section>
   <section class="panel" id="panel-tuner"></section>
-  <section class="panel" id="panel-trainer"></section>
   <section class="panel" id="panel-theory"></section>
   <section class="panel" id="panel-shed"></section>
   <section class="panel" id="panel-settings"></section>
-  <section class="panel" id="panel-song"></section>
-  <section class="panel" id="panel-arrange"></section>
-  <section class="panel" id="panel-tracks"></section>
   <section class="panel" id="panel-pads"></section>
   <section class="panel" id="panel-deck"></section>
   <section class="panel" id="panel-liveset"></section>
   <section class="panel" id="panel-midihub"></section>
-  <section class="panel" id="panel-lumipractice"></section>
-  <section class="panel" id="panel-ideas"></section>
 </main>
 <footer class="foot">
   soundLAB alpha &mdash; runs entirely in your browser
@@ -124,6 +109,7 @@
 <script src="js/learn-instruments.js"></script>
 <script src="js/midi.js"></script>
 <script src="js/remote.js"></script>
+<script src="js/midirules.js"></script>
 <script src="js/practice-router.js"></script>
 <script src="js/pitch-detector.js"></script>
 <script src="js/tonein.js"></script>
@@ -142,14 +128,13 @@
 <script src="js/theorytab.js"></script>
 <script src="js/daw/synth.js"></script>
 <script src="js/daw/engine.js"></script>
-<script src="js/studio.js"></script>
 <script src="js/practice-progress.js"></script>
 <script src="js/practice-progress-ui.js"></script>
 <script src="js/performance-engine.js"></script>
 <script src="js/performance-player.js"></script>
 <script src="js/woodshed.js"></script>
-<script src="js/arrange.js"></script>
 <script src="js/pads.js"></script>
+<script src="js/scoreplayer.js"></script>
 <script src="js/midihub.js"></script>
 <script src="js/synthtab.js"></script>
 <script src="js/synthlive.js"></script>
@@ -162,7 +147,6 @@
 <script src="js/practiceplan.js"></script>
 <script src="js/helix.js"></script>
 <script src="js/help.js"></script>
-<script src="js/plugins.js"></script>
 <script src="js/settings.js"></script>
 <script src="js/lights.js"></script>
 <script>
