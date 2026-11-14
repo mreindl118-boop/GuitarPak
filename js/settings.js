@@ -413,29 +413,11 @@
 
     // the chosen output (audio.outId), applied to the shared context — at the
     // first gesture after launch (no AudioContext before one) and again when
-    // the device comes back after an unplug (force: the context fell back)
+    // the device comes back after an unplug (force: the context fell back).
+    // The code is App.audioIn.applySink (js/audioin.js): soundLAB Gear has no
+    // Settings page and applies the same choice with it
     function applySink(force) {
-      var id = App.store.get('audio.outId', '');
-      if (!id) return;
-      function go() {
-        try {
-          var ctx = App.getAudio();
-          if (typeof ctx.setSinkId !== 'function' || (!force && ctx.sinkId === id)) return;
-          ctx.setSinkId(id).catch(function () { audMsg.textContent = 'The browser refused that output. Using the system default.'; });
-        } catch (e) { /* no audio here */ }
-      }
-      var ua = navigator.userActivation;
-      if (!ua || ua.hasBeenActive) { go(); return; }
-      if (applySink.wait) return;
-      applySink.wait = true;
-      function once() {
-        document.removeEventListener('pointerdown', once, true);
-        document.removeEventListener('keydown', once, true);
-        applySink.wait = false;
-        go();
-      }
-      document.addEventListener('pointerdown', once, true);
-      document.addEventListener('keydown', once, true);
+      if (AIN) AIN.applySink(force, function () { audMsg.textContent = 'The browser refused that output. Using the system default.'; });
     }
 
     function listDevices(withPoke) {

@@ -1204,18 +1204,30 @@ window.App = (function () {
   // cleanUrl: this address without the #page that boot has just used, so a
   // reload does not apply it again
   function wireBack(cleanUrl) {
-    try {
-      if (cleanUrl) history.replaceState({ sl: 'base' }, '', cleanUrl);
-      else history.replaceState({ sl: 'base' }, '');
-    } catch (e) { return; }
-    backWired = true;
-    guardUp();
+    var st = null;
+    try { st = history.state; } catch (e) { /* sandboxed frame */ }
+    if (!cleanUrl && st && st.sl === 'top') {
+      // loaded again on its own guard entry (Back from the other app, a
+      // reload): the base is still underneath. Making this one a second base
+      // showed the "Press Back again" hint twice
+      backWired = true;
+      guarded = true;
+    } else {
+      try {
+        if (cleanUrl) history.replaceState({ sl: 'base' }, '', cleanUrl);
+        else history.replaceState({ sl: 'base' }, '');
+      } catch (e) { return; }
+      backWired = true;
+      guardUp();
+    }
     window.addEventListener('popstate', function (e) {
       // a #page typed into the address of the open app makes a history entry
       // of its own (no state of ours) and fires this too: not a Back press,
       // wireHash takes it
       if (!e.state || !e.state.sl) return;
-      guarded = false;
+      // landed on an older guard (a typed #page left one below): still
+      // guarded, so the step below uses that entry up instead of adding one
+      guarded = e.state.sl === 'top';
       dropBackHint();
       if (backStep()) { guardUp(); return; }
       backHint = document.createElement('div');
@@ -1568,6 +1580,11 @@ window.App = (function () {
     if (across && !window.SL_ARTIFACT) { location.replace(APPS[across].url + '#' + hash); return; }
     var hashSettings = hash === 'settings' && hashHere(hash);
     var hashTab = !hashSettings && hashHere(hash) ? hash : null; // a page, or an old id (MOVED says where it went)
+    // a #page is where this start goes: it stands in for the one-time landing
+    // on Exercises (js/quiz.js init), which would replace it one tick later.
+    // Marked done, not only skipped: the next plain start brings the last
+    // page back, as every return does, instead of landing "for the first time"
+    if (APP_ID === 'main' && (hashSettings || hashTab)) store.set('qz.landed', true);
 
     PANEL_ORDER.forEach(function (name) {
       var el = document.getElementById('panel-' + name);

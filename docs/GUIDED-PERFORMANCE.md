@@ -57,8 +57,10 @@ Grading observes the original input **before** Scale Lock and sound-routing
 filters, so a muted wrong note still counts as a mistake. The player warns when
 the score or transposition contains pitches outside the selected scale.
 
-Virtual key sound uses the guarded DAW synth. Hardware MIDI sound uses existing
-app/Hub routes; this player does not create another external MIDI writer. To
+Virtual key sound uses the guarded DAW synth. Hardware MIDI sound uses the
+existing routes (the practice router, or MIDI Hub Thru, which runs in soundLAB
+Gear since 2.0 Phase A); this player does not create another external MIDI
+writer. To
 lock out an external synth's own engine, its **Local Control must be OFF** and
 external echo/Thru routing must be disabled manually. Software cannot suppress
 the synth's direct physical keyboard-to-engine path. See

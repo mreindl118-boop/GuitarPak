@@ -28,10 +28,11 @@
  *
  * TWO APPS (2.0): index.html (soundLAB) and gear.html (soundLAB Gear) both
  * load this file, read the same bindings and both claim a bound message. The
- * Settings card (mount) is in soundLAB only. With both open, ONE window acts
+ * Settings card (mount) is in soundLAB only. With both open, ONE APP acts
  * on a MIDI press: soundLAB while one of its windows is visible, Gear when
  * none is (Web Lock 'soundlab-remote-main' — see ONE WINDOW ACTS ON A PEDAL
- * near the end; App.remote.holdsMain).
+ * near the end; App.remote.holdsMain). Within one app every visible window
+ * acts, as two windows always did.
  */
 (function () {
   'use strict';
@@ -414,11 +415,13 @@
   //    the same as ever there: visible = it acts, focused or not (it has to
   //    keep answering while another program has the focus). Two soundLAB
   //    windows share the lock and both act, as before.
-  //  - Gear takes it for an instant per MIDI press ({ifAvailable: true}): it
-  //    gets it only while no soundLAB window holds it, acts inside the
-  //    callback and lets go. Keys (a page turner types into the focused
-  //    window only) and direct calls stay synchronous.
-  //  - no Web Locks, or the request is refused (the claude.ai viewer frame):
+  //  - Gear never takes it: per MIDI press it ASKS whether the lock is held
+  //    (locks.query()) and acts when it is not = no soundLAB window is
+  //    visible. So every visible Gear window acts, as every visible soundLAB
+  //    window does (taking the lock, even for an instant, made two Gear
+  //    windows shut each other out). Keys (a page turner types into the
+  //    focused window only) and direct calls stay synchronous.
+  //  - no Web Locks, or the question is refused (the claude.ai viewer frame):
   //    Gear acts on a MIDI press only while it has the focus.
   // Nothing is stored; a window that closes frees its lock.
   function lockApi() { try { var l = navigator.locks; return l && typeof l.request === 'function' ? l : null; } catch (e) { return null; } }
@@ -456,9 +459,8 @@
   }
 
   // Gear: ONE question to the lock at a time. turn = the presses waiting for
-  // its answer {t, list} — a second request made while the first is out
-  // would be refused by this window's own lock, and two bound presses in one
-  // MIDI packet must both act, in order. go() acts, no() puts the debounce
+  // its answer {t, list} — two bound presses in one MIDI packet take the
+  // same answer and both act, in order. go() acts, no() puts the debounce
   // back. A turn older than LOCK_MS never got its answer: the next press
   // asks again instead of waiting with it.
   var turn = null;
@@ -479,9 +481,11 @@
       if (turn === mine) turn = null;
     }
     function byFocus() { answer(focused()); }
-    if (!api) { byFocus(); return; }
-    try { p = api.request(LOCK, { ifAvailable: true }, function (lock) { answer(!!lock); }); } catch (e) { byFocus(); return; }
-    if (p && typeof p.then === 'function') p.then(null, byFocus); else byFocus();
+    // held = a visible soundLAB window has it (nothing else ever takes it)
+    function free(s) { return !((s && s.held) || []).some(function (l) { return !!l && l.name === LOCK; }); }
+    if (!api || typeof api.query !== 'function') { byFocus(); return; }
+    try { p = api.query(); } catch (e) { byFocus(); return; }
+    if (p && typeof p.then === 'function') p.then(function (s) { answer(free(s)); }, byFocus); else byFocus();
   }
 
   App.remote = {

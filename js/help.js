@@ -11,13 +11,16 @@
  * ONE FILE FOR BOTH APPS (2.0 Phase A3b): index.html (soundLAB) and gear.html
  * (soundLAB Gear) load it. TOURS is keyed by page id, so each app shows the
  * tours of its own pages (deck, liveset, midihub and helix are Gear pages)
- * and the two sheets' tours in both. The welcome card is about soundLAB's
- * pages: Gear never shows it and leaves help.seen alone, so soundLAB still
- * says hello on its own first start.
+ * and the two sheets' tours in both — with GEAR wording where a step names
+ * soundLAB's pages (lessons, Exercises, the Jam band, Settings): Gear has
+ * none of them, so the step says they are in soundLAB. The welcome card is
+ * about soundLAB's pages: Gear never shows it and leaves help.seen alone, so
+ * soundLAB still says hello on its own first start.
  */
 (function () {
   'use strict';
 
+  var GEAR = !!window.App && App.app === 'gear'; // js/app.js is loaded first in both apps
   var TOURS = {
     practiceplan: [
       { t: 'Practice plan', x: 'A short session built from your teacher’s notes. Open Teacher’s lesson notes, paste or import the text, review the mapping and accept it. Each student keeps a separate plan on this device.' },
@@ -26,7 +29,8 @@
       { sel: '#pp-tools', t: 'Free practice', x: 'Under the plan, closed until you open it: a session timer with its log, random practice prompts (Go sets up the Fretboard for the prompt) and one-minute chord changes. In a chord-change minute, Space or a Next pedal counts a change. This timer is separate from the plan’s measured minutes.' }
     ],
     metronome: [
-      { t: 'Metronome', x: 'It opens over whatever page you’re on and keeps clicking after you close it — the icon in the top corner glows and pulses on the beat while it runs. Its tempo is the ONE shared tempo: the Jam band and the practice runners follow it.' },
+      { t: 'Metronome', x: 'It opens over whatever page you’re on and keeps clicking after you close it — the icon in the top corner glows and pulses on the beat while it runs. Its tempo is the ONE shared tempo: ' +
+        (GEAR ? 'the Hub’s MIDI clock runs at it, and in soundLAB the Jam band and the practice runners follow it.' : 'the Jam band and the practice runners follow it.') },
       { sel: '#met-tap', t: 'Tap tempo', x: 'Tap along to a song and the BPM follows your taps. −5 / −1 / +1 / +5 and the slider fine-tune it.' },
       { sel: '#met-dots', t: 'Accents', x: 'Tap a beat dot to cycle it between accent, normal and muted.' },
       { sel: '#met-trbox', t: 'Tempo trainer', x: 'Speeds you up automatically: +N BPM every M bars until the target. Sounds lets you pick each click’s voice.' }
@@ -119,10 +123,13 @@
       { sel: '#pd-mode', t: 'MIDI mapping', x: 'ROLI octave maps eight keys from a base note — with key lights showing the kit on a LUMI, flashing with every hit. GM drums speaks the standard drum-pad map.' }
     ],
     lights: [
-      { t: 'Lights & help', x: 'One place for how much the app helps you. The Help level is the difficulty: Full shows the scale in color with names, fingers and the next note; None is a bare keyboard. It applies to the Keys page, Scale lessons, Exercises and your keyboard’s own lights.' },
+      { t: 'Lights & help', x: 'One place for how much the app helps you. The Help level is the difficulty: Full shows the scale in color with names, fingers and the next note; None is a bare keyboard. ' +
+        (GEAR ? 'It applies to your keyboard’s own lights and, in soundLAB, to the Keys page, Scale lessons and Exercises.' : 'It applies to the Keys page, Scale lessons, Exercises and your keyboard’s own lights.') },
       { t: 'Your keyboard’s lights', x: 'A LUMI lights every key of the scale in the same color as the screen (Color notes by: Interval = by scale degree, Note = every C one color), and follows the app’s key on every page. Play a note after pressing its octave buttons and the app follows the new octave too.' },
-      { t: 'LUMI Display', x: 'On by default: during a lesson or practice run the LUMI shows only what to play \u2014 the note to play now steady in its color, the next one blinking \u2014 and the full scale comes back when the run ends. Songs and the Woodshed light the notes to play the same way; Woodshed Wait mode holds the light until you play it. Double-tap your keyboard\u2019s lowest key, or the lesson card, to start and stop a lesson.' },
-      { sel: '#lc-remote', t: 'Hands-free', x: 'A pedal, a button on your synth or a page-turner pedal can press Next, Back and Stop on the practice pages, so you never reach for the screen. Set up opens Settings › Hands-free control.' }
+      { t: 'LUMI Display', x: 'On by default: ' + (GEAR ? 'in soundLAB, ' : '') + 'during a lesson or practice run the LUMI shows only what to play \u2014 the note to play now steady in its color, the next one blinking \u2014 and the full scale comes back when the run ends. Songs and the Woodshed light the notes to play the same way; Woodshed Wait mode holds the light until you play it. Double-tap your keyboard\u2019s lowest key, or the lesson card, to start and stop a lesson.' },
+      { sel: '#lc-remote', t: 'Hands-free', x: GEAR
+        ? 'A pedal, a button on your synth or a page-turner pedal can press Next and Back on the Deck and Live sets, so you never reach for the screen. While a soundLAB window is on screen the pedal moves its practice pages on instead. Set up opens Settings › Hands-free control in soundLAB.'
+        : 'A pedal, a button on your synth or a page-turner pedal can press Next, Back and Stop on the practice pages, so you never reach for the screen. Set up opens Settings › Hands-free control.' }
     ],
     settings: [
       { t: 'Settings', x: 'App-wide preferences, grouped by section: theme and accent color, one master volume for everything, screen wake, MIDI setup and hands-free control.' },
@@ -269,10 +276,17 @@
     }
 
     // fresh install: say hello once. Not in soundLAB Gear: the welcome is
-    // about soundLAB's pages, and help.seen stays unset there
+    // about soundLAB's pages, and help.seen stays unset there. Marked as
+    // seen only when the card is really shown: a document that is leaving
+    // for the other app (index.html#deck: boot returned before any page
+    // opened, App.active is still null) is gone before the card, and
+    // soundLAB's own first start must still get it
     if (App.app !== 'gear' && !store().get('help.seen', false)) {
-      store().set('help.seen', true);
-      setTimeout(welcome, 700);
+      setTimeout(function () {
+        if (!App.active) return;
+        store().set('help.seen', true);
+        welcome();
+      }, 700);
     }
   }
 

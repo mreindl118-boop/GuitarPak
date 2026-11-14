@@ -7,7 +7,9 @@
 // it a file) and window.SLMidiHub does not exist. The page has no MIDI connect
 // control: with no synth output the card's line names Settings › MIDI keyboard
 // and its button opens Settings. MIDI is off at the start (as on a first
-// visit) and is connected half way; the fake MODX is the only output.
+// visit) and is connected half way; the fake MODX is the only output. Then
+// Play is pressed on that card and the page is left (for Piano, and by
+// closing the window): the Player pauses with nothing held on the synth.
 // Also the score player's per-mount options as the Songs page passes them (its
 // own ports row, the no-output line, the connect button, the two texts that
 // name the host). The Hub's mount of the same card: tests/midihub-player.test.js.
@@ -84,6 +86,38 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
     'once the MODX is connected the card’s line names it, with no reload and before the Songs page is shown again (the Player repaints on midi:state): ' + JSON.stringify([c1.ready, c1.still, c1.sameDoc, c1.card.line, c1.card.btnShown]));
   ok(c1.back.seen && /MODX-1/.test(c1.back.line) && c1.back.ports && /Four/.test(c1.back.info),
     'back on the Songs page the card is still there with the file, the output and its Synth out / Channel selects: ' + JSON.stringify([c1.back.seen, c1.back.line, c1.back.ports]));
+
+  console.log('# playing from the Songs page, then leaving it');
+  // the card's Play sends to the synth; leaving the page (js/songs.js onHide) or the app (pagehide) pauses it:
+  // every note that went on gets its Note Off and nothing is sent afterwards
+  const pl = await page.evaluate(async () => {
+    const isOn = b => (b[0] & 0xF0) === 0x90 && b[2] > 0, isOff = b => (b[0] & 0xF0) === 0x80 || ((b[0] & 0xF0) === 0x90 && b[2] === 0);
+    const play = document.querySelector('#sg-player #mh-plplay');
+    const started = async () => { const t0 = Date.now(); while (Date.now() - t0 < 3000 && !__sent.some(isOn)) await __wait(20); };
+    const o = {};
+    __sent.length = 0;
+    play.click(); await started();
+    o.mid = { playing: SLScorePlayer.state.playing, held: SLScorePlayer.state.held, ons: __sent.filter(isOn).length };
+    App.switchTo('piano'); await __wait(120);
+    o.left = { active: App.active, playing: SLScorePlayer.state.playing, held: SLScorePlayer.state.held, ons: __sent.filter(isOn).length, offs: __sent.filter(isOff).length };
+    let n = __sent.length; await __wait(700); // longer than a beat of the file
+    o.left.later = __sent.length - n;
+    // the same from the other way out: the window is closed or the app is left while it plays
+    App.switchTo('songs'); await __wait(150);
+    __sent.length = 0;
+    play.click(); await started();
+    o.mid2 = { playing: SLScorePlayer.state.playing, held: SLScorePlayer.state.held };
+    window.dispatchEvent(new Event('pagehide')); await __wait(60);
+    o.hide = { playing: SLScorePlayer.state.playing, held: SLScorePlayer.state.held, ons: __sent.filter(isOn).length, offs: __sent.filter(isOff).length };
+    n = __sent.length; await __wait(700);
+    o.hide.later = __sent.length - n;
+    return o;
+  });
+  ok(pl.mid.playing && pl.mid.held > 0 && pl.mid.ons >= 1, 'Play on the Songs page’s card sends notes to the MODX: ' + JSON.stringify(pl.mid));
+  ok(pl.left.active === 'piano' && !pl.left.playing && pl.left.held === 0 && pl.left.offs >= pl.left.ons && pl.left.later === 0,
+    'leaving the Songs page (for Piano) pauses it: nothing held, every note released, nothing sent afterwards: ' + JSON.stringify(pl.left));
+  ok(pl.mid2.playing && pl.mid2.held > 0 && !pl.hide.playing && pl.hide.held === 0 && pl.hide.offs >= pl.hide.ons && pl.hide.later === 0,
+    'closing the window while it plays (pagehide) does the same: ' + JSON.stringify(pl.hide));
   const m3 = await page.evaluate(async () => { App.switchTo('songs'); await __wait(100); const before = Woodshed.lib ? null : null; document.getElementById('sg-openpractice').click(); await __wait(400); return { active: App.active, msg: document.getElementById('sg-openmsg').textContent }; });
   ok(m3.active === 'shed' && /In the Woodshed: four\.mid/.test(m3.msg), 'Practice files it in the Woodshed and opens it: ' + m3.msg);
 

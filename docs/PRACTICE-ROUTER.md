@@ -70,7 +70,8 @@ release all keys/pedal before starting this route."), and the explicit
 prerequisite to release keys/pedal prevents inheriting those unknown voices.
 
 The switch is read at Start only, and the route in soundLAB cannot see a Gear
-window. (In 1.x the Hub was a page of the same app and kept its Thru quiet
+window. (Before Phase A, in 1.x and the live 2.0.0, the Hub was a page of the
+same app and kept its Thru quiet
 while the route ran; in Gear that test finds no route.) The two still do not
 run together: the route stops when its window loses focus or is hidden, which
 happens as soon as you click into a Gear window, so it is already stopped

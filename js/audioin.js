@@ -33,6 +33,11 @@
  * spelled out above the lock code, near the end of this file.
  * App.audioIn.mountSwitch(el) = Off / On + a status line for a page without
  * the Settings card (Gear's Hub header).
+ * THE CHOSEN OUTPUT (audio.outId) is applied to the shared AudioContext here
+ * (applySink), for both apps: soundLAB's Settings card has the picker and
+ * calls it from its device list; soundLAB Gear has no Settings page, so this
+ * file looks at the list itself there (sinkWatch) — Gear's metronome, the
+ * Hub's Player and Hear input come out of the device chosen in soundLAB.
  * Bus: 'audioin:state' {on, monitor, want, device, label, error, msg, warn,
  * held, why, mic, paused} after every change (also when audio.monitor was
  * changed in another window); 'audioin:device' {id} when the
@@ -74,6 +79,7 @@
   var waiting = 0;        // a plain request of this document that waits in the queue (0 = none)
   var taking = null;      // On / Off pressed without the lock: the {steal: true} request in flight, {p}
   var launched = false;   // the launch restore has had its turn (500 ms after load)
+  var GEAR = App.app === 'gear'; // soundLAB Gear (js/app.js APPS): no Settings card there
 
   function md() { return navigator.mediaDevices || null; }
   // a frame without the microphone permission policy refuses every capture
@@ -346,7 +352,9 @@
           emit();
         };
       }
-      // the grant made the device names readable: label + mic check
+      // the grant made the device names readable: label + mic check (and
+      // in Gear the chosen output, whose id was hidden until now)
+      if (GEAR) sinkWatch();
       return enumerate().then(function () {
         if (stream !== r.s) return snapshot();
         fellListed = st.fell && isListed(id);
@@ -368,8 +376,11 @@
         return snapshot();
       }
       st.error = inputError(err, false);
-      // a declined prompt switches Hear input off: no new prompt at every launch
-      if ((n === 'NotAllowedError' || n === 'SecurityError') && wantMonitor()) {
+      // a declined prompt switches Hear input off: no new prompt at every
+      // launch. Only in the window that has Hear input (owner): the input
+      // declined for a meter in another window must not switch off what
+      // that one is playing — it would go on sounding with every switch at Off
+      if ((n === 'NotAllowedError' || n === 'SecurityError') && wantMonitor() && owner) {
         App.store.set('audio.monitor', false);
         ack = false;
       }
@@ -541,6 +552,7 @@
   }
 
   function onDeviceChange() {
+    if (GEAR) sinkWatch(); // the chosen output may be back (soundLAB: the Settings card does this)
     enumerate().then(function (list) {
       var ids = list.map(function (d) { return d.deviceId; });
       var want = wantId(), listed = !!want && ids.indexOf(want) !== -1;
@@ -833,6 +845,51 @@
     return el;
   }
 
+  // ---- the chosen OUTPUT (audio.outId) ----
+  // Applied to the shared context at the first gesture after launch (no
+  // AudioContext before one) and again when the device comes back after an
+  // unplug (force: the context fell back). refused() = the browser said no.
+  // Nothing here asks for a permission: an output the browser does not list
+  // is simply not applied.
+  var sinkWait = false;
+  function applySink(force, refused) {
+    var id = App.store.get('audio.outId', '');
+    if (!id) return;
+    function go() {
+      try {
+        var ctx = App.getAudio();
+        if (typeof ctx.setSinkId !== 'function' || (!force && ctx.sinkId === id)) return;
+        ctx.setSinkId(id).catch(function () { if (refused) refused(); });
+      } catch (e) { /* no audio here */ }
+    }
+    var ua = navigator.userActivation;
+    if (!ua || ua.hasBeenActive) { go(); return; }
+    if (sinkWait) return;
+    sinkWait = true;
+    function once() {
+      document.removeEventListener('pointerdown', once, true);
+      document.removeEventListener('keydown', once, true);
+      sinkWait = false;
+      go();
+    }
+    document.addEventListener('pointerdown', once, true);
+    document.addEventListener('keydown', once, true);
+  }
+  // soundLAB Gear: nobody else looks at the output there (soundLAB's Settings
+  // card calls applySink from its own device list). At load, on every device
+  // change and after an input was granted (the ids are readable from then)
+  var outGone = false; // the chosen output was missing at the last look
+  function sinkWatch() {
+    var id = App.store.get('audio.outId', ''), m = md();
+    if (!id || !m || typeof m.enumerateDevices !== 'function') return;
+    Promise.resolve().then(function () { return m.enumerateDevices(); }).then(function (all) {
+      var there = (all || []).some(function (d) { return d.kind === 'audiooutput' && d.deviceId === id; });
+      if (there) applySink(outGone);
+      outGone = !there;
+    }).catch(function () { /* no device list here */ });
+  }
+  if (GEAR) sinkWatch();
+
   App.audioIn = {
     start: start,
     stop: stop,
@@ -842,6 +899,7 @@
     setDevice: setDevice,
     setMonitor: setMonitor,
     mountSwitch: mountSwitch,
+    applySink: applySink, // (force, refused): the stored output onto the shared context
     setGain: setGain,
     level: level,
     devices: devices,

@@ -1433,3 +1433,23 @@ rejected as wrong. Four proposed fixes were not adopted as written (listed at th
 **Not verified by running anything** (read from the code only, as before): the two-window behaviour of Web
 Locks with real MIDI and audio devices, the size of a real 1.x profile, and the service-worker reasoning in D40.
 The checks for the owner's PC are listed in 7.7 and 8.7.
+
+## Changes after the A3b review
+
+The independent review of A3b (draft pull request #102) found places where the text above, followed to the
+letter, did not do what it says it means. The code now differs from these lines on purpose:
+
+- **7.3, D44 (the pedal lock).** Gear does not call `locks.request(LOCK, { ifAvailable: true })`. An exclusive
+  request, even for an instant, made two visible Gear windows shut each other out: a press acted in one of them,
+  at random. Gear asks `navigator.locks.query()` instead and acts when the lock is not held. The meaning is
+  the one D44 states: Gear answers only while no soundLAB window is visible. Every visible Gear window acts.
+- **6.3, `active().rules`.** Not "the number of enabled rules" but the number of enabled rules the input filter
+  can match: a rule for one keyboard (`m.port`) is Thru's only, so the Settings line no longer counts it.
+- **7.2, `#page` at boot.** A `#page` that soundLAB uses also marks the one-time landing on Exercises as done
+  (`qz.landed`): on a first start the landing replaced the page that was asked for.
+- **Not in the plan at all:** the sound output chosen in soundLAB's Settings (`audio.outId`) was applied only by
+  the Settings module, which Gear does not load. `App.audioIn.applySink` (js/audioin.js) applies it in both apps.
+
+Known and left: On in one window and Off in the other within about 3 ms of each other can end with Hear input
+stored on and no window playing (one more press recovers); a typed hash with nothing to step back to (`#quiz` on
+Exercises, a hash that is no page) still costs one extra Back.
