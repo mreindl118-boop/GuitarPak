@@ -193,6 +193,12 @@
           '</details>' +
         '</div>' +
       '</div>' +
+      // a MIDI guitar, one string per channel (js/midiguitar.js renders it)
+      '<div class="card" id="set-guitar-card">' +
+        '<h2>MIDI guitar</h2>' +
+        '<div class="muted small">For a guitar that sends MIDI, like the Rock Band 3 Squier. soundLAB sees which string and fret you play: the neck lights that spot, and Exercises, the Woodshed and Jam hear every note.</div>' +
+        '<div id="set-guitar"></div>' +
+      '</div>' +
       // the controller remote (js/remote.js renders the rows)
       '<div class="card" id="set-remote-card">' +
         '<h2>Hands-free control</h2>' +
@@ -996,6 +1002,7 @@
 
     paintMidi();
     if (App.remote) App.remote.mount(document.getElementById('set-remote'));
+    if (App.midiGuitar) App.midiGuitar.mount(document.getElementById('set-guitar'));
   }
 
   App.register('settings', {
@@ -1004,6 +1011,7 @@
     onShow: function () {
       if (audioUI) audioUI.show();
       if (App.remote) App.remote.paint();
+      if (App.midiGuitar) App.midiGuitar.paint();
       // dynamic prefs may have changed elsewhere (pads click chip, wake from
       // code, volume) — re-read them when the page opens
       var c = document.getElementById('set-click');

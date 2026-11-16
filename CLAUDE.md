@@ -124,6 +124,16 @@ js/midi.js        MIDI service (App.midi: in/out ports, note/bend/pressure
                   calls guide only when its now/next targets change, so the
                   blink keeps time; Wait mode lights the first note at Go).
                   Nothing calls App.midi.light/dark for practice any more.
+js/midiguitar.js  MIDI GUITAR (2.0 beta / v2, docs/MIDI-GUITAR.md): a guitar
+                  with one MIDI channel per string (the Rock Band 3 Squier via
+                  the UR24C's MIDI IN). Settings card #set-guitar-card (port
+                  mg.port by NAME, ring mg.ring s, one-pluck Set up -> mg.layout
+                  hi1|lo1 + mg.oct). Emits 'guitar:note' {string 1-6 (1 = high
+                  E), fret, ...}; App.midiGuitar.held lights ONE fretboard ring
+                  (data-gs/data-f). midi.js guitarSrc: channels 1-6 of that
+                  port are mono (re-strum without Note Off retriggers) and
+                  auto-release after mg.ring. Suite tests/midiguitar.test.js.
+                  Loaded right after midi.js.
 js/tonein.js      1/4"/audio-in TONE-IN: pitch-detects the selected audio
                   input (audio.inId; toggle audio.tonein in Settings) and
                   emits midi:note {silent:true} — instrument pages show the
