@@ -376,6 +376,19 @@ js/quiz.js        EXERCISES ('quiz', the practice HOME since v0.69.0): Musicca-
                   window.SLQuiz = test hook (levels, gen, start, pick, q,
                   view, cur, nodes, node(i), current, sprint, endless,
                   clock, finishSprint, tab, theory).
+                  2.1 WEAK-SPOT MAP (v2, docs/ROADMAP-2.0.md sibling plan
+                  Music-Studio/soundlab/2.1-CONCEPT.md): qz.items entries are
+                  [right, asked, avgMs?, day?] (avgMs = running average of
+                  RIGHT answers, recordItem). wsSpots(kind) adds items up per
+                  spot - guitar/bass: fret 0-12 x string (gn + gf items), keys:
+                  12 pitch classes (kn + kf) - score = accuracy x (0.6 + 0.4 x
+                  speed; <= 2 s full, >= 6 s none), bands strong/good/shaky/
+                  weak/none. Progress tab card #qz-wscard + small map on note-
+                  level results; tap a spot (data-qzspot) = startLevel(base,
+                  {drill: items, spot: true}) -> GEN.spot asks exactly those
+                  items (forced params fs/ff/fpc on neckName/neckFind/keyName/
+                  keyFind). Keys: 'Light them on the LUMI' = App.midi.reveal.
+                  Hook SLQuiz.weakSpots; suite tests/weakspots.test.js.
 js/learn-instruments.js Shared explicit Learn category (piano/synth/guitar/bass/
                   drums/voice/other), instrument-appropriate course modes and
                   actual lesson/practice entry points. Selection is not credit.
