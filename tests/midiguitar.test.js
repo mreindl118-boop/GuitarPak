@@ -113,5 +113,30 @@ function harness(values) {
   h.clear(); h.ur.receive([0x93, 50, 90]);
   ok(!h.gnotes().length, 'choosing No MIDI guitar turns it all off');
 
+  console.log('# found by itself: one strum');
+  h = harness();
+  await h.App.midi.enable(); h.clear();
+  h.lumi.receive([0x90, 60, 90]); h.lumi.receive([0x91, 64, 90]); h.lumi.receive([0x92, 67, 90]);
+  ok(!h.values['mg.port'], 'a LUMI chord on three channels is never taken for a guitar');
+  h.ur.receive([0x90, 60, 90]); h.ur.receive([0x90, 64, 90]);
+  ok(!h.values['mg.port'], 'a keyboard on one channel is not a guitar');
+  h.ur.receive([0x95, 40, 90]); h.ur.receive([0x94, 45, 90]); h.ur.receive([0x93, 50, 90]);
+  ok(h.values['mg.port'] === 'Steinberg UR24C-1' && h.events.some(e => e.name === 'guitar:port' && e.data.auto), 'a strum across 3 strings picks the UR24C port by itself');
+  h = harness({ 'mg.auto': false });
+  await h.App.midi.enable();
+  h.ur.receive([0x95, 40, 90]); h.ur.receive([0x94, 45, 90]); h.ur.receive([0x93, 50, 90]);
+  ok(!h.values['mg.port'], 'after picking No MIDI guitar by hand it never picks one by itself');
+
+  console.log('# string order by itself');
+  h = harness({ 'mg.port': 'Steinberg UR24C-1' });
+  await h.App.midi.enable(); h.clear();
+  h.ur.receive([0x90, 43, 90]); // channel 1 playing 43: that is the low E string
+  ok(h.values['mg.layout'] === 'lo1' && h.gnotes()[0].string === 6 && h.gnotes()[0].fret === 3, 'channel 1 below 63 flips to channel 1 = low E with no Set up');
+  h.ur.receive([0x95, 66, 90]);
+  ok(h.values['mg.layout'] === 'lo1' && h.gnotes().filter(x => x.on)[1].string === 1, 'channel 6 at 66 agrees: high E fret 2');
+  h.App.midiGuitar.setLayout('hi1');
+  h.ur.receive([0x90, 43, 90]);
+  ok(h.values['mg.layout'] === 'hi1', 'a layout set by hand is never flipped by itself');
+
   console.log('ALL ' + checks + ' CHECKS PASS');
 })().catch(e => { console.error('FAIL', e.message); process.exit(1); });

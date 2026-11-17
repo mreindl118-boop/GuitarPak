@@ -152,7 +152,7 @@
       '</div>' +
       '<div class="card" id="set-midi-card">' +
         '<h2>MIDI keyboard</h2>' +
-        '<div class="muted small">Plug in a keyboard by USB or Bluetooth. soundLAB hears your notes, and a LUMI lights up the keys to play.</div>' +
+        '<div class="muted small">Plug in a keyboard (or a MIDI guitar) by USB, Bluetooth or a MIDI cable. soundLAB hears your notes, and a LUMI lights up the keys to play.</div>' +
         '<div class="row tight" style="margin-top:12px" id="set-midi-row">' +
           '<button type="button" class="btn sm primary" id="set-midi-enable">Connect MIDI</button>' +
           '<span class="muted small" id="set-midi-msg" role="status"></span>' +
@@ -172,6 +172,8 @@
             '<button type="button" data-voice="off">Never</button>' +
           '</div>' +
           '<div class="muted small set-theme-note" id="set-midi-voicenote"></div>' +
+          // a MIDI guitar on any of these ports (js/midiguitar.js renders it)
+          '<div id="set-guitar"></div>' +
           '<details class="tips" id="set-midi-btnote" style="display:none"><summary>Bluetooth keyboard not showing up?</summary>' +
             '<ol class="set-steps">' +
               '<li>Pair the keyboard in Windows Bluetooth settings first.</li>' +
@@ -192,12 +194,6 @@
             '</div>' +
           '</details>' +
         '</div>' +
-      '</div>' +
-      // a MIDI guitar, one string per channel (js/midiguitar.js renders it)
-      '<div class="card" id="set-guitar-card">' +
-        '<h2>MIDI guitar</h2>' +
-        '<div class="muted small">For a guitar that sends MIDI, like the Rock Band 3 Squier. soundLAB sees which string and fret you play: the neck lights that spot, and Exercises, the Woodshed and Jam hear every note.</div>' +
-        '<div id="set-guitar"></div>' +
       '</div>' +
       // the controller remote (js/remote.js renders the rows)
       '<div class="card" id="set-remote-card">' +
@@ -886,6 +882,7 @@
     });
     App.on('midi:state', paintMidi);
     App.on('midi:voice', paintVoice);
+    App.on('guitar:port', function () { paintGear(); });
 
     // what is plugged in, in one line: a chip per keyboard with what
     // soundLAB does with it (a MODX sounds by itself, a LUMI shows lights)
@@ -902,6 +899,7 @@
         var nm = p.name || 'MIDI device', role;
         if (App.midi.selfSounding(nm)) role = App.midi.voice === 'on' ? 'makes its own sound' : 'makes its own sound, so soundLAB stays quiet';
         else if (/lumi/i.test(nm)) role = 'key lights';
+        else if (App.midiGuitar && App.midiGuitar.port && nm === App.midiGuitar.port) role = 'MIDI guitar';
         else if (/helix|stadium|line 6/i.test(nm)) role = 'Helix (use the Helix page)';
         else role = App.midi.voice === 'off' ? 'notes only' : 'plays soundLAB';
         return '<span class="set-chip"><b>' + esc(nm.replace(/\s*MIDI\s*\d*$/i, '').slice(0, 28)) + '</b> ' + esc(role) + '</span>';

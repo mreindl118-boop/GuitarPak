@@ -6,10 +6,19 @@ into an interface's MIDI IN (the owner's Steinberg UR24C).
 
 ## What it does
 
-- **Settings > MIDI guitar** (`#set-guitar-card`): pick the input port the
-  guitar comes in on (`mg.port`, port name; empty = no guitar), how long a
-  plucked note rings (`mg.ring` seconds, 0 = until the fretting changes),
-  **Set up** (pluck the open low E once) and "Strings are upside down".
+- **Found by itself**: no setup screen. With no guitar chosen, one strum
+  (notes on 3+ of channels 1-6 within 1.5 s, from a port that is not a
+  LUMI / ROLI / self-sounding synth and plays nothing above channel 6)
+  picks that port (`mg.port`) and toasts "MIDI guitar found". Picking "No
+  MIDI guitar" by hand sets `mg.auto` false and stops the search.
+- **String order by itself**: with the octave buttons in the middle, a note
+  on channel 1 or 6 tells which end is the high E (64+ vs 62-), until a
+  pluck or the box pins it (`mg.set` 'pluck').
+- Lives INSIDE Settings > MIDI keyboard (`#set-guitar`, a "MIDI guitar"
+  sub-section), not its own card: one status line (last string/fret),
+  **Fix strings** (pluck the open low E once) and a folded "Guitar options"
+  (port, ring time `mg.ring`, "Strings are upside down"). The Found chip
+  says "MIDI guitar" for that port.
 - **String and fret**: `guitar:note` {on, string 1-6 (1 = high E), fret,
   valid, midi, vel, chan, portId}. `App.midiGuitar.held` = string -> {fret,
   midi}. The fretboard lights the one ring on that string/fret
