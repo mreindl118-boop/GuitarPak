@@ -53,6 +53,7 @@
   var play = null;       // {src, t0, take, nodes}
   var raf = 0, visible = false;
   var lastFrame = null;
+  var guideTimer = 0, guideKey = '';
   var showTake = false;  // the graph shows the selected take (after a take / a pick) until you record or tap it
 
   function store(k, d) { return App.store.get('vx.' + k, d); }
@@ -301,13 +302,15 @@
       rec.offset = null;
       if (tg.list.length) {
         pattern = { nodes: schedule(t0, tg, store('ref', 'on') === 'on') };
-        pattern.timer = setTimeout(function () { stopRec(); }, (tg.end + 0.3) * 1000 + 150);
+        pattern.timer = setTimeout(function () { if (rec) rec.finished = true; stopRec(); }, (tg.end + 0.3) * 1000 + 150);
+        startGuide(t0, tg.list);
       }
       paint();
     };
     if (!listening) start().then(go); else go();
   }
   function stopPattern() {
+    stopGuide();
     if (!pattern) return;
     cancel(pattern.nodes);
     clearTimeout(pattern.timer);
@@ -327,7 +330,9 @@
     var take = { id: 'tk' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), at: r.at, mode: r.mode, sr: r.sr, pcm: pcm,
       frames: r.frames, targets: tl, beat: r.targets.beat, kept: false };
     take.card = A().score(take.frames, tl, { lag: latency(), timed: tl.length > 1 });
+    take.done = !!r.finished || !tl.length;
     addTake(take);
+    recordProgress(take);
     showTake = true;
     paint();
   }
@@ -350,6 +355,48 @@
     put('hist', h);
   }
   function takeById(id) { for (var i = 0; i < takes.length; i++) if (takes[i].id === id) return takes[i]; return null; }
+
+
+  // ---------- fits the rest of the app ----------
+  // LUMI / key lights: the sounding target + the next one, through the ONE
+  // keybed guide every practice page uses (cleared when the take ends)
+  function startGuide(t0, list) {
+    stopGuide();
+    if (!App.midi || typeof App.midi.guide !== 'function') return;
+    guideTimer = setInterval(function () {
+      var now = ctx().currentTime - t0, i = -1, j = -1;
+      for (var k = 0; k < list.length; k++) {
+        if (now >= list[k].t - 0.05 && now < list[k].t + list[k].d) { i = k; break; }
+        if (list[k].t > now) { j = k; break; }
+      }
+      var cur = i >= 0 ? [list[i].midi] : [], nx = list[i >= 0 ? i + 1 : j];
+      var next = nx && (!cur.length || nx.midi !== cur[0]) ? [nx.midi] : [];
+      var key = cur.join() + '|' + next.join();
+      if (key !== guideKey) { guideKey = key; try { App.midi.guide(cur, next); } catch (e) { /* no keybed */ } }
+    }, 25);
+  }
+  function stopGuide() {
+    if (guideTimer) { clearInterval(guideTimer); guideTimer = 0; }
+    if (guideKey) { guideKey = ''; try { App.midi.guide([], []); } catch (e) { /* ok */ } }
+  }
+  // Voice takes count like any other practice: singing time (only the time
+  // you actually sang) goes to the voice ledger, so the streak, daily goal and
+  // a Practice Plan "sing" block all see it. Notes in tune = matched.
+  function recordProgress(take) {
+    var P = App.practiceProgress, c = take.card;
+    if (!P || !c || !c.voicedSec || c.voicedSec < 1) return;
+    var end = Date.now(), dur = take.pcm.length / take.sr, start = Math.round(end - dur * 1000);
+    var secs = Math.min(c.voicedSec, dur);
+    var good = c.perNote.filter(function (n) { return n.sung && n.inTune >= 0.5; }).length;
+    var day = P.dayKey ? P.dayKey(start) : new Date(start).toISOString().slice(0, 10);
+    var expected = c.free ? c.notes : take.targets.length;
+    try {
+      var r = P.recordSession({ id: 'vx-' + take.id, instrument: 'voice', startedAt: start, endedAt: end, engagedSeconds: secs,
+        segments: [{ date: day, startedAt: start, endedAt: end, engagedSeconds: secs }], mode: 'voice',
+        status: take.done ? 'complete' : 'stopped', expected: expected, matched: Math.min(good, expected), missed: c.free ? 0 : c.missed });
+      if (r && r.ok) App.emit('practiceprogress:changed', { instrument: 'voice' });
+    } catch (e) { /* progress is best effort; the take is kept */ }
+  }
 
   // ---------- playback ----------
   function playTake(id, withNotes) {

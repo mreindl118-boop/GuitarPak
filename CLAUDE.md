@@ -177,7 +177,9 @@ js/vocal.js       VOICE TRAINER (page 'vocal', Train pill "Voice", prefix vx-,
                   live pitch line over targets (5-note scale / hold / free),
                   takes (PCM, WAV, play with notes), Hear myself sidetone (Off on
                   every visit, delay readout). js/vocal-analysis.js = pure score
-                  (SLVocalAnalysis.score). Hook window.SLVocal. Suites vocal-
+                  (SLVocalAnalysis.score). FITS IN: takes = 'voice' sessions in
+                  App.practiceProgress; scale/hold targets light via App.midi.guide;
+                  Plan 'sing' lines -> page vocal (shared). Hook window.SLVocal. Suites vocal-
                   analysis, vocal, vocal-sung (WAV as fake capture).
 js/remote.js      CONTROLLER REMOTE (App.remote, 2.0 beta / v2; docs/CONTROLLER-
                   REMOTE.md): practice moves on from the instrument. Actions

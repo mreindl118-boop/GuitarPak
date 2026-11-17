@@ -29,6 +29,21 @@ finder), D (band three-part), E (progress) are planned, not built.
    master. Off on every visit; shows the delay soundLAB adds and points to the
    UR24C MIX knob for zero delay.
 
+## Fits the rest of soundLAB (no separate corner)
+
+- **Same input** as Settings > Sound input, same key/scale/tempo as the context bar,
+  guide notes in the Keys page's piano voice.
+- **Key lights / LUMI**: during a scale or hold take, the sounding target and the next
+  one light through the one keybed guide (`App.midi.guide`), like Songs and Woodshed.
+- **Practice progress**: every take with at least 1 s of singing is a `voice` session
+  (`mode: 'voice'`, sung seconds, in-tune notes as matched) in `App.practiceProgress`,
+  so streaks, the daily goal and XP count singing.
+- **Practice Plan**: a teacher line with sing / singing / vocal / lip trills / sirens /
+  pitch matching becomes a "Sing with the pitch line" block that opens Voice. It is
+  shared (shows for any Learn category); it completes on a finished take with notes in
+  tune or the block's minutes of singing. Sight-singing stays a listed gap.
+- **Controller remote**: NEXT = Record / Stop.
+
 Stops on: page leave, app hidden, a foreign `transport:claim`. Remote: NEXT = Record/Stop.
 
 ## Tests

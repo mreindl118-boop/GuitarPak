@@ -39,6 +39,7 @@ fs.writeFileSync(wav, buf);
   await p.waitForTimeout(800);
   await p.click('#vx-mode [data-v="hold"]');
   await p.selectOption('#vx-note', '57');
+  await p.evaluate(() => { window.__guide = []; const g = App.midi.guide; App.midi.guide = (now, next) => { window.__guide.push([now.join(), next.join()]); return g.call(App.midi, now, next); }; });
   const res = {};
   for (const side of ['right', 'left']) {
     await p.click('#vx-ch [data-v="' + side + '"]');
@@ -47,6 +48,15 @@ fs.writeFileSync(wav, buf);
     res[side] = await p.evaluate(() => { const k = SLVocal.card; return { grade: k.grade, inTune: k.inTune, off: k.offset, vib: k.vibrato, oct: k.perNote[0].octave, sung: k.sungNotes, tip: k.tip }; });
   }
   const r = res.right, l = res.left;
+  const fit = await p.evaluate(() => {
+    const h = App.practiceProgress.history('voice');
+    const plan = App.practicePlan.preview('Sing the C major scale for 5 minutes\nPlay C major scale right hand');
+    return { sessions: h.length, last: h[h.length - 1], guide: window.__guide, plan: (plan.items || []).map(i => i.page + ':' + i.instrument) };
+  });
+  console.log('# fits the rest of the app');
+  ok(fit.sessions === 2 && fit.last.mode === 'voice' && fit.last.status === 'complete' && fit.last.engagedSeconds > 2, 'each finished take is a voice practice session: ' + fit.sessions + ', ' + (fit.last && fit.last.engagedSeconds.toFixed(1)) + ' s sung');
+  ok(fit.guide.some(g => g[0] === '57') && fit.guide[fit.guide.length - 1].join('|') === '|', 'key lights: the target A3 lit during the take, cleared after');
+  ok(fit.plan[0] === 'vocal:shared' && fit.plan.includes('piano:piano'), 'Plan: a "sing" line opens Voice for any Learn category; a "play" line stays on Keys: ' + fit.plan.join(', '));
   console.log('# right = the voice');
   ok(r.sung === 1 && r.oct === 0, 'held A3 found in its own octave');
   ok(r.inTune > 0.9, 'in tune ' + Math.round(r.inTune * 100) + '% (vibrato centre)');
