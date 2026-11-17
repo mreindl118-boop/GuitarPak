@@ -202,11 +202,13 @@
     return items;
   }
   // weak items (low accuracy so far) come up more often
-  function pickW(list, prefix) {
+  function pickW(list, prefix, keyOf) {
     var st = itemStats(), tot = 0;
     var w = list.map(function (id) {
-      var s = st[prefix + id] || [0, 0];
-      var x = 1 + 2.5 * (1 - (s[0] + 1) / (s[1] + 2));
+      var s = st[keyOf ? keyOf(id) : prefix + id] || [0, 0];
+      // missed AND slow items come up more (the same speed scale as the weak-spot map)
+      var slow = s[2] > 0 ? Math.max(0, Math.min(1, (s[2] - 2000) / 4000)) : 0;
+      var x = 1 + 2.5 * (1 - (s[0] + 1) / (s[1] + 2)) + 1.5 * slow;
       tot += x;
       return x;
     });
@@ -301,7 +303,11 @@
   GEN.keyName = function (o) {
     var midi;
     if (o.fpc != null) midi = 60 + o.fpc + 12 * rnd(2); // a forced key (weak-spot drill)
-    else do { midi = 60 + rnd(24); } while (!o.black && isBlack(midi));
+    else { // weak / slow keys come up more often
+      var kc = [];
+      for (var km = 60; km < 84; km++) if (o.black || !isBlack(km)) kc.push(km);
+      midi = pickW(kc, '', function (m) { return 'kn:' + mod(m, 12); });
+    }
     var pc = mod(midi, 12);
     var q = {
       kind: 'choice', item: 'kn:' + pc, miss: PC_LABEL[pc], sig: String(midi),
@@ -317,7 +323,11 @@
   GEN.keyFind = function (o) {
     var midi;
     if (o.fpc != null) { midi = 60 + o.fpc; o = { black: isBlack(midi) }; }
-    else do { midi = 60 + rnd(12); } while (o.black ? !isBlack(midi) : isBlack(midi));
+    else {
+      var fc = [];
+      for (var fm = 60; fm < 72; fm++) if (o.black ? isBlack(fm) : !isBlack(fm)) fc.push(fm);
+      midi = pickW(fc, '', function (m) { return 'kf:' + mod(m, 12); });
+    }
     var pc = mod(midi, 12);
     var name = o.black ? (Math.random() < 0.5 ? SHARP_N[pc] : FLAT_N[pc]) : LET[NAT.indexOf(pc)];
     return {
@@ -339,7 +349,12 @@
   GEN.neckName = function (o) {
     var neck = neckContext(), s, f, midi;
     if (o.fs != null) { s = o.fs; f = o.ff; midi = neck.midi[s] + f; } // a forced spot (weak-spot drill)
-    else do { s = rnd(neck.midi.length); f = rnd(o.max + 1); midi = neck.midi[s] + f; } while (o.nat && isBlack(midi));
+    else { // weak / slow spots come up more often
+      var nc = [], N = neck.midi.length;
+      for (var cs = 0; cs < N; cs++) for (var cf = 0; cf <= o.max; cf++) if (!(o.nat && isBlack(neck.midi[cs] + cf))) nc.push(cs * 100 + cf);
+      var pk = pickW(nc, '', function (v) { return 'gn:' + N + ':' + Math.floor(v / 100) + ':' + (v % 100); });
+      s = Math.floor(pk / 100); f = pk % 100; midi = neck.midi[s] + f;
+    }
     var pc = mod(midi, 12);
     var q = {
       kind: 'choice', item: 'gn:' + neck.midi.length + ':' + s + ':' + f, miss: PC_LABEL[pc] + ' (' + neck.names[s] + ', fret ' + f + ')', sig: s + ':' + f,
@@ -353,7 +368,15 @@
   };
 
   GEN.neckFind = function (o) {
-    var neck = neckContext(), s = o.fs != null ? o.fs : rnd(neck.midi.length), f = o.fpc != null ? mod(o.fpc - neck.midi[s], 12) : rnd(o.max + 1), midi = neck.midi[s] + f, pc = mod(midi, 12);
+    var neck = neckContext(), N = neck.midi.length, s, f;
+    if (o.fs != null) { s = o.fs; f = o.fpc != null ? mod(o.fpc - neck.midi[s], 12) : rnd(o.max + 1); }
+    else { // weak / slow string + note pairs come up more often
+      var gc = [];
+      for (var gs = 0; gs < N; gs++) for (var gf = 0; gf <= o.max; gf++) gc.push(gs * 100 + gf);
+      var gp = pickW(gc, '', function (v) { var vs = Math.floor(v / 100); return 'gf:' + N + ':' + vs + ':' + mod(neck.midi[vs] + v % 100, 12); });
+      s = Math.floor(gp / 100); f = gp % 100;
+    }
+    var midi = neck.midi[s] + f, pc = mod(midi, 12);
     var name = isBlack(midi) ? (Math.random() < 0.5 ? SHARP_N[pc] : FLAT_N[pc]) : LET[NAT.indexOf(pc)];
     var spots = [];
     for (var ff = 0; ff <= 12; ff++) if (mod(neck.midi[s] + ff, 12) === pc) spots.push({ s: s, f: ff });

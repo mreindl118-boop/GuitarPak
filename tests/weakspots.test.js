@@ -22,7 +22,7 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
     localStorage.setItem('guitarlab.help.seen', 'true');
     localStorage.setItem('guitarlab.help.done', 'true');
     localStorage.setItem('guitarlab.qz.landed', 'true');
-    localStorage.setItem('guitarlab.qz.items', JSON.stringify(items));
+    if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); localStorage.setItem('guitarlab.qz.items', JSON.stringify(items)); }
   }, items);
   const page = await ctx.newPage();
   const errs = [];
@@ -120,6 +120,26 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
   ok(bk.k.lumi, 'keys card offers Light them on the LUMI');
   ok(bk.k.drill === 'kn:6,kf:6' && /^k[nf]:6$/.test(bk.k.item), 'tapping a key drills that key');
   ok(bk.dr.kind === null && !bk.dr.card, 'drums: no weak-spot card');
+
+  // ---- regular levels: slow notes come up more often (no separate mode needed) ----
+  const wt = await page.evaluate(() => {
+    App.practiceInstrument.set('piano');
+    const st = JSON.parse(localStorage.getItem('guitarlab.qz.items'));
+    // two keys, both always right: C fast, D slow
+    for (const k in st) delete st[k];
+    st['kn:0'] = [10, 10, 900]; st['kn:2'] = [10, 10, 5900];
+    localStorage.setItem('guitarlab.qz.items', JSON.stringify(st));
+    location.reload();
+  }).catch(() => {});
+  await page.waitForFunction(() => window.SLQuiz && App.practiceInstrument);
+  const pickCount = await page.evaluate(() => {
+    App.practiceInstrument.set('piano');
+    const lid = SLQuiz.levels().filter(id => /nat\/piano\/1$/.test(id))[0];
+    let c = 0, d = 0;
+    for (let i = 0; i < 3000; i++) { const q = SLQuiz.gen(lid); if (q.item === 'kn:0') c++; if (q.item === 'kn:2') d++; }
+    return { c, d };
+  });
+  ok(pickCount.d > pickCount.c * 1.3, 'slow key comes up more in normal levels (slow ' + pickCount.d + ' vs fast ' + pickCount.c + ')');
 
   // ---- phone width: no horizontal scroll ----
   await page.setViewportSize({ width: 360, height: 800 });

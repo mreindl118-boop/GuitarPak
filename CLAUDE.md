@@ -388,6 +388,10 @@ js/quiz.js        EXERCISES ('quiz', the practice HOME since v0.69.0): Musicca-
                   {drill: items, spot: true}) -> GEN.spot asks exactly those
                   items (forced params fs/ff/fpc on neckName/neckFind/keyName/
                   keyFind). Keys: 'Light them on the LUMI' = App.midi.reveal.
+                  ONE FLOW, NOT A NEW SECTION (Matt: features must gel, no
+                  partitioning): normal note levels already lean on it -
+                  keyName/keyFind/neckName/neckFind pick by pickW (missed AND
+                  slow items, s[2] > 2 s, come up more).
                   Hook SLQuiz.weakSpots; suite tests/weakspots.test.js.
 js/learn-instruments.js Shared explicit Learn category (piano/synth/guitar/bass/
                   drums/voice/other), instrument-appropriate course modes and
