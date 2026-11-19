@@ -1,6 +1,6 @@
 {
   "version": "0.75.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/soundLAB-alpha.apk",
-  "web": "2.0.0",
-  "notes": "soundLAB 2.0 is here. Everything you used in 1.4 is still in place, plus: scale dots on the Keys page (one colored dot per key), the chord chart maker (Keys > Charts: draw, save, print and light up your chord sheets on the LUMI), and hands-free practice (start, stop and step through lessons from your keyboard or controller). Your progress and settings carry over."
+  "web": "2.1.0",
+  "notes": "soundLAB 2.1: three new things that fit right into the pages you already use. Exercises now shows your weak spots and gives you more of the notes you miss. A MIDI guitar (like the Rock Band 3 Squier) is found with one strum and shows string and fret on the neck. And Train > Voice lets you sing and see your pitch, with key lights and Practice Plan sing blocks. Your progress and settings carry over."
 }

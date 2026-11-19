@@ -63,6 +63,12 @@
     tuner: [
       { t: 'Tuner', x: 'A chromatic tuner using your microphone. Press Start, allow mic access, and play one string at a time — the needle shows how far off you are; green means in tune.' }
     ],
+    vocal: [
+      { t: 'Voice trainer', x: 'Sing and see your pitch as a line over the target notes. Green = in tune, yellow = close, red = off.' },
+      { sel: '#vx-ch', t: 'Which input', x: 'The UR24C sends input 1 on the Left and input 2 (your Helix XLR mic) on the Right. Pick the side your voice is on; the L and R meters show which one moves.' },
+      { sel: '#vx-rec', t: 'Record a take', x: 'Press Record, wait for the 4 clicks, then sing. When it stops you get a score and one tip. Play it back alone or with the notes.' },
+      { sel: '#vx-st', t: 'Hear myself', x: 'Plays your voice into your headphones. For zero delay, use the MIX knob on the UR24C instead.' }
+    ],
     trainer: [
       { t: 'Trainer', x: 'Practice prompts: it deals you a key, scale and tempo to work on. Hit Go and it sets up the Fretboard for that exact drill — a fresh challenge every time.' }
     ],
