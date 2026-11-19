@@ -40,7 +40,7 @@ window.App = (function () {
   // Settings is deliberately in NEITHER list: it's an overlay page opened by
   // the ever-present gear in the header, from any page in either space.
   var SPACES = {
-    practice: ['quiz', 'practiceplan', 'fretboard', 'tab', 'notation', 'helix', 'chords', 'piano', 'chart', 'synth', 'pads', 'deck', 'liveset', 'midihub', 'lumipractice', 'songs', 'jam', 'shed', 'tuner', 'trainer', 'theory'],
+    practice: ['quiz', 'practiceplan', 'fretboard', 'tab', 'notation', 'helix', 'chords', 'piano', 'chart', 'synth', 'pads', 'deck', 'liveset', 'midihub', 'lumipractice', 'songs', 'jam', 'shed', 'vocal', 'tuner', 'trainer', 'theory'],
     studio: ['arrange', 'tracks', 'song', 'ideas']
   };
   var SPACE_LABELS = {
@@ -48,7 +48,7 @@ window.App = (function () {
     chords: 'Chords', piano: 'Piano', songs: 'Songs', jam: 'Jam', tuner: 'Tuner',
     trainer: 'Trainer', theory: 'Theory', settings: 'Settings', shed: 'Shed', synth: 'Synth',
     song: 'Song', arrange: 'Arrange', tracks: 'Tracks', pads: 'Pads', ideas: 'Ideas',
-    quiz: 'Exercises', midihub: 'MIDI Hub', deck: 'Synth deck', liveset: 'Live sets', lumipractice: 'LUMI', practiceplan: 'Practice plan', helix: 'Helix Stadium', chart: 'Chord charts'
+    quiz: 'Exercises', midihub: 'MIDI Hub', deck: 'Synth deck', liveset: 'Live sets', lumipractice: 'LUMI', practiceplan: 'Practice plan', helix: 'Helix Stadium', chart: 'Chord charts', vocal: 'Voice trainer'
   };
   // overlays live outside both page sets: the metronome opens as a SHEET over
   // whatever page you're on (corner icon), settings toggles in place (gear)
@@ -64,7 +64,7 @@ window.App = (function () {
       { id: 'gkeys', label: 'Keys', icon: 'keys', pages: ['piano', 'chart', 'synth', 'pads', 'lumipractice'] },
       { id: 'gsynth', label: 'Synth', icon: 'sliders', pages: ['deck', 'liveset', 'midihub'] }, // 1.3: the Synth tab (js/synthtab.js) - Deck / Live / Hub (= the MIDI Hub, js/midihub.js)
       { id: 'gplay', label: 'Play', icon: 'note', pages: ['songs', 'jam'] },
-      { id: 'gprac', label: 'Train', icon: 'target', pages: ['shed', 'trainer', 'tuner'] } // 1.3 (primer A1): 'Practice' is the space, 'Train' the tab // the game first
+      { id: 'gprac', label: 'Train', icon: 'target', pages: ['shed', 'vocal', 'trainer', 'tuner'] } // 1.3 (primer A1): 'Practice' is the space, 'Train' the tab // the game first
     ],
     studio: [
       { id: 'gstudio', label: 'Studio', icon: 'sliders', pages: ['arrange', 'tracks'] }, // the DAW home
@@ -77,7 +77,7 @@ window.App = (function () {
     chords: 'Chords', theory: 'Circle', songs: 'Songs', jam: 'Jam',
     trainer: 'Trainer', shed: 'Woodshed', metronome: 'Metronome', tuner: 'Tuner',
     song: 'Song', ideas: 'Ideas', tracks: 'Editor', arrange: 'Timeline', pads: 'Pads', synth: 'Synth',
-    quiz: 'Exercises', midihub: 'Hub', deck: 'Deck', liveset: 'Live', lumipractice: 'LUMI', practiceplan: 'Plan', helix: 'Helix', chart: 'Charts'
+    quiz: 'Exercises', midihub: 'Hub', deck: 'Deck', liveset: 'Live', lumipractice: 'LUMI', practiceplan: 'Plan', helix: 'Helix', chart: 'Charts', vocal: 'Voice'
   };
 
   function groupOf(name) {
@@ -98,7 +98,7 @@ window.App = (function () {
   //            when an APK is actually built. Older APKs read nothing else, so
   //            this must never run ahead of the real file: when it did, the
   //            Android app kept downloading the same old APK in a loop.
-  var APP_VERSION = '2.0.0';
+  var APP_VERSION = '2.1.0';
   var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
 
   function verNum(v) {
