@@ -17,7 +17,11 @@ black keys on amber) rendered to icons/icon-192/512.png.
 ## soundLAB 2.0 (branch `v2`) — read first
 
 2.0.0 WENT LIVE (2026-11-11): `main` = v2 at that point (1.4.1 + scale dots,
-Keys > Charts, the controller remote), served at /GuitarPak/. Work continues on
+Keys > Charts, the controller remote), served at /GuitarPak/.
+2.1.0 WENT LIVE (2026-11-19, Matt's yes): PRs #107 weak-spot map (Exercises),
+#108 MIDI guitar (js/midiguitar.js, inside the MIDI keyboard card) and #109
+voice trainer part A (Train > Voice, js/vocal*.js) merged into v2, then v2 ->
+main; sw CACHE v6. Work continues on
 branch `v2`, published to the BETA address
 https://mreindl118-boop.github.io/GuitarPak/next/ by
 `.github/workflows/pages-next.yml` (full suite first; replaces only `next/` on
