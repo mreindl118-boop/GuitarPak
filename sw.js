@@ -23,6 +23,7 @@ var ASSETS = [
   'js/learn-instruments.js',
   'js/note-palette.js',
   'js/midi.js',
+  'js/midiguitar.js',
   'js/remote.js',
   'js/practice-router.js',
   'js/tonein.js',
