@@ -411,7 +411,7 @@
       var jy = rowY(r);
       for (f = 0; f <= N; f++) {
         s.push('<circle class="fb-jam-ring" data-pc="' + Theory.mod12(tun.midi[js] + f) +
-          '" data-midi="' + (tun.midi[js] + f) + '" cx="' + fx(colCX(f)) + '" cy="' + jy +
+          '" data-midi="' + (tun.midi[js] + f) + '" data-gs="' + (6 - js) + '" data-f="' + f + '" cx="' + fx(colCX(f)) + '" cy="' + jy +
           '" r="15" fill="none" ' +
           'stroke="rgba(255,255,255,0.85)" stroke-width="2.5" pointer-events="none"/>');
       }
@@ -453,8 +453,13 @@
     var svg = document.getElementById('fb-svg');
     if (!svg) return;
     var rings = svg.querySelectorAll('.fb-jam-ring');
+    // a MIDI guitar (js/midiguitar.js) knows its string and fret: light
+    // that one spot; keyboards and tone-in light every place the pitch lives
+    var gh = App.midiGuitar ? App.midiGuitar.held : {};
     for (var i = 0; i < rings.length; i++) {
-      rings[i].classList.toggle('midi', !!midiHeld[rings[i].getAttribute('data-midi')]);
+      var gp = gh[rings[i].getAttribute('data-gs')];
+      rings[i].classList.toggle('midi', !!midiHeld[rings[i].getAttribute('data-midi')] ||
+        !!(gp && String(gp.fret) === rings[i].getAttribute('data-f')));
     }
   }
 
@@ -2020,9 +2025,12 @@
     });
     App.on('midi:note', function (d) {
       if (!d) return;
+      if (App.midiGuitar && App.midiGuitar.isGuitar(d)) return; // 'guitar:note' paints it
       if (d.on) midiHeld[d.midi] = true; else delete midiHeld[d.midi];
       midiPaint();
     });
+    App.on('guitar:note', midiPaint);
+    App.on('guitar:port', midiPaint);
     App.on('note:input', function (d) { // on-screen piano / QWERTY too
       if (!d) return;
       if (d.on) midiHeld[d.midi] = true; else delete midiHeld[d.midi];
