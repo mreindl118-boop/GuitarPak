@@ -183,6 +183,17 @@ js/audioin.js     SOUND INPUT (App.audioIn): the ONE shared live-input service.
                   audio.outId is re-applied (setSinkId) when it is listed again.
                   Suite tests/audioin.test.js (Chromium fake media device).
                   Loaded right after tonein.js.
+js/vocal.js       VOICE TRAINER (page 'vocal', Train pill "Voice", prefix vx-,
+                  store vx.*; docs/VOCAL-TRAINER.md): part A Sing & see - shared
+                  input via App.audioIn.hold/tap('vocal'), side pick L/R/Both
+                  (UR24C in 2 = Right), ScriptProcessor -> SLPitchDetector frames,
+                  live pitch line over targets (5-note scale / hold / free),
+                  takes (PCM, WAV, play with notes), Hear myself sidetone (Off on
+                  every visit, delay readout). js/vocal-analysis.js = pure score
+                  (SLVocalAnalysis.score). FITS IN: takes = 'voice' sessions in
+                  App.practiceProgress; scale/hold targets light via App.midi.guide;
+                  Plan 'sing' lines -> page vocal (shared). Hook window.SLVocal. Suites vocal-
+                  analysis, vocal, vocal-sung (WAV as fake capture).
 js/remote.js      CONTROLLER REMOTE (App.remote, 2.0 beta / v2; docs/CONTROLLER-
                   REMOTE.md): practice moves on from the instrument. Actions
                   next / back / stop, each bound in Settings › Hands-free

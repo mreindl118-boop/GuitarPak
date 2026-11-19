@@ -38,6 +38,8 @@ var ASSETS = [
   'js/songs.js',
   'js/jam.js',
   'js/tuner.js',
+  'js/vocal.js',
+  'js/vocal-analysis.js',
   'js/trainer.js',
   'js/theorytab.js',
   'js/settings.js',
