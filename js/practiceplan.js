@@ -7,6 +7,8 @@
   // The single mapping table. Specific scale/hand/octave matching is below;
   // a matching word is never permission to invent an unsupported exercise.
   var RULES = [
+    // first: "sing the scale" is a Voice block, not a Keys one
+    { id: 'sing', match: /\b(sing(?:ing)?|sung|vocals?|lip trills?|sirens?|pitch[- ]matching)\b/i, title: 'Sing with the pitch line', page: 'vocal', kind: 'technique', area: 'Voice', minutes: 5 },
     { id: 'tune', match: /\b(tun(?:e|er|ing))\b/i, title: 'Tune up', page: 'tuner', kind: 'warm-up', area: 'Tuner', minutes: 2 },
     { id: 'scale', match: /\b(scales?|pentatonic|arpeggios?)\b/i, title: 'Scale technique', page: 'piano', kind: 'technique', area: 'Keys', minutes: 5 },
     { id: 'hanon', match: /\b(hanon|rudiments?|paradiddles?)\b/i, title: 'Technique in Woodshed', page: 'shed', kind: 'technique', area: 'Woodshed', minutes: 5 },
@@ -25,7 +27,7 @@
   function label(id) { return id === 'shared' ? 'Shared theory / reference' : id === 'keys' ? 'Legacy keyboard context' : id === 'legacy' ? 'Legacy / unassigned' : App.practiceInstrument ? App.practiceInstrument.label(id) : id; }
   function itemInstrument(item, plan) {
     if (item.instrument) return item.instrument;
-    if (item.page === 'quiz' || item.page === 'chords' || item.page === 'tuner') return 'shared';
+    if (item.page === 'quiz' || item.page === 'chords' || item.page === 'tuner' || item.page === 'vocal') return 'shared';
     if (item.page === 'fretboard') return 'guitar';
     if (item.lessonId || item.page === 'piano') return plan.instrument === 'synth' ? 'synth' : plan.instrument === 'piano' ? 'piano' : 'keys';
     return plan.instrument === 'keys' ? 'keys' : category(plan.instrument) || 'legacy';
@@ -73,7 +75,7 @@
     var items = [], gaps = [], seen = {}, selected = category(options.instrument) || instrument();
     function gap(source, reason) { gaps.push({ id: hash(source + '|' + reason), source: source, reason: reason }); }
     function add(source, rule, c, extra) {
-      var item = Object.assign({ source: source, instrument: ['quiz','chords','tuner'].indexOf(rule.page) >= 0 ? 'shared' : selected, title: rule.title, page: rule.page, kind: /warm[ -]?up/i.test(source) ? 'warm-up' : rule.kind, area: rule.area, minutes: c.minutes || rule.minutes, root: c.root, scale: c.scale, bpm: c.bpm, help: c.help }, extra || {});
+      var item = Object.assign({ source: source, instrument: ['quiz','chords','tuner','vocal'].indexOf(rule.page) >= 0 ? 'shared' : selected, title: rule.title, page: rule.page, kind: /warm[ -]?up/i.test(source) ? 'warm-up' : rule.kind, area: rule.area, minutes: c.minutes || rule.minutes, root: c.root, scale: c.scale, bpm: c.bpm, help: c.help }, extra || {});
       item.id = 'pp-' + hash(JSON.stringify([source, item.instrument, item.page, item.lessonId || '', item.root, item.scale, item.bpm, item.minutes, item.help]));
       items.push(item);
     }
@@ -83,7 +85,7 @@
       if (seen[source.toLowerCase()]) return; seen[source.toLowerCase()] = true;
       var c = context(source), rule = RULES.filter(function (r) { return r.match.test(source); })[0];
       if (c.ambiguous) { gap(source, 'Split assignments with multiple keys onto separate lines so each block has one setup.'); return; }
-      if (/\b(sing|singing|vocal|sight[ -]?read|sight[ -]?sing|transcrib|pedal|embouchure|bowing)\w*/i.test(source)) { gap(source, 'No matching guided module for this assignment.'); return; }
+      if (/\b(sight[ -]?read|sight[ -]?sing|transcrib|pedal|embouchure|bowing)\w*/i.test(source)) { gap(source, 'No matching guided module for this assignment.'); return; }
       if (!rule) { gap(source, 'No matching guided module.'); return; }
       if (rule.id === 'scale') {
         var octaveRequest = source.match(/\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten)[ -]?octave/i);
@@ -106,7 +108,7 @@
         if (/\blevel\s*\d|\bbpm\b/i.test(source.replace(/help\s*(?:level\s*)?[0-4]/ig, ''))) gap(source, 'Exact lesson speed/level needs selection in Keys; no public setup hook exists.');
         return;
       }
-      var setup = rule.page === 'shed' ? 'Choose or import the assigned piece/exercise in Woodshed, then start a run.' : rule.page === 'quiz' ? 'Choose the matching topic or ear mode in Exercises; answer time is measured.' : rule.page === 'tuner' ? 'Press Start in Tuner when ready. Tuner accuracy is not recorded.' : 'Shared key and tempo are applied. Choose the requested voicing or pattern here.';
+      var setup = rule.page === 'vocal' ? 'Opens Train > Voice in the shared key and tempo. Record a take; your singing time counts.' : rule.page === 'shed' ? 'Choose or import the assigned piece/exercise in Woodshed, then start a run.' : rule.page === 'quiz' ? 'Choose the matching topic or ear mode in Exercises; answer time is measured.' : rule.page === 'tuner' ? 'Press Start in Tuner when ready. Tuner accuracy is not recorded.' : 'Shared key and tempo are applied. Choose the requested voicing or pattern here.';
       if (rule.page === 'fretboard' && selected !== 'guitar') { gap(source, 'This warm-up hook opens the six-string guitar fretboard; choose a matching instrument-specific exercise instead.'); return; }
       add(source, rule, c, { setup: setup });
       if (rule.page === 'shed') gap(source, 'Direct selection/import of this score needs a Woodshed setup hook.');
@@ -143,11 +145,13 @@
     App.store.set('pp.sessions', all);
   }
   function telemetry(item, selected) {
-    var history = App.practiceProgress ? App.practiceProgress.history(selected) : [];
+    // singing is shared by every Learn category: Voice takes live in the voice ledger
+    var history = App.practiceProgress ? App.practiceProgress.history(item.page === 'vocal' ? 'voice' : selected) : [];
     var records = history.filter(function (r) {
       if (item.lessonId) return r.mode === 'keys:' + item.lessonId;
       if (item.page === 'quiz') return r.mode === 'knowledge';
       if (item.page === 'shed') return ['wait', 'tempo', 'woodshed'].indexOf(r.mode) >= 0;
+      if (item.page === 'vocal') return r.mode === 'voice';
       return false;
     });
     var scoped = obj('qz.instrumentProg')[selected];
@@ -172,6 +176,7 @@
       if (item.lessonId && fresh.some(function (r) { return r.status === 'complete' && r.matched > 0; })) reason = 'New ' + label(running.instrument) + ' Keys lesson session recorded';
       if (item.page === 'quiz' && Object.keys(now.quiz).some(function (id) { return (now.quiz[id].b || 0) >= 8 && (!base.quiz[id] || now.quiz[id].b > base.quiz[id].b); })) reason = 'New passing ' + label(running.instrument) + ' Exercises result recorded';
       if (item.page === 'shed' && fresh.some(function (r) { return r.status === 'complete' && (r.matched > 0 || r.engagedSeconds > 0); })) reason = 'New ' + label(running.instrument) + ' Woodshed session recorded';
+      if (item.page === 'vocal' && fresh.some(function (r) { return r.status === 'complete' && r.matched > 0; })) reason = 'New Voice take scored';
       if (st.seconds >= item.minutes * 60) reason = 'Active practice time reached';
       if (reason) { st.done = true; st.reason = reason; st.completedAt = new Date().toISOString(); App.store.set('pp.running', null); }
       saveSession(sess);
@@ -187,7 +192,7 @@
     // the block last opened (the controller remote's Next / Back start
     // from it) lives in the day's record, so a reload keeps the place
     sess.items[id] = st; sess.last = id; saveSession(sess);
-    var observed = !!item.lessonId || item.page === 'quiz' || item.page === 'shed';
+    var observed = !!item.lessonId || item.page === 'quiz' || item.page === 'shed' || item.page === 'vocal';
     App.store.set('pp.running', st.done || !observed ? null : { student: s.id, instrument: selected, day: dayKey(), plan: s.plan.id, item: id, base: telemetry(item, selected), previous: st.seconds, previousIds: st.sessionIds || [], startedAt: new Date().toISOString() });
     App.store.set('met.bpm', item.bpm); App.emit('tempo', { bpm: item.bpm, source: 'practiceplan' });
     App.emit('fb:set', { root: item.root, scale: item.scale, source: 'practiceplan' });
@@ -281,7 +286,7 @@
     var s = state(), done = 0, total = s.availableItems.reduce(function (n, i) { return n + i.minutes; }, 0);
     replaceRegion('pp-today', '<div class="pp-heading"><div><h2>Today’s ' + esc(label(s.instrument)) + ' session</h2><p class="pp-muted">' + dayKey() + ' · ' + total + ' minutes suggested · accepted plan context: ' + esc(label(s.plan.instrument || 'legacy')) + '</p></div><button type="button" class="btn sm" id="pp-refresh">Refresh progress</button></div>' + (s.availableItems.length ? '<ol class="pp-blocks">' + s.availableItems.map(function (i, n) {
       var st = s.session.items[i.id] || { seconds: 0, done: false }; if (st.done) done++;
-      var criterion = i.lessonId ? 'One new completed lesson session or ' + i.minutes + ' recorded playing minutes' : i.page === 'shed' ? 'One new completed run or ' + i.minutes + ' recorded playing minutes' : i.page === 'quiz' ? 'A new passing score or ' + i.minutes + ' recorded answering minutes' : 'No automated timer or completion is available for this casual tool; opening it earns no progress.';
+      var criterion = i.lessonId ? 'One new completed lesson session or ' + i.minutes + ' recorded playing minutes' : i.page === 'shed' ? 'One new completed run or ' + i.minutes + ' recorded playing minutes' : i.page === 'quiz' ? 'A new passing score or ' + i.minutes + ' recorded answering minutes' : i.page === 'vocal' ? 'One finished Voice take with notes in tune, or ' + i.minutes + ' minutes of singing' : 'No automated timer or completion is available for this casual tool; opening it earns no progress.';
       return '<li class="pp-block' + (st.done ? ' pp-done' : '') + '"><span class="pp-number" aria-label="' + (st.done ? 'Complete' : 'Step ' + (n + 1)) + '">' + (st.done ? '✓' : n + 1) + '</span><div class="pp-body"><span class="pp-kicker">' + esc(i.kind) + ' · ' + i.minutes + ' min</span><h3>' + esc(i.title) + '</h3><p class="pp-source">' + (s.plan.source ? 'Doc: “' + esc(i.source) + '”' : esc(i.source)) + '</p>' + (i.setup ? '<p class="pp-muted">' + esc(i.setup) + '</p>' : '') + '<p class="pp-evidence">' + (st.done ? esc(st.reason) : Math.floor(st.seconds) + ' seconds recorded · ' + criterion) + '</p></div><button type="button" class="btn' + (!st.done && n === done ? ' primary' : '') + '" data-pp-open="' + esc(i.id) + '">' + (st.done ? 'Open again' : st.seconds ? 'Continue' : 'Start') + '</button></li>';
     }).join('') + '</ol>' : '<p>No matching blocks for this Learn category. Your accepted plan is preserved below.</p>') + (s.preservedItems.length ? '<details id="pp-preserved"><summary>' + s.preservedItems.length + ' blocks preserved for other instrument contexts</summary><ul>' + s.preservedItems.map(function (i) { return '<li><b>' + esc(i.title) + '</b> · ' + esc(label(itemInstrument(i, s.plan))) + '<p class="pp-muted">' + esc(i.source) + '</p></li>'; }).join('') + '</ul></details>' : '') + '<p class="pp-muted">' + done + ' / ' + s.availableItems.length + ' matching blocks measured complete. Time comes from recorded sessions for ' + esc(label(s.instrument)) + '; opening a page earns no minutes or XP.</p>');
     var mins = s.week.reduce(function (n, d) { return n + (+d.engagedSeconds || 0); }, 0) / 60;

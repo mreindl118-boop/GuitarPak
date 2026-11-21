@@ -5,7 +5,7 @@ WebView wrapper. GitHub: https://github.com/mreindl118-boop/GuitarPak
 Branded **soundLAB** (formerly GuitarLab) since v0.43.0 — the rename is
 user-facing ONLY: the APK ships as soundLAB-alpha.apk (a GuitarLab-alpha.apk
 copy keeps old links alive), and internal ids/comments are untouched.
-STORAGE: the live app on branch main (2.0.0, the code before Phase A) keeps
+STORAGE: the live app on branch main (2.1.0, the code before Phase A) keeps
 its data under 'guitarlab.*', as 1.x did. The code on branch v2 since Phase
 A4 keeps its own under 'soundlab2.*' ('soundlab2-next.*' on the beta under
 /next/). For that code 'guitarlab.*' is THE EARLIER STORE (code comments and
@@ -24,7 +24,11 @@ black keys on amber) rendered to icons/icon-192/512.png.
 ## soundLAB 2.0 (branch `v2`) — read first
 
 2.0.0 WENT LIVE (2026-11-11): `main` = v2 at that point (1.4.1 + scale dots,
-Keys > Charts, the controller remote), served at /GuitarPak/. Work continues on
+Keys > Charts, the controller remote), served at /GuitarPak/.
+2.1.0 WENT LIVE (2026-11-19, Matt's yes): PRs #107 weak-spot map (Exercises),
+#108 MIDI guitar (js/midiguitar.js, inside the MIDI keyboard card) and #109
+voice trainer part A (Train > Voice, js/vocal*.js) merged into v2, then v2 ->
+main; sw CACHE v6. Work continues on
 branch `v2`, published to the BETA address
 https://mreindl118-boop.github.io/GuitarPak/next/ by
 `.github/workflows/pages-next.yml` (full suite first; replaces only `next/` on
@@ -44,7 +48,7 @@ roadmap before touching those areas.
 
 ```
 index.html        soundLAB: tab shell; loads theory → app → modules →
-                  App.boot(). 14 pages + the Settings overlay; since 2.0
+                  App.boot(). 15 pages + the Settings overlay; since 2.0
                   Phase A3b it loads NONE of the seven soundLAB Gear files
 gear.html         soundLAB Gear (2.0 Phase A3b): the second app over the same
                   scripts and the same store. <html data-app="gear">; the
@@ -87,7 +91,7 @@ js/app.js         shell: module registry, tab switching, shared AudioContext +
                   /next/<file> (the beta), else 'soundlab2.' (the live
                   address, the test server, file://, the artifact).
                   App.store.legacy = 'guitarlab.' = the earlier store (1.x
-                  wrote it, the live 2.0.0 on the same origin still does):
+                  wrote it, the live 2.1.0 on the same origin still does):
                   READ by the copy below, never written, deleted or
                   changed. get(key,
                   fallback) / set(key, value) = JSON, as always (a refused
@@ -263,6 +267,19 @@ js/midi.js        MIDI service (App.midi: in/out ports, note/bend/pressure
                   output; name() = the name of the port that is used; has() =
                   MIDI ready and a synth port or a selected output exists;
                   set(v) stores v ('' / null = 'shared').
+js/midiguitar.js  MIDI GUITAR (2.0 beta / v2, docs/MIDI-GUITAR.md): a guitar
+                  with one MIDI channel per string (the Rock Band 3 Squier via
+                  the UR24C's MIDI IN). FOUND BY ITSELF from one strum (mg.port
+                  by NAME, mg.auto false = None picked by hand); string order
+                  auto from the outer strings (mg.set auto|pluck); UI is a
+                  sub-section #set-guitar INSIDE the MIDI keyboard card (Fix
+                  strings = one pluck -> mg.layout hi1|lo1 + mg.oct; ring
+                  mg.ring s). Owner rule: features blend in, no partitions. Emits 'guitar:note' {string 1-6 (1 = high
+                  E), fret, ...}; App.midiGuitar.held lights ONE fretboard ring
+                  (data-gs/data-f). midi.js guitarSrc: channels 1-6 of that
+                  port are mono (re-strum without Note Off retriggers) and
+                  auto-release after mg.ring. Suite tests/midiguitar.test.js.
+                  Loaded right after midi.js.
 js/tonein.js      1/4"/audio-in TONE-IN: pitch-detects the selected audio
                   input (audio.inId; toggle audio.tonein in Settings) and
                   emits midi:note {silent:true} — instrument pages show the
@@ -370,6 +387,17 @@ js/audioin.js     SOUND INPUT (App.audioIn): the ONE shared live-input service.
                   cases are in tests/gear.test.js.
                   Loaded right after tonein.js (soundLAB) / midirules.js
                   (soundLAB Gear).
+js/vocal.js       VOICE TRAINER (page 'vocal', Train pill "Voice", prefix vx-,
+                  store vx.*; docs/VOCAL-TRAINER.md): part A Sing & see - shared
+                  input via App.audioIn.hold/tap('vocal'), side pick L/R/Both
+                  (UR24C in 2 = Right), ScriptProcessor -> SLPitchDetector frames,
+                  live pitch line over targets (5-note scale / hold / free),
+                  takes (PCM, WAV, play with notes), Hear myself sidetone (Off on
+                  every visit, delay readout). js/vocal-analysis.js = pure score
+                  (SLVocalAnalysis.score). FITS IN: takes = 'voice' sessions in
+                  App.practiceProgress; scale/hold targets light via App.midi.guide;
+                  Plan 'sing' lines -> page vocal (shared). Hook window.SLVocal. Suites vocal-
+                  analysis, vocal, vocal-sung (WAV as fake capture).
 js/remote.js      CONTROLLER REMOTE (App.remote, 2.0 beta / v2; docs/CONTROLLER-
                   REMOTE.md): practice moves on from the instrument. Actions
                   next / back / stop, each bound in Settings › Hands-free
@@ -712,7 +740,7 @@ js/settings.js    ┘ (settings: app-level prefs — theme dark/light/auto; MIDI
                      that start with 'soundlab2.' or 'soundlab2-next.'
                      (a beta file restores on live and the other way
                      round) and 'guitarlab.' keys (a file exported by 1.x
-                     or by the live 2.0.0), strips
+                     or by the live 2.1.0), strips
                      the prefix and writes under THIS scope with setRaw:
                      string values only, App.store.deny keys skipped,
                      never a 'guitarlab.' key written; it reports "N
@@ -779,6 +807,23 @@ js/quiz.js        EXERCISES ('quiz', the practice HOME since v0.69.0): Musicca-
                   window.SLQuiz = test hook (levels, gen, start, pick, q,
                   view, cur, nodes, node(i), current, sprint, endless,
                   clock, finishSprint, tab, theory).
+                  2.1 WEAK-SPOT MAP (v2, docs/ROADMAP-2.0.md sibling plan
+                  Music-Studio/soundlab/2.1-CONCEPT.md): qz.items entries are
+                  [right, asked, avgMs?, day?] (avgMs = running average of
+                  RIGHT answers, recordItem). wsSpots(kind) adds items up per
+                  spot - guitar/bass: fret 0-12 x string (gn + gf items), keys:
+                  12 pitch classes (kn + kf) - score = accuracy x (0.6 + 0.4 x
+                  speed; <= 2 s full, >= 6 s none), bands strong/good/shaky/
+                  weak/none. Progress tab card #qz-wscard + small map on note-
+                  level results; tap a spot (data-qzspot) = startLevel(base,
+                  {drill: items, spot: true}) -> GEN.spot asks exactly those
+                  items (forced params fs/ff/fpc on neckName/neckFind/keyName/
+                  keyFind). Keys: 'Light them on the LUMI' = App.midi.reveal.
+                  ONE FLOW, NOT A NEW SECTION (Matt: features must gel, no
+                  partitioning): normal note levels already lean on it -
+                  keyName/keyFind/neckName/neckFind pick by pickW (missed AND
+                  slow items, s[2] > 2 s, come up more).
+                  Hook SLQuiz.weakSpots; suite tests/weakspots.test.js.
 js/learn-instruments.js Shared explicit Learn category (piano/synth/guitar/bass/
                   drums/voice/other), instrument-appropriate course modes and
                   actual lesson/practice entry points. Selection is not credit.
@@ -845,7 +890,7 @@ js/help.js        (?) button + guided page tours (TOURS per page id, spotlight
                   step on #sg-player.
 js/helix.js       soundLAB Gear — HELIX STADIUM page ('helix': Gear's own
                   "Helix" tab, group ghelix, one page so no pill strip;
-                  before Phase A (1.x, the live 2.0.0) the Guitar group's
+                  before Phase A (1.x, the live 2.1.0) the Guitar group's
                   "Helix" pill;
                   0.82.0; prefix hx-, store hx.*; built in — it began as a
                   plug-in, before 2.0 removed the plug-in API).
@@ -1274,7 +1319,7 @@ A1 (Studio space, sequencer/arranger, sampler, plug-in API removed):
 - ONE PAGE SET (js/app.js): `PAGES` = the one flat page list, `HOME =
   PAGES[0]`, `GROUPS` = a plain array of tab groups, the last page is stored
   under `TAB_KEY`. Since A3b there is one such set PER APP and all four come
-  from `APPS[APP_ID]`: soundLAB 14 pages / five groups / HOME 'quiz' /
+  from `APPS[APP_ID]`: soundLAB 15 pages / five groups / HOME 'quiz' /
   `app.tab`, soundLAB Gear 4 pages / two groups / HOME 'deck' / `gear.tab`
   (see A3b). Gone: SPACES, App.space,
   App.setSpace, the `space` event, #space-btn, #wipe, <html data-space>,
@@ -1305,7 +1350,7 @@ A1 (Studio space, sequencer/arranger, sampler, plug-in API removed):
   `Woodshed.importTrack` stays (tests/remote-shed.test.js).
 - #cx-met drives ONLY the metronome (`met:toggle`); transport owners are met,
   jam, keys, quiz, chart.
-- REMOVED-FEATURE DATA IS NEVER WRITTEN OR DELETED (the live app, 2.0.0 = the
+- REMOVED-FEATURE DATA IS NEVER WRITTEN OR DELETED (the live app, 2.1.0 = the
   code before the trim, shares the origin and still uses it): st.*, ideas.list, song.name, sd.*, plugins.list,
   app.space, app.tabStudio, app.click, pads.track have no reader and no
   writer; the IndexedDB 'guitarlab-daw' is never opened. Settings › Backup
@@ -1316,9 +1361,10 @@ A1 (Studio space, sequencer/arranger, sampler, plug-in API removed):
 - NO PLUG-IN API: js/plugins.js, plugins/, PLUGINS.md and the Settings card
   are gone, nothing runs stored code. `App.addPage(id, label, sp, mod)` stays
   as an INTERNAL test hook (tests/remote.test.js; `sp` is ignored).
-- sw.js: A1 set `CACHE` to `PREFIX + 'v5'` ('sl2-next-v5' on the beta,
-  'sl2-live-v5' at the live address; A2 v6, A3a v7, A3b v8, A4 v9 = the
-  number now; v4 = the live 2.0.0). The fetch handler looks ONLY in
+- sw.js: A1 set `CACHE` to `PREFIX + 'v7'` ('sl2-next-v7' on the beta,
+  'sl2-live-v7' at the live address; A2 v8, A3a v9, A3b v10, A4 v11 = the
+  number now; v6 = the live 2.1.0. The numbers only have to rise: a step takes the
+  next one after whatever `v2` holds when it is merged). The fetch handler looks ONLY in
   its own cache
   (`caches.open(CACHE)` then `match(req, {ignoreSearch: true})`), never the
   global `caches.match`: the live worker's cache on the same origin can hold
@@ -1338,10 +1384,10 @@ A1 (Studio space, sequencer/arranger, sampler, plug-in API removed):
 
 A2 (the three folds: the Trainer page, the Synth pill, the LUMI pill):
 
-- 18 PAGES AFTER A2: Learn (quiz, chords, theory, practiceplan) · Guitar
+- 19 PAGES AFTER A2: Learn (quiz, chords, theory, practiceplan) · Guitar
   (fretboard, tab, notation, helix) · Keys (piano, chart, pads) · Synth
-  (deck, liveset, midihub) · Play (songs, jam) · Train (shed, tuner). (A3b
-  moved helix and the Synth group to soundLAB Gear: 14 + 4.) The ids 'trainer',
+  (deck, liveset, midihub) · Play (songs, jam) · Train (shed, vocal, tuner). (A3b
+  moved helix and the Synth group to soundLAB Gear: 15 + 4.) The ids 'trainer',
   'synth' and 'lumipractice' are in js/app.js ONLY as MOVED rows: no PAGES
   entry, no label, no panel in index.html. No file was deleted or added:
   js/trainer.js, js/lumi-practice.js, css/lumi-practice.css and
@@ -1508,7 +1554,7 @@ controls and what it sends are as before):
 A3b (soundLAB Gear: the Deck, Live sets, the Hub and Helix leave index.html;
 today's look and behaviour on both sides):
 
-- TWO APPS FROM ONE CODEBASE, ONE STORE: index.html = soundLAB, 14 pages in
+- TWO APPS FROM ONE CODEBASE, ONE STORE: index.html = soundLAB, 15 pages in
   five groups: Learn (quiz, chords, theory, practiceplan) · Guitar
   (fretboard, tab, notation) · Keys (piano, chart, pads) · Play (songs, jam)
   · Train (shed, tuner), plus the Settings overlay. gear.html = soundLAB
@@ -1732,7 +1778,7 @@ the Backup card and one start notice):
   Phase A; this block is what is true once A4 is on the beta. What that
   paragraph says about the service-worker caches (named by scope) is true.
 - WORDS: "the earlier store" / "earlier data" = 'guitarlab.*', what 1.x
-  wrote and the live 2.0.0 (the code before Phase A) still reads and
+  wrote and the live 2.1.0 (the code before Phase A) still reads and
   writes. "2.0" in this block = the code from Phase A4 on. Code comments
   and suite messages still say "the 1.x store" / "1.x data" for the same
   thing; on screen it is "your earlier soundLAB data" at the live address
@@ -1755,7 +1801,7 @@ the Backup card and one start notice):
 - 'guitarlab.*' IS THE EARLIER STORE, READ-ONLY FROM A4 ON: no code on this
   branch writes, removes or changes a 'guitarlab.*' key (removed feature or
   not), and none opens or deletes the IndexedDB 'guitarlab-daw'. The live
-  app (2.0.0) on the same origin still uses both. Deleting them is an
+  app (2.1.0) on the same origin still uses both. Deleting them is an
   explicit Settings action in a later release, never a side effect.
 - EVERYTHING GOES THROUGH App.store: no file but js/app.js calls
   localStorage, and no file spells a storage prefix to build a key. Raw
@@ -1834,7 +1880,7 @@ the Backup card and one start notice):
   {app: 'soundLAB', format: 2, from: <app version>, scope: <prefix>, keys:
   {'<prefix><key>': raw string}} with this scope's keys only and without
   the marker. The IMPORT reads format 2 files of either 2.0 scope and older
-  files (1.x and the live 2.0.0 export their keys under 'guitarlab.' and
+  files (1.x and the live 2.1.0 export their keys under 'guitarlab.' and
   without a format field; it goes by each key's prefix: 'soundlab2.',
   'soundlab2-next.' or 'guitarlab.'), writes every key under
   THIS scope, string values only, skips the deny list (in every file, a
@@ -1848,8 +1894,8 @@ the Backup card and one start notice):
   confirm(), then App.store.copyAgain() (overwrites 2.0's values) and a
   reload. The other export files carry no prefix and are unchanged (the
   Hub, the Deck library, Live profiles, chord charts, practice progress).
-- sw.js: A4 set `CACHE` to `PREFIX + 'v9'`; ASSETS unchanged (no file added
-  or removed). Cache names ('sl2-next-v9' / 'sl2-live-v9') and storage keys
+- sw.js: A4 set `CACHE` to `PREFIX + 'v11'`; ASSETS unchanged (no file added
+  or removed). Cache names ('sl2-next-v11' / 'sl2-live-v11') and storage keys
   ('soundlab2.fb.root') are unrelated.
 - SUITES: every browser suite seeds and reads back 'soundlab2.*' (index.html
   and gear.html on the test server are the live scope). Seed under the 2.0
@@ -1906,7 +1952,7 @@ the Backup card and one start notice):
   APPS[APP_ID].groups since 2.0 Phase A3b. soundLAB (index.html): Learn
   (quiz=Exercises HOME/chords/theory/practiceplan), Guitar
   (fretboard/tab/notation), Keys (piano/chart/pads), Play (songs/jam), Train
-  (shed/tuner; 1.3: the Practice tab became Train). soundLAB Gear
+  (shed/vocal/tuner; 1.3: the Practice tab became Train). soundLAB Gear
   (gear.html): Synth (deck=HOME/liveset/midihub; 1.3's SYNTH tab), Helix
   (helix).
   Rendered twice: #tabbar inside the top bar (> 900px) and #tabbar-m fixed

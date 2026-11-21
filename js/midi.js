@@ -258,6 +258,45 @@
     if ((t === 0x80 || (t === 0x90 && message[2] === 0)) && state.notes['note:' + (message[0] & 15) + ':' + message[1]]) return false;
     try { return inputClaim(message.slice(), { portId: state.id, port: state.name }) === true; } catch (e) { return false; }
   }
+  // STRING-PER-CHANNEL GUITAR (2.0 beta, js/midiguitar.js): a MIDI guitar
+  // such as the Rock Band 3 Squier sends each string on its own channel
+  // (1-6) and sends Note Off only when the fretting changes - a re-strum
+  // of the same fret is a second Note On with no Off between. On the port
+  // chosen as the guitar (store mg.port = port name, '' = none), channels
+  // 1-6 are MONO: a new Note On first lets go of the note that string was
+  // holding (so quizzes and graders hear every strum), and a note that is
+  // still held after mg.ring seconds (default 3, 0 = never) lets go by
+  // itself, the way a plucked string stops ringing.
+  function guitarSrc(name, chan) {
+    var want = App.store.get('mg.port', '');
+    return !!want && chan <= 5 && String(name || '') === String(want);
+  }
+  function guitarRingMs() {
+    var r = Number(App.store.get('mg.ring', 3));
+    return isFinite(r) && r > 0 ? Math.min(r, 30) * 1000 : 0;
+  }
+  function guitarLetGo(state, rawChan) {
+    var prefix = 'note:' + rawChan + ':', any = false;
+    Object.keys(state.notes).forEach(function (key) {
+      if (key.indexOf(prefix) !== 0) return;
+      var n = state.notes[key]; delete state.notes[key]; any = true;
+      if (state.ring && state.ring[key]) { clearTimeout(state.ring[key]); delete state.ring[key]; }
+      dispatchIngress(state, [0x80 | n.chan, n.midi, 0]);
+    });
+    return any;
+  }
+  function guitarRing(state, rawKey) {
+    var ms = guitarRingMs(), entry = state.notes[rawKey];
+    if (!ms || !entry || typeof setTimeout !== 'function') return;
+    if (!state.ring) state.ring = {};
+    if (state.ring[rawKey]) clearTimeout(state.ring[rawKey]);
+    state.ring[rawKey] = setTimeout(function () {
+      if (state.ring) delete state.ring[rawKey];
+      if (state.disposed || state.notes[rawKey] !== entry) return;
+      delete state.notes[rawKey];
+      dispatchIngress(state, [0x80 | entry.chan, entry.midi, 0]); rebuildIngressHeld();
+    }, ms);
+  }
   function ingressMessage(state, message) {
     withIngressSource(state, function () {
       if (claimedByRemote(state, message)) { App.emit('midi:remote', { bytes: message.slice(), portId: state.id, port: state.name }); return; }
@@ -275,12 +314,18 @@
         // A changed input rule cannot strand an already delivered note.
         filtered = [0x80 | paired.chan, paired.midi, 0]; delete state.notes[rawKey];
       }
+      if (rawOff && state.ring && state.ring[rawKey]) { clearTimeout(state.ring[rawKey]); delete state.ring[rawKey]; }
+      // a guitar's string already let go (ring time): its late Note Off is not news
+      if (rawOff && !paired && guitarSrc(state.name, message[0] & 15)) return;
       if (!validIngressChannel(filtered)) return;
       filtered = Array.prototype.slice.call(filtered);
       var type = filtered[0] & 0xf0;
+      var guitar = rawType === 0x90 && guitarSrc(state.name, message[0] & 15);
       if (type === 0x90 && filtered[2] > 0) {
-        if (paired && (paired.chan !== (filtered[0] & 15) || paired.midi !== filtered[1])) dispatchIngress(state, [0x80 | paired.chan, paired.midi, 0]);
+        if (guitar) guitarLetGo(state, message[0] & 15);
+        else if (paired && (paired.chan !== (filtered[0] & 15) || paired.midi !== filtered[1])) dispatchIngress(state, [0x80 | paired.chan, paired.midi, 0]);
         state.notes[rawKey] = { chan: filtered[0] & 15, midi: filtered[1], vel: filtered[2] };
+        if (guitar) { dispatchIngress(state, filtered); rebuildIngressHeld(); guitarRing(state, rawKey); return; }
       } else if (type === 0x80 || type === 0x90 && filtered[2] === 0) {
         if (paired && (paired.chan !== (filtered[0] & 15) || paired.midi !== filtered[1])) dispatchIngress(state, [0x80 | paired.chan, paired.midi, 0]);
         delete state.notes[rawKey];

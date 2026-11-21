@@ -13,7 +13,9 @@
  * subset of the SMuFL font Bravura (license: fonts/OFL-Bravura.txt).
  *
  * Stores: qz.prog {levelId: {b: best score, s: stars}}, qz.items
- * {itemKey: [right, asked]} (weak items come up more often), qz.sound
+ * {itemKey: [right, asked, avgMs?, day?]} (weak items come up more often;
+ * avgMs = running average of RIGHT answers, day = last asked, days since
+ * 1970 — both feed the weak-spot map), qz.sound
  * 'piano' | 'guitar', qz.landed (one-time landing on this page).
  */
 (function () {
@@ -200,11 +202,13 @@
     return items;
   }
   // weak items (low accuracy so far) come up more often
-  function pickW(list, prefix) {
+  function pickW(list, prefix, keyOf) {
     var st = itemStats(), tot = 0;
     var w = list.map(function (id) {
-      var s = st[prefix + id] || [0, 0];
-      var x = 1 + 2.5 * (1 - (s[0] + 1) / (s[1] + 2));
+      var s = st[keyOf ? keyOf(id) : prefix + id] || [0, 0];
+      // missed AND slow items come up more (the same speed scale as the weak-spot map)
+      var slow = s[2] > 0 ? Math.max(0, Math.min(1, (s[2] - 2000) / 4000)) : 0;
+      var x = 1 + 2.5 * (1 - (s[0] + 1) / (s[1] + 2)) + 1.5 * slow;
       tot += x;
       return x;
     });
@@ -212,11 +216,14 @@
     for (var i = 0; i < list.length; i++) { r -= w[i]; if (r <= 0) return list[i]; }
     return list[list.length - 1];
   }
-  function recordItem(key, ok) {
+  function recordItem(key, ok, ms) {
     if (!key) return;
     var st = itemStats(), s = st[key] || [0, 0];
     if (ok) s[0]++;
     s[1]++;
+    // speed of right answers: a running average that leans on recent answers
+    if (ok && ms > 0) { ms = Math.min(ms, 30000); s[2] = s[2] > 0 ? Math.round(s[2] * 0.7 + ms * 0.3) : Math.round(ms); }
+    s[3] = Math.floor(Date.now() / 864e5);
     st[key] = s;
     App.store.set('qz.items', st);
   }
@@ -295,7 +302,12 @@
 
   GEN.keyName = function (o) {
     var midi;
-    do { midi = 60 + rnd(24); } while (!o.black && isBlack(midi));
+    if (o.fpc != null) midi = 60 + o.fpc + 12 * rnd(2); // a forced key (weak-spot drill)
+    else { // weak / slow keys come up more often
+      var kc = [];
+      for (var km = 60; km < 84; km++) if (o.black || !isBlack(km)) kc.push(km);
+      midi = pickW(kc, '', function (m) { return 'kn:' + mod(m, 12); });
+    }
     var pc = mod(midi, 12);
     var q = {
       kind: 'choice', item: 'kn:' + pc, miss: PC_LABEL[pc], sig: String(midi),
@@ -310,7 +322,12 @@
 
   GEN.keyFind = function (o) {
     var midi;
-    do { midi = 60 + rnd(12); } while (o.black ? !isBlack(midi) : isBlack(midi));
+    if (o.fpc != null) { midi = 60 + o.fpc; o = { black: isBlack(midi) }; }
+    else {
+      var fc = [];
+      for (var fm = 60; fm < 72; fm++) if (o.black ? isBlack(fm) : !isBlack(fm)) fc.push(fm);
+      midi = pickW(fc, '', function (m) { return 'kf:' + mod(m, 12); });
+    }
     var pc = mod(midi, 12);
     var name = o.black ? (Math.random() < 0.5 ? SHARP_N[pc] : FLAT_N[pc]) : LET[NAT.indexOf(pc)];
     return {
@@ -331,12 +348,18 @@
 
   GEN.neckName = function (o) {
     var neck = neckContext(), s, f, midi;
-    do { s = rnd(neck.midi.length); f = rnd(o.max + 1); midi = neck.midi[s] + f; } while (o.nat && isBlack(midi));
+    if (o.fs != null) { s = o.fs; f = o.ff; midi = neck.midi[s] + f; } // a forced spot (weak-spot drill)
+    else { // weak / slow spots come up more often
+      var nc = [], N = neck.midi.length;
+      for (var cs = 0; cs < N; cs++) for (var cf = 0; cf <= o.max; cf++) if (!(o.nat && isBlack(neck.midi[cs] + cf))) nc.push(cs * 100 + cf);
+      var pk = pickW(nc, '', function (v) { return 'gn:' + N + ':' + Math.floor(v / 100) + ':' + (v % 100); });
+      s = Math.floor(pk / 100); f = pk % 100; midi = neck.midi[s] + f;
+    }
     var pc = mod(midi, 12);
     var q = {
       kind: 'choice', item: 'gn:' + neck.midi.length + ':' + s + ':' + f, miss: PC_LABEL[pc] + ' (' + neck.names[s] + ', fret ' + f + ')', sig: s + ':' + f,
       prompt: 'Name the note at the dot', pcAnswer: pc,
-      show: { type: 'neck', frets: o.max <= 5 ? 5 : 12, marks: [{ s: s, f: f, c: 'a' }] },
+      show: { type: 'neck', frets: o.max <= 5 && f <= 5 ? 5 : 12, marks: [{ s: s, f: f, c: 'a' }] },
       audio: [{ m: [midi], at: 0, d: 1.2, gtr: 1 }],
       explain: PC_LABEL[pc] + ' — ' + neck.names[s] + ' string, fret ' + f + '. Each fret is a half step up from the open string.'
     };
@@ -345,7 +368,15 @@
   };
 
   GEN.neckFind = function (o) {
-    var neck = neckContext(), s = rnd(neck.midi.length), f = rnd(o.max + 1), midi = neck.midi[s] + f, pc = mod(midi, 12);
+    var neck = neckContext(), N = neck.midi.length, s, f;
+    if (o.fs != null) { s = o.fs; f = o.fpc != null ? mod(o.fpc - neck.midi[s], 12) : rnd(o.max + 1); }
+    else { // weak / slow string + note pairs come up more often
+      var gc = [];
+      for (var gs = 0; gs < N; gs++) for (var gf = 0; gf <= o.max; gf++) gc.push(gs * 100 + gf);
+      var gp = pickW(gc, '', function (v) { var vs = Math.floor(v / 100); return 'gf:' + N + ':' + vs + ':' + mod(neck.midi[vs] + v % 100, 12); });
+      s = Math.floor(gp / 100); f = gp % 100;
+    }
+    var midi = neck.midi[s] + f, pc = mod(midi, 12);
     var name = isBlack(midi) ? (Math.random() < 0.5 ? SHARP_N[pc] : FLAT_N[pc]) : LET[NAT.indexOf(pc)];
     var spots = [];
     for (var ff = 0; ff <= 12; ff++) if (mod(neck.midi[s] + ff, 12) === pc) spots.push({ s: s, f: ff });
@@ -356,6 +387,19 @@
       audio: [{ m: [midi], at: 0, d: 1.2, gtr: 1 }], reveal: { neck: spots },
       explain: name + ' on the ' + neck.names[s] + ' string: fret ' + spots.map(function (p) { return p.f; }).join(' and ') + '.'
     };
+  };
+
+  // a weak-spot drill: pick one of the drilled items (weakest first) and ask
+  // exactly that note again (kn/kf = keys, gn/gf = neck; see the map below)
+  GEN.spot = function (o) {
+    var n = neckContext().midi.length;
+    var list = (o.items || []).filter(function (k) { var p = k.split(':'); return p[0] === 'kn' || p[0] === 'kf' || +p[1] === n; });
+    if (!list.length) list = o.items || [];
+    var p = pickW(list, '').split(':');
+    if (p[0] === 'kn') return GEN.keyName({ black: 1, fpc: +p[1] });
+    if (p[0] === 'kf') return GEN.keyFind({ fpc: +p[1] });
+    if (p[0] === 'gn') return GEN.neckName({ max: 12, fs: +p[2], ff: +p[3] });
+    return GEN.neckFind({ max: 12, fs: +p[2], fpc: +p[3] });
   };
 
   GEN.pitch = function (o) {
@@ -1403,7 +1447,7 @@
   function renderRun() {
     var l = cur.lvl, shell = el('qz-runshell'), sid = (cur.sprint ? (cur.sprint.endless ? 'endless:' : 'sprint:') : cur.jump != null ? 'jump:' : cur.drill ? 'drill:' : '') + l.id + (cur.clock ? '@' + cur.clock.base : '');
     if (!shell || shell.getAttribute('data-lvl') !== sid) {
-      var tag = (cur.sprint ? (cur.sprint.endless ? 'Endless streak · ' : '60-second sprint · ') + MODE_NAME[l.mode] : cur.jump != null ? 'Jump test · ' + MODE_NAME[l.mode] : cur.drill ? 'Drill · your misses' : MODE_NAME[l.mode] + ' · Level ' + l.n) +
+      var tag = (cur.sprint ? (cur.sprint.endless ? 'Endless streak · ' : '60-second sprint · ') + MODE_NAME[l.mode] : cur.jump != null ? 'Jump test · ' + MODE_NAME[l.mode] : cur.drill ? (cur.spot ? 'Drill · weak spots' : 'Drill · your misses') : MODE_NAME[l.mode] + ' · Level ' + l.n) +
         (cur.clock ? ' · ' + cur.clock.base + ' s clock' : '');
       root.innerHTML =
         '<div class="qz-view qz-run" id="qz-runshell" data-lvl="' + esc(sid) + '">' +
@@ -1573,7 +1617,7 @@
         (best && best.b > cur.score && !jump && !drill ? '<div class="muted small">Your best: ' + best.b + '/10</div>' : '') +
         doneStats() + doneNotes() +
         (misses.length ? '<div class="qz-miss"><span class="muted">Practice: </span>' + esc(misses.join(', ')) + '</div>' : '') +
-        '<div class="qz-acts">' + acts + '</div>' +
+        '<div class="qz-acts">' + acts + '</div>' + wsDoneHTML(l) +
         (jump ? '' : '<div class="qz-donelinks"><button type="button" class="qz-backlink" id="qz-back">' + App.icon('left', 14) + ' ' + esc(cur.from === 'topic' ? l.unit.name : 'The path') + '</button>' +
           (ap ? '<button type="button" class="qz-backlink" data-qzapply="' + l.unit.id + '">' + esc(ap.label) + ' ' + App.icon('right', 14) + '</button>' : '') + '</div>');
     }
@@ -1598,7 +1642,7 @@
     var sessionId = 'quiz-' + (window.crypto && crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(36).slice(2));
     cur = { lvl: l, instrument: learnInstrument(), sessionId: sessionId, n: 10, res: [], miss: {}, q: null, answered: false, tap: {}, got: {}, played: null, playedPos: null, lastSig: null,
       from: from, xp: 0, combo: 0, times: [], ms: 0, prevSpeed: XP().speed(l.unit.id), jump: opt.jump != null ? opt.jump : null, sprint: null,
-      drill: opt.drill || null, drillPool: [] };
+      drill: opt.drill || null, spot: !!(opt.spot && opt.drill), drillPool: [] };
     if (window.SLXP && SLXP.beginSession) SLXP.beginSession({ id: cur.sessionId, instrument: cur.instrument, source: 'quiz' });
     if (cur.drill) cur.n = Math.min(10, Math.max(5, cur.drill.length * 2));
     if (opt.sprint != null) {
@@ -1619,7 +1663,7 @@
 
   function newQ() {
     var q, tries = 0, again = !!(cur && cur.q);
-    do { q = GEN[cur.lvl.gen](cur.lvl.o); }
+    do { q = cur.spot ? GEN.spot({ items: cur.drill }) : GEN[cur.lvl.gen](cur.lvl.o); }
     while ((q.sig === cur.lastSig || (cur.drill && cur.drill.indexOf(q.item) < 0)) && tries++ < (cur.drill ? 60 : 6));
     cur.lastSig = q.sig;
     cur.q = q;
@@ -1655,8 +1699,8 @@
     // endless + clock: every right answer takes 0.1 s off the clock, down to half
     if (ok && cur.clock && cur.sprint && cur.sprint.endless) cur.clock.now = Math.max(cur.clock.base / 2, Math.round(cur.clock.now * 10 - 1) / 10);
     cur.res.push(ok);
-    recordItem(q.item, ok);
     var ms = Math.max(0, (window.performance || Date).now() - (cur.t0 || 0));
+    recordItem(q.item, ok, ok && !cur.timedOut ? ms : 0);
     cur.combo = ok ? cur.combo + 1 : 0;
     cur.ms += Math.min(ms, 45000);
     if (ok) cur.times.push(Math.min(ms, 30000));
@@ -2089,7 +2133,7 @@
         tile('bolt', 'Lifetime earned XP', Number(summary.lifetimeEarnedXP || 0).toLocaleString(), t.x + ' earned today; lifetime earnings do not decay') +
         tile('flame', 'Streak', st.n + (st.n === 1 ? ' day' : ' days'), 'Best ' + st.best + ' days meeting the engaged-minute goal') +
         tile('clock', 'Engaged practice', fmtDur(summary.totalEngagedSeconds || 0), tot.q + ' knowledge questions · ' + tot.l + ' completed exercises') +
-      '</div>' +
+      '</div>' + wsCardHTML() +
       '<section class="card qz-pcard"><div class="qz-pchead"><h3>This week</h3><span class="muted small">A day counts when this instrument reaches its engaged-minute goal. Planned breaks and consistency settings are shared with Practice progress.</span></div>' + weekStrip() + '</section>' +
       '<section class="card qz-pcard"><div class="qz-pchead"><h3>Daily goal</h3><span class="muted small">' + ((summary.today.engagedSeconds || 0) / 60).toFixed(1) + ' of ' + g + ' engaged minutes today</span></div>' +
         '<button class="btn sm" id="qz-progress-settings" type="button">Open practice progress settings</button>' +
@@ -2415,6 +2459,122 @@
     return '<ul class="qz-dnotes">' + out.map(function (o) { return '<li>' + ico(o[1], 16) + '<span>' + esc(o[0]) + '</span></li>'; }).join('') + '</ul>';
   }
 
+  // ================= weak-spot map (2.1) =================
+  // Every neck / keyboard note question saves [right, asked, avgMs] per item
+  // (qz.items). The map adds them up per SPOT — a fret on a string, or a key —
+  // and colors it by how right AND how fast it was. Tap a spot = drill it.
+  var WS_BANDS = [['strong', 'Strong'], ['good', 'Good'], ['shaky', 'Shaky'], ['weak', 'Weak'], ['none', 'Not tried']];
+  var WS_FAST = 2000, WS_SLOW = 6000; // ms: at or under = full speed credit; at or over = none
+  var WS_NECK = { guitar: { open: OPEN, short: ['E', 'A', 'D', 'G', 'B', 'e'], names: STR_NAME },
+    bass: { open: [28, 33, 38, 43], short: ['E', 'A', 'D', 'G'], names: ['E (4th)', 'A (3rd)', 'D (2nd)', 'G (1st)'] } };
+
+  function wsKind() {
+    if (modeAllowed('neck')) return learnInstrument() === 'bass' ? 'bass' : 'guitar';
+    if (modeAllowed('piano')) return 'keys';
+    return null;
+  }
+  function wsScore(r, n, ms) {
+    if (!n) return null;
+    var sf = ms > 0 ? Math.max(0, Math.min(1, (WS_SLOW - ms) / (WS_SLOW - WS_FAST))) : 1;
+    return (r / n) * (0.6 + 0.4 * sf);
+  }
+  function wsBand(sc) { return sc == null ? 'none' : sc >= 0.85 ? 'strong' : sc >= 0.65 ? 'good' : sc >= 0.4 ? 'shaky' : 'weak'; }
+  function wsSpot(id, items, label, pc, extra) {
+    var st = itemStats(), r = 0, n = 0, msSum = 0, msN = 0;
+    items.forEach(function (k) {
+      var x = st[k];
+      if (!x) return;
+      r += x[0]; n += x[1];
+      if (x[2] > 0 && x[0] > 0) { msSum += x[2] * x[0]; msN += x[0]; }
+    });
+    var ms = msN ? Math.round(msSum / msN) : 0, sc = wsScore(r, n, ms);
+    var o = { id: id, items: items, label: label, pc: pc, r: r, n: n, ms: ms, score: sc, band: wsBand(sc) };
+    for (var k in extra) o[k] = extra[k];
+    return o;
+  }
+  function wsSpots(kind) {
+    kind = kind || wsKind();
+    var out = [];
+    if (kind === 'keys') {
+      for (var pc = 0; pc < 12; pc++) out.push(wsSpot('k' + pc, ['kn:' + pc, 'kf:' + pc], PC_LABEL[pc], pc, {}));
+      return out;
+    }
+    var nk = WS_NECK[kind];
+    if (!nk) return out;
+    var N = nk.open.length;
+    for (var s = 0; s < N; s++) for (var f = 0; f <= 12; f++) {
+      var p = mod(nk.open[s] + f, 12);
+      out.push(wsSpot('n' + s + ':' + f, ['gn:' + N + ':' + s + ':' + f, 'gf:' + N + ':' + s + ':' + p],
+        PC_LABEL[p] + ' · ' + nk.names[s] + ' string, ' + (f ? 'fret ' + f : 'open'), p, { s: s, f: f }));
+    }
+    return out;
+  }
+  // tried spots that are not Strong yet, weakest first (ties: the most-asked)
+  function wsWeakest(kind, max) {
+    return wsSpots(kind).filter(function (x) { return x.n && x.score < 0.85; })
+      .sort(function (a, b) { return a.score - b.score || b.n - a.n; }).slice(0, max || 6);
+  }
+  function wsBaseLevel(kind) {
+    var gen = kind === 'keys' ? 'keyName' : 'neckName', l = null;
+    LEVELS.forEach(function (x) { if (!l && x.gen === gen && modeAllowed(x.mode) && (kind === 'keys' ? x.o.black : x.o.max === 12 && !x.o.nat)) l = x; });
+    return l;
+  }
+  function wsDrill(items, kind) {
+    var l = wsBaseLevel(kind || wsKind());
+    if (!l || !items || !items.length) return false;
+    return startLevel(l.id, { drill: items.slice(), spot: true });
+  }
+  function wsTip(x) {
+    return x.label + ': ' + (x.n ? Math.round(100 * x.r / x.n) + '% right of ' + x.n + (x.ms ? ', ' + (x.ms / 1000).toFixed(1) + ' s' : '') + ' · ' + WS_BANDS.filter(function (b) { return b[0] === x.band; })[0][1] : 'not tried yet') + '. Tap to drill it.';
+  }
+  function wsLegend() {
+    return '<div class="qz-wsleg" aria-hidden="true">' + WS_BANDS.map(function (b) { return '<span><i class="qz-wsb b-' + b[0] + '"></i>' + b[1] + '</span>'; }).join('') + '</div>';
+  }
+  function wsMapHTML(kind, compact) {
+    var spots = wsSpots(kind), cls = 'qz-ws' + (compact ? ' compact' : '');
+    if (kind === 'keys') {
+      var WH = [0, 2, 4, 5, 7, 9, 11], BL = { 1: 1, 3: 2, 6: 4, 8: 5, 10: 6 };
+      var keys = WH.map(function (pc) { var x = spots[pc]; return '<button type="button" class="qz-wskey w b-' + x.band + '" data-qzspot="' + x.items.join(',') + '" aria-label="' + esc(wsTip(x)) + '" title="' + esc(wsTip(x)) + '"><span>' + esc(x.label.split('/')[0]) + '</span></button>'; }).join('') +
+        Object.keys(BL).map(function (pc) { var x = spots[pc]; return '<button type="button" class="qz-wskey k b-' + x.band + '" style="left:calc(' + BL[pc] + ' * 100% / 7)" data-qzspot="' + x.items.join(',') + '" aria-label="' + esc(wsTip(x)) + '" title="' + esc(wsTip(x)) + '"></button>'; }).join('');
+      return '<div class="' + cls + ' qz-wskeys" role="group" aria-label="Weak-spot map: keyboard">' + keys + '</div>';
+    }
+    var nk = WS_NECK[kind], N = nk.open.length, rows = '';
+    for (var s = N - 1; s >= 0; s--) { // high string on top, like tab
+      rows += '<span class="qz-wsstr">' + nk.short[s] + '</span>';
+      for (var f = 0; f <= 12; f++) {
+        var x = spots[s * 13 + f];
+        rows += '<button type="button" class="qz-wsdot b-' + x.band + (f ? '' : ' open') + '" data-qzspot="' + x.items.join(',') + '" aria-label="' + esc(wsTip(x)) + '" title="' + esc(wsTip(x)) + '"><span>' + esc(x.label.split(/[\/ ]/)[0]) + '</span></button>';
+      }
+    }
+    rows += '<span></span>';
+    for (var ff = 0; ff <= 12; ff++) rows += '<span class="qz-wsfret' + ([3, 5, 7, 9, 12].indexOf(ff) >= 0 ? ' mk' : '') + '">' + ff + '</span>';
+    return '<div class="' + cls + ' qz-wsneck" role="group" aria-label="Weak-spot map: ' + (kind === 'bass' ? 'bass' : 'guitar') + ' neck">' + rows + '</div>';
+  }
+  function wsSummary(kind) {
+    var weak = wsWeakest(kind, 3), tried = wsSpots(kind).filter(function (x) { return x.n; }).length;
+    if (!tried) return 'Nothing here yet. Play a few ' + (kind === 'keys' ? 'Piano' : 'Fretboard') + ' note levels and the map fills in.';
+    if (!weak.length) return 'Every note you have tried is Strong. Try the grey ones next.';
+    return 'Weakest: ' + weak.map(function (x) { return x.label + ' (' + Math.round(100 * x.r / x.n) + '%' + (x.ms ? ', ' + (x.ms / 1000).toFixed(1) + ' s' : '') + ')'; }).join('; ') + '.';
+  }
+  function wsActs(kind) {
+    var weak = wsWeakest(kind);
+    return '<div class="qz-acts qz-wsacts">' + (weak.length ? '<button type="button" class="btn primary" id="qz-ws-drill">' + ico('bolt', 15) + ' Drill my weak spots</button>' : '') +
+      (kind === 'keys' && weak.length && App.midi && App.midi.reveal ? '<button type="button" class="btn" id="qz-ws-lumi">Light them on the LUMI</button>' : '') + '</div>';
+  }
+  function wsCardHTML() {
+    var kind = wsKind();
+    if (!kind) return '';
+    return '<section class="card qz-pcard qz-wscard" id="qz-wscard"><div class="qz-pchead"><h3>Weak spots</h3><span class="muted small">' +
+      (kind === 'keys' ? 'Every key' : 'Every fret, open to 12,') + ' colored by how often you got it right and how fast. Tap any spot to drill it.</span></div>' +
+      wsMapHTML(kind) + wsLegend() + '<p class="small qz-wssum">' + esc(wsSummary(kind)) + '</p>' + wsActs(kind) + '</section>';
+  }
+  // the results screen of a note level / weak-spot drill gets a small map too
+  function wsDoneHTML(l) {
+    var kind = wsKind(), g = l.gen;
+    if (!kind || !(cur.spot || ((kind === 'keys') ? (g === 'keyName' || g === 'keyFind') : (g === 'neckName' || g === 'neckFind')))) return '';
+    return '<div class="qz-wsdone"><span class="muted small">Your weak spots</span>' + wsMapHTML(kind, true) + wsLegend() + wsActs(kind) + '</div>';
+  }
+
   // ================= events =================
 
   function onClick(e) {
@@ -2444,6 +2604,7 @@
     if ((a = t.getAttribute('data-qzapply'))) { var ap = applyFor(a); if (ap) ap.go(); return; }
     if ((a = t.getAttribute('data-qzjump'))) { startLevel(NODES[+a].levels[0].id, { jump: +a }); return; }
     if ((a = t.getAttribute('data-qzgoal'))) { XP().setGoal(+a); paintHomeBody(); var sh = root.querySelector('.qz-strip'); if (sh) sh.outerHTML = statsStrip(); return; }
+    if ((a = t.getAttribute('data-qzspot'))) { wsDrill(a.split(',')); return; }
     if ((a = t.getAttribute('data-qzl'))) { startLevel(a); return; }
     if ((a = t.getAttribute('data-qzc'))) { answerChoice(a); return; }
     if ((a = t.getAttribute('data-qzs'))) { App.store.set('qz.sound', a); paintSound(); return; }
@@ -2458,6 +2619,11 @@
         var pendingURL = URL.createObjectURL(new Blob([SLXP.exportPending()], { type: 'application/json' })), pendingLink = document.createElement('a');
         pendingLink.href = pendingURL; pendingLink.download = 'soundlab-unsaved-lesson-sessions.json'; pendingLink.click(); setTimeout(function () { URL.revokeObjectURL(pendingURL); }, 1000); break;
       case 'qz-progress-settings': App.emit('learn:practice', { instrument: learnInstrument() }); App.switchTo('shed'); var progressHost = el('ws-progress'); if (progressHost) progressHost.scrollIntoView({ block: 'start' }); break;
+      case 'qz-ws-drill': var wk = []; wsWeakest(wsKind()).forEach(function (x) { wk = wk.concat(x.items); }); wsDrill(wk); break;
+      case 'qz-ws-lumi':
+        App.midi.reveal(wsWeakest('keys').map(function (x) { return x.pc; }), 6000);
+        if (App.toast) App.toast(App.midi.lumi || (App.midi.lights && App.midi.lights.on) ? 'Your weak keys are lit for 6 seconds.' : 'Connect the LUMI to see your weak keys light up.');
+        break;
       case 'qz-home': view = 'home'; render(); reveal(root); break;
       case 'qz-tohome': stopSprint(); toPath(cur ? cur.lvl.node.i : null); break;
       case 'qz-cont': break; // carries data-qzl (path frontier)
@@ -2467,7 +2633,7 @@
       case 'qz-check': checkTaps(); break;
       case 'qz-clear': if (cur) { cur.tap = {}; cur.got = {}; paintAns(); } break;
       case 'qz-retry': if (cur) startLevel(cur.lvl.id); break;
-      case 'qz-drill': if (cur && cur.drillPool.length) startLevel(cur.lvl.id, { drill: cur.drillPool.slice() }); break;
+      case 'qz-drill': if (cur && cur.drillPool.length) startLevel(cur.lvl.id, { drill: cur.drillPool.slice(), spot: cur.spot }); break;
     }
   }
 
@@ -2594,7 +2760,7 @@
       if (cur.sprint) { var en = cur.sprint.endless; return startSprint(nd.i, en) ? (en ? 'Go again' : 'Sprint again') : false; }
       if (cur.jump != null) return cur.score >= 9 ? false : startLevel(nd.levels[0].id, { jump: nd.i }) ? 'Jump again' : false;
       if (cur.drill) {
-        if (cur.drillPool.length) return startLevel(l.id, { drill: cur.drillPool.slice() }) ? 'Drill again' : false;
+        if (cur.drillPool.length) return startLevel(l.id, { drill: cur.drillPool.slice(), spot: cur.spot }) ? 'Drill again' : false;
         return startLevel(l.id) ? 'Back to the level' : false;
       }
       return startLevel(l.id) ? 'Try again' : false;
@@ -2845,6 +3011,28 @@
     '.qz-axis{font:500 11px var(--font-body);fill:var(--muted)}.qz-val{font:600 12px var(--font-body);fill:var(--text)}' +
     '.qz-nlearn{margin:2px 0 10px;border:1px solid var(--line);border-radius:10px;padding:0 12px}.qz-nlearn summary{cursor:pointer;padding:9px 0;font-weight:600;font-size:14px}.qz-nlearn .qz-learn{background:none;border-radius:0;padding:0 0 12px;font-size:14px}.qz-nlearn .qz-learn p{margin:0 0 8px}' +
     '.qz-donelinks{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 18px}' +
+    // weak-spot map (2.1)
+    '.qz-wsb,.qz-wsdot,.qz-wskey{--ws:transparent}' +
+    '.b-strong{--ws:var(--sl-ok,#6fd58f)}.b-good{--ws:color-mix(in srgb,var(--sl-ok,#6fd58f) 50%,var(--sl-warn,#ffb36b))}.b-shaky{--ws:var(--sl-warn,#ffb36b)}.b-weak{--ws:var(--sl-bad,#ff6f6f)}' +
+    '.qz-ws{width:100%;margin:6px 0 4px}' +
+    '.qz-wsneck{display:grid;grid-template-columns:18px repeat(13,minmax(0,1fr));gap:4px 2px;align-items:center;padding:8px 4px;border-radius:12px;background:var(--line-soft)}' +
+    '.qz-wsstr,.qz-wsfret{font-size:11px;color:var(--muted);text-align:center;font-variant-numeric:tabular-nums}.qz-wsfret.mk{color:var(--text);font-weight:600}' +
+    '.qz-wsdot{position:relative;display:grid;place-items:center;min-width:0;height:30px;padding:0;border:0;background:none;cursor:pointer;color:var(--text)}' +
+    '.qz-wsdot::before{content:"";position:absolute;left:0;right:0;top:50%;height:1px;background:var(--muted);opacity:.45}' +
+    '.qz-wsdot span{position:relative;display:grid;place-items:center;width:min(26px,100%);aspect-ratio:1;border-radius:50%;font-size:10px;font-weight:600;background:var(--ws);border:1.5px solid var(--ws);color:#141114}' +
+    '.qz-wsdot.b-none span{background:var(--bg,#131114);border-color:var(--line,#444);color:var(--muted)}' +
+    '.qz-wsdot.open span{border-radius:6px}.qz-wsdot:hover span,.qz-wsdot:focus-visible span{outline:2px solid var(--accent);outline-offset:1px}' +
+    '.qz-wskeys{position:relative;display:flex;height:150px;max-width:520px;margin-inline:auto}' +
+    '.qz-wskey{border:1px solid var(--line,#444);cursor:pointer;padding:0}' +
+    '.qz-wskey.w{flex:1;background:#f4efe6;border-radius:0 0 8px 8px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:8px;color:#141114;font-weight:600;font-size:13px;box-shadow:inset 0 -46px 0 -4px var(--ws)}' +
+    '.qz-wskey.w.b-none{box-shadow:none}' +
+    '.qz-wskey.k{position:absolute;top:0;width:calc(100% / 7 * .6);height:60%;transform:translateX(-50%);background:#1b181c;border-radius:0 0 6px 6px;box-shadow:inset 0 -26px 0 -3px var(--ws);z-index:1}' +
+    '.qz-wskey.k.b-none{box-shadow:none}.qz-wskey:hover,.qz-wskey:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}' +
+    '.qz-ws.compact .qz-wsdot{height:24px}.qz-ws.compact .qz-wsdot span{width:min(20px,100%);font-size:0}.qz-ws.compact.qz-wskeys{height:96px}.qz-ws.compact .qz-wskey.w{font-size:11px;box-shadow:inset 0 -30px 0 -3px var(--ws)}.qz-ws.compact .qz-wskey.w.b-none{box-shadow:none}' +
+    '.qz-wsleg{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--muted);margin:4px 0}.qz-wsleg span{display:inline-flex;align-items:center;gap:5px}' +
+    '.qz-wsb{width:11px;height:11px;border-radius:50%;background:var(--ws);border:1.5px solid var(--ws)}.qz-wsb.b-none{border-color:var(--line,#444)}' +
+    '.qz-wssum{margin:6px 0 8px}.qz-wsacts{justify-content:flex-start}' +
+    '.qz-wsdone{display:grid;gap:4px;width:100%;max-width:560px;margin-top:14px;padding-top:12px;border-top:1px solid var(--line-soft);text-align:left}.qz-wsdone .qz-wsacts{justify-content:center}' +
     '.qz-areas{display:grid;gap:6px;margin-top:12px}.qz-arow{display:grid;grid-template-columns:90px minmax(0,1fr) 62px;align-items:center;gap:10px;font-size:13.5px}.qz-arow b{font-weight:600;text-align:right;font-variant-numeric:tabular-nums}' +
     '.qz-abar{height:8px;border-radius:4px;background:var(--qz-track);overflow:hidden}.qz-abar i{display:block;height:100%;border-radius:4px;background:var(--accent)}' +
     '.qz-rec .qz-klbar{flex:none;display:block;width:70px;height:6px;border-radius:3px;background:var(--line);overflow:hidden}.qz-klbar i{display:block;height:100%;background:var(--accent);border-radius:3px}' +
@@ -2970,6 +3158,7 @@
     clock: function (s) { if (s != null) App.store.set('qz.clock', s); return clockSetting(); },
     tab: setHomeTab,
     finishSprint: finishSprint,
+    weakSpots: { kind: wsKind, spots: wsSpots, weakest: wsWeakest, drill: wsDrill, score: wsScore, band: wsBand },
     lumiTargets: lumiTargets,
     lumiState: function () {
       var targets = cur && view === 'run' ? lumiTargets(cur.q) : [];
