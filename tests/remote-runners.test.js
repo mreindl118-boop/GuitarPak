@@ -1,15 +1,21 @@
 // CONTROLLER REMOTE on the runner pages: the fretboard runner (pages
 // fretboard / tab / notation, js/fretboard.js), the Songs player
-// (js/songs.js), the Trainer (js/trainer.js), Live sets (js/synthlive.js)
-// and the Deck (js/synthtab.js). onRemote next / back / stop does what the
-// on-screen buttons do (Play / Pause, reset, Replay, +1 change, Next › /
+// (js/songs.js), the Free practice cards on the Plan page (js/trainer.js,
+// mounted by js/practiceplan.js), Live sets (js/synthlive.js) and the Deck
+// (js/synthtab.js). onRemote next / back / stop does what the on-screen
+// buttons do (Play / Pause, reset, +1 change, the run's Reset, Next › /
 // ‹ Prev, program Prev / Next through the deck's funnel), 'nothing here'
 // returns false, a learned CC works end to end (claimed: it never reaches
 // 'midi:raw' — so a foot switch learned on the same CC steps a Live set once,
 // not twice), the foot-switch Learn says the remote's pedal cannot be learned
 // (and times out), and the reserved double-tap key is claimed only where
-// remoteKey allows it (the Trainer; the runners and Songs only while the
+// remoteKey allows it (the Plan page; the runners and Songs only while the
 // lowest key is not a lit target) — on Live sets and the Deck the key plays.
+// On the Plan page the cards are asked first: a chord-change run counts NEXT
+// and holds BACK (the Plan's "Again: …" would leave the page and cancel the
+// run), STOP cancels it or pauses the Free practice timer, folding the
+// section cancels it; with no run NEXT / BACK are the Plan's own "Block: …" /
+// "Again: …" (tests/remote-plan.test.js covers the Plan itself).
 // Where nothing happens, a page that toasted its reason answers false (no
 // success HUD), so the remote adds neither its own note nor the sound hint.
 const { chromium } = require('playwright');
@@ -193,46 +199,67 @@ async function newPage(browser, seed) {
   ok(sg4.bars === 3 && sg4.next === false && /Loop range is empty/.test(sg4.toast) && /Play/.test(sg4.play), 'a loop with nothing to play: NEXT toasts why and answers false: ' + J([sg4.next, sg4.toast]));
   ok(/Loop range is empty/.test(sg4.pedal[0]) && !sg4.pedal[1] && sg4.pedal[2].join() === 'next:cc:0', 'the same from a pedal: the page’s reason stays, no HUD: ' + J(sg4.pedal));
 
-  console.log('# Trainer');
+  console.log('# Free practice on the Plan page (the Trainer cards, js/trainer.js)');
   const tr = await page.evaluate(async () => {
     const o = {};
-    App.switchTo('trainer'); await __wait(250);
+    // a plan block opened by NEXT sets the shared key and tempo: both are put back at the end
+    const key0 = [App.store.get('fb.root', 9), App.store.get('fb.scale', 'minorPent')], bpm0 = parseInt((__q('#fb-pr-bpm') || {}).value, 10) || 100;
+    const toPlan = async () => { App.switchTo('practiceplan'); await __wait(250); const d = __q('#pp-tools'); if (d) d.open = true; await __wait(30); };
+    await toPlan();
+    o.at = App.active; o.cards = !!__q('#pp-tools-body #tr-sess-start') && !!__q('#pp-tools-body #tr-cc-start');
     o.key = App.remoteKeyPage();
     o.back0 = __ra('back'); o.stop0 = __ra('stop');
-    let p0 = __plucks;
-    o.next = __ra('next'); o.nextPl = __plucks - p0; o.replayOn = !__q('#tr-ear-replay').disabled; o.msg = __txt('#tr-ear-msg');
-    p0 = __plucks; o.back = __ra('back'); o.backPl = __plucks - p0;
     __q('#tr-sess-start').click(); await __wait(60);
     o.sessStop = __ra('stop'); o.sessBtn = __q('#tr-sess-start').hidden; o.sessLabel = __txt('#tr-sess-start');
     o.stopAgain = __ra('stop');
     __q('#tr-cc-start').click(); await __wait(30);
-    o.c1 = __ra('next'); o.c2 = __ra('next'); o.ccNum = __txt('#tr-cc-num');
+    o.c1 = __ra('next'); o.c2 = __ra('next'); o.ccNum = __txt('#tr-cc-num'); o.atRun = App.active;
     o.ccStop = __ra('stop'); o.ccRes = __txt('#tr-cc-result'); o.ccStartOn = !__q('#tr-cc-start').disabled; o.ccNum2 = __txt('#tr-cc-num');
-    // the minute runs out under the foot: a late press is not an interval
+    // the minute runs out under the foot: a late press must not open a plan block
     __q('#tr-cc-start').click(); await __wait(30);
     const real = Date.now, shift = 60100; Date.now = () => real() + shift;
     await __wait(320); o.ccDone = !__q('#tr-cc-start').disabled;
-    p0 = __plucks; o.late = __ra('next'); o.latePl = __plucks - p0; // (the end-of-run chime already sounded)
+    o.late = __ra('next'); o.lateAt = App.active;
     Date.now = () => real() + 61900; // the same clock, past the 1.5 s after the run ran out
-    p0 = __plucks; o.after = __ra('next'); o.afterPl = __plucks - p0;
+    o.after = __ra('next'); o.afterAt = App.active; // no run: the Plan's own NEXT opens a block (and leaves the page)
     Date.now = real;
-    // a cancelled run never ran out: a minute after its start NEXT is an interval
+    // a cancelled run never ran out: a minute after its start NEXT is the Plan's own again
+    await toPlan();
     __q('#tr-cc-start').click(); await __wait(50); __q('#tr-cc-reset').click(); await __wait(30);
     Date.now = () => real() + 60200;
-    p0 = __plucks; o.cancelled = __ra('next'); o.cancelledPl = __plucks - p0;
+    o.cancelled = __ra('next'); o.cancelledAt = App.active;
     Date.now = real;
+    await __wait(100);
+    // blocks were opened from here by now, so the Plan's own BACK is "Again: <block>" (it leaves the
+    // page, which cancels a run): during a run the cards hold BACK, the run goes on
+    await toPlan();
+    __q('#tr-cc-start').click(); await __wait(30);
+    __ra('next');
+    o.backRun = __ra('back'); await __wait(60);
+    o.backRunAt = App.active; o.backRunOn = [__q('#tr-cc-start').disabled, __txt('#tr-cc-num'), __txt('#tr-cc-result'), __ra('next')];
+    // folding the section cancels the run: a hidden run must not take the pedal or Space
+    __q('#pp-tools').open = false; await __wait(80);
+    o.fold = [!__q('#tr-cc-start').disabled, __txt('#tr-cc-result'), App.trainerCards.remote('next'), App.trainerCards.remote('back')];
+    // no run: BACK is the Plan's own again (the last block once more)
+    o.backIdle = __ra('back'); o.backIdleAt = App.active;
+    await __wait(100);
+    App.emit('fb:set', { source: 'test', root: key0[0], scale: key0[1] });
+    App.store.set('met.bpm', bpm0); App.emit('tempo', { bpm: bpm0, source: 'test' });
+    await __wait(100);
     return o;
   });
-  ok(tr.key === true, 'the Trainer declares remoteKey (no MIDI grading there)');
-  ok(tr.back0 === false && tr.stop0 === false, 'nothing loaded or running: BACK and STOP have nothing to do');
-  ok(tr.next === 'New interval' && tr.nextPl === 2 && tr.replayOn && /Listen/.test(tr.msg), 'NEXT = Play interval: two notes sound, Replay unlocks: ' + J([tr.next, tr.nextPl, tr.msg]));
-  ok(tr.back === 'Again' && tr.backPl === 2, 'BACK = Replay: the same two notes again');
-  ok(tr.sessStop === 'Session paused' && !tr.sessBtn && /Resume/.test(tr.sessLabel) && tr.stopAgain === false, 'STOP pauses the running session clock (Resume shows); then nothing to stop');
-  ok(tr.c1 === 'Change 1' && tr.c2 === 'Change 2' && tr.ccNum === '2', 'during a chord-change run NEXT counts a change (like Space): ' + J([tr.c1, tr.c2, tr.ccNum]));
+  ok(tr.at === 'practiceplan' && tr.cards && tr.key === true, 'the Trainer cards are on the Plan page (Free practice); the page declares remoteKey (no MIDI grading there): ' + J([tr.at, tr.cards, tr.key]));
+  ok(tr.back0 === false && tr.stop0 === false, 'no block opened, nothing running: BACK and STOP have nothing to do');
+  ok(tr.sessStop === 'Session paused' && !tr.sessBtn && /Resume/.test(tr.sessLabel) && tr.stopAgain === false, 'STOP pauses the running Free practice timer (Resume shows); then nothing to stop');
+  ok(tr.c1 === 'Change 1' && tr.c2 === 'Change 2' && tr.ccNum === '2' && tr.atRun === 'practiceplan', 'during a chord-change run NEXT counts a change (like Space) and opens no plan block: ' + J([tr.c1, tr.c2, tr.ccNum, tr.atRun]));
   ok(tr.ccStop === 'Run cancelled' && /Run cancelled/.test(tr.ccRes) && tr.ccStartOn && tr.ccNum2 === '0', 'STOP = the run’s Reset (cancelled, unscored)');
-  ok(tr.ccDone && tr.late === 'Time’s up' && tr.latePl === 0, 'a NEXT just after the minute ran out plays nothing (Time’s up): ' + J([tr.late, tr.latePl]));
-  ok(tr.after === 'New interval' && tr.afterPl === 2, 'once the 1.5 s after the run ran out have passed, NEXT is Play interval again: ' + J([tr.after, tr.afterPl]));
-  ok(tr.cancelled === 'New interval' && tr.cancelledPl === 2, 'a run cancelled with Reset never "runs out": a minute after its start NEXT plays an interval: ' + J([tr.cancelled, tr.cancelledPl]));
+  ok(tr.ccDone && tr.late === 'Time’s up' && tr.lateAt === 'practiceplan', 'a NEXT just after the minute ran out opens no plan block (Time’s up): ' + J([tr.late, tr.lateAt]));
+  ok(/^Block: /.test(tr.after) && tr.afterAt !== 'practiceplan', 'once the 1.5 s after the run ran out have passed, NEXT is the Plan’s again (it opens the next block): ' + J([tr.after, tr.afterAt]));
+  ok(/^Block: /.test(tr.cancelled) && tr.cancelledAt !== 'practiceplan', 'a run cancelled with Reset never "runs out": a minute after its start NEXT opens a plan block: ' + J([tr.cancelled, tr.cancelledAt]));
+  ok(tr.backRun === 'Chord changes running' && tr.backRunAt === 'practiceplan' && tr.backRunOn[0] === true && tr.backRunOn[1] === '1' && tr.backRunOn[2] === '' && tr.backRunOn[3] === 'Change 2',
+    'with a plan block opened earlier today, BACK during a chord-change run is held by the cards: the Plan page stays and the run goes on: ' + J([tr.backRun, tr.backRunAt, tr.backRunOn]));
+  ok(tr.fold[0] === true && /Run cancelled/.test(tr.fold[1]) && tr.fold[2] === false && tr.fold[3] === false, 'folding Free practice during a run cancels it: the hidden cards no longer answer the pedal: ' + J(tr.fold));
+  ok(/^Again: /.test(tr.backIdle) && tr.backIdleAt !== 'practiceplan', 'with no run BACK is the Plan’s own again (it opens the last block once more): ' + J([tr.backIdle, tr.backIdleAt]));
 
   console.log('# Live sets');
   const lv = await page.evaluate(async () => {
@@ -355,7 +382,7 @@ async function newPage(browser, seed) {
   ok(dk.lumi === 0, 'nothing reached the LUMI');
   ok(dk.e2e[0] === dk.pc0 + 1 && dk.e2e[1] && dk.e2e[2] === 'next:cc:1', 'CC 86 on the Deck steps the program: ' + J(dk.e2e));
 
-  console.log('# double-tap the lowest key on the runner pages (remoteKey: the runner while stopped or the key unlit, the Trainer)');
+  console.log('# double-tap the lowest key on the runner pages (remoteKey: the runner while stopped or the key unlit, the Plan page)');
   const dt = await page.evaluate(async () => {
     const o = {};
     App.remote.setDoubleTap(true);
@@ -382,10 +409,13 @@ async function newPage(browser, seed) {
     o.free = { notes: __notes.filter(n => / 48$/.test(n)), ev: __ev.slice(), play: __txt('#fb-pr-play') };
     __ra('stop');
     App.emit('fb:set', { source: 'test', root: 9, scale: 'minorPent' }); await __wait(100);
-    App.switchTo('trainer'); await __wait(200);
-    __ev.length = 0; await __wait(300);
+    // the Plan page, a chord-change run going in Free practice: the double-tap counts a change
+    App.switchTo('practiceplan'); await __wait(200);
+    __q('#pp-tools').open = true; __q('#tr-cc-start').click(); await __wait(30);
+    __ev.length = 0; __notes.length = 0; await __wait(300);
     __strike(48, 'li'); await __wait(80); __strike(48, 'li'); await __wait(80);
-    o.tr = [__ev.slice(), __txt('#tr-ear-msg')];
+    o.tr = [__ev.slice(), __txt('#tr-cc-num'), App.active, __notes.filter(n => / 48$/.test(n)).length];
+    __q('#tr-cc-reset').click();
     App.remote.setDoubleTap(false);
     return o;
   });
@@ -394,7 +424,7 @@ async function newPage(browser, seed) {
   ok(dt.other.join('|') === 'on 50|off 50', 'other keys still reach the page');
   ok(dt.litKey === false && dt.lit.notes.join('|') === 'on 48|off 48|on 48|off 48' && !dt.lit.ev.length && /Pause/.test(dt.lit.play), 'running with the lowest key lit (C in A minor pentatonic): both strikes reach midi:note, no remote action, the run keeps going: ' + J(dt.lit));
   ok(dt.freeKey === true && !dt.free.notes.length && dt.free.ev.join() === 'next:dbltap:1' && /Play/.test(dt.free.play), 'running A major pentatonic (nothing on the lowest key): the key stays reserved, a double-tap pauses: ' + J(dt.free));
-  ok(dt.tr[0].join() === 'next:dbltap:1' && /Listen/.test(dt.tr[1]), 'Trainer: the double-tap plays an interval');
+  ok(dt.tr[0].join() === 'next:dbltap:1' && dt.tr[1] === '1' && dt.tr[2] === 'practiceplan' && dt.tr[3] === 0, 'Plan page, a chord-change run going: the double-tap counts a change (the strikes are claimed, no plan block opens): ' + J(dt.tr));
 
   console.log('# Songs: the lowest key is reserved only while the song does not light it');
   await page.evaluate(async (tab) => { App.remote.setDoubleTap(true); App.switchTo('songs'); await __wait(250); __q('#sg-paste').value = tab; __q('#sg-parse').click(); }, TAB);

@@ -37,9 +37,13 @@ Set it up in **Settings › Hands-free control**. The Lights & help sheet shows 
   - On pages that allow it (`remoteKey` in the module contract), that key is **reserved**: it doesn't
     play or count as an answer there. Two strikes within 350 ms count as Next.
   - When a LUMI is connected, only the LUMI's key is reserved.
-  - The Woodshed and LUMI practice release the key while you play.
+  - The Woodshed releases the key while you play.
+  - On the Piano page (Keys › Piano; older notes call it the Keys page) the key is reserved only while
+    the section *Notes and triads on the LUMI* is open with simulated answers. Hardware answers arrive
+    on their own port, so the key isn't reserved then. With the section closed, the key plays and is
+    graded as always.
   - The Keys page's scale lessons keep their own double-tap (`kl.dbltap`: start / stop) and are never
-    claimed.
+    claimed. Their lowest-key double-tap stands down while the LUMI section is open.
 
 ## What each page does
 
@@ -50,13 +54,27 @@ The active page decides, through its module hook `onRemote(action, info)`:
 | Exercises | Continue the path or start the level · Next after an answer · on an unanswered question, press twice to show the answer (never in Endless) · the result screen's main button | Hear the question again · Try again · close the node card | End the run |
 | Exercises: multiple choice | **Play the answer's white key**: each choice shows one (up to 7 choices: C D E F G A B in any octave; more: the white keys up from the window's bottom C, so a LUMI's two octaves hold 14). After a miss, the right answer's key moves on. | | |
 | Keys lessons (Keys page) | Start · Next level / Again · next lesson after the top level | Retry the level just played · restart the run (a finished run is scored first) | Stop, like the Stop button (End run in ∞) · results → the lesson list |
-| Keys / Synth page runner (while it plays or guides) | Resume · skip a note (Guide) | Restart · one note back (Guide) | Pause |
+| Keys page runner (while it plays or guides) | Resume · skip a note (Guide) | Restart · one note back (Guide) | Pause |
 | Woodshed / Guided performance | Start · Again · Resume · in Phrases, the next phrase | Restart · in Phrases the phrase before | End the run (stays in the session) · with nothing running, back to the Library |
-| LUMI practice | Start · Check → next target · skip a target in guided flow | — | Stop |
+| LUMI practice (on the Piano page, while its section is open) | Start · Check → next target · skip a target in guided flow | — | Stop |
 | Practice plan | Launch the next block not yet done | Relaunch the last block | — |
+| Plan page: one-minute chord changes (Free practice) | Count a chord change | Nothing during a chord run (the press is held, so the run goes on) · with no run, the Practice plan row | End the chord run · with no run, pause the Free practice timer |
 | Fretboard / Tab / Notation runner, Songs | Play / pause | Restart | Stop |
-| Trainer | Count a chord change · new interval | Hear it again | End the chord run / pause the session |
 | Live sets, the Deck | Next slot (or next program; never while the Deck's Map Learn listens) | Previous | — |
+
+Two pages hold more than one thing a press could mean. Each has one rule:
+
+- **Piano page: the open LUMI section owns the pedal.** While *Notes and triads on the LUMI* is open, it
+  alone answers. A press it has no use for does nothing: it never starts a lesson or the runner.
+  Opening the section stops a lesson run and the runner. Starting a lesson or the runner, or opening a
+  lesson from the Plan page or the Learn bar, closes the section and stops its session. With the
+  section closed, the lessons answer first, then the runner.
+- **Plan page: the Free practice cards are asked first.** During a one-minute chord run, Next counts a
+  change. For 1.5 seconds after the minute ran out it answers "Time's up", so a late press doesn't
+  launch a plan block. Back does nothing during a run and answers "Chord changes running": the plan's
+  Back would relaunch the last block, which leaves the page and cancels the run. Stop ends the run;
+  with no run, it pauses the Free practice timer if that is running. Folding the section cancels a
+  run. At any other time the Practice plan row applies.
 
 The order of checks:
 1. A help tour takes the action first: Next and Back move through it, Stop closes it.

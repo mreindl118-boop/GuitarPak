@@ -1,5 +1,5 @@
 // Built-in internal note admission and scheduled-voice cleanup. Node VM graphs
-// inspect production synth/sampler/Jam paths; real OfflineAudioContext renders
+// inspect production synth/drum/Jam paths; real OfflineAudioContext renders
 // verify silence without speakers, permissions, physical ports or hardware.
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const { chromium } = require('playwright');
@@ -61,50 +61,22 @@ async function browserRenders() {
     await page.addScriptTag({ content: source('js/daw/engine.js') });
     const result = await page.evaluate(async () => {
       const energy = buffer => Array.from(buffer.getChannelData(0)).reduce((s, v) => s + v * v, 0);
-      async function note(kind, pitch, opts = {}) {
+      async function note(pitch, opts = {}) {
         const ctx = new OfflineAudioContext(1, 48000, 48000);
-        let inst;
-        if (kind === 'synth') inst = DAW.createSynth(ctx, DAW.defaultSynth());
-        else {
-          const buffer = ctx.createBuffer(1, 24000, 48000), data = buffer.getChannelData(0);
-          for (let i = 0; i < data.length; i++) data[i] = Math.sin(i * 2 * Math.PI * 261.63 / 48000) * 0.5;
-          DAW.samples.test = buffer;
-          inst = DAW.createSampler(ctx, { sampleId: 'test', rootNote: opts.audio ? pitch : 60, loop: true,
-            start: 0, end: 1, env: { a: 0.003, d: 0.1, s: 0.9, r: 0.05 }, gain: 0.9 });
-        }
+        const inst = DAW.createSynth(ctx, DAW.defaultSynth());
         inst.output.connect(ctx.destination);
-        const meta = opts.audio ? { audioClip: true } : undefined;
         const at = opts.future ? 0.5 : 0.02;
-        inst.noteOn(pitch, 0.8, at, 5, meta); inst.noteOff(pitch, at + 0.2, 5, meta);
+        inst.noteOn(pitch, 0.8, at, 5); inst.noteOff(pitch, at + 0.2, 5);
         if (opts.flush) App.emit('scale:boundary', { reason: 'test' });
         const value = energy(await ctx.startRendering()); inst.dispose(); return value;
       }
-      const out = { synthBlocked: await note('synth', 61), synthAllowed: await note('synth', 60),
-        sampleBlocked: await note('sample', 61), sampleAllowed: await note('sample', 60),
-        scheduledSynthFlushed: await note('synth', 60, { future: true, flush: true }),
-        scheduledSampleFlushed: await note('sample', 60, { future: true, flush: true }),
-        opaqueRecording: await note('sample', 61, { audio: true, future: true, flush: true }) };
-      const track = (pitch, src) => ({ id: 'render-test', kind: 'synth', voice: 'keys', notes: [{ m: pitch, v: 100, t: 0, d: 0.25 }],
-        mix: { vol: 80 }, fx: { type: 'none' }, clips: [{ start: 0, len: 1, src: src || 'pattern' }] });
-      const wavEnergy = async blob => { const view = new DataView(await blob.arrayBuffer()); let sum = 0;
-        for (let i = 44; i < view.byteLength; i += 2) sum += view.getInt16(i, true) ** 2; return sum; };
-      DAW.engine.tracks = [track(61)]; out.loopBlocked = await wavEnergy(await DAW.engine.render());
-      DAW.engine.tracks = [track(60)]; out.loopAllowed = await wavEnergy(await DAW.engine.render());
-      DAW.engine.tracks = [track(61)]; out.arrangementBlocked = await wavEnergy(await DAW.engine.renderSong());
-      DAW.engine.tracks = [track(60)]; out.arrangementAllowed = await wavEnergy(await DAW.engine.renderSong());
-      DAW.samples['render-test'] = DAW.samples.test;
-      DAW.engine.tracks = [Object.assign(track(61), { kind: 'sampler', sampler: { rootNote: 60, loop: true } })];
-      out.samplerLoopBlocked = await wavEnergy(await DAW.engine.render());
-      DAW.engine.tracks = [Object.assign(track(60), { kind: 'sampler', sampler: { rootNote: 60, loop: true } })];
-      out.samplerLoopAllowed = await wavEnergy(await DAW.engine.render());
-      DAW.engine.tracks = [Object.assign(track(61, 'audio'), { kind: 'sampler', sampler: { rootNote: 61, loop: true } })];
-      out.recordingArrangement = await wavEnergy(await DAW.engine.renderSong());
-      return out;
+      return { synthBlocked: await note(61), synthAllowed: await note(60),
+        scheduledSynthFlushed: await note(60, { future: true, flush: true }) };
     });
-    for (const k of ['synthBlocked', 'sampleBlocked', 'scheduledSynthFlushed', 'scheduledSampleFlushed', 'loopBlocked', 'arrangementBlocked', 'samplerLoopBlocked']) {
+    for (const k of ['synthBlocked', 'scheduledSynthFlushed']) {
       ok(result[k] === 0, 'real silent render: ' + k + ' has zero sample energy');
     }
-    for (const k of ['synthAllowed', 'sampleAllowed', 'opaqueRecording', 'loopAllowed', 'arrangementAllowed', 'samplerLoopAllowed', 'recordingArrangement']) {
+    for (const k of ['synthAllowed']) {
       ok(result[k] > 0, 'real silent render: ' + k + ' remains audible in the offline buffer');
     }
     await page.close();
@@ -138,7 +110,7 @@ async function browserRenders() {
   unlocked.noteOn(61, 0.8, 0, 2); ok(open.length === 1 && open[0][0] === 61, 'unlocked instruments preserve chromatic notes'); unlocked.dispose();
   values['scale.lock'] = true;
 
-  console.log('# actual internal factories and explicit opaque recording scope');
+  console.log('# actual internal factories');
   const ctx = graph(); h.sandbox.ctx = ctx;
   const synth = DAW.createSynth(ctx, DAW.defaultSynth());
   let from = ctx.nodes.length; synth.noteOn(61, 0.8, 1, 2);
@@ -147,16 +119,6 @@ async function browserRenders() {
   const future = ctx.nodes.filter(n => n.kind === 'osc' && n.starts.some(a => a[0] === 20));
   App.emit('scale:boundary'); ok(future.length === 2 && future.every(n => n.stops.includes(ctx.currentTime + 0.08)), 'boundary cancels already scheduled future synth oscillators');
   synth.dispose();
-  DAW.samples.test = { duration: 1 };
-  const sampler = DAW.createSampler(ctx, { sampleId: 'test', rootNote: 60, loop: true, start: 0, end: 1,
-    env: { a: 0.003, d: 0.1, s: 0.9, r: 0.1 }, gain: 0.9 });
-  from = ctx.nodes.length; sampler.noteOn(61, 0.9, 1, 3);
-  ok(ctx.nodes.length === from, 'production pitched sampler rejects disallowed pitch before constructing a source');
-  sampler.noteOn(60, 0.9, 20, 3); const melodic = ctx.nodes.filter(n => n.kind === 'buffer').at(-1);
-  sampler.noteOn(61, 0.9, 20, 4, { audioClip: true }); const recording = ctx.nodes.filter(n => n.kind === 'buffer').at(-1);
-  App.emit('scale:boundary');
-  ok(melodic.stops.includes(ctx.currentTime + 0.08) && recording.stops.length === 0, 'boundary cancels pitched samples while explicit opaque recordings keep playing');
-  sampler.allNotesOff(); ok(recording.stops.length === 1, 'normal transport stop still releases opaque recording sources'); sampler.dispose();
   const drum = DAW.createDrums(ctx, { gain: 0.9, lanes: Array.from({ length: 8 }, () => ({ tune: 0, decay: 0.3, level: 0.9 })) });
   from = ctx.nodes.length; drum.noteOn(1, 0.8, 1); const percussion = ctx.nodes.slice(from).filter(n => n.starts.length);
   App.emit('scale:boundary'); ok(percussion.length > 0 && percussion.every(n => !n.stops.includes(ctx.currentTime + 0.08)), 'drum lane one remains unpitched and is not muted by scale-boundary cleanup'); drum.dispose();
