@@ -62,6 +62,26 @@ window.Theory = (function () {
     { label: 'Exotic', ids: ['phrygDom'] }
   ];
 
+  // CHORD KEY of a scale: chord pages need seven notes to build chords from.
+  // A 7-note scale is its own; a pentatonic / blues scale borrows the major or
+  // natural minor it sits inside (minor third -> minor, else major). One rule
+  // for Chords, Jam and anything else that harmonizes the shared key.
+  function parentScale(id) {
+    var s = SCALES[id];
+    if (!s) return 'major';
+    if (s.steps.length === 7) return id;
+    return s.steps.indexOf(4) === -1 && s.steps.indexOf(3) !== -1 ? 'aeolian' : 'major';
+  }
+  // short names for tight spots (the key chip in the top bar)
+  var SCALE_SHORT = {
+    major: 'major', aeolian: 'minor', majorPent: 'major pent', minorPent: 'minor pent',
+    blues: 'blues', harmonicMinor: 'harm. minor', melodicMinor: 'mel. minor', phrygDom: 'phryg. dom'
+  };
+  function keyShort(root, id) {
+    var pc = mod12(root), sc = SCALES[id];
+    return pcName(pc, FLAT_KEYS.has(pc)) + ' ' + (SCALE_SHORT[id] || (sc ? sc.name.replace(/\s*\(.*\)$/, '').toLowerCase() : ''));
+  }
+
   var TUNINGS = {
     standard: { name: 'Standard (E A D G B E)',   midi: [40, 45, 50, 55, 59, 64] },
     dropD:    { name: 'Drop D (D A D G B E)',     midi: [38, 45, 50, 55, 59, 64] },
@@ -567,6 +587,8 @@ window.Theory = (function () {
     noteFreq: noteFreq,
     freqToNote: freqToNote,
     scaleInfo: scaleInfo,
+    parentScale: parentScale,
+    keyShort: keyShort,
     diatonic: diatonic,
     resolveProgression: resolveProgression,
     chordShapes: chordShapes,
