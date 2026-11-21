@@ -21,7 +21,9 @@ Keys > Charts, the controller remote), served at /GuitarPak/.
 2.1.0 WENT LIVE (2026-11-19, Matt's yes): PRs #107 weak-spot map (Exercises),
 #108 MIDI guitar (js/midiguitar.js, inside the MIDI keyboard card) and #109
 voice trainer part A (Train > Voice, js/vocal*.js) merged into v2, then v2 ->
-main; sw CACHE v6. Work continues on
+main; sw CACHE v6.
+2.2.0 (2026-11-21, Matt's "push it to 2.2"): PR #112 the FLOW PASS (see Cross-
+module conventions) into v2, then v2 -> main; sw CACHE v7. Work continues on
 branch `v2`, published to the BETA address
 https://mreindl118-boop.github.io/GuitarPak/next/ by
 `.github/workflows/pages-next.yml` (full suite first; replaces only `next/` on
