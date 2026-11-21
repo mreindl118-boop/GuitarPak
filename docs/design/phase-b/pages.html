@@ -1,0 +1,1003 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Pages · soundLAB 2.0 drawings</title>
+<!--
+  soundLAB 2.0 Phase B, step B1b: the pages inside the new frame, drawn before they are built
+  (docs/plans/phase-b/PLAN.md, table B1b.1; decisions D9, D27, D28; steps B10, B11, B12, B15a, B17).
+  This drawing answers the owner's items 6 (nine pages keep today's arrangement) and 7 (smaller
+  rows for the mouse) of the plan's section 9.
+
+    1  a practice page: Piano with a scale lesson (one headline, the keyboard as the largest thing,
+       one primary action, everything else in folds), with its folds closed and with one open
+    2  the tool pages: Chords, and the three heaviest: the start of Exercises (the Path tab),
+       the Woodshed's library, the Plan. Today's arrangement in the new look. The first two
+       screens of each are drawn as pictures; the page itself is drawn whole
+    3  one row of the Woodshed's library at 44 px and at 36 px (and at the 48 px of a touch screen)
+    4  Settings as five groups that fold: Look · Sound · Keyboard and lights · Hands-free ·
+       Data and about
+
+  Opened without ?w= it shows every picture at 390 and 1280 px, dark and light.
+  Opened with ?w= it is one page, laid out for the window it is given.
+  The shell, the frames and the shared parameters are mock.js's; the components are mock.css's;
+  the instruments are drawn by mock-hero.js. Read their header comments first.
+
+  THIS DRAWING'S OWN PARAMETERS (beside the shell's: key, bpm, lock, lights, help, colors, inst …)
+    view=piano|chords|quiz|shed|plan|rows|settings     which page (left out: piano)
+    scr=2            the second screen: the page scrolled on by one window, the header slid away
+    fold=perf|runner|keys|lumi    view=piano: that fold is open and scrolled into view
+    open=look|sound|keys|remote|data|all|none    view=settings: which groups are open. Left out:
+                     what a profile that never touched a group gets (all above 900 px, none below)
+    whole=1          contact view only: the frame is made as long as the page
+    page=<id>        what a tap on a tab, a pill or the gear sets (mock.js): this drawing then
+                     shows that page if it draws it (piano, chords, quiz, shed, practiceplan,
+                     settings), and the shell over mock.js's quiet page if it does not
+
+  WHERE THE CONTENT COMES FROM. Every page was opened in the app as it is today (this branch,
+  served from the worktree) at 390 and 1280 px, and its texts, controls and their order were
+  read from the running page. The numbers are ones the app showed: a new profile that answered
+  four Exercises levels at a human pace (3.3 minutes); the eight pieces that "+ Scale",
+  "+ Pentatonic fours" and "+ Hanon" make in the Woodshed in four keys; Settings with a LUMI
+  and a MODX connected. The lines of the code are named beside each part of the script.
+  How long a page is today was measured in the same way (TODAY in the script).
+  Texts are today's, with three kinds of exception, each marked in the script:
+    - a line that a step rewords before or with the page (docs/plans/phase-b/WORDING.md) is shown
+      in that step's words;
+    - what a step of the plan removes is gone (the instrument bar above the Learn pages, B8; the
+      Help level control on the Piano page, B12; the accent colour picker, B5a);
+    - XP is printed as a whole number on the Exercises start (a fix of B10).
+  The instruments are mock-hero.js's, so two things today's own drawings have are not drawn:
+  the finger numbers over the Piano's keys at Help "Full", and the computer keys' letters.
+
+  THREE THINGS THAT DIFFER FROM THE OTHER DRAWINGS
+    - A frame of 901 px or wider inside the contact view shows the heights a mouse gets (44 and
+      36 px) on every device, so that the dense rows can be judged on a phone or an iPad too.
+      Opened alone, a page takes the heights of the device it is on (the tokens decide).
+    - The rows picture (view=rows) sets the three heights itself, on each sample.
+    - Settings' pictures are as long as the page (whole=1): the bottom tab bar then stands at
+      the end of the picture, not at the end of a phone's screen.
+
+  The styles in this file are drawing-only: first what the modules themselves inject in the app
+  (decision D8), written from tokens as their steps will write it; then what only lays out this
+  drawing. The components (rows, tiles, cards, folds, the instruments) are in mock.css.
+-->
+<link rel="icon" href="../../../icons/icon.svg">
+<link rel="stylesheet" href="../../../css/tokens.css">
+<link rel="stylesheet" href="mock.css">
+<style>
+/* drawing-only */
+
+/* ============ 0 · The frame of a page of this drawing: one column, centred (the modules
+                    below set their own widths and columns on it) ============ */
+.mk-pg { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sl-space-5); max-width: calc(var(--sl-space-8) * 16); margin: 0 auto; }
+.mk-pg > * { min-width: 0; }
+.mk-pg.is-mid { max-width: calc(var(--sl-space-8) * 13 + var(--sl-space-5)); }
+.mk-pg.is-narrow { max-width: calc(var(--sl-space-8) * 10 + var(--sl-space-6) + var(--sl-space-2)); }
+.mk-pg-head { display: grid; gap: var(--sl-space-2); }
+.mk-pg-head p { margin: 0; }
+
+/* ============ 1 · What the modules inject themselves (D8), as their steps will write it
+                    from tokens. Not for mock.css: each stays with its module. ============ */
+
+/* ---- shared by several modules: a check box with its words, a small label over a control ---- */
+:is(.pn-check, .ch-check, .set-check, .pgu-check) { display: inline-flex; align-items: center; gap: var(--sl-space-2); min-height: var(--sl-control-h); color: var(--sl-ink); font-size: var(--sl-text-sm); cursor: pointer; }
+:is(.ctl-label, .set-sub) { color: var(--sl-ink-soft); font-family: var(--sl-font-cond); font-size: var(--sl-text-xs); font-weight: var(--sl-weight-cond); line-height: 1.2; letter-spacing: var(--sl-caps-ls); text-transform: uppercase; }
+/* .fb-chip is one of the classes that cross pages (D8); mock.css gives it the dense height until its
+   owners' steps. On a page that has had its step it is a chip like any other: the full height */
+.sl-skin .chip.fb-chip { min-height: var(--sl-control-h); padding: 0 var(--sl-space-4); }
+/* a degree's or a note's colour beside words in the ink colour (never coloured text) */
+.mk-c { box-sizing: border-box; flex: 0 0 auto; display: inline-block; width: var(--sl-space-3); height: var(--sl-space-3); border: 2px solid var(--sl-ink-on-color); border-radius: var(--sl-radius-pill); background: var(--c); }
+
+/* ---- js/piano.js and js/keylessons.js (B12): the Piano page. Every id of today is kept ---- */
+.pn-page { row-gap: var(--sl-space-4); }
+.pn-card, #pn-lessons, .kl-card { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sl-space-3); min-width: 0; }
+.pn-under { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sl-space-2); min-width: 0; }
+/* the headline's row ends with the turn button, right above the stage's corner */
+.pn-headrow { display: flex; align-items: center; justify-content: space-between; gap: var(--sl-space-3); min-height: var(--sl-control-h); }
+/* the stage holds the keys and nothing else. Dark in both themes */
+.pn-stage { padding: 0 var(--sl-space-3) var(--sl-space-3); }
+.pn-stage .sl-kbd { height: clamp(calc(var(--sl-space-8) * 2 - var(--sl-space-4)), min(27vh, 35vw), calc(var(--sl-space-8) * 3 + var(--sl-space-5))); }
+.pn-always { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sl-space-2) var(--sl-space-3); }
+.field.pn-inl { display: inline-flex; align-items: center; gap: var(--sl-space-2); }
+.field.pn-inl select { width: auto; }
+.pn-legend { display: flex; flex-wrap: wrap; gap: var(--sl-space-1) var(--sl-space-3); color: var(--sl-ink-soft); font-size: var(--sl-text-sm); }
+.pn-leg { display: inline-flex; align-items: center; gap: var(--sl-space-1); white-space: nowrap; }
+.pn-foot { margin: 0; }
+.kl-head h2 { margin: 0; font-family: var(--sl-font-cond); font-size: var(--sl-text-lg); font-weight: var(--sl-weight-cond-bold); line-height: 1.2; }
+.kl-sel { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sl-space-3); min-width: 0; }
+.kl-top { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sl-space-3) var(--sl-space-4); }
+.kl-title { display: grid; flex: 1 1 auto; gap: 2px; min-width: 0; }
+.kl-title > b { font-size: var(--sl-text-lg); line-height: 1.2; }
+.kl-acts { display: flex; flex: 0 0 auto; gap: var(--sl-space-2); }
+.kl-set { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sl-space-2) var(--sl-space-5); }
+.kl-level { display: inline-flex; align-items: center; gap: var(--sl-space-2); font-size: var(--sl-text-sm); }
+.kl-mastery { display: grid; gap: var(--sl-space-1); }
+.kl-opts { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--sl-space-2) var(--sl-space-3); }
+.sl-skin .kl-helpbtn { padding: 0 var(--sl-space-2); text-decoration: underline; text-underline-offset: var(--sl-space-1); }
+.kl-ctl { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sl-space-2) var(--sl-space-3); }
+.kl-ctl > span { flex: 1 1 calc(var(--sl-space-8) * 3); min-width: 0; }
+.kl-credit { margin: 0; }
+.sl-skin .kl-tiers { display: flex; width: 100%; max-width: calc(var(--sl-space-8) * 8); margin-top: var(--sl-space-3); }
+.kl-tiers > button { flex: 1 1 0; }
+.kl-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(calc(var(--sl-space-8) * 3), 1fr)); gap: var(--sl-space-2); }
+.kl-row { min-height: calc(var(--sl-control-h) + var(--sl-space-3)); }
+.pn-folds { display: grid; grid-template-columns: minmax(0, 1fr); margin-top: var(--sl-space-3); }
+.pn-foldrow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sl-space-2) var(--sl-space-3); }
+.pn-foldrow select { width: auto; }
+.pn-foldrow input[type="number"] { width: calc(var(--sl-space-8) + var(--sl-space-2)); }
+.pn-foldrow .seg > button .ic { margin: 0 calc(-1 * var(--sl-space-1)); }
+@media (max-width: 640px) {
+  .pn-page { row-gap: var(--sl-space-3); }
+  .pn-card, #pn-lessons, .kl-card, .kl-sel { gap: var(--sl-space-2); }
+  .pn-legend { gap: var(--sl-space-1) var(--sl-space-2); font-size: var(--sl-text-xs); }
+  .kl-top { gap: var(--sl-space-2) var(--sl-space-4); }
+  .kl-acts { flex: 1 1 100%; }
+  .kl-acts > .btn.primary { flex: 1 1 auto; }
+  .kl-list { grid-template-columns: minmax(0, 1fr); }
+}
+/* above 900 px the lesson stands beside the keyboard's own controls, so that its Start button
+   is on the first screen of a window 640 px high too. The order in the document is unchanged */
+@media (min-width: 901px) {
+  .pn-page { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: var(--sl-space-7); }
+  .pn-card, #pn-lessons, .kl-card { display: contents; }
+  .pn-headrow, .pn-stage, .kl-tiers, .kl-list, .pn-folds { grid-column: 1 / -1; }
+  .pn-under { grid-column: 1; grid-row: 3 / span 2; align-self: start; }
+  .kl-head { grid-column: 2; grid-row: 3; }
+  .kl-sel { grid-column: 2; grid-row: 4; }
+}
+
+/* ---- js/chords.js (B11): the Chords page ---- */
+.ch-card { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sl-space-3); }
+.sl-skin .ch-card > h2 { margin: 0; }
+.ch-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sl-space-2) var(--sl-space-3); }
+.ch-row.is-end { align-items: flex-end; }
+.ch-row > .small { min-height: var(--sl-control-h); display: inline-flex; align-items: center; }
+:is(.ch-inkeyrow, .ch-shapesel, .ch-palette, .ch-tones) { display: flex; flex-wrap: wrap; gap: var(--sl-space-2); }
+/* a chord: its degree's colour as a dot, its numeral, its name in the condensed face */
+.ch-chip > b { font-weight: var(--sl-weight-medium); color: var(--sl-ink); }
+.ch-chip > span { font-family: var(--sl-font-cond); font-size: var(--sl-text-md); font-weight: var(--sl-weight-cond); color: var(--sl-ink); }
+span.chip { cursor: default; }
+.ch-exrow { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--sl-space-3) var(--sl-space-4); }
+.ch-exname { min-width: calc(var(--sl-space-8) + var(--sl-space-4)); font-family: var(--sl-font-cond); font-size: var(--sl-display-sm); font-weight: var(--sl-weight-cond-bold); line-height: var(--sl-control-h); }
+.ch-exsel { display: grid; grid-template-columns: calc(var(--sl-space-8) + var(--sl-space-4)) calc(var(--sl-space-8) * 3 + var(--sl-space-4)) calc(var(--sl-space-8) * 2 - var(--sl-space-3)); gap: var(--sl-space-3); }
+.ch-exacts { display: flex; gap: var(--sl-space-2); }
+.ch-board { max-width: calc(var(--sl-space-8) * 10 + var(--sl-space-6) + var(--sl-space-2)); padding: var(--sl-space-3) var(--sl-space-4); }
+.ch-fnline { margin: 0; }
+.ch-presetf { flex: 0 1 calc(var(--sl-space-8) * 5); }
+.ch-track { display: flex; align-items: center; min-height: var(--sl-control-h); padding: 0 var(--sl-space-3); border: 1px dashed var(--sl-line-control); border-radius: var(--sl-radius-md); }
+.ch-numf { flex: 0 0 calc(var(--sl-space-8) + var(--sl-space-5)); }
+/* on a phone the chord's name stands beside Root and Chord; View and the buttons follow, each in its own row */
+@media (max-width: 640px) {
+  .ch-exrow { display: grid; grid-template-columns: auto calc(var(--sl-space-8) + var(--sl-space-4)) minmax(0, 1fr); gap: var(--sl-space-2) var(--sl-space-3); }
+  .ch-exname { grid-column: 1; grid-row: 1; align-self: end; min-width: 0; }
+  .ch-exsel { display: contents; }
+  .ch-exsel > :nth-child(1) { grid-column: 2; grid-row: 1; }
+  .ch-exsel > :nth-child(2) { grid-column: 3; grid-row: 1; }
+  .ch-exsel > :nth-child(3) { grid-column: 1 / -1; grid-row: 2; }
+  .ch-exacts { grid-column: 1 / -1; grid-row: 3; }
+  .ch-exacts > .btn { flex: 1 1 0; }
+  .ch-board { padding: var(--sl-space-2); }
+}
+
+/* ---- js/quiz.js (B10): the start of Exercises, Path tab ---- */
+.mk-pg.qz-page { max-width: calc(var(--sl-space-8) * 12 + var(--sl-space-4)); }
+.qz-strip { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; align-items: center; gap: var(--sl-space-3); }
+.qz-stat { grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: var(--sl-space-3); min-height: var(--sl-space-8); }
+.qz-stat > :first-child { grid-row: 1 / span 2; }
+.qz-stat > .ic { color: var(--sl-ink-muted); }
+.qz-stat .sl-tile-num > small { color: var(--sl-ink-muted); font-family: var(--sl-font-body); font-size: var(--sl-text-md); }
+.qz-lvstat > :first-child { grid-row: 1 / span 3; }
+.qz-lvstat > b { line-height: 1.2; }
+.qz-lvbadge { display: grid; place-items: center; width: calc(var(--sl-space-7) - var(--sl-space-1)); aspect-ratio: 1; border: 1px solid var(--sl-accent-deep); border-radius: var(--sl-radius-md); background: var(--sl-accent-soft); color: var(--sl-ink); font-family: var(--sl-font-display); font-size: var(--sl-text-xl); line-height: 1; }
+.qz-stripnote { grid-column: 1 / -1; margin: 0; padding-top: var(--sl-space-3); border-top: 1px solid var(--sl-line); color: var(--sl-ink-muted); font-size: var(--sl-text-sm); }
+.sl-skin .qz-tabs { display: flex; }
+.qz-tabs > button { flex: 1 1 0; }
+.qz-path, .qz-psec { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sl-space-5); }
+.qz-pban { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: var(--sl-space-1) var(--sl-space-3); padding: var(--sl-space-4) var(--sl-space-5); border: 1px solid var(--sl-accent-deep); border-radius: var(--sl-radius-lg); background: var(--sl-accent-soft); }
+.qz-pban > .sl-eyebrow { grid-column: 1 / -1; }
+.qz-pban h3 { margin: 0; font-family: var(--sl-font-display); font-size: var(--sl-text-xl); font-weight: var(--sl-weight-regular); line-height: 1; letter-spacing: 0.01em; text-transform: uppercase; }
+.qz-pmeta { color: var(--sl-ink-soft); font-size: var(--sl-text-sm); font-variant-numeric: tabular-nums; }
+.qz-pnodes { display: grid; justify-items: center; gap: var(--sl-space-4); padding-top: var(--sl-space-5); }
+.qz-nwrap { --zz: min(calc(var(--sl-space-7) + var(--sl-space-2)), 12vw); transform: translateX(calc(var(--x) * var(--zz))); }
+.qz-node { position: relative; display: grid; justify-items: center; gap: var(--sl-space-2); min-width: calc(var(--sl-space-8) + var(--sl-space-3)); padding: var(--sl-space-1); border: 0; border-radius: var(--sl-radius-md); background: transparent; color: var(--sl-ink); font-family: var(--sl-font-body); cursor: pointer; }
+.qz-ndisc { --p: 0; display: grid; place-items: center; width: calc(var(--sl-space-8) - var(--sl-space-1)); aspect-ratio: 1; border-radius: var(--sl-radius-pill); background: conic-gradient(var(--sl-accent-text) calc(var(--p) * 1%), var(--sl-line-control) 0); }
+.qz-nface { display: grid; place-items: center; width: calc(100% - var(--sl-space-2) - 2px); aspect-ratio: 1; border-radius: var(--sl-radius-pill); background: var(--sl-surface-2); color: var(--sl-accent-text); }
+.qz-node.done .qz-ndisc { background: var(--sl-accent-deep); }
+.qz-node.done .qz-nface { background: var(--sl-accent); color: var(--sl-accent-ink); }
+.qz-node.cur .qz-ndisc { box-shadow: 0 0 0 2px var(--sl-bg), 0 0 0 var(--sl-space-1) var(--sl-accent-deep); }
+.qz-node.locked .qz-ndisc { background: var(--sl-line-strong); }
+.qz-node.locked .qz-nface { background: var(--sl-surface); color: var(--sl-ink-muted); }
+.qz-nlbl { display: grid; font-size: var(--sl-text-sm); font-weight: var(--sl-weight-medium); line-height: 1.25; text-align: center; }
+.qz-nlbl > small { color: var(--sl-ink-muted); font-size: var(--sl-text-xs); font-weight: var(--sl-weight-regular); }
+.qz-node.locked .qz-nlbl { color: var(--sl-ink-muted); }
+.qz-nstart { position: absolute; top: calc(-1 * var(--sl-space-5)); left: 50%; transform: translateX(-50%); padding: var(--sl-space-1) var(--sl-space-2); border-radius: var(--sl-radius-sm); background: var(--sl-accent); color: var(--sl-accent-ink); font-family: var(--sl-font-cond); font-size: var(--sl-text-xs); font-weight: var(--sl-weight-cond-bold); line-height: 1; letter-spacing: var(--sl-caps-ls); text-transform: uppercase; white-space: nowrap; }
+.qz-nstart::after { content: ''; position: absolute; left: 50%; bottom: calc(-1 * var(--sl-space-1)); margin-left: calc(-1 * var(--sl-space-1)); border: var(--sl-space-1) solid transparent; border-bottom: 0; border-top-color: var(--sl-accent); }
+.qz-nwrap.is-cur { margin-top: var(--sl-space-4); }
+@media (max-width: 640px) {
+  .qz-strip { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .qz-strip > .qz-lvstat, .qz-strip > .btn { grid-column: 1 / -1; }
+}
+
+/* ---- js/woodshed.js and js/practice-progress-ui.js (B15a): the Woodshed's library ---- */
+.ws-add { display: flex; flex-wrap: wrap; gap: var(--sl-space-2); }
+.ws-card, .pgu { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sl-space-3); }
+.sl-skin :is(.ws-card, .pgu) h2 { margin: 0; }
+.ws-card p, .pgu p { margin: 0; }
+.ws-rudh { padding-top: var(--sl-space-2); }
+.ws-row { flex-wrap: wrap; }
+.ws-main { display: flex; flex: 1 1 calc(var(--sl-space-8) * 3); flex-wrap: wrap; align-items: baseline; gap: 0 var(--sl-space-2); }
+.ws-main > b { font-weight: var(--sl-weight-medium); }
+.ws-meta { color: var(--sl-ink-muted); font-size: var(--sl-text-xs); }
+@media (max-width: 640px) { .ws-main { flex: 1 1 100%; flex-direction: column; align-items: flex-start; } }      /* a piece's name, its line under it, then its buttons */
+.pgu-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: var(--sl-space-3) var(--sl-space-5); }
+.pgu-head > div { display: grid; flex: 1 1 calc(var(--sl-space-8) * 4); gap: var(--sl-space-1); }
+.pgu-head p { max-width: 72ch; }
+.pgu-select { flex: 0 0 calc(var(--sl-space-8) * 2 + var(--sl-space-3)); }
+.pgu-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(calc(var(--sl-space-8) * 2 + var(--sl-space-3)), 1fr)); gap: var(--sl-space-2); margin: 0; }
+.pgu-tiles .sl-tile { align-content: start; }
+.pgu-goal { display: grid; gap: var(--sl-space-1); }
+.pgu-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sl-space-2) var(--sl-space-3); padding-top: var(--sl-space-2); }
+.pgu-ranges { display: flex; gap: var(--sl-space-2); }
+.pgu-chart { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--sl-space-1) var(--sl-space-3); color: var(--sl-ink-soft); font-size: var(--sl-text-xs); font-variant-numeric: tabular-nums; }
+.pgu-y { display: flex; flex-direction: column; justify-content: space-between; text-align: right; }
+.pgu-bars { display: flex; align-items: flex-end; gap: 2px; height: calc(var(--sl-space-8) * 2); border-bottom: 1px solid var(--sl-line-control); }
+.pgu-bars > i { flex: 1 1 0; height: calc(var(--p) * 1%); border-radius: 2px 2px 0 0; background: var(--sl-accent); }
+.pgu-x { grid-column: 2; display: flex; justify-content: space-between; }
+.pgu-table-wrap { overflow-x: auto; }
+.pgu-table { width: 100%; border-collapse: collapse; font-size: var(--sl-text-sm); font-variant-numeric: tabular-nums; }
+.pgu-table caption { padding-bottom: var(--sl-space-2); color: var(--sl-ink-muted); font-size: var(--sl-text-xs); text-align: left; }
+.pgu-table :is(th, td) { padding: var(--sl-space-2) var(--sl-space-3) var(--sl-space-2) 0; border-top: 1px solid var(--sl-line-strong); text-align: left; white-space: nowrap; }
+.pgu-table th { color: var(--sl-ink-soft); font-weight: var(--sl-weight-medium); }
+
+/* ---- js/practiceplan.js (B11): the Plan ---- */
+.pp-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sl-space-3); }
+.pp-head > div { display: grid; gap: var(--sl-space-1); min-width: 0; }
+.pp-muted { margin: 0; color: var(--sl-ink-muted); font-size: var(--sl-text-sm); }
+.pp-student { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; align-items: end; gap: var(--sl-space-3); }
+.pp-card { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sl-space-3); }
+.sl-skin .pp-card h2 { margin: 0; }
+.pp-cardhead { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: var(--sl-space-2) var(--sl-space-3); }
+.pp-cardhead > div { display: grid; flex: 1 1 calc(var(--sl-space-8) * 3); gap: var(--sl-space-1); }
+.pp-block { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: var(--sl-space-1) var(--sl-space-3); padding: var(--sl-space-3) var(--sl-space-4); border-radius: var(--sl-radius-md); }
+.pp-number { display: grid; place-items: center; width: var(--sl-space-6); aspect-ratio: 1; margin-top: var(--sl-space-1); border: 1px solid var(--sl-accent-deep); border-radius: var(--sl-radius-pill); color: var(--sl-ink); font-size: var(--sl-text-sm); font-weight: var(--sl-weight-medium); }
+.pp-btitle { display: grid; gap: 2px; align-self: center; min-width: 0; }
+.pp-kicker { color: var(--sl-accent-text); font-family: var(--sl-font-cond); font-size: var(--sl-text-xs); font-weight: var(--sl-weight-cond); line-height: 1.2; letter-spacing: var(--sl-caps-ls); text-transform: uppercase; }
+.sl-skin .pp-block h3 { margin: 0; color: var(--sl-ink); font-family: var(--sl-font-cond); font-size: var(--sl-text-lg); font-weight: var(--sl-weight-cond-bold); line-height: 1.2; letter-spacing: 0; text-transform: none; }
+.pp-bbody { grid-column: 2 / -1; display: grid; gap: var(--sl-space-1); }
+.pp-source { margin: 0; font-size: var(--sl-text-sm); }
+.pp-evidence { margin: 0; color: var(--sl-ink-muted); font-size: var(--sl-text-xs); line-height: 1.4; }
+.pp-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--sl-space-2); }
+.pp-day { display: grid; justify-items: center; gap: 2px; padding: var(--sl-space-2) var(--sl-space-1); border-radius: var(--sl-radius-sm); background: var(--sl-surface-2); font-size: var(--sl-text-sm); font-variant-numeric: tabular-nums; }
+.pp-day > b { font-weight: var(--sl-weight-medium); }
+.pp-day > small { color: var(--sl-ink-muted); font-size: var(--sl-text-xs); }
+.pp-day.is-today { box-shadow: inset 0 0 0 1px var(--sl-line-control); }
+.pp-folds { display: grid; grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 640px) {
+  .pp-student { grid-template-columns: minmax(0, 1fr) auto; }
+  .pp-student > :first-child { grid-column: 1 / -1; }
+  .pp-days { gap: var(--sl-space-1); }
+  .pp-day { padding: var(--sl-space-2) 0; font-size: var(--sl-text-xs); text-align: center; }
+  .pp-day > small { line-height: 1.2; }
+}
+
+/* ---- js/settings.js and js/remote.js (B17): Settings in five groups ---- */
+.set-page { gap: var(--sl-space-4); }
+.set-groups { display: grid; grid-template-columns: minmax(0, 1fr); }
+.sl-skin .set-group > summary { min-height: calc(var(--sl-control-h) + var(--sl-space-3)); font-family: var(--sl-font-cond); font-size: var(--sl-text-lg); font-weight: var(--sl-weight-cond-bold); }
+.set-sec { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sl-space-2); padding: var(--sl-space-4) 0; }
+.set-sec > :is(.seg, .btn, .set-check, details) { justify-self: start; }
+.set-sec > .set-sec { padding: 0; border: 0; }
+.set-sec + .set-sec { border-top: 1px solid var(--sl-line); }
+.set-group > .set-sec:first-of-type { padding-top: var(--sl-space-1); }
+.sl-skin .set-sec > h2 { margin: 0 0 var(--sl-space-1); font-family: var(--sl-font-body); font-size: var(--sl-text-md); font-weight: var(--sl-weight-medium); line-height: 1.3; }
+.set-sec p { margin: 0; max-width: 76ch; }
+.set-sub { padding-top: var(--sl-space-2); }
+.set-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sl-space-2) var(--sl-space-3); }
+.set-row.is-end { align-items: flex-end; }
+.set-row input[type="range"] { width: calc(var(--sl-space-8) * 3); }
+.set-row .field { flex: 0 1 calc(var(--sl-space-8) * 3); }
+.set-check { align-items: flex-start; padding: var(--sl-space-2) 0; }
+.set-check > span { display: grid; gap: 2px; padding-top: 2px; }
+.set-check small { color: var(--sl-ink-muted); font-size: var(--sl-text-xs); line-height: 1.4; max-width: 76ch; }
+.set-gear { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sl-space-2); }
+.set-chip { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0 var(--sl-space-2); min-height: var(--sl-control-h-dense); padding: var(--sl-space-1) var(--sl-space-3); border: 1px solid var(--sl-line-control); border-radius: var(--sl-radius-md); color: var(--sl-ink-soft); font-size: var(--sl-text-sm); }
+.set-chip > b { color: var(--sl-ink); }
+.rm-row { padding-top: var(--sl-space-2); padding-bottom: var(--sl-space-2); }
+.rm-what { flex: 0 0 auto; }
+@media (max-width: 640px) { .set-row input[type="range"] { width: 100%; flex: 1 1 calc(var(--sl-space-8) * 2); } .set-row .field { flex: 1 1 100%; } }
+
+/* ============ 2 · What only lays out this drawing ============ */
+/* the contact view: the line under a page's pictures */
+.mk-state > p.mk-after { margin-top: var(--sl-space-3); padding-left: var(--sl-space-3); border-left: 2px solid var(--sl-accent-text); color: var(--sl-ink); }
+/* the rows picture: three samples of the same row, each at one height */
+.mk-h44 { --sl-control-h: 44px; --sl-control-h-dense: 44px; }       /* the three pairs of css/tokens.css (:132-134, :199), */
+.mk-h36 { --sl-control-h: 44px; --sl-control-h-dense: 36px; }       /* set by hand so that every device shows all three */
+.mk-h48 { --sl-control-h: 48px; --sl-control-h-dense: 48px; }
+.mk-sample { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sl-space-3); }
+.mk-sample + .mk-sample { padding-top: var(--sl-space-5); border-top: 1px solid var(--sl-line-strong); }
+.mk-sample-head { display: grid; gap: var(--sl-space-1); }
+.mk-sample-head > b { font-family: var(--sl-font-cond); font-size: var(--sl-text-xl); font-weight: var(--sl-weight-cond-bold); line-height: 1.1; }
+.mk-sample-head > span { max-width: 72ch; color: var(--sl-ink-soft); font-size: var(--sl-text-sm); }
+.mk-sample-head > span b { color: var(--sl-ink); font-variant-numeric: tabular-nums; }
+.mk-tag { display: inline-block; margin-left: var(--sl-space-2); padding: 2px var(--sl-space-2); border: 1px solid var(--sl-accent-deep); border-radius: var(--sl-radius-pill); background: var(--sl-accent-soft); color: var(--sl-ink); font-family: var(--sl-font-cond); font-size: var(--sl-text-xs); font-weight: var(--sl-weight-cond); letter-spacing: var(--sl-caps-ls); text-transform: uppercase; vertical-align: middle; }
+</style>
+<script src="mock.js"></script>
+<script src="mock-hero.js"></script>
+</head>
+<body>
+<noscript>This drawing is built by a script (mock.js). Please switch JavaScript on.</noscript>
+<script>
+(function () {
+  'use strict';
+  var D = Mock.DATA, esc = Mock.esc, q = Mock.q;
+
+  var ic = Mock.icon;      // every icon is mock.js's
+  function options(list, selected) {
+    return list.map(function (t) { return '<option' + (t === selected ? ' selected' : '') + '>' + esc(t) + '</option>'; }).join('');
+  }
+  // a segmented control: items are words, or { html, aria, title }
+  function seg(attrs, items, active) {
+    return '<div class="seg" role="group" ' + attrs + '>' + items.map(function (it, i) {
+      var on = i === active, o = typeof it === 'string' ? { html: esc(it) } : it;
+      return '<button type="button"' + (on ? ' class="active"' : '') + ' aria-pressed="' + on + '"' + (o.aria ? ' aria-label="' + esc(o.aria) + '"' : '') +
+        (o.title ? ' title="' + esc(o.title) + '"' : '') + '>' + o.html + '</button>';
+    }).join('') + '</div>';
+  }
+  var FLAT_KEYS = [1, 3, 5, 6, 8, 10];
+  function noteName(pc, root) { return Mock.pcName(pc, FLAT_KEYS.indexOf(root) !== -1); }
+
+  // =====================================================================================
+  // 1 · THE PIANO PAGE (js/piano.js:1351-1466 and js/keylessons.js:536-598, in the order of
+  //     step B12: the headline, the stage, one row that is always shown, legend and foot,
+  //     the lessons, the folds). Every id is today's.
+  // =====================================================================================
+  function pianoMain(o) {
+    var wide = window.innerWidth > 900, mid = window.innerWidth > 640, fold = q('fold', '');
+    var steps = D.SCALES[o.scale].steps, byNote = o.colors === 'note';
+    // the keyboard shows the key bar's key; the labels are note names (#pn-display is on "Notes")
+    var model = SLHero.model({ root: o.root, scale: steps.map(function (s) { return o.root + s; }), help: o.help, mode: byNote ? 'note' : 'interval',
+      color: function (pc) { return byNote ? D.COLORS.NOTES[pc] : D.COLORS.INTERVALS[(pc - o.root + 12) % 12]; },
+      label: function (pc) { return noteName(pc, o.root); }, name: function (pc) { return noteName(pc, o.root); } });
+    // today the page draws C2 to C6 at 1280 px (js/piano.js); a phone gets the LUMI's two octaves
+    var kbd = SLHero.keyboard(model, { from: wide ? 36 : 48, octaves: wide ? 4 : mid ? 3 : 2 });
+    // the legend, in the words of today's page: the degree, then the note (js/piano.js legend)
+    var legend = o.help >= 3 ? steps.map(function (s) {
+      var pc = (o.root + s) % 12;
+      return '<span class="pn-leg"><i class="mk-c" style="--c:' + (byNote ? D.COLORS.NOTES[pc] : D.COLORS.INTERVALS[s]) + '"></i>' +
+        esc(D.COLORS.INTERVAL_LABELS[s].replace('♭', 'b') + ' · ' + noteName(pc, o.root)) + '</span>';
+    }).join('') : '';
+    // js/keylessons.js: the nine lessons of the tier "Start here", all at level 1 on this profile
+    var LESSONS = [['C major', 'Right hand'], ['C major', 'Left hand'], ['G major', 'Right hand'], ['G major', 'Left hand'], ['F major', 'Right hand'],
+      ['F major', 'Left hand'], ['A minor', 'Right hand'], ['A minor', 'Left hand'], ['A minor pentatonic', 'Right hand']];
+    var rows = LESSONS.map(function (l, i) {
+      return '<button type="button" class="sl-row kl-row' + (i ? '' : ' on') + '" aria-pressed="' + !i + '">' +
+        '<span class="sl-row-main kl-rname"><b>' + l[0] + '</b><small>' + l[1] + '</small></span><span class="sl-row-state kl-rlv">Level 1</span></button>';
+    }).join('');
+    var open = function (name) { return fold === name || fold === 'all' ? ' open' : ''; };
+
+    return '<div class="mk-pg pn-page">' +
+      '<div class="pn-card">' +
+        '<div class="pn-headrow"><h1 class="pn-title" id="pn-title">' + esc(Mock.keyName(o.root, o.scale, 'full')) + '</h1>' +
+          '<button type="button" class="btn sm icon-btn" id="pn-rotate" title="Rotate the keyboard (portrait / landscape)" aria-label="Rotate the keyboard">' + ic('rotate', 20) + '</button></div>' +
+        '<div class="pn-stage sl-hero" id="pn-stage">' + kbd + '</div>' +
+        '<div class="pn-under">' +
+          '<div class="pn-always">' +
+            '<label class="field pn-inl" title="What this keyboard sounds like: the sampled grand piano or a synth sound">Sound' +
+              '<select id="pn-voice">' + options(['Grand piano', 'Super saw', 'Warm pad', 'Soft keys', 'Round bass'], 'Grand piano') + '</select></label>' +
+            seg('id="pn-look" aria-label="How the scale shows" title="How the scale shows on the keys: one colored dot per key, or the whole key colored"', ['Dots', 'Whole keys'], 0) +
+            seg('id="pn-display" aria-label="What the keys are labelled with"', ['Notes', 'Intervals', 'Degrees'], 0) +
+          '</div>' +
+          '<div class="pn-legend" id="pn-legend">' + legend + '</div>' +
+          '<p class="muted small pn-foot">' + (wide ? 'Tap, type (home row = white keys, Z / X = octave) or play a MIDI keyboard.' : 'Tap or play a MIDI keyboard.') + '</p>' +
+        '</div>' +
+      '</div>' +
+      // the lessons. Inside the block the Start button moved up beside the lesson's name and
+      // the line "Credit: …" down to its end, so that the button is on the first screen
+      '<div id="pn-lessons"><div class="kl-card">' +
+        '<div class="kl-head"><h2>Scale lessons</h2></div>' +
+        '<div class="kl-sel">' +
+          '<div class="kl-top">' +
+            '<div class="kl-title"><b>C major · Right hand</b><span class="muted small">1 octave · up and down</span></div>' +
+            '<div class="kl-acts"><button type="button" class="btn primary" id="kl-start">' + ic('play', 14) + ' Start</button>' +
+              '<button type="button" class="btn" id="kl-listen">Listen first</button></div>' +
+          '</div>' +
+          '<div class="kl-set">' +
+            '<div class="kl-level"><button type="button" class="btn sm icon-btn" aria-label="Easier" disabled>' + ic('minus', 18) + '</button>' +
+              '<span><b>Level 1</b> of 10 · Quarter notes at 60</span>' +
+              '<button type="button" class="btn sm icon-btn" aria-label="Harder">' + ic('plus', 18) + '</button></div>' +
+            '<div class="kl-opts">' + seg('aria-label="Times through"', ['1×', '2×', '4×', { html: '∞', aria: 'Infinite', title: 'Infinite: loop until you stop, go for a streak' }], 1) +
+              '<button type="button" class="btn ghost kl-helpbtn" id="kl-help">Help: ' + D.HELP_NAMES[o.help] + '</button></div>' +      // B5b: opens the key bar's Help panel
+          '</div>' +
+          '<div class="kl-mastery" title="Levels passed"><span class="sl-bar" style="--p:0"></span><span class="muted small">0 of 10 levels passed</span></div>' +
+          '<div class="kl-ctl">' +
+            // "Only the notes to play": the name step B5a gives the chip "Guide focus" (WORDING.md, js/keylessons.js:575)
+            '<button type="button" class="chip fb-chip active" id="kl-disp" aria-pressed="true" title="In a lesson the LUMI lights only the note to play. Switch the LUMI lights on and off in the key bar.">Only the notes to play</button>' +
+            '<button type="button" class="chip fb-chip active" id="kl-dbltap" aria-pressed="true" title="Start and stop with a double-tap">Double-tap</button>' +
+            '<span class="muted small">Double-tap <b>C3</b> (your keyboard’s lowest key) or this card to start; again to stop.</span>' +
+          '</div>' +
+          '<p class="muted small kl-credit">Credit: piano. Shared keyboard course. Play along with the click. Right notes on the beat level you up.</p>' +
+        '</div>' +
+        '<div class="seg kl-tiers" role="tablist">' + ['Start here', 'Building', 'Stretch'].map(function (t, i) {
+          return '<button type="button" role="tab" class="' + (i ? '' : 'active') + '" aria-selected="' + !i + '">' + t + '</button>'; }).join('') + '</div>' +
+        '<div class="kl-list">' + rows + '</div>' +
+      '</div></div>' +
+      // the folds of step B12 (D28): the controls stay in the document; three remember, the LUMI one does not
+      '<div class="pn-folds">' +
+        '<details class="sl-fold" data-keep="pn-perf"' + open('perf') + '><summary>Chords and arpeggio</summary>' +
+          '<div class="pn-foldrow" id="pn-perf">' + seg('id="pn-chseg" aria-label="Smart chords" title="Smart chords: in-scale keys play full diatonic chords"', [{ html: 'Single', title: 'One note per key' }, 'Triads', '7ths'], 0) +
+            '<button type="button" class="chip fb-chip" id="pn-arp" aria-pressed="false" title="Arpeggiate held notes at the shared tempo">Arp</button></div></details>' +
+        '<details class="sl-fold" data-keep="pn-practice"' + open('runner') + '><summary>Practice a scale</summary>' +
+          '<div class="pn-foldrow pn-practice">' +
+            '<button type="button" class="btn" id="pn-play">' + ic('play', 14) + ' Play</button>' +
+            '<button type="button" class="btn sm icon-btn" id="pn-reset" title="Back to the first note" aria-label="Back to the first note">' + ic('restart', 18) + '</button>' +
+            '<select id="pn-type" title="Pattern type" aria-label="Pattern type">' + options(['Scale', 'Groups', 'Intervals'], 'Scale') + '</select>' +
+            seg('id="pn-dir" aria-label="Direction"', [{ html: ic('up', 16), aria: 'Ascending', title: 'Ascending' }, { html: ic('down', 16), aria: 'Descending', title: 'Descending' },
+              { html: ic('updown', 16), aria: 'Up, then back down', title: 'Up, then back down' }], 0) +
+            seg('id="pn-handseg" aria-label="Which hand you are practicing"', ['R hand', 'L hand'], 0) +
+            '<input id="pn-bpm" type="number" min="30" max="280" value="' + o.bpm + '" title="Tempo (BPM) — linked to the metronome" aria-label="Tempo (BPM)">' +
+            '<select id="pn-rate" title="Notes per beat" aria-label="Notes per beat">' + options(['1 / beat', '8ths', 'Triplets', '16ths'], '1 / beat') + '</select>' +
+            '<select id="pn-pause" title="Rest between loop repeats — smooths looping practice" aria-label="Rest between loop repeats">' +
+              options(['No pause', '1-beat pause', '2-beat pause', '3-beat pause', '4-beat pause'], 'No pause') + '</select>' +
+            '<label class="pn-check" title="Play the exercise notes out loud"><input type="checkbox" id="pn-sound" checked> Sound</label>' +
+            '<label class="pn-check"><input type="checkbox" id="pn-click"> Click</label>' +
+            '<button type="button" class="chip fb-chip" id="pn-guide" aria-pressed="false" title="Guide mode: the app lights the note to play">Guide</button>' +
+          '</div></details>' +
+        '<details class="sl-fold" data-keep="pn-keys"' + open('keys') + '><summary>Computer keys</summary>' +
+          '<div class="pn-foldrow">' +
+            '<button type="button" class="chip fb-chip' + (wide ? ' active' : '') + '" id="pn-qw" aria-pressed="' + wide + '" title="Play the piano with your computer or iPad keyboard — home row = white keys, top row = black keys">Typing</button>' +
+            '<span class="pn-foldrow" id="pn-octrow" title="Which octaves the typing keys cover (Z / X also shift)">' +
+              '<button type="button" class="btn sm icon-btn" id="pn-octdn" aria-label="Keys octave down">' + ic('minus', 18) + '</button>' +
+              '<span class="chip" id="pn-octlabel">C4 – F#5</span>' +
+              '<button type="button" class="btn sm icon-btn" id="pn-octup" aria-label="Keys octave up">' + ic('plus', 18) + '</button></span>' +
+            '<button type="button" class="btn" id="pn-qwmap" title="Remap which computer key plays which note">Remap</button>' +
+          '</div></details>' +
+        '<details class="sl-fold" id="pn-lumi"' + open('lumi') + '><summary>Notes and triads on the LUMI</summary>' +
+          '<p class="muted small">While this section is open, your pedal works here and the lessons&#39; Double-tap on the lowest key is paused. The double-tap key from Settings › Hands-free control, if it is on, works here in Simulated mode. Close the section to use the pedal and Double-tap for the lessons above.</p>' +
+        '</details>' +
+      '</div>' +
+    '</div>';
+  }
+
+  // =====================================================================================
+  // 2a · CHORDS (js/chords.js:1074-1160), in A Dorian, the key bar's key. Read from the app
+  //      with that key: the chords of the key, the open voicing of Am, the lines under the neck.
+  // =====================================================================================
+  var DORIAN = [['i', 'Am', 0], ['ii', 'Bm', 2], ['♭III', 'C', 3], ['IV', 'D', 5], ['v', 'Em', 7], ['vi°', 'F#°', 9], ['♭VII', 'G', 10]];
+  function chordChips(cls, active, verb) {
+    return DORIAN.map(function (c, i) {
+      var on = i === active;
+      return '<button type="button" class="chip ch-chip ' + cls + (on ? ' active' : '') + '"' + (active >= 0 ? ' aria-pressed="' + on + '"' : '') + ' title="' + verb.replace('%', c[1]) + '">' +
+        '<i class="mk-c" style="--c:' + D.COLORS.INTERVALS[c[2]] + '"></i><b>' + c[0] + '</b><span>' + c[1] + '</span></button>';
+    }).join('');
+  }
+  function chordNeck(o) {
+    // the open A minor: e open, B fret 1, G fret 2, D fret 2, A open; the low E is not played
+    var spots = { '5:0': 1, '4:1': 1, '3:2': 1, '2:2': 1, '1:0': 1 }, tones = [9, 0, 4];
+    var m = SLHero.model({ root: 9, scale: tones, help: 4, mode: 'interval',
+      color: function (pc) { return D.COLORS.INTERVALS[(pc - 9 + 12) % 12]; }, label: function (pc) { return noteName(pc, 9); }, name: function (pc) { return noteName(pc, 9); } });
+    var at = m.at;
+    m.at = function (p) { var s = at(p); if (!spots[p.string + ':' + p.fret]) { s.dot = false; s.root = false; s.state = ''; s.color = null; s.label = ''; } return s; };
+    // five frets as today; a phone gets three, so that the note names stay readable (today's phone shows three too)
+    var phone = window.innerWidth <= 640;
+    var svg = SLHero.neck(m, { frets: phone ? 3 : 5, fretW: phone ? 76 : 110, label: 'A neck from the nut to fret ' + (phone ? 3 : 5) + ' with the chord A minor: E open on the first string, C at fret 1 of the B string, ' +
+      'A at fret 2 of the G string, E at fret 2 of the D string, A open on the fifth string. The low E string is not played.' });
+    // the mark of a string that is not played, where the low E's open note would stand
+    return svg.replace('</g></svg>', '<text class="sl-neck-name" x="50" y="176" dy="0.35em" text-anchor="middle">×</text></g></svg>');
+  }
+  function chordsMain(o) {
+    var TONES = [['R', 'A', 0], ['♭3', 'C', 3], ['5', 'E', 7]];
+    return '<div class="mk-pg">' +
+      '<h1>Chords</h1>' +
+      '<div class="card ch-card"><h2>Chord explorer</h2>' +
+        '<div class="ch-row">' +
+          '<span class="chip" id="ch-key-label" title="Key and scale come from the bar at the top">A Dorian</span>' +
+          seg('id="ch-seg" aria-label="Chords of the key"', ['Triads', '7ths'], 0) +
+          '<span class="ch-inkeyrow" id="ch-inkey">' + chordChips('ch-inkeychip', 0, 'Load % onto the neck') + '</span>' +
+        '</div>' +
+        '<div class="ch-exrow">' +
+          '<span class="ch-exname" id="ch-ex-name">Am</span>' +
+          '<div class="ch-exsel">' +
+            '<label class="field">Root<select id="ch-ex-root">' + options(['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'], 'A') + '</select></label>' +
+            '<label class="field">Chord<select id="ch-ex-quality">' + options(['Major', 'Minor (m)', 'Dominant 7 (7)', 'Major 7 (maj7)', 'Minor 7 (m7)', 'Sus2 (sus2)', 'Sus4 (sus4)',
+              'Diminished (°)', 'Half-diminished (m7♭5)', 'Diminished 7 (°7)', 'Augmented (+)'], 'Minor (m)') + '</select></label>' +
+            '<label class="field">View<select id="ch-view" title="See the chord as a guitar neck, piano keys, tablature or notation">' + options(['Guitar', 'Piano', 'Tab', 'Notation'], 'Guitar') + '</select></label>' +
+          '</div>' +
+          '<div class="ch-exacts"><button type="button" class="btn primary" id="ch-ex-strum">Strum</button>' +
+            '<button type="button" class="btn" id="ch-ex-add" title="Append this chord to the progression below">+ Progression</button></div>' +
+        '</div>' +
+        '<div id="ch-shaperow" class="ch-card"><h3>Voicings — low to high</h3>' +
+          '<div class="ch-shapesel" id="ch-shapesel">' + ['Open', 'Fret 2', 'Em-shape barre', 'Fret 7', 'Fret 9', 'Am-shape barre'].map(function (v, i) {
+            return '<button type="button" class="chip ch-shapechip' + (i ? '' : ' active') + '" aria-pressed="' + !i + '">' + v + '</button>'; }).join('') + '</div></div>' +
+        '<div class="sl-hero ch-board" id="ch-board" title="Tap the neck to strum; tap a note to hear it">' + chordNeck(o) + '</div>' +
+        '<p class="muted small" id="ch-boardhint">Tap anywhere on the neck to strum · tap a single note to hear it alone.</p>' +
+        '<div class="ch-tones" id="ch-tones">' + TONES.map(function (t) {
+          return '<span class="chip ch-chip ch-tonechip"><i class="mk-c" style="--c:' + D.COLORS.INTERVALS[t[2]] + '"></i><b>' + t[0] + '</b><span>' + t[1] + '</span></span>'; }).join('') + '</div>' +
+        '<p class="muted small" id="ch-formula">Minor (m) · formula R – ♭3 – 5</p>' +
+        '<p class="ch-fnline" id="ch-fn">In A Dorian: <b>i</b> — tonic — home base.</p>' +
+        '<div class="ch-row"><span class="muted small">Solo over it with</span><span class="chip" id="ch-suggest-name">A Dorian</span>' +
+          '<button type="button" class="btn" id="ch-practice" title="Set up the fretboard with this scale and start the practice runner">Practice it ' + ic('right', 16) + '</button></div>' +
+        '<div class="ch-row"><button type="button" class="btn" id="ch-pn-play" title="Hear the chord on piano">' + ic('play', 14) + ' Piano</button></div>' +
+      '</div>' +
+      '<div class="card ch-card"><h2>Progression player</h2>' +
+        '<div class="ch-row is-end">' +
+          '<label class="field ch-presetf">Preset<select id="ch-preset">' + options(['— choose preset —', 'I – V – vi – IV  (Axis of Awesome)', 'vi – IV – I – V  (pop / punk)',
+            'I – vi – IV – V  (50s doo-wop)', 'I – V – vi – iii – IV – I – IV – V  (Canon)', 'ii – V – I  (jazz, 7th chords)'], '— choose preset —') + '</select></label>' +
+          '<span class="muted small">Tap palette chords to build; the neck above follows the chord as it plays.</span>' +
+        '</div>' +
+        '<div class="ch-palette" id="ch-palette">' + chordChips('ch-pal', -1, 'Add % to the progression') + '</div>' +
+        '<h3>Progression</h3>' +
+        '<div class="ch-track" id="ch-track"><span class="muted small">Empty — click palette chords above or pick a preset, then press Play.</span></div>' +
+        '<div class="ch-row is-end">' +
+          // step B11: the field shows and sets the one tempo of the key bar
+          '<label class="field ch-numf">BPM<input id="ch-bpm" type="number" min="30" max="280" value="' + o.bpm + '"></label>' +
+          '<label class="field ch-numf">Bars / chord<select id="ch-bars">' + options(['1', '2'], '1') + '</select></label>' +
+          '<label class="ch-check"><input type="checkbox" id="ch-countin"> Count-in</label>' +
+          '<button type="button" class="btn primary" id="ch-play">Play</button>' +
+          '<span class="muted small">Space toggles play</span>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }
+
+  // =====================================================================================
+  // 2b · THE START OF EXERCISES, Path tab (js/quiz.js:1292 renderHome, :1893 statsStrip,
+  //      :1912 pathHTML). The numbers are the ones the app showed after four levels.
+  // =====================================================================================
+  // the course as the Path lists it for Piano: section, its count of levels, its nodes (unit, way of answering)
+  var PATH = [
+    ['Notes', '4/14', [['Natural notes', 'Treble clef'], ['Natural notes', 'Bass clef'], ['Natural notes', 'Piano'], ['Sharps & flats', 'Treble clef'],
+      ['Sharps & flats', 'Bass clef'], ['Sharps & flats', 'Piano'], ['Pitch', 'Ear training']]],
+    ['Intervals', '0/32', [['Seconds & thirds', 'Notation'], ['Seconds & thirds', 'Piano'], ['Seconds & thirds', 'Ear training'], ['Fourths & fifths', 'Notation'],
+      ['Fourths & fifths', 'Piano'], ['Fourths & fifths', 'Ear training'], ['Sixths, sevenths & octave', 'Notation'], ['Sixths, sevenths & octave', 'Piano'],
+      ['Sixths, sevenths & octave', 'Ear training'], ['All intervals', 'Notation'], ['All intervals', 'Piano'], ['All intervals', 'Ear training']]],
+    ['Chords', '0/50', [['Major & minor', 'Notation'], ['Major & minor', 'Piano'], ['Major & minor', 'Ear training'], ['Diminished, augmented & sus', 'Notation'],
+      ['Diminished, augmented & sus', 'Piano'], ['Diminished, augmented & sus', 'Ear training'], ['Triads recap', 'Notation'], ['Triads recap', 'Piano'],
+      ['Triads recap', 'Ear training'], ['Seventh chords', 'Notation'], ['Seventh chords', 'Piano'], ['Seventh chords', 'Ear training'],
+      ['More four-note chords', 'Notation'], ['More four-note chords', 'Piano'], ['More four-note chords', 'Ear training'], ['Chords in a key', 'Theory'],
+      ['Chords in a key', 'Ear training']]],
+    ['Scales', '0/27', [['Major & minor', 'Notation'], ['Major & minor', 'Piano'], ['Major & minor', 'Ear training'], ['Minor scales', 'Notation'], ['Minor scales', 'Piano'],
+      ['Minor scales', 'Ear training'], ['Pentatonic & blues', 'Notation'], ['Pentatonic & blues', 'Piano'], ['Pentatonic & blues', 'Ear training'],
+      ['Modes', 'Notation'], ['Modes', 'Piano'], ['Modes', 'Ear training'], ['Modes', 'Theory'], ['Scale degrees', 'Ear training']]],
+    ['Key signatures', '0/14', [['Sharp keys', 'Notation'], ['Sharp keys', 'Theory'], ['Flat keys', 'Notation'], ['Flat keys', 'Theory'], ['All keys', 'Notation'],
+      ['All keys', 'Theory'], ['Circle of fifths', 'Theory']]]
+  ];
+  // the first five nodes on this profile: three with one level passed, one done, the one to do next
+  var NODE_STATE = [['part', 33, ' · 1/3', '1 of 3'], ['part', 33, ' · 1/3', '1 of 3'], ['part', 50, ' · 1/2', '1 of 2'], ['done', 100, '', '1 of 1'], ['cur', 0, '', '0 of 1']];
+  var MODE_ICON = { 'Treble clef': 'note', 'Bass clef': 'note', 'Notation': 'note', 'Piano': 'keys', 'Fretboard': 'guitar', 'Ear training': 'ear', 'Theory': 'learn' };      // js/quiz.js:1849
+  var ZIG = [0, 1, 1.5, 1, 0, -1, -1.5, -1];      // js/quiz.js:1910
+  function quizMain() {
+    var n = 0, path = PATH.map(function (sec, si) {
+      var nodes = sec[2].map(function (nd, k) {
+        var st = NODE_STATE[n++] || ['locked', 0, '', ''], state = st[0];
+        var face = state === 'locked' ? ic('lock', 22) : state === 'done' ? ic('check', 28) : ic(MODE_ICON[nd[1]], 26);
+        return '<div class="qz-nwrap' + (state === 'cur' ? ' is-cur' : '') + '" style="--x:' + ZIG[k % 8] + '">' +
+          '<button type="button" class="qz-node ' + state + '" aria-expanded="false" aria-label="' + esc(nd[0] + ', ' + nd[1] + ': ' + (state === 'locked' ? 'locked' : st[3] + ' levels passed')) + '">' +
+          (state === 'cur' ? '<span class="qz-nstart" aria-hidden="true">Start</span>' : '') +
+          '<span class="qz-ndisc" style="--p:' + st[1] + '"><span class="qz-nface">' + face + '</span></span>' +
+          '<span class="qz-nlbl" aria-hidden="true">' + esc(nd[0]) + '<small>' + esc(nd[1] + st[2]) + '</small></span></button></div>';
+      }).join('');
+      return '<section class="qz-psec"><header class="qz-pban"><span class="sl-eyebrow qz-eyebrow">Section ' + (si + 1) + '</span><h3>' + esc(sec[0]) + '</h3>' +
+        '<span class="qz-pmeta">' + sec[1] + ' levels</span></header><div class="qz-pnodes">' + nodes + '</div></section>';
+    }).join('');
+    return '<div class="mk-pg qz-page">' +
+      '<div class="mk-pg-head"><h1>Exercises</h1><p class="small muted" id="qz-category">Piano exercises</p></div>' +
+      // the strip from .sl-tile and .sl-ring (B10). XP as whole numbers: today "93.38 XP to level 2" and "Lifetime: 6.621 XP."
+      '<div class="card qz-strip">' +
+        '<div class="sl-tile qz-stat">' + ic('flame', 26) + '<span class="sl-tile-num">0</span><span class="sl-tile-label">day streak</span></div>' +
+        '<div class="sl-tile qz-stat"><span class="sl-ring" style="--p:33" title="3.3 of 10 minutes" aria-hidden="true"></span><span class="sl-tile-num">3.3<small>/10</small></span><span class="sl-tile-label">engaged minutes today</span></div>' +
+        '<div class="sl-tile qz-stat qz-lvstat"><span class="qz-lvbadge" aria-hidden="true">1</span><b>Consistency level 1</b><span class="sl-bar" style="--p:7"></span><span class="sl-tile-label">93 XP to level 2</span></div>' +
+        '<button type="button" class="btn primary qz-go" id="qz-cont">' + ic('play', 14) + ' Continue</button>' +
+        '<p class="qz-stripnote">Daily goal: 10 engaged minutes. Lifetime: 7 XP.</p>' +
+      '</div>' +
+      '<div class="seg qz-tabs" role="tablist">' + ['Path', 'Topics', 'Progress'].map(function (t, i) {
+        return '<button type="button" role="tab" class="' + (i ? '' : 'active') + '" aria-selected="' + !i + '">' + t + '</button>'; }).join('') + '</div>' +
+      '<div id="qz-homebody"><div class="qz-path">' + path + '</div></div>' +
+    '</div>';
+  }
+
+  // =====================================================================================
+  // 2c · THE WOODSHED'S LIBRARY (js/woodshed.js:1143 renderLib, js/practice-progress-ui.js:55)
+  // =====================================================================================
+  // the eight pieces the page's own buttons made in A Dorian, C Major, G Major and E Minor
+  // Pentatonic, newest first: title, the instrument of the score, BPM, notes
+  var PIECES = [['E Minor Pentatonic scale', 'piano', 80, 21], ['G pentatonic fours', 'guitar', 88, 32], ['G Major scale', 'piano', 80, 29], ['C pentatonic fours', 'guitar', 88, 32],
+    ['C Major scale', 'piano', 80, 29], ['Hanon pattern No.1', 'piano', 92, 64], ['A pentatonic fours', 'guitar', 88, 32], ['A Dorian scale', 'piano', 80, 29]];
+  function libraryRows(list) {
+    return '<ul class="sl-rows" id="ws-lib">' + list.map(function (p) {
+      return '<li class="sl-row ws-row">' +
+        '<span class="sl-row-main ws-main"><b>' + esc(p[0]) + '</b><span class="ws-meta">' + p[1] + ' · ' + p[2] + ' BPM · ' + p[3] + ' notes · diff ★★</span></span>' +
+        '<span class="sl-row-acts">' +
+          '<button type="button" class="btn sm" data-wsperform="wait">Wait for Me</button><button type="button" class="btn sm" data-wsperform="tempo">Play at Tempo</button>' +
+          '<button type="button" class="btn sm" data-wsplay="run">Run</button><button type="button" class="btn sm" data-wsplay="phrase">Phrases</button>' +
+          '<button type="button" class="btn sm" data-wsplay="wait">Wait</button><button type="button" class="btn sm" data-wsplay="ladder">Ladder</button>' +
+          '<button type="button" class="btn sm" data-wsdel aria-label="Remove ' + esc(p[0]) + '">' + ic('close', 16) + '</button>' +
+        '</span></li>';
+    }).join('') + '</ul>';
+  }
+  var RUDIMENTS = [      // js/woodshed.js RUDIMENTS, the 40 PAS rudiments in their four families
+    ['Rolls', ['Single stroke roll', 'Single stroke four', 'Single stroke seven', 'Multiple bounce roll', 'Triple stroke roll', 'Double stroke open roll', 'Five stroke roll', 'Six stroke roll',
+      'Seven stroke roll', 'Nine stroke roll', 'Ten stroke roll', 'Eleven stroke roll', 'Thirteen stroke roll', 'Fifteen stroke roll', 'Seventeen stroke roll']],
+    ['Diddles', ['Single paradiddle', 'Double paradiddle', 'Triple paradiddle', 'Paradiddle-diddle']],
+    ['Flams', ['Flam', 'Flam accent', 'Flam tap', 'Flamacue', 'Flam paradiddle', 'Single flammed mill', 'Flam paradiddle-diddle', 'Pataflafla', 'Swiss army triplet', 'Inverted flam tap', 'Flam drag']],
+    ['Drags', ['Drag (half drag)', 'Single drag tap', 'Double drag tap', 'Lesson 25', 'Single dragadiddle', 'Drag paradiddle #1', 'Drag paradiddle #2', 'Single ratamacue', 'Double ratamacue', 'Triple ratamacue']]
+  ];
+  function shedMain() {
+    var TILES = [
+      ['Lifetime earned XP', '6.6', 'Recorded earnings stay intact when consistency decays.'],
+      ['Consistency XP · level 1', '6.6', 'This balance can decay after inactivity; it is not a measured skill level.'],
+      ['Current streak', '0 days', 'Best recorded streak: 0 days.'],
+      ['Lifetime engaged practice', '3.31 min', '4 recorded sessions for piano.'],
+      ['Lifetime raw note accuracy', '—', 'No scored note observations yet.'],
+      ['Mean absolute timing', '—', 'No measured timed onsets yet. Wait-mode practice does not imply timing accuracy.'],
+      ['Observed tempo', '—', 'Tempo seen during recorded practice, including unfinished runs.'],
+      ['Completed tempo', '—', 'Tempo of completed runs; completion does not certify note accuracy.']
+    ];
+    var bars = '';
+    for (var d = 0; d < 30; d++) bars += '<i style="--p:' + (d === 29 ? 100 : 0) + '"></i>';      // thirty days, practice on the last one
+    return '<div class="mk-pg">' +
+      '<div class="mk-pg-head"><h1>Woodshed · piano</h1>' +
+        '<p class="muted small">Legacy / unassigned: Level 1 · 0 XP · 0-day legacy streak · Shared achievements 0/6 achievements</p>' +
+        '<p class="muted small">Pick something to practice — every run is scored (Perfect ±30ms). Calibrate once per input for honest timing.</p></div>' +
+      '<div class="card ws-card"><h2>Guided performance</h2>' +
+        '<p class="small">See what to play on the piano roll and keyboard. <b>Wait for Me</b> follows your notes and chords; <b>Play at Tempo</b> keeps time and gives a full accuracy report. MIDI and touch/typing keys work without LUMI.</p>' +
+        '<div class="ws-add"><button type="button" class="btn primary" id="ws-guided-melody">Melody and rhythm</button><button type="button" class="btn" id="ws-guided-chords">Chord journey</button></div>' +
+      '</div>' +
+      '<div class="ws-add">' +
+        '<button type="button" class="btn" id="ws-gen-scale">+ Scale (your key)</button><button type="button" class="btn" id="ws-gen-hanon">+ Hanon</button>' +
+        '<button type="button" class="btn" id="ws-gen-pent">+ Pentatonic fours</button><label class="btn ws-filebtn">+ MIDI file</label>' +
+        '<button type="button" class="btn" id="ws-ascii-btn">+ Paste tab</button><button type="button" class="btn" id="ws-cal-btn">Calibrate timing</button>' +
+      '</div>' +
+      '<div id="ws-progress"><section class="card pgu" aria-labelledby="pgu-2-title">' +
+        '<div class="pgu-head"><div><h2 id="pgu-2-title">Practice progress</h2>' +
+          '<p class="small muted">Earned XP records your practice. Consistency XP and its level can decline after time away; that is not a measured loss of musical skill.</p></div>' +
+          '<label class="field pgu-select">Instrument<select aria-label="Progress instrument">' + options(['Piano', 'Synth', 'Guitar', 'Bass', 'Drums', 'Voice', 'Other'], 'Piano') + '</select></label></div>' +
+        '<div class="pgu-tiles">' + TILES.map(function (t) {
+          return '<div class="sl-tile"><span class="sl-tile-label">' + t[0] + '</span><span class="sl-tile-num">' + t[1] + '</span><span class="sl-tile-note">' + t[2] + '</span></div>'; }).join('') + '</div>' +
+        '<div class="pgu-goal"><span>Today: 3.3 / 10 engaged minutes</span><span class="sl-bar" id="pgu-2-goal" style="--p:33" role="progressbar" aria-valuemin="0" aria-valuemax="10" aria-valuenow="3.3"></span>' +
+          '<span class="small muted">Calendar: UTC. Activity is assigned to its recorded instrument.</span></div>' +
+        '<div class="pgu-toolbar"><h3>Recorded history</h3><div class="pgu-ranges">' + ['7 days', '30 days', '90 days'].map(function (r, i) {
+          return '<button type="button" class="btn" aria-pressed="' + (i === 1) + '">' + r + '</button>'; }).join('') + '</div></div>' +
+        '<p class="small muted">Piano · last 30 calendar days · 1 day with recorded practice · 3.31 engaged minutes · no scored note observations. Missing timing or tempo stays unknown.</p>' +
+        '<div class="pgu-chart" role="img" aria-label="Piano: engaged practice minutes per day. 3.3 minutes on November 15, none on the 29 days before.">' +
+          '<div class="pgu-y"><span>3.3</span><span>0</span></div><div class="pgu-bars">' + bars + '</div>' +
+          '<div class="pgu-x">' + ['Oct 17', 'Oct 21', 'Oct 25', 'Oct 29', 'Nov 2', 'Nov 6', 'Nov 10', 'Nov 15'].map(function (t) { return '<span>' + t + '</span>'; }).join('') + '</div></div>' +
+        '<div class="pgu-table-wrap"><table class="pgu-table"><caption>Recorded piano practice days · last 30 days</caption>' +
+          '<thead><tr>' + ['Date', 'Engaged minutes', 'Earned XP', 'Raw accuracy', 'Measured timing', 'Observed tempo', 'Completed tempo'].map(function (t) { return '<th scope="col">' + t + '</th>'; }).join('') + '</tr></thead>' +
+          '<tbody><tr><td>2026-11-15</td><td>3.3</td><td>6.6</td><td>—</td><td>—</td><td>—</td><td>—</td></tr></tbody></table></div>' +
+        '<details class="tips pgu-settings"><summary>Goals, XP and consistency settings</summary>' +
+          '<p class="small muted">These parameters apply to all instruments. They do not erase sessions or rewrite lifetime earned XP. Future sessions keep the earning parameters recorded with them.</p></details>' +
+      '</section></div>' +
+      '<div class="card ws-card"><h2>Rudiments</h2>' + RUDIMENTS.map(function (g) {
+        return '<h3 class="ws-rudh">' + g[0] + '</h3><div class="ws-add">' + g[1].map(function (r) { return '<button type="button" class="chip fb-chip">' + esc(r) + '</button>'; }).join('') + '</div>'; }).join('') +
+        '<p class="muted small">All 40 PAS rudiments with sticking + accent targets — the ladder raises tempo as you pass.</p></div>' +
+      '<div class="card ws-card"><h2>Shared source library</h2>' +
+        '<p class="muted small">Practice credit: piano. Source instrument describes the score, not your XP category.</p>' + libraryRows(PIECES) + '</div>' +
+    '</div>';
+  }
+
+  // =====================================================================================
+  // 2d · THE PLAN (js/practiceplan.js:274-311): the starter plan every profile has
+  // =====================================================================================
+  function planMain() {
+    // the four blocks of the starter plan (js/practiceplan.js:118-126). The last small line of the fourth
+    // is in the words of step B11 (WORDING.md, :122); the others are today's, some of them pinned by a suite
+    var BLOCKS = [
+      ['warm-up · 2 min', 'Tune up', '', '0 seconds recorded · No automated timer or completion is available for this casual tool; opening it earns no progress.'],
+      ['technique · 5 min', 'C major · RH', '', '0 seconds recorded · One new completed lesson session or 5 recorded playing minutes'],
+      ['repertoire · 5 min', 'Work on your piece', 'Choose or import your piece in Woodshed.', '0 seconds recorded · One new completed run or 5 recorded playing minutes'],
+      ['ear / theory · 3 min', 'Ear &amp; theory', 'Choose a topic for your instrument.', '0 seconds recorded · A new passing score or 3 recorded answering minutes']
+    ];
+    var DAYS = [['11-09', 0], ['11-10', 0], ['11-11', 0], ['11-12', 0], ['11-13', 0], ['11-14', 0], ['11-15', 3]];
+    return '<div class="mk-pg is-mid">' +
+      '<div class="pp-head"><div><span class="sl-eyebrow pp-kicker">A little, every day</span><h1>Practice plan</h1><p class="pp-muted">Turn lesson notes into a clear next step.</p></div>' +
+        '<button type="button" class="btn" id="pp-help">Help level</button></div>' +      // B5b: reads "Help level", opens the key bar's Help panel
+      '<div class="card pp-student">' +
+        '<label class="field">Student<select id="pp-student"><option>My practice</option></select></label>' +
+        '<label class="field">New student<input type="text" id="pp-name" placeholder="Name"></label>' +
+        '<button type="button" class="btn" id="pp-add">Add student</button></div>' +
+      '<div class="card pp-card" id="pp-today">' +
+        '<div class="pp-cardhead"><div><h2>Today’s Piano session</h2><p class="pp-muted">2026-11-15 · 15 minutes suggested · accepted plan context: Piano</p></div>' +
+          '<button type="button" class="btn" id="pp-refresh">Refresh progress</button></div>' +
+        '<ol class="sl-rows">' + BLOCKS.map(function (b, i) {
+          return '<li class="sl-row pp-block"><span class="pp-number" aria-label="Step ' + (i + 1) + '">' + (i + 1) + '</span>' +
+            '<div class="pp-btitle"><span class="pp-kicker">' + b[0] + '</span><h3>' + b[1] + '</h3></div>' +
+            '<button type="button" class="btn' + (i ? '' : ' primary') + '">Start</button>' +
+            '<div class="pp-bbody"><p class="pp-source">Suggested starter — replace with your teacher’s notes.</p>' + (b[2] ? '<p class="pp-muted">' + b[2] + '</p>' : '') +
+            '<p class="pp-evidence">' + b[3] + '</p></div></li>';
+        }).join('') + '</ol>' +
+        '<p class="pp-muted">0 of 4 blocks done. Only time you play or answer as Piano counts; opening a page does not.</p>' +      // B11 (WORDING.md, :286)
+      '</div>' +
+      '<div class="card pp-card" id="pp-week"><h2>Last seven days · Piano</h2>' +
+        '<p>3 minutes · 1 day with practice</p>' +      // B11 (WORDING.md, :289); today "3 recorded minutes · 1 observed days"
+        '<div class="pp-days">' + DAYS.map(function (d, i) {
+          return '<div class="pp-day' + (i === 6 ? ' is-today' : '') + '"><b>' + d[0] + '</b><span>' + d[1] + ' min</span><small>0 blocks</small></div>'; }).join('') + '</div>' +
+        '<p class="pp-muted">Only practice on this instrument is counted. Practice from before you picked an instrument is not.</p>' +      // B11 (WORDING.md, :292)
+      '</div>' +
+      '<div class="pp-folds"><details class="sl-fold pp-notes"><summary>Teacher’s lesson notes</summary>' +
+        '<p class="pp-muted">The link is a bookmark. Paste or export the Doc’s text to import it. Notes stay in this browser; nothing is fetched or uploaded.</p></details></div>' +
+      '<div class="card pp-card" id="pp-gaps">' +
+        '<div class="pp-cardhead"><div><h2>What soundLAB can’t do yet</h2></div><button type="button" class="btn" id="pp-export">Export this list</button></div>' +      // B11 (WORDING.md, :293)
+        '<p class="pp-muted">Nothing yet. Lines of your notes that soundLAB has no exercise for appear here.</p></div>' +
+      '<div class="pp-folds"><details class="sl-fold pp-tools" id="pp-tools"><summary>Free practice: timer, prompts, one-minute chord changes</summary>' +
+        '<p class="pp-muted">The timer pauses when you leave this page; it is separate from the plan’s measured minutes.</p></details></div>' +
+    '</div>';
+  }
+
+  // =====================================================================================
+  // 3 · ONE ROW OF THE LIBRARY AT THREE HEIGHTS (decision D9, the owner's item 7)
+  // =====================================================================================
+  function rowsMain() {
+    var three = PIECES.slice(5);      // Hanon pattern No.1, A pentatonic fours, A Dorian scale
+    var sample = function (cls, id, title, tag, text) {
+      return '<section class="mk-sample ' + cls + '" data-sample="' + id + '"><div class="mk-sample-head"><b>' + title + (tag ? '<span class="mk-tag">' + tag + '</span>' : '') + '</b>' +
+        '<span>' + text + ' One row is <b data-rowh></b> px high; the Woodshed’s eight pieces take <b data-all></b> px.</span></div>' + libraryRows(three) + '</section>';
+    };
+    return '<div class="mk-pg">' +
+      '<div class="mk-pg-head"><p class="sl-eyebrow">Train · Woodshed · Shared source library</p><h1>One row, three heights</h1>' +
+        '<p class="muted small">Three pieces of the library, each drawn three times. Only the height of the buttons differs. Today a row is 51 px high with a mouse (its buttons 34 px), and the eight pieces take 408 px.</p></div>' +
+      '<div class="card ws-card">' +
+        sample('mk-h44', '44', '44 px', '', 'With a mouse, if every control is 44 px high, as the design says today.') +
+        sample('mk-h36', '36', '36 px', 'proposed', 'With a mouse, in long lists only: the Woodshed’s library, Settings, the rows inside Piano’s folds.') +
+        sample('mk-h48', '48', '48 px', '', 'On a phone, an iPad and a laptop with a touch screen, whichever of the two you choose.') +
+      '</div>' +
+    '</div>';
+  }
+
+  // =====================================================================================
+  // 4 · SETTINGS IN FIVE GROUPS (js/settings.js:54-232, js/remote.js:340-362; step B17, D27).
+  //     The eight cards of today are the sections of five folds; every id stays.
+  // =====================================================================================
+  function settingsMain() {
+    var theme = document.documentElement.getAttribute('data-theme') === 'light' ? 1 : 0;
+    var which = q('open', window.innerWidth > 900 ? 'all' : 'none');
+    var group = function (id, key, name, body) {
+      return '<details class="sl-fold set-group" id="' + id + '" data-keep="' + id + '"' + (which === 'all' || which === key ? ' open' : '') + '><summary>' + name + '</summary>' + body + '</details>';
+    };
+    var note = function (t, id) { return '<p class="muted small"' + (id ? ' id="' + id + '"' : '') + '>' + t + '</p>'; };
+    var REMOTE = [['Next', 'start · show answer · next question · next level'], ['Back', 'retry · hear it again'], ['Stop', 'end the run']];
+    return '<div class="mk-pg is-narrow set-page">' +
+      '<h1>Settings</h1>' +
+      '<div class="set-groups">' +
+      group('set-g-look', 'look', 'Look',
+        '<section class="set-sec"><h2>Appearance</h2><div class="set-sub">Theme</div>' + seg('id="set-theme" aria-label="Theme"', ['Dark', 'Light', 'Auto'], theme) +
+          note('Auto follows your device’s light/dark setting and switches live when it changes.') + '</section>' +
+        '<section class="set-sec"><h2>Screen &amp; battery</h2><label class="set-check"><input type="checkbox" id="set-wake" checked><span>Keep the screen awake' +
+          '<small>While sound plays or a practice runner is going.</small></span></label></section>') +
+      group('set-g-sound', 'sound', 'Sound',
+        '<section class="set-sec"><h2>Sound</h2>' +
+          '<div class="set-sub">Master volume</div><div class="set-row"><input type="range" id="set-vol" min="0" max="100" step="5" value="100" aria-label="Master volume"><span class="muted small" id="set-vol-val">100%</span></div>' +
+          note('One knob for everything — metronome, practice notes, the Jam band.') +
+          '<div class="set-sub">Latency</div>' + note('Audio engine 10 ms + output device 0 ms = ~10 ms to your ears. Good for live playing.', 'set-latency') +
+          '<div class="set-sub">Guitar</div>' + seg('id="set-tone" aria-label="Guitar"', ['Steel', 'Electric', 'Nylon', 'Synth'], 0) +
+          note('The voice for fretboard taps, scale practice, chord strums and practice notes.') +
+          '<div class="set-sub">Piano</div>' + seg('id="set-ptone" aria-label="Piano"', ['Grand', 'Bright', 'Electric', 'Organ'], 0) +
+          note('The Piano tab, MIDI keyboard and chord piano voicings. All open source: Grand is a real recorded Salamander grand; Bright, Electric and Organ are FluidR3 / MusyngKite voices.') +
+          '<div class="set-sub">Bass</div>' + seg('id="set-bass" aria-label="Bass"', ['Fingered', 'Picked'], 0) +
+          note('How the Jam backing-track bass plays — warm finger-plucked or bright picked. Takes effect on the next bass note.') +
+          '<div class="set-sub">Time signature</div>' + note('Set the time signature in the metronome. The Jam band always plays in 4/4.') +      // B17 (WORDING.md, js/settings.js:110)
+        '</section>' +
+        '<section class="set-sec" id="set-audio-card"><h2>Sound input &amp; output</h2>' +
+          note('Your guitar, mic or synth coming in, and where soundLAB’s sound goes out. soundLAB picks your audio interface, Helix or MODX by itself when it sees one.') +
+          '<div class="set-row is-end" id="set-audio-sel"><label class="field">Input<select id="set-audio-in"><option>System default</option></select></label>' +
+            '<label class="field">Output<select id="set-audio-out"><option>System default</option></select></label></div>' +
+          '<div class="set-sub" id="set-ain-sub">Use the input to</div>' + seg('id="set-ain-mon" aria-label="Use the input to"', ['Off', 'Hear it', 'Show notes', 'Both'], 0) +
+          note('The input is not used.', 'set-ain-usenote') +
+        '</section>') +
+      group('set-g-keys', 'keys', 'Keyboard and lights',
+        '<section class="set-sec" id="set-midi-card"><h2>MIDI keyboard</h2>' +
+          note('Plug in a keyboard by USB or Bluetooth. soundLAB hears your notes, and a LUMI lights up the keys to play.') +
+          '<div class="set-gear" id="set-midi-gear"><span class="muted small">Found:</span><span class="set-chip"><b>LUMI Keys BLOCK</b> key lights</span>' +
+            '<span class="set-chip"><b>MODX8+-1</b> makes its own sound, so soundLAB stays quiet</span></div>' +
+          '<div class="set-row is-end"><label class="field">Keyboard<select id="set-midi-in">' + options(['All keyboards', 'LUMI Keys BLOCK', 'MODX8+-1'], 'All keyboards') + '</select></label>' +
+            '<label class="field">Key lights<select id="set-midi-out">' + options(['LUMI Keys BLOCK', 'MODX8+-1'], 'LUMI Keys BLOCK') + '</select></label>' +
+            '<button type="button" class="btn sm" id="set-midi-test" title="Lights a short C major run on the keys">Light test</button></div>' +
+          '<div class="set-sub">soundLAB plays my keys</div>' + seg('id="set-midi-voice" aria-label="soundLAB plays my keys"', ['Auto', 'Always', 'Never'], 0) +
+          note('Auto: soundLAB plays notes from a LUMI or other silent keyboard, and stays quiet for a MODX or other synth that makes its own sound.', 'set-midi-voicenote') +
+          '<details class="tips" id="set-midi-more"><summary>More MIDI options</summary>' +
+            '<div class="set-sec"><div class="set-sub">Pitch bend</div>' + seg('id="set-midi-bend" aria-label="Pitch bend"', ['Off', '±2', '±12', '±48 (ROLI)'], 0) +
+            // B5b: the button reads "Keyboard lights". The line beside it no longer names the Help level, which has left that sheet
+            '<div class="set-row"><button type="button" class="btn sm" id="set-open-lights">Keyboard lights</button><span class="muted small">Key light colors and brightness.</span></div></div>' +
+          '</details>' +
+        '</section>') +
+      group('set-g-remote', 'remote', 'Hands-free',
+        '<section class="set-sec" id="set-remote-card"><h2>Hands-free control</h2>' +
+          note('Move practice on from the instrument: a pedal, a button on your synth or a page-turner pedal does Next, Back and Stop on Exercises, Keys lessons and LUMI practice on the Piano page, ' +
+            'the Woodshed, the Practice plan and its one-minute chord changes, Songs and the fretboard runner, and on Live sets and the Deck in soundLAB Gear. ' +
+            'With soundLAB and Gear both on screen, a MIDI pedal or synth button works in soundLAB. Gear answers it when soundLAB is hidden or closed.') +
+          '<div id="set-remote" class="set-sec">' +
+            '<ul class="sl-rows rm-rows">' + REMOTE.map(function (r) {
+              return '<li class="sl-row rm-row" data-rm="' + r[0].toLowerCase() + '"><span class="sl-row-main rm-name"><b>' + r[0] + '</b><small>' + r[1] + '</small></span>' +
+                '<span class="sl-row-state rm-what">Not set</span><button type="button" class="btn sm" aria-pressed="false">Learn</button></li>'; }).join('') + '</ul>' +
+            '<label class="set-check"><input type="checkbox" id="rm-pt"><span>Page turner pedal<small>Page Down, Right or Down = Next; Page Up, Left or Up = Back. For a Bluetooth page turner; ' +
+              'on a computer keyboard these keys then stop scrolling the page and changing lists (sliders keep their arrows).</small></span></label>' +
+            '<label class="set-check"><input type="checkbox" id="rm-dbl"><span>Double-tap the lowest key = Next<small>For a LUMI with no pedal: the leftmost key (it moves with the octave buttons) becomes the remote key ' +
+              'on practice pages — it does not play or count as an answer there. Keys lessons have their own double-tap (start / stop).</small></span></label>' +
+            '<details class="tips"><summary>Which buttons work?</summary><p class="muted small">Any button or pedal that sends MIDI: a foot switch on the synth (Yamaha MODX / MONTAGE: UTILITY › Settings › Controller › FS Assign ' +
+              'set to a free CC number), the MODX Assign switches 1 / 2 (CC 86 / 87 — they also do what the Performance assigns them), a MIDI pedal box, or a key you never play (the top key of an 88). ' +
+              'A Bluetooth page turner works as keys. Press Learn, then the button: it is ready at once, and it only advances — it never sustains, sounds or answers.</p></details>' +
+          '</div>' +
+        '</section>') +
+      group('set-g-data', 'data', 'Data and about',
+        '<section class="set-sec"><h2>Backup</h2>' +
+          note('Updates NEVER clear your settings — they live on this device and survive every version. If things ever look reset, you are probably in a different install ' +
+            '(a Chrome tab vs the desktop app, or another browser profile). Export moves everything — preferences, palettes, jam songs, practice progress — between installs.') +
+          note('Looked for earlier soundLAB data in this browser on 11/15/2026: there was nothing to copy.', 'set-backup-info') +
+          '<div class="set-row"><button type="button" class="btn sm" id="set-backup-out">Export settings</button><label class="btn sm">Import settings</label>' +
+            '<button type="button" class="btn sm" id="set-copy-again">Copy my earlier data again</button></div></section>' +
+        '<section class="set-sec"><h2>About</h2><div class="set-row"><span class="muted small">soundLAB v2.0.0 — updates are checked automatically at startup.</span>' +
+          '<button type="button" class="btn sm" id="set-update">Check now</button></div></section>') +
+      '</div></div>';
+  }
+
+  // =====================================================================================
+  // The pages of this drawing, each with the shell it stands in
+  // =====================================================================================
+  var VIEWS = {
+    piano: { name: 'Piano', shell: { page: 'piano', root: 0, scale: 'major', help: 4, goal: true, fixed: ['page', 'key'] }, main: pianoMain },
+    chords: { name: 'Chords', shell: { page: 'chords', root: 9, scale: 'dorian', goal: true, fixed: ['page', 'key'] }, main: chordsMain },
+    quiz: { name: 'Exercises', shell: { page: 'quiz', goal: true, fixed: ['page'] }, main: quizMain },
+    shed: { name: 'Woodshed', shell: { page: 'shed', goal: true, fixed: ['page'] }, main: shedMain },
+    plan: { name: 'Plan', shell: { page: 'practiceplan', goal: true, fixed: ['page'] }, main: planMain },
+    rows: { name: 'One row, three heights', shell: { page: 'shed', goal: true, fixed: ['page'] }, main: rowsMain },
+    settings: { name: 'Settings', shell: { page: 'settings', goal: true, fixed: ['page'] }, main: settingsMain }
+  };
+
+  // what a page is long, without the space the window adds: the footer is the last thing in it
+  window.mkPageLength = function () {
+    var foot = document.querySelector('.foot');
+    return foot ? Math.round(foot.getBoundingClientRect().bottom + window.pageYOffset) : document.documentElement.scrollHeight;
+  };
+
+  if (Mock.single) {
+    // A tap on a tab, a pill or the gear opens this drawing again with page=<id> (mock.js): the
+    // pages this drawing has are shown, any other page is the shell over mock.js's quiet page.
+    var PAGE_VIEW = { piano: 'piano', chords: 'chords', quiz: 'quiz', shed: 'shed', practiceplan: 'plan', settings: 'settings' };
+    var went = q('page', '');
+    if (went && !PAGE_VIEW[went]) { Mock.page({ title: 'Pages · soundLAB 2.0 drawings', shell: { goal: true } }); return; }
+    var view = went ? PAGE_VIEW[went] : VIEWS[q('view', 'piano')] ? q('view', 'piano') : 'piano', V = VIEWS[view];
+    var second = !went && q('scr', '') === '2', fold = !went && view === 'piano' ? q('fold', '') : '';
+    // inside the contact view a frame of 901 px or wider shows the heights a mouse gets, on every device
+    if (window.parent !== window && !Object.prototype.hasOwnProperty.call(Mock.params, 'touch') && parseInt(q('w', '0'), 10) > 900) {
+      document.documentElement.style.setProperty('--sl-control-h', '44px');
+      document.documentElement.style.setProperty('--sl-control-h-dense', '36px');
+    }
+    var shell = {}, k;
+    for (k in V.shell) if (Object.prototype.hasOwnProperty.call(V.shell, k)) shell[k] = V.shell[k];
+    if (second || fold) shell.scrolled = true;      // scrolled on: the header has slid away, the key bar is the top edge
+    Mock.page({ title: V.name + ' · Pages · soundLAB 2.0 drawings', shell: shell, main: V.main(Mock.shellOpts(shell)) });
+
+    var place = function () {
+      var bar = document.getElementById('ctxbar'), tabs = document.getElementById('tabbar-m');
+      var barH = bar ? bar.offsetHeight : 0, tabsH = tabs && getComputedStyle(tabs).display !== 'none' ? tabs.offsetHeight : 0;
+      if (fold) {      // the open fold under the key bar, with the end of the lesson list above it
+        var det = document.querySelector('.pn-folds > details[open]');
+        if (det) window.scrollTo(0, Math.max(0, det.getBoundingClientRect().top + window.pageYOffset - barH - window.innerHeight * 0.3));
+      } else if (second) {      // exactly where the first screen ended
+        window.scrollTo(0, Math.max(0, window.innerHeight - tabsH - barH));
+      }
+      // the rows picture prints what it measures
+      Array.prototype.forEach.call(document.querySelectorAll('[data-sample]'), function (s) {
+        var rows = s.querySelectorAll('.sl-row'), list = s.querySelector('.sl-rows');
+        if (rows.length < 2) return;
+        var h = rows[0].offsetHeight, step = rows[1].offsetTop - rows[0].offsetTop;
+        s.querySelector('[data-rowh]').textContent = h;
+        s.querySelector('[data-all]').textContent = (step * (PIECES.length - 1) + h).toLocaleString('en-US');
+      });
+    };
+    place();
+    window.addEventListener('load', place);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(place);
+    return;
+  }
+
+  // =====================================================================================
+  // The contact view: every picture at 390 and 1280 px, dark and light
+  // =====================================================================================
+  // How long a page is today, measured in the running app (px at 1280 and at 390 px wide; a
+  // screen is 800 px and 844 px high), and how long this drawing of it is (LEN, measured with
+  // the script named in the step's report; the page corrects the number when a frame has loaded).
+  var TODAY = { piano: [1590, 2329], chords: [1603, 2010], quiz: [8072, 7938], shed: [2573, 4646], plan: [1997, 2744], settings: [3077, 3816] };
+  var LEN = { 'chords-1280': 1588, 'chords-390': 2302, 'plan-1280': 1748, 'plan-390': 2248, 'quiz-1280': 8889, 'quiz-390': 9134, 'shed-1280': 2857, 'shed-390': 5363 };
+  // the frames that are as long as their page (whole=1): Settings
+  var HEIGHTS = { 'rows': { 390: 2385, 1280: 1293 }, 'settings': { 390: 844, 1280: 3026 }, 'settings-data': { 390: 1180 }, 'settings-keys': { 390: 1329 }, 'settings-look': { 390: 990 }, 'settings-remote': { 390: 1437 }, 'settings-sound': { 390: 1874 } };
+  var px = function (n) { return n.toLocaleString('en-US'); };
+  var screens = function (n, h) { return (Math.round(n / h * 10) / 10).toLocaleString('en-US'); };
+  var after = {};
+  var lengths = function (id, view, extra) {
+    var t = TODAY[view];
+    after[id] = 'Today this page is <b>' + px(t[0]) + ' px</b> long on a 1280 px desktop (' + screens(t[0], 800) + ' screens) and <b>' + px(t[1]) + ' px</b> on a 390 px phone (' +
+      screens(t[1], 844) + ' screens). This drawing of it is <b data-len="' + view + '-1280">' + px(LEN[view + '-1280'] || 0) + '</b> px and <b data-len="' + view + '-390">' + px(LEN[view + '-390'] || 0) + '</b> px long.' + (extra || '');
+  };
+  var whole = function (id, widths) { return widths.map(function (w) { return [w, (HEIGHTS[id] && HEIGHTS[id][w]) || D.SIZES[w]]; }); };
+  var two = function (view, name, first, secondNote) {
+    return [
+      { id: view, title: name + ': the first screen.', note: first, params: { view: view } },
+      { id: view + '-2', title: name + ': the second screen.', note: secondNote, params: { view: view, scr: 2 } }
+    ];
+  };
+  lengths('chords-2', 'chords', ' Today’s numbers include the instrument bar above the page (116 px, 168 px on a phone), which moves into the header.');
+  lengths('quiz-2', 'quiz', ' The path goes on like this through five sections and 57 steps.');
+  lengths('shed-2', 'shed', ' Both with the same eight pieces in the library.');
+  lengths('plan-2', 'plan');
+
+  var GROUPS = ['look', 'sound', 'keys', 'remote', 'data'], GROUP_NAMES = ['Look', 'Sound', 'Keyboard and lights', 'Hands-free', 'Data and about'];
+  Mock.contact({
+    title: 'Pages',
+    widths: [390, 1280],
+    lead: [
+      'What the pages of soundLAB 2.0 look like inside the new header and key bar. Every text, every control and every number is taken from the app as it runs today.',
+      'Two questions are yours: <b>may nine pages keep today’s arrangement</b> for now (part 2), and <b>may long lists use smaller rows with a mouse</b> (part 3)? ' +
+        'Both are built as drawn unless you say otherwise.'
+    ],
+    groups: [
+      { title: '1 · A practice page: Piano',
+        lead: 'The Piano page with a scale lesson chosen. New: one headline, the keyboard as the largest thing, one amber button, four groups of controls folded away. ' +
+          'The same as today: every control, the lesson list, and what each of them does.',
+        states: [
+          { id: 'piano', title: 'At rest: the keyboard, what it sounds like and shows, and the lesson with its Start button.',
+            note: 'The whole keyboard and the Start button are on the first screen. On a wide screen the lesson stands beside the keyboard’s own controls.', params: { view: 'piano' } },
+          { id: 'piano-fold', title: 'Further down, with the fold “Practice a scale” open.',
+            note: 'A fold stays as you left it. Only “Notes and triads on the LUMI” starts closed every time, because the pedal belongs to it while it is open.', params: { view: 'piano', fold: 'runner' } }
+        ] },
+      { title: '2 · Four tool pages keep today’s arrangement',
+        lead: 'Chords, the start of Exercises, the Woodshed’s library and the Plan. New: colours and type, one headline, one amber button on the first screen, controls 44 px high ' +
+          '(48 px on a touch screen). The same as today: what is on each page, in which order, and roughly how long it is. <b>Is that right for now, or must one of them be rebuilt in this phase?</b>',
+        states: two('chords', 'Chords', 'The chords of the key bar’s key, here A Dorian. A chord’s colour is a dot beside its name, never coloured text.',
+            'The rest of the chord and the progression player. Its tempo is the key bar’s tempo.')
+          .concat(two('quiz', 'Exercises', 'After four levels on a new profile: the numbers are the ones the app showed.', 'The path, as today: a step with a ring is begun, a tick is done, a lock is still closed.'))
+          .concat(two('shed', 'The Woodshed', 'Guided performance, the buttons that add a piece, and the start of Practice progress.', 'Practice progress goes on; the rudiments and the library follow below.'))
+          .concat(two('plan', 'The Plan', 'The starter plan every profile has, with its four blocks.', 'The rest of today’s session, the last seven days and the folds.'))
+      },
+      { title: '3 · One row, three heights',
+        lead: 'One row of the Woodshed’s library with every control 44 px high, and with the 36 px proposed for work with a mouse. On a touch screen the row is 48 px either way. ' +
+          '<b>36 px with a mouse in long lists, or 44 px everywhere?</b> Without your yes every row is 44 px.',
+        states: [
+          { id: 'rows', title: 'The same three pieces at 44 px, at 36 px and at 48 px.', note: 'Each sample says how high a row is and how long the library of eight pieces gets.',
+            params: { view: 'rows', whole: 1 }, widths: whole('rows', [390, 1280]) }
+        ] },
+      { title: '4 · Settings in five groups',
+        lead: 'Settings stays a page. New: its eight cards are sorted into five groups that fold (Look, Sound, Keyboard and lights, Hands-free, Data and about), and the accent colour picker is gone. ' +
+          'The same as today: every other control and what it does. The pictures are as long as the page.',
+        states: [
+          { id: 'settings', title: 'On a wide screen the five groups start open; on a phone they start closed.',
+            note: 'A group you open or close stays that way.', params: { view: 'settings', whole: 1 }, widths: whole('settings', [390, 1280]) }
+        ].concat(GROUPS.map(function (g, i) {
+          return { id: 'settings-' + g, title: 'On a phone, “' + GROUP_NAMES[i] + '” open.', params: { view: 'settings', open: g, whole: 1 }, widths: whole('settings-' + g, [390]) };
+        })) }
+    ]
+  });
+
+  // under a page's pictures: how long it is
+  Object.keys(after).forEach(function (id) {
+    var sec = document.getElementById(id);
+    if (sec) sec.insertAdjacentHTML('beforeend', '<p class="mk-after">' + after[id] + '</p>');
+  });
+  // when a frame has loaded: a frame that is "whole" takes its page's length, and the line
+  // under a page's pictures takes the length the drawing really has
+  Array.prototype.forEach.call(document.querySelectorAll('.mk-view > iframe'), function (f) {
+    var fit = function () {
+      try {
+        var win = f.contentWindow, src = f.getAttribute('src') || '';
+        if (!win || !win.mkPageLength) return;
+        var len = win.mkPageLength(), w = f.parentNode.getAttribute('data-w'), m = /[?&]view=(\w+)/.exec(src);
+        var high = Math.max(len, D.SIZES[w] || 0);      // never shorter than the device's own screen
+        if (/[?&]whole=1/.test(src) && Math.abs(high - (+f.parentNode.getAttribute('data-h'))) > 1) {
+          f.setAttribute('height', high);
+          f.parentNode.setAttribute('data-h', high);
+          window.dispatchEvent(new Event('resize'));
+        }
+        if (m && !/[?&](scr|fold)=/.test(src) && /theme=dark/.test(src)) {
+          var out = document.querySelector('[data-len="' + m[1] + '-' + w + '"]');
+          if (out) out.textContent = px(len);
+        }
+      } catch (e) { /* a page opened from a file cannot look into its frames: the written numbers stay */ }
+    };
+    f.addEventListener('load', function () { fit(); setTimeout(fit, 600); });
+  });
+})();
+</script>
+</body>
+</html>

@@ -52,7 +52,7 @@
  *                                  open panel that carries .sl-skin, the footer, the message stack
  *   Mock.page({ shell: { page: 'quiz', fixed: ['page'] }, main: html, toasts: ['Saved'] })
  *     shell    the shell's state (below); main: the panel's content (left out: a quiet page);
- *     toasts   messages for the stack: a text, or { id, text, bad, icon, action };
+ *     toasts   messages for the stack: a text, or { id, text, bad, icon, acts: [[words, 'primary']] };
  *     foot: false leaves the footer out; after: markup behind the stack (a tour layer); title
  *   Mock.shell(opts)               only the shell's markup, as a string: the header with the pill
  *                                  row, the key bar, the bottom tab bar, the sheets (Appendix A)
@@ -60,8 +60,10 @@
  *     app, page, nav, root (0-11), scale (id), bpm, lock, lights, help, colors, inst, pop,
  *     scrolled, goal, beta, met, sheet, sheetBody (the open sheet's content), bar, hint, labels
  *   Mock.settle(opts)   run it after Mock.shell's markup is in the page (Mock.page does). It runs
- *                       again by itself on resize and when the fonts have arrived. Three jobs that
+ *                       again by itself on resize and when the fonts have arrived. The jobs that
  *                       the app has too (step B5a):
+ *     0. in Gear the header's key button takes the longest form of the key's name that leaves the
+ *        header in one row: plain, short, short without the caret (data-fit on #cx-toggle);
  *     1. the header's height is published on <html> as --sl-topbar-h (the bar sticks under it);
  *     2. the hidden attribute of the three panels that are panels on phones only (Tempo, Scale
  *        lock, More) follows the 640 px tier;
@@ -79,12 +81,18 @@
  *                    pages, tabs and labels, Help levels with their sentences, instruments,
  *                    the keyboard's states, the window sizes
  *   Mock.icon(name, size)   the app's Lucide icons (js/app.js ICONS) plus the two that B6 adds
+ *                    (more, caret) and one that B7b is asked to add (alert). A drawing takes every
+ *                    icon from here and carries no copy of its own
  *   Mock.wordmark()  the real wordmark SVG (index.html)
  *   Mock.keyName(root, scale, 'full'|'plain'|'short')    Mock.scaleName(scale, form)
  *   Mock.lockSentence(on, root, scale, 'full'|'mid'|'short')    Mock.lockMessage(on, root, scale)
  *   Mock.scaleNotes(root, scale)   the notes of a key: { pc, step, name, color, label }
  *   Mock.inkOn(hex)  'dark' or 'light': which ink reads on a note colour
  *   Mock.quietPage(opts)    a quiet page body, a headline and a keyboard, for drawings of the shell
+ *                    (the keyboard is SLHero.keyboard: load mock-hero.js after this file)
+ *   Mock.toast(t)    one message of the stack, as markup
+ *   Mock.change(rows)   "Change this picture": a fold of chips under a picture opened alone, and the
+ *                    way back to all pictures. rows = [[parameter, words, value, [[value, words], …]], …]
  *   Mock.q(name, fallback), Mock.esc(text), Mock.href(params), Mock.tierOf(width), Mock.single
  */
 (function () {
@@ -150,6 +158,9 @@
   function flatKey(pc) { return FLAT_KEYS.indexOf(pc) !== -1; }
   function pcName(pc, preferFlat) { pc = ((pc % 12) + 12) % 12; return preferFlat ? FLAT[pc] : SHARP[pc]; }
   var ROOTS = SHARP.map(function (n, pc) { return pcName(pc, flatKey(pc)); });       // the twelve names of the Key select
+  // THE TWO PALETTES' DATA: the only raw colours in the drawings' files besides the saved Gear
+  // page (gear.html). A note's colour is data, not a token (decision D12): in the app it comes
+  // from App.colors, here from this table, and it reaches an element as the inline property --c.
   // Note colours AS A PAGE SHOWS THEM: App.colors snaps the stored colours to the LUMI's table
   // (js/note-palette.js; tests/colors.test.js:16-17). Not the --sl-deg tokens, which hold the
   // stored colours. DEGREES = the seven scale degrees; INTERVALS = the twelve semitones above
@@ -158,7 +169,17 @@
     DEGREES: ['#ffaa2e', '#ffd429', '#7dfc74', '#41eab4', '#439af5', '#7e58f5', '#ff6460'],
     INTERVALS: ['#ffaa2e', '#ffbd2b', '#ffd429', '#baf94f', '#7dfc74', '#41eab4', '#2fbced', '#439af5', '#5877fd', '#7e58f5', '#9d42ea', '#ff6460'],
     INTERVAL_LABELS: ['R', '♭2', '2', '♭3', '3', '4', '♭5', '5', '♭6', '6', '♭7', '7'],
-    NOTES: ['#ff6460', '#ff8944', '#ffb12d', '#ffd429', '#caf945', '#85fc6f', '#4df2a2', '#29dbd9', '#35b2ef', '#4f86f9', '#7160f9', '#9746ec']
+    NOTES: ['#ff6460', '#ff8944', '#ffb12d', '#ffd429', '#caf945', '#85fc6f', '#4df2a2', '#29dbd9', '#35b2ef', '#4f86f9', '#7160f9', '#9746ec'],
+    PAD_NEUTRAL: '#c8c2b8',     // js/pads.js:36-38: seven pads take the seven degree colours, the eighth (Crash) this neutral
+    // The other palette of gate G4 ("the mockup's colours", instruments.html): the red-first set
+    // css/tokens.css held before step B1a (git show a914df2:css/tokens.css, lines 43-49: ff4d4d,
+    // ff9a3c, ffd23f, 4cd964, 34d0e0, 4d7dff, b36bff), run through the LUMI's colour table the way
+    // a page's colours are: DEGREES = SLNotePalette.mapped(), INTERVALS = SLNotePalette.intervals()
+    // of js/note-palette.js (map-pages-instr.md 3 b; the seven are the plan's B16.6).
+    MOCKUP: {
+      DEGREES: ['#ff5869', '#ff9a37', '#ffd029', '#5ffe86', '#26cbe9', '#557cfc', '#8d4def'],
+      INTERVALS: ['#ff5869', '#ff7950', '#ff9a37', '#ffb52c', '#ffd029', '#5ffe86', '#3ee9b9', '#26cbe9', '#3ea3f2', '#557cfc', '#6e62fa', '#8d4def']
+    }
   };
   // js/app.js:76-93 (APPS), :103-109 (SPACE_LABELS), :115-121 (SUB_LABELS)
   var APPS = {
@@ -214,11 +235,20 @@
       note: 'The configured LUMI display is disconnected or unavailable; no fallback is used.' }
   };
 
-  // js/app.js:233-278 (ICONS, Lucide, ISC), plus the two that B6 adds from lucide-static (D35):
-  // more = ellipsis, caret = chevron-down
+  // js/app.js:233-278 (ICONS, Lucide, ISC): the ones a drawing uses, path for path. Plus the two
+  // that B6 adds from lucide-static (D35): more = ellipsis, caret = chevron-down. Plus one that
+  // overlays.html asks B7b to add, for "it failed": alert = circle-alert. Its path was written
+  // from memory, not copied from lucide-static: compare it before B7b adds it.
   var ICONS = {
     play: '<path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z" fill="currentColor"/>',
     stop: '<rect x="5" y="5" width="14" height="14" rx="2" fill="currentColor"/>',
+    restart: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>',
+    rotate: '<path d="M12 5H6a2 2 0 0 0-2 2v3"/><path d="m9 8 3-3-3-3"/><path d="M4 14v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/>',
+    up: '<path d="m5 12 7-7 7 7"/><path d="M12 19V5"/>',
+    down: '<path d="M12 5v14"/><path d="m19 12-7 7-7-7"/>',
+    updown: '<path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/>',
+    left: '<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>',
+    right: '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
     close: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
     sliders: '<path d="M10 8h4"/><path d="M12 21v-9"/><path d="M12 8V3"/><path d="M17 16h4"/><path d="M19 12V3"/><path d="M19 21v-5"/><path d="M3 14h4"/><path d="M5 10V3"/><path d="M5 21v-7"/>',
     plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
@@ -236,10 +266,12 @@
     lock: '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
     check: '<path d="M20 6 9 17l-5-5"/>',
     clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+    ear: '<path d="M6 8.5a6.5 6.5 0 1 1 13 0c0 6-6 6-6 10a3.5 3.5 0 1 1-7 0"/><path d="M15 8.5a2.5 2.5 0 0 0-5 0v1a2 2 0 1 1 0 4"/>',
     mic: '<path d="M12 19v3"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><rect x="9" y="2" width="6" height="13" rx="3"/>',
     drum: '<path d="m2 2 8 8"/><path d="m22 2-8 8"/><ellipse cx="12" cy="9" rx="10" ry="5"/><path d="M7 13.4v7.9"/><path d="M12 14v8"/><path d="M17 13.4v7.9"/><path d="M2 9v8a10 5 0 0 0 20 0V9"/>',
     more: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
-    caret: '<path d="m6 9 6 6 6-6"/>'
+    caret: '<path d="m6 9 6 6 6-6"/>',
+    alert: '<circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/>'
   };
   function icon(name, size, cls) {
     var d = ICONS[name];
@@ -490,35 +522,21 @@
   }
 
   // ---- a quiet page body: a headline and a keyboard, so that the shell is seen in place ----
-  // The keyboard shows the scale of the key bar's key (D30: a dot in the note's colour; the root's
-  // ring is thicker). mock-hero.js draws the real instruments; this one only fills the page.
-  function quietKeys(o, octaves) {
-    var W = [0, 2, 4, 5, 7, 9, 11], hasBlack = [0, 2, 5, 7, 9], byPc = {};
-    scaleNotes(o.root, o.scale).forEach(function (n) { byPc[n.pc] = n; });
-    var mark = function (pc) {
-      var n = byPc[pc], show = n && (o.help >= 3 || (o.help === 1 && n.step === 0));
-      if (!show) return { cls: '', dot: '' };
-      return { cls: n.step === 0 ? ' is-scale is-root' : ' is-scale',
-        dot: '<span class="sl-dot' + (inkOn(n.color) === 'light' ? ' is-ink-light' : '') + '" style="--c:' + n.color + '">' + (o.help === 4 && octaves > 2 ? n.name : '') + '</span>' };
-    };
-    // three grid columns per ivory key; the ebony keys come after the ivory ones (mock.css)
-    var whites = '', blacks = '', n = 0;
-    for (var oct = 0; oct < octaves; oct++) {
-      W.forEach(function (pc, i) {
-        var w = mark(pc), last = oct === octaves - 1 && i === 6;
-        whites += '<div class="sl-key' + w.cls + '" style="grid-column:' + (3 * n + 1) + ' / span 3">' + w.dot + '</div>';
-        if (hasBlack.indexOf(pc) !== -1 && !last) {
-          var b = mark(pc + 1);
-          blacks += '<div class="sl-key sl-key-b' + b.cls + '" style="grid-column:' + (3 * n + 3) + ' / span 2">' + b.dot + '</div>';
-        }
-        n++;
-      });
-    }
-    return '<div class="sl-hero"><div class="sl-kbd" role="img" aria-label="A keyboard that shows ' + keyName(o.root, o.scale, 'plain') +
-      '" style="grid-template-columns:repeat(' + (3 * n) + ', minmax(0, 1fr))">' + whites + blacks + '</div></div>';
+  // The keyboard is mock-hero.js's (SLHero.keyboard), the same drawing every other picture
+  // uses: it shows the scale of the key bar's key at the bar's Help level and colour mode.
+  // A drawing that shows a quiet page loads mock-hero.js after this file.
+  // Its range is the Piano page's (pages.html): C2 to C6 above 900 px, as the page draws today
+  // (js/piano.js), C3 to C6 from 641 px, and the LUMI's two octaves, C3 to C5, on a phone.
+  function quietKeys(o) {
+    var H = window.SLHero, w = window.innerWidth, wide = w > 900, mid = w > 640;
+    if (!H) return '';
+    var m = H.sample({ root: o.root, steps: (SCALES[o.scale] || SCALES.minorPent).steps, help: o.help, mode: o.colors,
+      intervals: COLORS.INTERVALS, notes: COLORS.NOTES });
+    return '<div class="sl-hero">' + H.keyboard(m, { from: wide ? 36 : 48, octaves: wide ? 4 : mid ? 3 : 2,
+      label: 'A keyboard that shows ' + keyName(o.root, o.scale, 'plain') }) + '</div>';
   }
   function quietPage(given) {
-    var o = shellOpts(given), g = groupOf(o), wide = window.innerWidth > 640;
+    var o = shellOpts(given), g = groupOf(o);
     var title = o.page === 'piano' ? keyName(o.root, o.scale, 'full') : (PAGE_LABELS[o.page] || o.page);      // js/piano.js:637
     var eyebrow = (g ? g.label + ' · ' : '') + (PILL_LABELS[o.page] || PAGE_LABELS[o.page] || '');
     // the folds a page will have: Piano's (B12), the five groups of Settings (D27)
@@ -527,8 +545,19 @@
     var folds = names.map(function (name) { return '<details class="sl-fold"><summary>' + name + '</summary></details>'; }).join('');
     return '<div class="mk-quiet' + (o.scrolled ? ' mk-quiet-tall' : '') + '">' +
       '<div class="mk-quiet-head">' + (eyebrow && g ? '<p class="sl-eyebrow">' + eyebrow + '</p>' : '') + '<h1>' + title + '</h1></div>' +
-      (g ? quietKeys(o, wide ? 3 : 2) : '') +
+      (g ? quietKeys(o) : '') +
       '<div class="mk-quiet-folds">' + folds + '</div></div>';
+  }
+
+  // ---- one message of the stack (D25): an icon when it is bad news, its words, then ONE group
+  // of buttons. t = a text, or { id, text, bad, icon, acts: [[words, 'primary' | ''], …] }
+  function toast(t) {
+    if (typeof t === 'string') t = { text: t };
+    var acts = t.acts || (t.action ? [[t.action, '']] : null);
+    return '<div class="sl-toast' + (t.bad ? ' sl-toast-bad' : '') + (acts ? ' sl-toast-action' : '') + '"' + (t.id ? ' id="' + esc(t.id) + '"' : '') + ' role="status">' +
+      (t.icon ? icon(t.icon, 20) : t.bad ? icon('alert', 20) : '') + '<span>' + esc(t.text) + '</span>' +
+      (acts ? '<span class="sl-toast-acts">' + acts.map(function (a) { return '<button type="button" class="btn sm' + (a[1] ? ' ' + a[1] : '') + '">' + esc(a[0]) + '</button>'; }).join('') + '</span>' : '') +
+      '</div>';
   }
 
   // ---- the whole page: shell, <main>, footer, message stack ----------------------------
@@ -545,11 +574,7 @@
       note = '<p class="mk-note">This window is ' + window.innerWidth + ' px wide, so this is the ' + tierOf(window.innerWidth) + ' layout, not the ' + w +
         ' px picture. <a href="' + esc(href({ only: q('only', '') })) + '">All sizes</a></p>';
     }
-    var stack = toasts.map(function (t) {
-      if (typeof t === 'string') t = { text: t };
-      return '<div class="sl-toast' + (t.bad ? ' sl-toast-bad' : '') + (t.action ? ' sl-toast-action' : '') + '"' + (t.id ? ' id="' + t.id + '"' : '') + ' role="status">' +
-        (t.icon ? icon(t.icon, 18) : '') + '<span>' + esc(t.text) + '</span>' + (t.action ? '<button type="button" class="btn sm">' + esc(t.action) + '</button>' : '') + '</div>';
-    }).join('');
+    var stack = toasts.map(toast).join('');
     document.body.innerHTML = note + shell(def.shell) +
       '<main><section class="panel active sl-skin" id="panel-' + esc(o.page) + '">' + (def.main == null ? quietPage(def.shell) : def.main) + '</section></main>' +
       (def.foot === false ? '' : '<footer class="foot">' + (o.app === 'gear' ? 'soundLAB Gear alpha' : 'soundLAB alpha') + ' — runs entirely in your browser · v2.0.0</footer>') +
@@ -582,6 +607,22 @@
       var wraps = tools.offsetTop > brand.offsetTop + brand.offsetHeight / 2;
       head.classList.toggle('mk-pills-inline', !wraps);
       head.setAttribute('data-pills', wraps || tier !== 'desktop' ? 'own-row' : 'in-the-header-row');
+    }
+    // 0. Gear's key button (#cx-toggle, D14) takes the longest form of the key's name that leaves
+    //    the header in one row, as the key bar's Key chip does (D17): the plain name, the short
+    //    name, the short name without the caret (class is-tight). Above 900 px the plain name
+    //    always fits. The button's aria-label keeps the whole name. data-fit names what was
+    //    chosen, and says CUT if even the last form is cut. (B5a: paintKeyChip.)
+    var tg = document.getElementById('cx-toggle'), tgVal = tg && tg.querySelector('.sl-kchip-value');
+    if (tgVal) {
+      var forms = [['plain', false], ['short', false], ['short', true]], f;
+      for (f = 0; f < forms.length; f++) {
+        tgVal.textContent = keyName(o.root, o.scale, forms[f][0]);
+        tg.classList.toggle('is-tight', forms[f][1]);
+        if (tier === 'desktop' || tgVal.scrollWidth <= tgVal.clientWidth + 1) break;
+      }
+      f = Math.min(f, forms.length - 1);
+      tg.setAttribute('data-fit', 'key-' + forms[f][0] + (forms[f][1] ? ' tight' : '') + (tgVal.scrollWidth > tgVal.clientWidth + 1 ? ' CUT' : ''));
     }
     // 1. the header's height, for the key bar that sticks under it (--sl-topbar-h)
     if (head) root.style.setProperty('--sl-topbar-h', (head.classList.contains('bar-hidden') ? 0 : head.offsetHeight) + 'px');
@@ -660,6 +701,23 @@
     if (e.key === 'Escape' && single && (P.pop || P.sheet)) location.assign(href(merged({ pop: '', sheet: '', toast: '' })));
   });
 
+  // ---- "Change this picture": a fold under a picture that is opened alone ----------------
+  // rows = [[parameter, its words, the value it has, [[value, words], …]], …]: each row is a
+  // line of chips, and a tap opens the same drawing with that one parameter changed. Under
+  // the fold stands the way back to all pictures of the drawing.
+  function change(rows) {
+    var file = location.pathname.split('/').pop() || 'index.html';
+    return '<div class="mk-change sl-skin"><details class="sl-fold"><summary>Change this picture</summary><div class="mk-change-body">' +
+      rows.map(function (r) {
+        return '<div class="mk-tools"><span class="mk-tools-label">' + esc(r[1]) + '</span>' + r[3].map(function (op) {
+          var on = String(r[2]) === String(op[0]), to = merged({});
+          to[r[0]] = op[0];
+          return '<a class="chip' + (on ? ' active' : '') + '"' + (on ? ' aria-current="true"' : '') + ' href="' + esc(href(to)) + '" data-go="' + esc(r[0] + '=' + op[0]) + '">' + op[1] + '</a>';
+        }).join('') + '</div>';
+      }).join('') + '</div></details>' +
+      '<p class="mk-back"><a href="' + esc(file) + '">All pictures of this drawing</a> · <a href="index.html">All drawings and questions</a></p></div>';
+  }
+
   // ---- the contact view: every state at every width it needs, dark and light -------------
   // The window sizes of the drawings: the width is what matters, the height is a real device's.
   var SIZES = { 360: 740, 390: 844, 640: 900, 641: 900, 820: 1180, 1024: 640, 1280: 800 };
@@ -737,7 +795,7 @@
       PAGE_LABELS: PAGE_LABELS, PILL_LABELS: PILL_LABELS, HELP_NAMES: HELP_NAMES, HELP_TEXT: HELP_TEXT, INSTRUMENTS: INSTRUMENTS, LIGHTS: LIGHTS, SIZES: SIZES },
     icon: icon, wordmark: wordmark, keyName: keyName, scaleName: scaleName, lockSentence: lockSentence, lockMessage: lockMessage,
     scaleNotes: scaleNotes, pcName: pcName, inkOn: inkOn,
-    shellOpts: shellOpts, shell: shell, quietPage: quietPage, page: page, settle: settle,
-    contact: contact, frames: function () { return frames.slice(); }
+    shellOpts: shellOpts, shell: shell, quietPage: quietPage, page: page, settle: settle, toast: toast,
+    contact: contact, frames: function () { return frames.slice(); }, change: change
   };
 })();

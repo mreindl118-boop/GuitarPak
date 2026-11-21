@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>soundLAB Gear until its own phase · soundLAB 2.0 drawings</title>
+<!--
+  soundLAB 2.0 Phase B, step B1b: soundLAB Gear between Phase B and Phase H, drawn before it is built
+  (docs/plans/phase-b/PLAN.md, table B1b.1; decisions D13 and D14; "For the owner", item 5).
+
+  WHAT IT SHOWS. Gear's Deck and Hub exactly as they render today, inside the NEW header, with the
+  key bar folded behind the header button that names the key (#cx-toggle) and with it open, at 390
+  and 1280 px, dark and light. The frame is new and the pages are not: the drawing is there to show
+  that honestly. A third group shows the key button with the key the app starts with, at 360, 390
+  and 1280 px.
+
+  Opened without ?w= it shows every state at both widths, dark and light.
+  Opened with ?w= it is one state, laid out for the window it is given.
+  The shell, the frames and the shared parameters are mock.js's; the shell's styles are mock.css's.
+  Read their header comments first.
+
+  THIS DRAWING'S OWN PARAMETER (beside the shell's: bar=open, key, bpm, lock, lights, help, pop, theme, touch)
+    page=deck|midihub   the saved page. liveset and helix are not saved: a line says so.
+  The shell is always Gear's (app=gear cannot be changed here) and starts with lights=off, the
+  state the pages were saved in. A tap on the header's key button opens and folds the bar; a tap
+  outside the bar, Escape and a change of page fold it, as D14 asks.
+
+  THE KEY BUTTON NEVER BREAKS THE HEADER'S ROW. With the app's own first key, "A Minor Pentatonic",
+  a button that always wrote the key's plain name would break Gear's header into two rows at
+  390 px, and at 360 px even "A Dorian" would. So up to 900 px the tools give way, not the row
+  (mock.css, "The header's width tiers"), and the button takes the longest form of the name that
+  fits: the plain name, then the short name, then the short name without the caret (mock.js,
+  Mock.settle; the button's aria-label keeps the whole name).
+
+  THE SAVED COPY. The three <template> elements below hold today's pages. Nothing in them is
+  written by hand, and nothing in this file's own styles or script reaches into them:
+    saved-css       css/style.css and the <style> elements the scripts add to the page (App.injectCSS),
+                    in the page's order, each rule in its source text
+    saved-deck      #panel-deck, the Deck's first view (Perform)
+    saved-midihub   #panel-midihub, the Hub's first view (Deck > Knobs, Yamaha MODX / MONTAGE)
+  A saved page is shown in an <iframe srcdoc> of its own (sandboxed: no script can run in it;
+  inert: it is a picture). That document carries the old stylesheet with the old variables and
+  nothing of tokens.css or mock.css, so the header's tokens cannot restyle the old page and the old
+  rules cannot restyle the header. Two rules are added to it and say so: its ground is see-through,
+  because the ground under Gear's pages is the new shell's from B6 on (D13), and it does not scroll
+  (the frame is made as high as the page).
+
+  HOW THE COPY WAS TAKEN (2026-11-15, from the app as it is in commit 3232b9f; js/ and css/ are
+  those of 0133287). gear.html of the worktree, served locally, in headless Chromium, seeded as the
+  returning user of tests/gear.test.js: help.seen, help.done and qz.landed true; midi.wanted true,
+  lights.on false, midihub.profile "yamaha"; fake Web MIDI ports "MODX-1" and "LUMI Keys Block ALXJ
+  (Bluetooth MIDI IN / OUT)"; app.theme dark or light. The Deck after boot, the Hub after
+  App.switchTo('midihub'). Before a panel's markup was read, the live state of its form controls was
+  written into attributes (which option is selected, what is checked, the values). The markup was
+  the same at 390 and 1280 px and in both themes (in the Hub only the times in the hidden Monitor
+  list differed), so one copy serves all four.
+  To keep the file small, three things that cannot change the picture were taken out:
+    1  the content of every element that is display:none at 390 AND at 1280 px in both themes (the
+       element itself stays, so that no sibling rule changes): the Deck 3,463 elements -> 81, the Hub
+       4,030 -> 365
+    2  data-* attributes that no rule of the stylesheets reads (kept: data-app, data-conf, data-dc,
+       data-group, data-theme, data-ui, data-view); there were no script tags and no on* attributes
+    3  rules whose selector matches nothing in the two saved panels, under either theme (a state
+       such as :hover and a pseudo-element are ignored for that test; print rules, and @keyframes
+       that no kept rule names, go too): 715 style rules -> 174. Font files are named from this
+       folder (../../../fonts/).
+  Checked against the running page at 390 x 844 (touch) and 1280 x 800, dark and light, both pages:
+  every box that is drawn (1,600 in all) has the same place and size within 0.02 px and the same 52
+  computed styles; the same holds in dark at 360, 641, 700, 820, 900, 1024 and 1920 px (2,800 boxes
+  more). Window by window the pictures are equal once the copy sits as far down its document as
+  <main> does in the app: six of the eight cases then have no differing pixel, and the Deck at
+  390 px has 20 and 24 that differ by one step of 255. Without that, 0.03 to 0.05 % of the pixels
+  differ, on rounded corners and on the knobs' arcs, where anti-aliasing moves with the position.
+  The pixel comparison used a flat ground of the old colour in both, because today's ground is a
+  gradient fixed to the window.
+
+  WHAT A SAVED PAGE DOES NOT DO. Its old rules ask the device whether it has a touch screen
+  ((pointer: coarse), (hover: hover)); ?touch=1 only changes the new shell. So in the contact view
+  on a desktop a 390 px frame shows the old page with mouse sizes under a shell with touch sizes;
+  on a phone both are touch. And it never scrolls sideways: at 360 px today's Hub is 3 px wider
+  than the window (its "Synth out" select), which the running app shows as a sideways scroll and
+  this frame hides. At 390 px and wider nothing reaches past the window.
+-->
+<link rel="icon" href="../../../icons/icon.svg">
+<link rel="stylesheet" href="../../../css/tokens.css">
+<link rel="stylesheet" href="mock.css">
+<style>
+/* drawing-only */
+/* Gear's <main> is the saved page's own: it is inside the frame below, with the padding and the
+   width css/style.css gives it today. The stand-in padding mock.css gives Gear's <main> comes off. */
+:root[data-app="gear"] main { padding: 0; }
+.mk-old { display: block; }
+.mk-old-frame { display: block; width: 100%; border: 0; pointer-events: none; }
+/* a page of Gear that is not saved in this drawing */
+.mk-old-none {
+  max-width: 60ch;
+  margin: 0 auto;
+  padding: var(--sl-space-6) var(--sl-gutter) var(--sl-space-7);
+  color: var(--sl-ink-soft);
+  font-family: var(--sl-font-body);
+  font-size: var(--sl-text-md);
+  line-height: var(--sl-leading);
+}
+.mk-old-none a { color: var(--sl-accent-text); }
+</style>
+<script src="mock.js"></script>
+<template id="saved-css"><style>
+/* css/style.css */
+@font-face { font-family: 'Barlow'; font-style: normal; font-weight: 400; src: url('../../../fonts/barlow-400.woff2') format('woff2'); }
+@font-face { font-family: 'Barlow'; font-style: normal; font-weight: 500; src: url('../../../fonts/barlow-500.woff2') format('woff2'); }
+@font-face { font-family: 'Barlow Condensed'; font-style: normal; font-weight: 600; src: url('../../../fonts/barlowcond-600.woff2') format('woff2'); }
+@font-face { font-family: 'Barlow Condensed'; font-style: normal; font-weight: 700; src: url('../../../fonts/barlowcond-700.woff2') format('woff2'); }
+@font-face { font-family: 'Bebas Neue'; font-style: normal; font-weight: 400 700; src: url('../../../fonts/bebasneue-400.ttf') format('truetype'); }
+:root { color-scheme: dark; --bg: #131114; --panel: #191518; --card: #1e191c; --card2: #292328; --inset: #141114; --line: #342c2f; --line-soft: rgba(255, 255, 255, 0.05); --text: #ede8e0; --muted: #a29889; --label: #c9beac; --ctl-border: #4d4247; --accent: #ffab47; --accent-dim: #c97f26; --accent-glow: rgba(255, 171, 71, 0.35); --accent-soft: color-mix(in srgb, var(--accent) 13%, transparent); --accent-line: color-mix(in srgb, var(--accent) 60%, transparent); --accent-ink: var(--accent); --warn: #ffb36b; --h-ctl: 34px; --teal: #4cc9b0; --green: #77d98b; --red: #ff6f6f; --blue: #6ea8fe; --purple: #b48ef0; --radius: 16px; --shadow-1: 0 1px 3px rgba(0, 0, 0, 0.22); --font-body: 'Barlow', 'Segoe UI', system-ui, sans-serif; --font-display: 'Bebas Neue', 'Barlow Condensed', 'Segoe UI', system-ui, sans-serif; --font-condensed: 'Barlow Condensed', 'Segoe UI', system-ui, sans-serif; }
+:root[data-theme="light"] { color-scheme: light; --bg: #f3efe8; --panel: #efe9df; --card: #fffdf9; --card2: #f1ebe1; --inset: #e7e0d3; --line: #d8cfc1; --line-soft: rgba(0, 0, 0, 0.05); --text: #2b241d; --muted: #756b5c; --label: #6e6355; --ctl-border: #c2b6a2; --accent: #d97e0f; --accent-dim: #b96a10; --accent-glow: rgba(217, 126, 15, 0.28); --accent-ink: color-mix(in srgb, var(--accent) 70%, #000); --warn: #9a5a0c; --teal: #12806b; --green: #2c7f3e; --red: #c23434; --blue: #2f68c8; --purple: #7449c2; --shadow-1: 0 1px 3px rgba(0, 0, 0, 0.1); }
+@media (pointer: coarse) {
+  :root { --h-ctl: 38px; }
+}
+:root[data-theme="light"] select { background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='7'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23b96a10' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; background-size: 12px 7px; }
+* { box-sizing: border-box; }
+* { touch-action: manipulation; }
+button, input, select, textarea { font-family: inherit; }
+html, body { margin: 0; padding: 0; touch-action: manipulation; color: var(--text); font-family: var(--font-body); font-size: 15px; line-height: 1.5; background: radial-gradient(1100px 520px at 18% -12%, color-mix(in srgb, var(--accent) 6%, transparent), transparent 60%), var(--bg); background-attachment: fixed; }
+::selection { background: color-mix(in srgb, var(--accent) 30%, transparent); }
+body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
+.ic { display: inline-block; vertical-align: -0.22em; flex: 0 0 auto; pointer-events: none; }
+.icon-btn { display: inline-flex; align-items: center; justify-content: center; }
+main { max-width: 1150px; margin: 0 auto; padding: 26px 18px 70px; }
+.panel { display: none; }
+.panel.active { display: block; animation: panel-in 240ms ease; }
+@keyframes panel-in { from { opacity: 0; transform: translateY(6px); } to   { opacity: 1; transform: none; } }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px 22px; margin-bottom: 18px; box-shadow: var(--shadow-1); }
+.card h2 { margin: 0 0 14px; font-family: var(--font-display); font-size: 21px; font-weight: 600; letter-spacing: 1.2px; text-transform: uppercase; text-wrap: balance; }
+.card h2::before { content: ''; display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin: 0 10px 2px 0; background: var(--accent); box-shadow: 0 0 9px var(--accent-glow); }
+.card h3 { margin: 0 0 10px; font-size: 11.5px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 1.8px; }
+.row { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+.row.tight { gap: 8px; }
+.muted { color: var(--muted); }
+.small { font-size: 12.5px; }
+.btn { background: var(--card2); color: var(--text); border: 1px solid var(--ctl-border); border-radius: 11px; padding: 10px 18px; font-family: var(--font-body); font-size: 15px; font-weight: 600; letter-spacing: 0.2px; cursor: pointer; user-select: none; box-shadow: var(--shadow-1); transition: border-color 120ms ease, background 120ms ease, transform 60ms ease; }
+@media (hover: hover) {
+  .btn:hover { border-color: var(--accent-line); }
+}
+.btn:active { transform: translateY(1px); background: var(--inset); }
+.btn.primary { background: var(--accent); color: #221302; font-weight: 600; border-color: var(--accent); }
+@media (hover: hover) {
+  .btn.primary:hover { filter: brightness(1.06); border-color: var(--accent); }
+}
+.btn.primary:active { filter: brightness(0.94); background: var(--accent); }
+.btn.danger { background: transparent; color: var(--red); border-color: color-mix(in srgb, var(--red) 55%, transparent); box-shadow: none; }
+@media (hover: hover) {
+  .btn.danger:hover { border-color: var(--red); background: color-mix(in srgb, var(--red) 7%, transparent); }
+}
+.btn.sm { font-size: 13px; padding: 6px 12px; border-radius: 9px; }
+.btn.sm, .chip { min-height: var(--h-ctl); }
+label.field { display: inline-flex; flex-direction: column; gap: 5px; font-size: 11.5px; font-weight: 600; letter-spacing: 1.4px; text-transform: uppercase; color: var(--label); }
+.ctl-label { font-size: 11.5px; font-weight: 600; letter-spacing: 1.4px; text-transform: uppercase; color: var(--label); }
+select, input[type="number"], input[type="text"] { background-color: var(--card2); color: var(--text); border: 1px solid var(--ctl-border); border-radius: 10px; padding: 6px 12px; min-height: var(--h-ctl); font-size: 15px; font-weight: 500; font-family: var(--font-body); }
+select { appearance: none; -webkit-appearance: none; padding: 6px 36px 6px 13px; font-weight: 600; cursor: pointer; background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='7'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23ffab47' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; background-size: 12px 7px; box-shadow: var(--shadow-1); transition: border-color 120ms ease, background-color 120ms ease; }
+@media (hover: hover) {
+  select:hover { border-color: var(--accent-line); }
+}
+select:active { background-color: var(--inset); }
+select option { background: var(--card); color: var(--text); font-weight: 500; }
+select:focus, input[type="number"]:focus, input[type="text"]:focus { outline: none; border-color: var(--accent-line); }
+select:focus-visible, input[type="number"]:focus-visible, input[type="text"]:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+input[type="checkbox"] { accent-color: var(--accent); width: 16px; height: 16px; }
+.seg { display: inline-flex; background: var(--inset); border: 1px solid var(--ctl-border); border-radius: 10px; padding: 2px; min-height: var(--h-ctl); }
+.seg button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; background: transparent; color: var(--label); border: none; border-radius: 7px; padding: 4px 13px; font-family: var(--font-body); font-size: 14px; font-weight: 600; cursor: pointer; transition: color 120ms ease, background 120ms ease; }
+.seg button.active { background: var(--card2); color: var(--accent-ink); box-shadow: var(--shadow-1); }
+.chip { display: inline-flex; align-items: center; gap: 6px; background: var(--card2); border: 1px solid var(--ctl-border); border-radius: 999px; padding: 5px 13px; font-family: inherit; font-size: 13.5px; font-weight: 500; color: var(--text); transition: border-color 120ms ease, color 120ms ease, background 120ms ease; }
+button.chip { cursor: pointer; }
+svg { display: block; }
+button .ic, .chip .ic { display: inline-block; }
+::-webkit-scrollbar { height: 10px; width: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--line); border-radius: 5px; }
+::-webkit-scrollbar-thumb:hover { background: var(--ctl-border); }
+@media (max-width: 900px) {
+  main { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
+}
+@media (max-width: 640px) {
+  main { padding: 18px 12px 60px; }
+  .card { padding: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+/* css-scoreplayer */
+.mh-cv-head {display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.mh-cv-head h2 {margin:0}
+.mh-mono {font-family:ui-monospace,Consolas,Menlo,monospace;font-size:12px;color:var(--text)}
+.mh-chk {display:inline-flex;gap:6px;align-items:center;font-size:12.5px;color:var(--muted)}
+.mh-warn {color:var(--red);margin-top:6px}
+/* css-synthtab */
+.st-top {display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 10px}
+.st-explain {width:44px;height:44px;min-height:44px;padding:0;font:700 17px/1 var(--font-body)}
+.st-mode button {min-height:44px;padding:0 16px}
+.st-conn {display:grid;gap:6px;padding:14px 16px;margin:0 0 12px;border-color:var(--accent-line);background:var(--accent-soft)}
+.st-conn[hidden] {display:none}
+.st-perform {display:grid;gap:12px}
+.st-now {display:grid;gap:8px;padding:16px 18px}
+.st-nowname {font:600 32px/1.1 var(--font-condensed);letter-spacing:.3px;overflow-wrap:anywhere}
+.st-nowacts {display:flex;gap:8px;margin-top:4px}
+.st-big {flex:1;min-height:48px;font-size:15px;font-weight:600}
+.st-big.primary {flex:1.4}
+.st-pins {margin-top:6px;display:grid;gap:6px}
+.st-pingrid {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.st-strips {display:grid;gap:10px;padding:14px 16px}
+.st-striphead {display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.st-lab {font-size:13px;font-weight:600;color:var(--muted)}
+.st-val {font:600 15px/1 var(--font-body);font-variant-numeric:tabular-nums}
+.st-hero+.st-striphead .st-val,#st-superval {font:600 26px/1 var(--font-condensed);color:var(--accent-ink)}
+.st-strip {position:relative;height:44px;border-radius:10px;border:1px solid var(--line);background:var(--card-2,rgba(255,255,255,.05));overflow:hidden;touch-action:none;cursor:pointer;user-select:none}
+.st-strip:focus-visible {outline:2px solid var(--accent);outline-offset:2px}
+.st-hero {height:52px}
+.st-fill {position:absolute;left:0;top:0;bottom:0;width:0;background:var(--accent-soft)}
+.st-thumb {position:absolute;top:4px;bottom:4px;left:0;width:8px;border-radius:4px;background:var(--accent)}
+.st-rows {display:flex;overflow-x:auto;gap:4px;padding-bottom:2px}
+.st-rows button {flex:0 0 auto;min-height:40px;white-space:nowrap}
+.st-four {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 14px}
+.st-one {display:grid;gap:4px}
+.st-one .st-strip {height:40px}
+.st-pickfav {justify-self:start;height:44px;min-height:44px}
+.st-chips {display:flex;gap:8px;flex-wrap:wrap}
+.st-chip {min-height:44px;padding:0 16px;font-size:14px;font-weight:600}
+.st-scenes {display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:6px}
+.st-scene {min-height:44px;border-radius:10px;border:1px solid var(--line);background:var(--card-2,rgba(255,255,255,.04));color:var(--text);font:600 15px/1 var(--font-body)}
+.st-scenelab {margin:-4px 0 0}
+.st-sheet {position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center}
+.st-sheet[hidden] {display:none}
+@media (min-width:700px) {
+  .st-sheet {align-items:center}
+}
+@media (min-width:900px) {
+  .st-four {grid-template-columns:repeat(4,minmax(0,1fr))}
+  .st-pingrid {grid-template-columns:repeat(8,minmax(0,1fr))}
+}
+/* css-midihub */
+.mh-top h2 .small {font-weight:400;margin-left:8px;letter-spacing:0}
+.mh-status {font-size:12.5px}
+.mh-status.ok {color:var(--green)}
+.mh-warn {color:var(--red);margin-top:6px}
+.mh-chk {display:inline-flex;gap:6px;align-items:center;font-size:12.5px;color:var(--muted)}
+.mh-chk[hidden] {display:none}
+.mh-act {margin-top:6px;color:var(--muted)}
+.mh-act>span {display:inline-flex;align-items:center;gap:4px}
+.mh-led {display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--line);transition:background .08s}
+.mh-mono {font-family:ui-monospace,Consolas,Menlo,monospace;font-size:12px;color:var(--text)}
+.mh-seg {margin:0 0 12px;flex-wrap:wrap}
+.mh-toast {position:fixed;left:50%;bottom:76px;transform:translateX(-50%);background:var(--card);border:1px solid var(--accent);padding:8px 14px;border-radius:9px;z-index:50;font-size:13px}
+.mh-cv-head {display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.mh-cv-head h2 {margin:0}
+.mh-parts {display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:12px 0}
+.mh-plab {font-size:12.5px;color:var(--muted);font-weight:600;margin-right:4px}
+.mh-parts button {min-width:40px;height:38px;border-radius:9px;border:1px solid var(--line);background:var(--card2);color:var(--text);font-weight:600;cursor:pointer}
+.mh-parts button.active {background:var(--accent);color:#1c1206;border-color:var(--accent)}
+.mh-hero {display:flex;justify-content:center;margin:4px 0 8px}
+.mh-knobs {display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:12px}
+.mh-knob {display:grid;justify-items:center;gap:2px;padding:10px 6px 8px;border-radius:12px;background:var(--card2);border:1px solid var(--line);cursor:ns-resize;touch-action:none;user-select:none;outline:none}
+.mh-knob:focus-visible {border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-glow)}
+.mh-knob svg {width:72px;height:72px}
+.mh-knob.hero svg {width:132px;height:132px}
+.mh-knob.hero {padding:14px 28px 12px}
+.mh-ktrack {fill:none;stroke:var(--line);stroke-width:6;stroke-linecap:round}
+.mh-karc {fill:none;stroke:var(--accent);stroke-width:6;stroke-linecap:round}
+.mh-kptr {stroke:var(--text);stroke-width:4;stroke-linecap:round}
+.mh-kv {font:400 26px/1 var(--font-display);font-variant-numeric:tabular-nums}
+.mh-knob.hero .mh-kv {font-size:40px}
+.mh-kn {font-size:13px;font-weight:600}
+.mh-knob small {font-size:11px}
+.mh-cv h3 {margin:16px 0 8px}
+.mh-cv-prog {display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:center;margin-top:16px}
+.mh-cv-prog .btn {min-height:52px;font-size:16px}
+.mh-cv-pnum {display:grid;justify-items:center;gap:2px;min-width:110px}
+.mh-cv-pnum b {font:400 44px/1 var(--font-display)}
+.mh-cv-acts {justify-content:center;margin-top:12px}
+@media (max-width:700px) {
+  .mh-knobs {grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+  .mh-knob svg {width:60px;height:60px}
+  .mh-knob.hero svg {width:110px;height:110px}
+  .mh-parts button {min-width:34px;height:36px}
+}
+/* css-synthdeck */
+.sdk-now {padding:16px 18px}
+.sdk-now-main {display:flex;flex-direction:column;gap:2px;margin-bottom:12px;min-width:0}
+.sdk-name {background:none;border:0;padding:0;text-align:left;color:var(--text);font:600 30px/1.1 var(--font-condensed);cursor:pointer;letter-spacing:.2px;overflow-wrap:anywhere;max-width:100%}
+@media (hover:hover) {
+  .sdk-name:hover {color:var(--accent-ink)}
+}
+#sdk-nowsub {overflow-wrap:anywhere}
+.sdk-now-acts {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.btn.sdk-big {min-height:52px;font-size:16px;padding:8px 10px;display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap}
+.sdk-pins {display:flex;gap:8px;overflow-x:auto;padding:10px 0 4px;scrollbar-width:thin;-webkit-overflow-scrolling:touch}
+.sdk-pins[hidden] {display:none}
+.sdk-ldrow {margin-top:6px}
+#sdk-ldst {font-size:12.5px;color:var(--muted)}
+#sdk-ldst:empty {display:none}
+#sdk-native {margin-top:8px}
+#sdk-native.info {color:var(--warn)}
+.sdk-form {margin-top:12px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--card2)}
+.seg.sdk-tabs {display:flex;width:100%;margin:0 0 12px;box-sizing:border-box}
+.sdk-tabs button {flex:1;min-height:44px;font-size:14px;padding:4px 6px}
+.sdk-pagehead {justify-content:space-between;margin-bottom:12px}
+.sdk-pageacts {margin-top:12px}
+.sdk-slot {display:grid;justify-items:center;align-content:center;gap:4px;min-height:124px;border:1px dashed var(--ctl-border);border-radius:12px;background:transparent;color:var(--muted);font-family:var(--font-body);font-size:12px;cursor:pointer}
+@media (hover:hover) {
+  .sdk-slot:hover {border-color:var(--accent-line);color:var(--text)}
+}
+.sdk-picker {margin-top:10px}
+@media (pointer:coarse) {
+  .mh-knob svg {width:84px;height:84px}
+  .mh-knob.hero svg {width:140px;height:140px}
+  .mh-knobs {grid-template-columns:repeat(auto-fill,minmax(112px,1fr))}
+}
+@media (max-width:700px) {
+  .sdk-now-acts {grid-template-columns:repeat(2,minmax(0,1fr))}
+  .sdk-name {font-size:26px}
+}
+@media (max-width:400px) {
+  .sdk-tabs button {font-size:13px;padding:4px 2px}
+}
+</style></template>
+<template id="saved-deck"><section class="panel active" id="panel-deck"><div class="st-face"><div class="st-top"><button type="button" class="btn sm icon-btn st-explain" id="st-explain" aria-pressed="false" aria-label="Explain the controls" title="Explain: what each control does on the synth">?</button><div class="seg st-mode" role="group" aria-label="Perform or edit"><button type="button" class="active" aria-pressed="true">Perform</button><button type="button" class="" aria-pressed="false">Edit</button></div></div><div class="card st-conn" id="st-conn" role="status" aria-live="polite" hidden=""></div><div class="st-perform" id="st-perform"><div class="card st-now" id="st-now"><div class="st-nowname" id="st-nowname">CFX + FM EP</div><div class="muted small" id="st-nowsub">Part 1 · Bank 63/0 · Program 1 → MODX-1</div><div class="st-nowacts"><button type="button" class="btn st-big" id="st-prev" aria-label="Previous program">‹ Prev</button><button type="button" class="btn st-big" id="st-next" aria-label="Next program">Next ›</button><button type="button" class="btn st-big primary" id="st-save">Save preset</button></div><div class="st-pins" id="st-pins" role="group" aria-label="Your sounds" hidden=""><div class="st-pingrid"></div></div></div><div class="card st-strips"><div class="st-striphead"><span class="st-lab">Super Knob</span><b class="st-val" id="st-superval">0 %</b></div><div class="st-strip st-hero" role="slider" tabindex="0" aria-label="Super Knob" aria-valuemin="0" aria-valuemax="127" aria-valuenow="0"><i class="st-fill" style="width: 0%;"></i><i class="st-thumb" style="left: calc(0% - 4px);"></i></div><div class="seg st-rows" role="group" aria-label="Which four strips"><button type="button" class="active" aria-pressed="true">Favourites</button><button type="button" class="" aria-pressed="false">Tone</button><button type="button" class="" aria-pressed="false">Effects</button><button type="button" class="" aria-pressed="false">Assign 1-4</button><button type="button" class="" aria-pressed="false">Assign 5-8</button><button type="button" class="" aria-pressed="false">Expression</button></div><div class="st-four"><div class="st-one"><div class="st-striphead"><span class="st-lab">Cutoff</span><b class="st-val">64</b></div><div class="st-strip" role="slider" tabindex="0" aria-label="Cutoff" aria-valuemin="0" aria-valuemax="127" aria-valuenow="64"><i class="st-fill" style="width: 50.4%;"></i><i class="st-thumb" style="left: calc(50.4% - 4px);"></i></div></div><div class="st-one"><div class="st-striphead"><span class="st-lab">Reverb</span><b class="st-val">40</b></div><div class="st-strip" role="slider" tabindex="0" aria-label="Reverb" aria-valuemin="0" aria-valuemax="127" aria-valuenow="40"><i class="st-fill" style="width: 31.5%;"></i><i class="st-thumb" style="left: calc(31.5% - 4px);"></i></div></div><div class="st-one"><div class="st-striphead"><span class="st-lab">Attack</span><b class="st-val">64</b></div><div class="st-strip" role="slider" tabindex="0" aria-label="Attack" aria-valuemin="0" aria-valuemax="127" aria-valuenow="64"><i class="st-fill" style="width: 50.4%;"></i><i class="st-thumb" style="left: calc(50.4% - 4px);"></i></div></div><div class="st-one"><div class="st-striphead"><span class="st-lab">Assign knob 1</span><b class="st-val">64</b></div><div class="st-strip" role="slider" tabindex="0" aria-label="Assign knob 1" aria-valuemin="0" aria-valuemax="127" aria-valuenow="64"><i class="st-fill" style="width: 50.4%;"></i><i class="st-thumb" style="left: calc(50.4% - 4px);"></i></div></div></div><button type="button" class="btn sm st-pickfav" id="st-pickfav">Choose these four</button></div><div class="st-chips" id="st-chips"><button type="button" class="chip st-chip" aria-pressed="false">Arpeggiator</button><button type="button" class="chip st-chip" aria-pressed="false">Motion sequencer</button><button type="button" class="chip st-chip" aria-pressed="false" title="No split">Split</button><button type="button" class="chip st-chip" aria-pressed="false">Assign Sw 1</button><button type="button" class="chip st-chip" aria-pressed="false">Assign Sw 2</button><button type="button" class="chip st-chip" aria-pressed="false">Sustain</button></div><div class="st-scenes" id="st-scenes" role="group" aria-label="Scenes"><button type="button" class="st-scene" aria-label="Scene 1" aria-pressed="false">1</button><button type="button" class="st-scene" aria-label="Scene 2" aria-pressed="false">2</button><button type="button" class="st-scene" aria-label="Scene 3" aria-pressed="false">3</button><button type="button" class="st-scene" aria-label="Scene 4" aria-pressed="false">4</button><button type="button" class="st-scene" aria-label="Scene 5" aria-pressed="false">5</button><button type="button" class="st-scene" aria-label="Scene 6" aria-pressed="false">6</button><button type="button" class="st-scene" aria-label="Scene 7" aria-pressed="false">7</button><button type="button" class="st-scene" aria-label="Scene 8" aria-pressed="false">8</button></div><div class="muted small st-scenelab">Scenes 1–8</div></div><div class="st-edit" id="st-edit" hidden=""></div><div class="st-sheet" id="st-sheet" hidden=""></div></div></section></template>
+<template id="saved-midihub"><section class="panel active" id="panel-midihub"><div class="card mh-top"><h2>MIDI Hub <span class="muted small">read · write · reshape — any MIDI device</span></h2><div class="row tight" id="mh-connect" hidden=""><button type="button" class="btn sm primary" id="mh-enable">Connect MIDI</button></div><div class="row tight" id="mh-ports"><label class="field">In<select id="mh-in"><option value="all" selected="">All keyboards</option><option value="in-modx">MODX-1</option><option value="in-lumi">LUMI Keys Block ALXJ (Bluetooth MIDI IN)</option></select></label><label class="field" title="Where the Hub sends: your synth. The key lights keep their own output (Lights &amp; help).">Synth out<select id="mh-out"><option value="shared">Same as key lights</option><option value="out-modx" selected="">MODX-1</option><option value="out-lumi">LUMI Keys Block ALXJ (Bluetooth MIDI OUT)</option></select></label><label class="field">Channel<select id="mh-ch"><option value="0" selected="">1</option><option value="1">2</option><option value="2">3</option><option value="3">4</option><option value="4">5</option><option value="5">6</option><option value="6">7</option><option value="7">8</option><option value="8">9</option><option value="9">10</option><option value="10">11</option><option value="11">12</option><option value="12">13</option><option value="13">14</option><option value="14">15</option><option value="15">16</option></select></label><label class="field">Device<select id="mh-profile"><option value="generic">Generic (any MIDI device)</option><option value="yamaha" selected="">Yamaha MODX / MONTAGE</option><option value="roland">Roland (DT1 / RQ1)</option></select></label><label class="mh-chk" title="Pass everything from In to Out, through the Rules. Thru runs while soundLAB Gear is open."><input type="checkbox" id="mh-thru" style=""> Thru</label><label class="mh-chk" id="mh-hearlab" hidden="" title="Also play soundLAB’s own piano for the notes coming in. Off = only the device sounds (no doubled notes)."></label><span id="mh-hearin"><span class="ctl-label">Hear input</span> <span class="seg" role="group" aria-label="Hear input"><button type="button" class="active" aria-pressed="true" title="">Off</button><button type="button" aria-pressed="false" title="">On</button></span> <span class="muted small"><span aria-live="polite">Off.</span> Input, level and meter: <a href="index.html#settings" style="color:inherit">soundLAB › Settings</a>.</span></span><button type="button" class="btn sm danger" id="mh-panic" title="All notes off + all sound off on every channel">Panic</button></div><div class="row tight small" style="margin-top:8px"><span id="mh-status" class="mh-status ok">In: All keyboards · Synth out: MODX-1 · Key lights: LUMI Keys Block ALXJ (Bluetooth MIDI OUT)</span><span class="muted" id="mh-thruinfo">Thru runs while soundLAB Gear is open.</span></div><div class="mh-warn small" id="mh-lightswarn" hidden=""></div><div class="row tight small mh-act"><span><i class="mh-led in" id="mh-ledin"></i>In <span class="mh-mono" id="mh-lastin">—</span></span><span><i class="mh-led out" id="mh-ledout"></i>Out <span class="mh-mono" id="mh-lastout">SysEx (16 bytes)</span></span></div></div><div class="seg mh-seg" id="mh-views" role="group" aria-label="Hub views"><button type="button" data-view="control" class="active">Deck</button><button type="button" data-view="player">Player</button><button type="button" data-view="play">Keys</button><button type="button" data-view="controls">CCs</button><button type="button" data-view="rules">Rules</button><button type="button" data-view="sysex">SysEx</button><button type="button" data-view="monitor">Monitor</button><button type="button" data-view="learn">Learn</button></div><div class="mh-view" data-view="control"><div id="mh-deck"><div class="card sdk-now" id="sdk-now"><div class="sdk-now-main"><button type="button" class="sdk-name" id="sdk-nowname" title="Open this sound in Sounds">CFX + FM EP</button><span class="muted small" id="sdk-nowsub">Part 1 · Bank 63/0 · Program 1 → MODX-1</span></div><div class="sdk-now-acts"><button type="button" class="btn sdk-big" id="sdk-prev" aria-label="Previous program">‹ Prev</button><button type="button" class="btn sdk-big" id="sdk-next" aria-label="Next program">Next ›</button><button type="button" class="btn sdk-big" id="sdk-star" aria-pressed="false" title="Pin this sound up here"><svg class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"></path></svg> <span>Star</span></button><button type="button" class="btn sdk-big primary" id="sdk-save">Save sound</button></div><div id="sdk-pins" class="sdk-pins" role="group" aria-label="Pinned sounds" hidden=""></div><div class="row tight sdk-ldrow"><div id="sdk-ldst" role="status" aria-live="polite"></div><button type="button" class="btn sm" id="sdk-lstop" hidden=""></button></div><div id="sdk-native" class="mh-warn small info" hidden=""></div><form id="sdk-save-form" class="sdk-form" hidden="" autocomplete="off"></form></div><div class="seg sdk-tabs" id="sdk-tabs" role="group" aria-label="Synth deck"><button type="button" aria-pressed="true" class="active">Knobs</button><button type="button" aria-pressed="false">Buttons</button><button type="button" aria-pressed="false">Sounds</button><button type="button" aria-pressed="false">Scope</button><button type="button" aria-pressed="false">Map</button></div></div><div class="card mh-cv"><div class="mh-cv-head"><h2>Synth control</h2><span class="muted small" id="mh-cvout">Part 1 → MODX-1</span></div><div class="mh-parts" id="mh-parts" role="group" aria-label="Part"><span class="mh-plab">Part</span><button type="button" class="active" aria-pressed="true">1</button><button type="button" class="" aria-pressed="false">2</button><button type="button" class="" aria-pressed="false">3</button><button type="button" class="" aria-pressed="false">4</button><button type="button" class="" aria-pressed="false">5</button><button type="button" class="" aria-pressed="false">6</button><button type="button" class="" aria-pressed="false">7</button><button type="button" class="" aria-pressed="false">8</button><button type="button" class="" aria-pressed="false">9</button><button type="button" class="" aria-pressed="false">10</button><button type="button" class="" aria-pressed="false">11</button><button type="button" class="" aria-pressed="false">12</button><button type="button" class="" aria-pressed="false">13</button><button type="button" class="" aria-pressed="false">14</button><button type="button" class="" aria-pressed="false">15</button><button type="button" class="" aria-pressed="false">16</button></div><div class="mh-hero" id="mh-hero"><div class="mh-knob hero" role="slider" tabindex="0" aria-label="Super Knob" aria-valuemin="0" aria-valuemax="127" aria-valuenow="0" title="Super Knob · CC 95 — drag up/down or arrow keys (click it first to scroll it); double-tap resets"><svg viewBox="0 0 64 64" aria-hidden="true"><path class="mh-ktrack" d="M14.32 49.68 A25 25 0 1 1 49.68 49.68"></path><path class="mh-karc" d=""></path><line class="mh-kptr" x1="32" y1="32" x2="19.98" y2="44.02"></line></svg><b class="mh-kv">0</b><span class="mh-kn">Super Knob</span><small class="muted">CC 95</small></div></div><div class="mh-knobs" id="mh-knobs"><div class="mh-knob" role="slider" tabindex="0" aria-label="Cutoff" aria-valuemin="0" aria-valuemax="127" aria-valuenow="64" title="Cutoff · CC 74 — drag up/down or arrow keys (click it first to scroll it); double-tap resets"><svg viewBox="0 0 64 64" aria-hidden="true"><path class="mh-ktrack" d="M14.32 49.68 A25 25 0 1 1 49.68 49.68"></path><path class="mh-karc" d="M14.32 49.68 A25 25 0 0 1 32.46 7.00"></path><line class="mh-kptr" x1="32" y1="32" x2="32.32" y2="15.00"></line></svg><b class="mh-kv">64</b><span class="mh-kn">Cutoff</span><small class="muted">CC 74</small></div><div class="mh-knob" role="slider" tabindex="0" aria-label="Resonance" aria-valuemin="0" aria-valuemax="127" aria-valuenow="64" title="Resonance · CC 71 — drag up/down or arrow keys (click it first to scroll it); double-tap resets"><svg viewBox="0 0 64 64" aria-hidden="true"><path class="mh-ktrack" d="M14.32 49.68 A25 25 0 1 1 49.68 49.68"></path><path class="mh-karc" d="M14.32 49.68 A25 25 0 0 1 32.46 7.00"></path><line class="mh-kptr" x1="32" y1="32" x2="32.32" y2="15.00"></line></svg><b class="mh-kv">64</b><span class="mh-kn">Resonance</span><small class="muted">CC 71</small></div><div class="mh-knob" role="slider" tabindex="0" aria-label="Attack" aria-valuemin="0" aria-valuemax="127" aria-valuenow="64" title="Attack · CC 73 — drag up/down or arrow keys (click it first to scroll it); double-tap resets"><svg viewBox="0 0 64 64" aria-hidden="true"><path class="mh-ktrack" d="M14.32 49.68 A25 25 0 1 1 49.68 49.68"></path><path class="mh-karc" d="M14.32 49.68 A25 25 0 0 1 32.46 7.00"></path><line class="mh-kptr" x1="32" y1="32" x2="32.32" y2="15.00"></line></svg><b class="mh-kv">64</b><span class="mh-kn">Attack</span><small class="muted">CC 73</small></div><div class="mh-knob" role="slider" tabindex="0" aria-label="Release" aria-valuemin="0" aria-valuemax="127" aria-valuenow="64" title="Release · CC 72 — drag up/down or arrow keys (click it first to scroll it); double-tap resets"><svg viewBox="0 0 64 64" aria-hidden="true"><path class="mh-ktrack" d="M14.32 49.68 A25 25 0 1 1 49.68 49.68"></path><path class="mh-karc" d="M14.32 49.68 A25 25 0 0 1 32.46 7.00"></path><line class="mh-kptr" x1="32" y1="32" x2="32.32" y2="15.00"></line></svg><b class="mh-kv">64</b><span class="mh-kn">Release</span><small class="muted">CC 72</small></div><div class="mh-knob" role="slider" tabindex="0" aria-label="Reverb" aria-valuemin="0" aria-valuemax="127" aria-valuenow="40" title="Reverb · CC 91 — drag up/down or arrow keys (click it first to scroll it); double-tap resets"><svg viewBox="0 0 64 64" aria-hidden="true"><path class="mh-ktrack" d="M14.32 49.68 A25 25 0 1 1 49.68 49.68"></path><path class="mh-karc" d="M14.32 49.68 A25 25 0 0 1 12.86 15.92"></path><line class="mh-kptr" x1="32" y1="32" x2="18.98" y2="21.06"></line></svg><b class="mh-kv">40</b><span class="mh-kn">Reverb</span><small class="muted">CC 91</small></div><div class="mh-knob" role="slider" tabindex="0" aria-label="Chorus" aria-valuemin="0" aria-valuemax="127" aria-valuenow="0" title="Chorus · CC 93 — drag up/down or arrow keys (click it first to scroll it); double-tap resets"><svg viewBox="0 0 64 64" aria-hidden="true"><path class="mh-ktrack" d="M14.32 49.68 A25 25 0 1 1 49.68 49.68"></path><path class="mh-karc" d=""></path><line class="mh-kptr" x1="32" y1="32" x2="19.98" y2="44.02"></line></svg><b class="mh-kv">0</b><span class="mh-kn">Chorus</span><small class="muted">CC 93</small></div><div class="mh-knob" role="slider" tabindex="0" aria-label="Volume" aria-valuemin="0" aria-valuemax="127" aria-valuenow="100" title="Volume · CC 7 — drag up/down or arrow keys (click it first to scroll it); double-tap resets"><svg viewBox="0 0 64 64" aria-hidden="true"><path class="mh-ktrack" d="M14.32 49.68 A25 25 0 1 1 49.68 49.68"></path><path class="mh-karc" d="M14.32 49.68 A25 25 0 1 1 56.42 26.63"></path><line class="mh-kptr" x1="32" y1="32" x2="48.60" y2="28.35"></line></svg><b class="mh-kv">100</b><span class="mh-kn">Volume</span><small class="muted">CC 7</small></div><div class="mh-knob" role="slider" tabindex="0" aria-label="Pan" aria-valuemin="0" aria-valuemax="127" aria-valuenow="64" title="Pan · CC 10 — drag up/down or arrow keys (click it first to scroll it); double-tap resets"><svg viewBox="0 0 64 64" aria-hidden="true"><path class="mh-ktrack" d="M14.32 49.68 A25 25 0 1 1 49.68 49.68"></path><path class="mh-karc" d="M14.32 49.68 A25 25 0 0 1 32.46 7.00"></path><line class="mh-kptr" x1="32" y1="32" x2="32.32" y2="15.00"></line></svg><b class="mh-kv">64</b><span class="mh-kn">Pan</span><small class="muted">CC 10</small></div></div><div id="mh-extra"><h3>Assign knobs</h3><div class="mh-knobs"><div class="mh-knob" role="slider" tabindex="0" aria-label="Assign 1" aria-valuemin="0" aria-valuemax="127" aria-valuenow="64" title="Assign 1 · CC 17 — drag up/down or arrow keys (click it first to scroll it); double-tap resets"><svg viewBox="0 0 64 64" aria-hidden="true"><path class="mh-ktrack" d="M14.32 49.68 A25 25 0 1 1 49.68 49.68"></path><path class="mh-karc" d="M14.32 49.68 A25 25 0 0 1 32.46 7.00"></path><line class="mh-kptr" x1="32" y1="32" x2="32.32" y2="15.00"></line></svg><b class="mh-kv">64</b><span class="mh-kn">Assign 1</span><small class="muted">CC 17</small></div><div class="mh-knob" role="slider" tabindex="0" aria-label="Assign 2" aria-valuemin="0" aria-valuemax="127" aria-valuenow="64" title="Assign 2 · CC 18 — drag up/down or arrow keys (click it first to scroll it); double-tap resets"><svg viewBox="0 0 64 64" aria-hidden="true"><path class="mh-ktrack" d="M14.32 49.68 A25 25 0 1 1 49.68 49.68"></path><path class="mh-karc" d="M14.32 49.68 A25 25 0 0 1 32.46 7.00"></path><line class="mh-kptr" x1="32" y1="32" x2="32.32" y2="15.00"></line></svg><b class="mh-kv">64</b><span class="mh-kn">Assign 2</span><small class="muted">CC 18</small></div><div class="mh-knob" role="slider" tabindex="0" aria-label="Assign 3" aria-valuemin="0" aria-valuemax="127" aria-valuenow="64" title="Assign 3 · CC 19 — drag up/down or arrow keys (click it first to scroll it); double-tap resets"><svg viewBox="0 0 64 64" aria-hidden="true"><path class="mh-ktrack" d="M14.32 49.68 A25 25 0 1 1 49.68 49.68"></path><path class="mh-karc" d="M14.32 49.68 A25 25 0 0 1 32.46 7.00"></path><line class="mh-kptr" x1="32" y1="32" x2="32.32" y2="15.00"></line></svg><b class="mh-kv">64</b><span class="mh-kn">Assign 3</span><small class="muted">CC 19</small></div><div class="mh-knob" role="slider" tabindex="0" aria-label="Assign 4" aria-valuemin="0" aria-valuemax="127" aria-valuenow="64" title="Assign 4 · CC 20 — drag up/down or arrow keys (click it first to scroll it); double-tap resets"><svg viewBox="0 0 64 64" aria-hidden="true"><path class="mh-ktrack" d="M14.32 49.68 A25 25 0 1 1 49.68 49.68"></path><path class="mh-karc" d="M14.32 49.68 A25 25 0 0 1 32.46 7.00"></path><line class="mh-kptr" x1="32" y1="32" x2="32.32" y2="15.00"></line></svg><b class="mh-kv">64</b><span class="mh-kn">Assign 4</span><small class="muted">CC 20</small></div><div class="mh-knob" role="slider" tabindex="0" aria-label="Assign 5" aria-valuemin="0" aria-valuemax="127" aria-valuenow="64" title="Assign 5 · CC 21 — drag up/down or arrow keys (click it first to scroll it); double-tap resets"><svg viewBox="0 0 64 64" aria-hidden="true"><path class="mh-ktrack" d="M14.32 49.68 A25 25 0 1 1 49.68 49.68"></path><path class="mh-karc" d="M14.32 49.68 A25 25 0 0 1 32.46 7.00"></path><line class="mh-kptr" x1="32" y1="32" x2="32.32" y2="15.00"></line></svg><b class="mh-kv">64</b><span class="mh-kn">Assign 5</span><small class="muted">CC 21</small></div><div class="mh-knob" role="slider" tabindex="0" aria-label="Assign 6" aria-valuemin="0" aria-valuemax="127" aria-valuenow="64" title="Assign 6 · CC 22 — drag up/down or arrow keys (click it first to scroll it); double-tap resets"><svg viewBox="0 0 64 64" aria-hidden="true"><path class="mh-ktrack" d="M14.32 49.68 A25 25 0 1 1 49.68 49.68"></path><path class="mh-karc" d="M14.32 49.68 A25 25 0 0 1 32.46 7.00"></path><line class="mh-kptr" x1="32" y1="32" x2="32.32" y2="15.00"></line></svg><b class="mh-kv">64</b><span class="mh-kn">Assign 6</span><small class="muted">CC 22</small></div><div class="mh-knob" role="slider" tabindex="0" aria-label="Assign 7" aria-valuemin="0" aria-valuemax="127" aria-valuenow="64" title="Assign 7 · CC 23 — drag up/down or arrow keys (click it first to scroll it); double-tap resets"><svg viewBox="0 0 64 64" aria-hidden="true"><path class="mh-ktrack" d="M14.32 49.68 A25 25 0 1 1 49.68 49.68"></path><path class="mh-karc" d="M14.32 49.68 A25 25 0 0 1 32.46 7.00"></path><line class="mh-kptr" x1="32" y1="32" x2="32.32" y2="15.00"></line></svg><b class="mh-kv">64</b><span class="mh-kn">Assign 7</span><small class="muted">CC 23</small></div><div class="mh-knob" role="slider" tabindex="0" aria-label="Assign 8" aria-valuemin="0" aria-valuemax="127" aria-valuenow="64" title="Assign 8 · CC 24 — drag up/down or arrow keys (click it first to scroll it); double-tap resets"><svg viewBox="0 0 64 64" aria-hidden="true"><path class="mh-ktrack" d="M14.32 49.68 A25 25 0 1 1 49.68 49.68"></path><path class="mh-karc" d="M14.32 49.68 A25 25 0 0 1 32.46 7.00"></path><line class="mh-kptr" x1="32" y1="32" x2="32.32" y2="15.00"></line></svg><b class="mh-kv">64</b><span class="mh-kn">Assign 8</span><small class="muted">CC 24</small></div></div></div><div class="mh-cv-prog"><button type="button" class="btn" id="mh-cvprev" aria-label="Previous program"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg> Prev</button><div class="mh-cv-pnum"><span class="muted small">Program</span><b id="mh-cvpnum">1</b><span class="muted small" id="mh-cvbank">Bank 63/0</span></div><button type="button" class="btn" id="mh-cvnext" aria-label="Next program">Next <svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg></button></div><div class="row tight mh-cv-acts"><button type="button" class="btn sm" id="mh-cvsend" title="Send every knob on this Part to the synth">Send all</button><button type="button" class="btn sm" id="mh-cvreset" title="Every knob back to its start value, sent">Reset knobs</button></div><p class="muted small">Drag a knob up or down (Shift = fine), scroll on it, or use the arrow keys; double-tap puts it back. Turn a knob on the synth and the one here follows. Sounds, banks and programs live in Sounds above.</p></div><div id="mh-deck2"><div class="sdk-tab"><div id="sdk-pages" class="card"><div class="row tight sdk-pagehead"><div class="seg" id="sdk-pagesel" role="group" aria-label="Knob page"><button type="button" class="active" aria-pressed="true">Expression</button><button type="button" class="" aria-pressed="false">Master</button></div><span class="muted small" id="sdk-pageinfo">Part 1 · 7 knobs</span></div><div class="mh-knobs" id="sdk-knobs"><div class="mh-knob" role="slider" tabindex="0" aria-label="Mod wheel" aria-valuemin="0" aria-valuemax="127" aria-valuenow="0" title="Mod wheel · CC 1 — drag up/down or arrow keys (click it first to scroll it); double-tap resets"><svg viewBox="0 0 64 64" aria-hidden="true"><path class="mh-ktrack" d="M14.32 49.68 A25 25 0 1 1 49.68 49.68"></path><path class="mh-karc" d=""></path><line class="mh-kptr" x1="32" y1="32" x2="19.98" y2="44.02"></line></svg><b class="mh-kv">0</b><span class="mh-kn">Mod wheel</span><small class="muted">CC 1</small></div><div class="mh-knob" role="slider" tabindex="0" aria-label="Breath" aria-valuemin="0" aria-valuemax="127" aria-valuenow="0" title="Breath · CC 2 — drag up/down or arrow keys (click it first to scroll it); double-tap resets"><svg viewBox="0 0 64 64" aria-hidden="true"><path class="mh-ktrack" d="M14.32 49.68 A25 25 0 1 1 49.68 49.68"></path><path class="mh-karc" d=""></path><line class="mh-kptr" x1="32" y1="32" x2="19.98" y2="44.02"></line></svg><b class="mh-kv">0</b><span class="mh-kn">Breath</span><small class="muted">CC 2</small></div><div class="mh-knob" role="slider" tabindex="0" aria-label="Foot ctrl 2" aria-valuemin="0" aria-valuemax="127" aria-valuenow="0" title="Foot ctrl 2 · CC 4 — drag up/down or arrow keys (click it first to scroll it); double-tap resets"><svg viewBox="0 0 64 64" aria-hidden="true"><path class="mh-ktrack" d="M14.32 49.68 A25 25 0 1 1 49.68 49.68"></path><path class="mh-karc" d=""></path><line class="mh-kptr" x1="32" y1="32" x2="19.98" y2="44.02"></line></svg><b class="mh-kv">0</b><span class="mh-kn">Foot ctrl 2</span><small class="muted">CC 4</small></div><div class="mh-knob" role="slider" tabindex="0" aria-label="Portamento time" aria-valuemin="0" aria-valuemax="127" aria-valuenow="0" title="Portamento time · CC 5 — drag up/down or arrow keys (click it first to scroll it); double-tap resets"><svg viewBox="0 0 64 64" aria-hidden="true"><path class="mh-ktrack" d="M14.32 49.68 A25 25 0 1 1 49.68 49.68"></path><path class="mh-karc" d=""></path><line class="mh-kptr" x1="32" y1="32" x2="19.98" y2="44.02"></line></svg><b class="mh-kv">0</b><span class="mh-kn">Portamento time</span><small class="muted">CC 5</small></div><div class="mh-knob" role="slider" tabindex="0" aria-label="Expression" aria-valuemin="0" aria-valuemax="127" aria-valuenow="127" title="Expression · CC 11 — drag up/down or arrow keys (click it first to scroll it); double-tap resets"><svg viewBox="0 0 64 64" aria-hidden="true"><path class="mh-ktrack" d="M14.32 49.68 A25 25 0 1 1 49.68 49.68"></path><path class="mh-karc" d="M14.32 49.68 A25 25 0 1 1 49.68 49.68"></path><line class="mh-kptr" x1="32" y1="32" x2="44.02" y2="44.02"></line></svg><b class="mh-kv">127</b><span class="mh-kn">Expression</span><small class="muted">CC 11</small></div><div class="mh-knob" role="slider" tabindex="0" aria-label="Decay" aria-valuemin="0" aria-valuemax="127" aria-valuenow="64" title="Decay · CC 75 — drag up/down or arrow keys (click it first to scroll it); double-tap resets"><svg viewBox="0 0 64 64" aria-hidden="true"><path class="mh-ktrack" d="M14.32 49.68 A25 25 0 1 1 49.68 49.68"></path><path class="mh-karc" d="M14.32 49.68 A25 25 0 0 1 32.46 7.00"></path><line class="mh-kptr" x1="32" y1="32" x2="32.32" y2="15.00"></line></svg><b class="mh-kv">64</b><span class="mh-kn">Decay</span><small class="muted">CC 75</small></div><div class="mh-knob" role="slider" tabindex="0" aria-label="Ribbon" aria-valuemin="0" aria-valuemax="127" aria-valuenow="64" title="Ribbon · CC 16 — drag up/down or arrow keys (click it first to scroll it); double-tap resets"><svg viewBox="0 0 64 64" aria-hidden="true"><path class="mh-ktrack" d="M14.32 49.68 A25 25 0 1 1 49.68 49.68"></path><path class="mh-karc" d="M14.32 49.68 A25 25 0 0 1 32.46 7.00"></path><line class="mh-kptr" x1="32" y1="32" x2="32.32" y2="15.00"></line></svg><b class="mh-kv">64</b><span class="mh-kn">Ribbon</span><small class="muted">CC 16</small></div><button class="sdk-slot" type="button" title="Put a knob in this slot"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg><span>add a knob</span></button></div><div class="row tight sdk-pageacts"><button type="button" class="btn sm" id="sdk-pagesend" title="Send every knob on this page as it stands">Send page</button><button type="button" class="btn sm" id="sdk-addpage">+ Page</button><button type="button" class="btn sm" id="sdk-pageedit">Edit in Map</button></div><div id="sdk-picker" class="sdk-picker" hidden=""></div></div></div><div class="sdk-tab" hidden=""></div><div class="sdk-tab" hidden=""></div><div class="sdk-tab" hidden=""></div><div class="sdk-tab" hidden=""></div></div></div><div class="mh-view" data-view="player" hidden=""></div><div class="mh-view" data-view="play" hidden=""></div><div class="mh-view" data-view="controls" hidden=""></div><div class="mh-view" data-view="rules" hidden=""></div><div class="mh-view" data-view="sysex" hidden=""></div><div class="mh-view" data-view="monitor" hidden=""></div><div class="mh-view mh-learn" data-view="learn" hidden=""></div><div class="mh-toast" id="mh-toast" hidden=""></div></section></template>
+</head>
+<body>
+<noscript>This drawing is built by a script (mock.js). Please switch JavaScript on.</noscript>
+<script>
+(function () {
+  'use strict';
+  var TITLE = 'soundLAB Gear until its own phase';
+  var SAVED = {
+    deck: { label: 'The Deck as it is today. A saved picture: nothing in it can be used.' },
+    midihub: { label: 'The Hub as it is today. A saved picture: nothing in it can be used.' }
+  };
+
+  if (!Mock.single) {
+    Mock.contact({
+      title: TITLE,
+      lead: [
+        '<b>The frame is new, the pages are as today, and for a while the two will not match.</b> ' +
+          'Gear gets the new header now; its pages wait for Gear’s own phase. ' +
+          'The other choice is to re-colour Gear’s pages now: cheap, but nobody has checked those screens for readability.',
+        'This is what gets built unless you say otherwise.',
+        'Key, tempo, Scale lock, lights and Help are folded behind one button in the header, the one that names the key. ' +
+          'Today they are behind the clef. Folded, a stray touch during a gig cannot switch the Scale lock.',
+        'The Deck and the Hub in these pictures are saved copies of today’s pages, taken from the running app with a MODX and a LUMI connected. ' +
+          'They are pictures, so nothing in them can be tapped. The header around them can.'
+      ],
+      widths: [390, 1280],
+      groups: [
+        { title: '1 · The Deck',
+          states: [
+            { id: 'deck', title: 'The Deck as it is today, inside the new header. The button that says “A Dorian” holds the key bar.',
+              params: { page: 'deck' } },
+            { id: 'deck-open', title: 'A tap on that button opens the key bar: the same bar soundLAB has.',
+              note: 'It folds again with a tap outside it, with Escape, or when you change the page.', params: { page: 'deck', bar: 'open' } }
+          ] },
+        { title: '2 · The Hub',
+          states: [
+            { id: 'hub', title: 'The Hub as it is today, inside the new header.', params: { page: 'midihub' } },
+            { id: 'hub-open', title: 'The Hub with the key bar open.', params: { page: 'midihub', bar: 'open' } }
+          ] },
+        { title: '3 · The button that names the key',
+          states: [
+            { id: 'key-first', title: 'The key the app starts with, A Minor Pentatonic. On a phone the button says “A Min Pent”, as the key bar does.',
+              note: 'The header stays in one row with every key. On the narrowest phone the little arrow goes when the name needs its room.',
+              params: { page: 'deck', key: 'A-minorPent' }, widths: [360, 390, 1280] }
+          ] }
+      ]
+    });
+    return;
+  }
+
+  // ---- one state: Gear's shell from mock.js, and under it the saved page ---------------
+  var P = Mock.params, pageId = Mock.q('page', 'deck');
+  if (Mock.DATA.APPS.gear.pages.indexOf(pageId) === -1) pageId = 'deck';
+  // the saved copy is read before Mock.page writes the body
+  var saved = SAVED[pageId] && document.getElementById('saved-' + pageId);
+  var css = document.getElementById('saved-css').content.querySelector('style').textContent;
+  var shell = { app: 'gear', page: pageId, lights: 'off', fixed: ['app', 'page'] };
+  Mock.page({ title: TITLE + ' · soundLAB 2.0 drawings', shell: shell, main: '' });
+
+  // Mock.page writes a panel that carries .sl-skin. A panel of Gear never does (D13): the saved page takes its place.
+  var main = document.querySelector('main');
+  if (!saved) {
+    main.innerHTML = '<p class="mk-old-none">The ' + Mock.esc(Mock.DATA.PAGE_LABELS[pageId]) + ' page is not drawn here. It keeps today’s look until Gear’s own phase, ' +
+      'in the same way as the <a href="' + Mock.esc(go({ page: 'deck' })) + '">Deck</a> and the <a href="' + Mock.esc(go({ page: 'midihub' })) + '">Hub</a>.</p>';
+  } else {
+    var theme = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+    main.innerHTML = '<div class="mk-old" role="img" aria-label="' + Mock.esc(SAVED[pageId].label) + '">' +
+      '<iframe class="mk-old-frame" title="' + Mock.esc(SAVED[pageId].label) + '" sandbox="allow-same-origin" inert tabindex="-1"></iframe></div>';
+    var frame = main.querySelector('iframe');
+    var fit = function () {
+      var doc = frame.contentDocument, old = doc && doc.querySelector('main');
+      if (old) frame.style.height = Math.ceil(old.getBoundingClientRect().bottom) + 'px';
+    };
+    frame.addEventListener('load', function () {
+      var doc = frame.contentDocument, old = doc && doc.querySelector('main');
+      fit();
+      if (!old) return;
+      if (doc.fonts && doc.fonts.ready) doc.fonts.ready.then(fit);
+      if (window.ResizeObserver) new ResizeObserver(fit).observe(old);
+    });
+    window.addEventListener('resize', fit);
+    // today's document around the panel: <html> with the app's and the theme's attributes, the old stylesheet, <body>, <main>
+    frame.srcdoc = '<!doctype html><html lang="en" data-app="gear" data-theme="' + theme + '"><head><meta charset="utf-8"><style>' + css + '</style>' +
+      '<style>/* added by the drawing: the ground is the new shell\'s (D13), and the frame is as high as the page */' +
+      'html, body { background: transparent !important; } html { overflow: hidden !important; }</style></head>' +
+      '<body><main>' + saved.innerHTML + '</main></body></html>';
+  }
+
+  // ---- the folded key bar closes as today's dropdown does (D14) --------------------------
+  function go(changes) {
+    var out = {}, k;
+    for (k in P) if (Object.prototype.hasOwnProperty.call(P, k)) out[k] = P[k];
+    for (k in changes) if (Object.prototype.hasOwnProperty.call(changes, k)) out[k] = changes[k];
+    return Mock.href(out);
+  }
+  // a change of page folds the bar
+  Array.prototype.forEach.call(document.querySelectorAll('[data-go*="page="]'), function (el) {
+    el.setAttribute('data-go', el.getAttribute('data-go') + '&bar=');
+  });
+  // the way to soundLAB leads out of this drawing: here it does nothing
+  document.addEventListener('click', function (e) {
+    var out = e.target.closest && e.target.closest('#app-switch');
+    if (out) { e.preventDefault(); e.stopPropagation(); }
+  }, true);
+  if (Mock.q('bar', '') === 'open' && !Mock.q('pop', '') && !Mock.q('sheet', '')) {
+    document.addEventListener('click', function (e) {
+      if (e.target.closest && e.target.closest('.topbar, #ctxbar, .sl-pop, #tabbar-m, [data-go], a')) return;
+      location.assign(go({ bar: '' }));
+    });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') location.assign(go({ bar: '' })); });
+  }
+})();
+</script>
+</body>
+</html>

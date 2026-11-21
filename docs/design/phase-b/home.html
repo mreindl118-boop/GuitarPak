@@ -1,0 +1,588 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>The home · soundLAB 2.0 drawings</title>
+<!--
+  soundLAB 2.0 Phase B, step B1b: the new home, drawn before it is built
+  (docs/plans/phase-b/PLAN.md, table B1b.1; decisions D20, D21, D22, D28, D29; step B9).
+  This drawing answers the owner's gate G3 (step B9): where does the home sit, does the button
+  say the right thing, and is the picture of the instrument right?
+  It is docs/design/home-mockup.html made real: the same order of parts (the next step as one
+  headline, one button, the instrument, one line of numbers), at four window sizes, for four
+  instruments, with only the texts and numbers the app can give today.
+
+  Opened without ?w= it shows every picture at every size it needs, dark and light; under each
+  picture stands the instrument's height and its share of the window, measured in that picture.
+  Opened with ?w= it is one picture, laid out for the window it is given.
+  The shell comes from mock.js, the instruments from mock-hero.js; read their header comments
+  and the one of mock.css first.
+
+  THIS DRAWING'S PARAMETERS (the shell's own, nav= inst= key= help= lock= lights= …, are in mock.js)
+    nav=b|a|c     where the home sits (decision D20). b, the proposed one: a page of its own
+                  outside the tabs, no row of pills. a: the pill "Today" of Learn. c: as a, with
+                  the pills in the header's row where they fit (above 900 px)
+    inst=piano|guitar|bass|drums (and synth|voice|other)     whose home it is
+    step=course|lesson|tuner|two|long     the next step, as a provider of js/home.js gives it (B9.1)
+        course   the course's next level: what a profile without a plan of its own gets
+                 ("Natural notes · Treble clef"; for Drums "Chords in a key · Theory"); "Start"
+        lesson   a block of the player's own plan that is a Keys lesson ("C major · RH"); "Start"
+        tuner    a block the app cannot start ("Tune up"); the button says "Open the Tuner"
+        two      the longest headline the course can give: two lines at most widths
+        long     a title of 80 letters: cut after two lines, the whole title in the line under it
+    day=some|fresh|goal     the line at the bottom: minutes and a streak (left out: some); a
+                  profile with nothing stored; today's goal reached
+    more=1        "Something else" is open
+    title=<text>  another headline (for measuring: any text)
+  window.HomeMeasure holds what the page measured on itself (the instrument's height, its share
+  of the window, the headline's lines, whether the button and the whole instrument are on the
+  first screen); the contact view prints it under each picture.
+
+  The styles in this file: first the home page's own layout, which is the first draft of the CSS
+  that js/home.js brings (step B9), written from tokens; then what only lays out this drawing
+  (mk-). The components, the instruments among them, are in mock.css.
+-->
+<link rel="icon" href="../../../icons/icon.svg">
+<link rel="stylesheet" href="../../../css/tokens.css">
+<link rel="stylesheet" href="mock.css">
+<style>
+/* drawing-only */
+/* ==========================================================================================
+   The home page's own CSS: the first draft of what js/home.js brings (step B9). Tokens only.
+   Template "Home" of decision D28: the headline at --sl-display-lg (56 px in a window lower
+   than 700 px), the button, the instrument, the footer line.
+   The page is exactly as high as the window under the header and the key bar (and over the
+   bottom tab bar): script publishes those two heights as --home-above and --home-below. The
+   instrument takes the height that is left between the button and the footer line.
+   ========================================================================================== */
+:root.is-home:not([data-app="gear"]) main { max-width: none; padding: 0; }      /* the home fills the window: no page margin */
+#panel-home {
+  --home-pad: var(--sl-gutter);        /* where the words start */
+  --home-edge: var(--sl-gutter);       /* where the instrument and the footer line start: the header's own edge */
+}
+#panel-home.active {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - var(--home-above, 0px) - var(--home-below, 0px));
+  min-height: calc(100dvh - var(--home-above, 0px) - var(--home-below, 0px));
+}
+/* the space between the parts follows the window's height, so that a low window keeps its
+   room for the instrument and a tall one (a tablet held upright) gets air above the words */
+.home-head {
+  flex: 0 0 auto;
+  min-width: 0;
+  padding: clamp(var(--sl-space-4), 3vh, var(--sl-space-7)) calc(var(--home-pad) + env(safe-area-inset-right, 0px))
+    clamp(var(--sl-space-3), 2.5vh, var(--sl-space-6)) calc(var(--home-pad) + env(safe-area-inset-left, 0px));
+}
+/* the one headline: never more than two lines; what does not fit is cut, and the line under
+   it then carries the whole title (script) */
+#home-title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  margin-top: clamp(var(--sl-space-1), 1.2vh, var(--sl-space-3));
+  font-size: var(--sl-display-lg);
+  overflow-wrap: break-word;
+  text-wrap: balance;
+}
+#home-title.is-cut { text-wrap: wrap; }                                  /* a cut headline fills its two lines */
+#home-title.is-whole { display: block; overflow: visible; }                /* for measuring only: the headline without the cut */
+@media (max-height: 699px) {
+  #home-title { font-size: min(var(--sl-display-lg), var(--sl-display-md)); }
+}
+#home-detail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--sl-space-5);
+  margin-top: clamp(var(--sl-space-2), 1.5vh, var(--sl-space-4));
+  color: var(--sl-ink-muted);
+  font-size: var(--sl-text-md);
+}
+#home-detail b { color: var(--sl-ink); }
+#home-detail > .home-full { flex: 1 1 100%; color: var(--sl-ink-soft); }      /* the whole title of a headline that was cut */
+/* the button, and beside it "Something else": the button floats, so the fold's list opens
+   under both and neither moves */
+.home-cta { display: flow-root; margin-top: clamp(var(--sl-space-3), 2.5vh, var(--sl-space-6)); }
+#home-start { float: left; margin-right: var(--sl-space-5); }
+#home-more { border: 0; }
+#home-more > summary {
+  display: flex;
+  justify-content: flex-start;
+  gap: var(--sl-space-1);
+  min-height: var(--sl-control-h-hero);
+  padding: 0;
+}
+#home-more > summary > span {
+  text-decoration: underline;
+  text-decoration-color: var(--sl-ink-muted);
+  text-decoration-thickness: 1px;
+  text-underline-offset: var(--sl-space-1);
+}
+#home-more > summary::after { margin: 0 var(--sl-space-1) var(--sl-space-1); }
+#home-more > .home-more-body { clear: both; max-width: calc(var(--sl-space-8) * 8); padding: var(--sl-space-2) 0 0; }
+/* a row of the list is a control of the home: never the dense height (D9) */
+#home-more .sl-row { min-height: var(--sl-control-h); padding-top: var(--sl-space-2); padding-bottom: var(--sl-space-2); }
+#home-more .sl-row-main > b { font-size: var(--sl-text-md); }
+#home-more .sl-row-state { color: var(--sl-ink-soft); font-size: var(--sl-text-sm); }
+/* the instrument: all the height that is left, never lower than 140 px (the plan's number,
+   B9); where the window is too low for that, the page scrolls. Script draws what suits the
+   box and sets the largest height the instrument can take with its proportions (max-height,
+   inline); room that is still left stays between the button and the instrument, which
+   stands on the footer line. A tap on it does what the button does. */
+#home-hero {
+  flex: 1 1 0px;                       /* the room that is left, whatever is drawn inside */
+  display: flex;
+  min-height: 140px;
+  margin: auto calc(var(--home-edge) + env(safe-area-inset-right, 0px)) 0 calc(var(--home-edge) + env(safe-area-inset-left, 0px));
+  padding: var(--sl-space-3);
+  cursor: pointer;
+}
+#home-hero > * { flex: 1 1 auto; min-width: 0; min-height: 0; height: auto; }      /* stretched to the box, whatever its own height says */
+#home-hero .sl-pads { gap: var(--sl-space-2); }
+#home-hero .sl-pad { min-height: 0; padding: var(--sl-space-1); }      /* a picture here, not eight controls */
+/* the footer line: today's minutes against the goal, the streak, the plan's blocks */
+#home-foot {
+  flex: 0 0 auto;
+  gap: var(--sl-space-1) var(--sl-space-6);
+  margin: 0 calc(var(--home-edge) + env(safe-area-inset-right, 0px)) 0 calc(var(--home-edge) + env(safe-area-inset-left, 0px));
+  padding: var(--sl-space-3) var(--sl-space-1);
+}
+#home-foot > * { min-height: var(--sl-space-5); }
+@media (max-width: 640px) {
+  /* a phone: the button, and "Something else" under it */
+  .home-cta { display: grid; justify-items: start; gap: var(--sl-space-1); }
+  #home-start { float: none; margin-right: 0; }
+  #home-more { justify-self: stretch; }
+  #home-more > summary { min-height: var(--sl-control-h); }
+  #home-more > .home-more-body { padding-top: 0; }
+  #home-hero { padding: var(--sl-space-2); }
+}
+@media (min-width: 641px) {
+  #panel-home { --home-pad: clamp(var(--sl-space-5), 5.6vw, var(--sl-space-8)); }
+}
+@media (min-height: 1000px) {
+  .home-head { padding-top: var(--sl-space-8); }
+}
+@media (min-width: 901px) {
+  #panel-home { --home-edge: var(--sl-space-5); }
+  #home-hero .sl-pads { gap: var(--sl-space-3); }
+}
+/* large keys and large pads (script says when: is-roomy): the dot, its label, a pad's mark
+   and its name grow with them */
+#home-hero.is-roomy .sl-dot { width: min(86%, calc(var(--sl-space-6) + var(--sl-space-1))); font-size: var(--sl-text-sm); }
+#home-hero.is-roomy .is-root > .sl-dot { width: min(86%, calc(var(--sl-space-6) + var(--sl-space-2))); }
+#home-hero.is-roomy .sl-pad { gap: var(--sl-space-2); }
+#home-hero.is-roomy .sl-pad-dot { width: calc(var(--sl-space-5) + var(--sl-space-1)); }
+#home-hero.is-roomy .sl-pad-name { font-size: var(--sl-text-lg); }
+
+/* ==========================================================================================
+   mk-: only for this drawing
+   ========================================================================================== */
+/* "Change this picture", under the page: the parameters as chips */
+.mk-change { margin: 0; padding: var(--sl-space-5) var(--sl-gutter) var(--sl-space-5); border-top: 1px solid var(--sl-line-strong); }
+/* the contact view: what a picture measured on itself, under its frame */
+.mk-frame { width: min-content; }
+.mk-frame > figcaption a { white-space: nowrap; }
+.mk-measure { margin: var(--sl-space-2) 0 0; color: var(--sl-ink-muted); font-size: var(--sl-text-xs); line-height: var(--sl-leading); }
+.mk-measure b { color: var(--sl-ink); font-size: var(--sl-text-sm); }
+.mk-measure .mk-bad { color: var(--sl-bad); font-weight: var(--sl-weight-medium); }
+/* the three placements side by side: one column each above 900 px, the same sizes in the
+   same rows; one under the other on a phone */
+.mk-compare { display: grid; grid-template-columns: minmax(0, 1fr); column-gap: var(--sl-space-5); }
+.mk-compare > h2, .mk-compare > p { grid-column: 1 / -1; }
+.mk-compare .mk-frames { display: grid; justify-items: start; }
+@media (min-width: 901px) {
+  .mk-compare { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .mk-compare > .mk-state { display: grid; grid-template-rows: subgrid; grid-row: span 4; align-content: start; }
+}
+/* the measured numbers of the three placements, as a table */
+.mk-sum { grid-column: 1 / -1; max-width: 72ch; margin-top: var(--sl-space-4); }
+.mk-sum table { width: 100%; border-collapse: collapse; font-size: var(--sl-text-sm); font-variant-numeric: tabular-nums; }
+.mk-sum caption { padding-bottom: var(--sl-space-2); color: var(--sl-ink-soft); text-align: left; }
+.mk-sum th, .mk-sum td { padding: var(--sl-space-2) var(--sl-space-3) var(--sl-space-2) 0; border-top: 1px solid var(--sl-line-strong); text-align: left; vertical-align: top; }
+.mk-sum th { color: var(--sl-ink-soft); font-weight: var(--sl-weight-medium); }
+.mk-sum td { color: var(--sl-ink); }
+.mk-sum td small { display: block; color: var(--sl-ink-muted); font-size: var(--sl-text-xs); }
+.mk-sum .mk-bad { color: var(--sl-bad); }
+</style>
+<script src="mock.js"></script>
+<script src="mock-hero.js"></script>
+</head>
+<body>
+<noscript>This drawing is built by a script (mock.js, mock-hero.js). Please switch JavaScript on.</noscript>
+<script>
+(function () {
+  'use strict';
+  var D = Mock.DATA, esc = Mock.esc, q = Mock.q, icon = Mock.icon;
+  function el(id) { return document.getElementById(id); }
+
+  // the four window sizes of the home (table B1b.1) and the three where the first screen must
+  // hold the button and the whole instrument (B1b.3)
+  var SIZES = [[390, 844], [820, 1180], [1024, 640], [1280, 800]];
+  // a brand-new profile, as the app starts: js/app.js:1129 (the key), :1124 (the lock is off),
+  // :1266 (Help is Full); no keyboard is connected and nothing is practised
+  var FRESH = { key: 'A-minorPent', lock: 0, lights: 'none', help: 4, day: 'fresh' };
+
+  // =====================================================================================
+  // The contact view: every picture at every size it needs, dark and light
+  // =====================================================================================
+  if (!Mock.single) {
+    var ALL = SIZES, PD = [[390, 844], [1280, 800]], PLD = [[390, 844], [1024, 640], [1280, 800]];
+    var SAME = 'The same home at four window sizes: a phone, a tablet held upright, a small laptop window and a desktop.';
+    Mock.contact({
+      title: 'The home',
+      lead: [
+        'The first page of soundLAB 2.0: the next thing to practise as one headline, one button, your instrument, and one line of numbers. ' +
+          'Nothing else is on it until you ask.',
+        'One question waits for your yes, or for what you want changed: <b>where does the home sit</b>, as a page of its own that the logo leads to ' +
+          '(proposed, B below), or as “Today” inside Learn (A or C)? The home is built only after your answer.',
+        'Under every picture stands how high the instrument is in it, and how much of the window that is.'
+      ],
+      groups: [
+        { title: '1 · The proposed home',
+          lead: 'One headline, one button, your instrument. The button says “Start” only when a tap starts playing. The picture shows the scale of the key in the bar above it and nothing else.',
+          states: [
+            { id: 'home', title: 'The home on a phone and on a desktop, for piano, on an ordinary day.',
+              note: 'The headline is the next level of the course. The keyboard shows A Dorian, the key in the bar, as a LUMI lights it. ' +
+                'The line at the bottom has today’s minutes against your goal and your streak.', widths: PD }
+          ] },
+        { title: '2 · Where the home sits: three ways',
+          lead: 'The same home in three places. What changes is the top of the page, and with it the room that is left for the instrument: the numbers under each picture say how much.',
+          states: [
+            { id: 'place-b', title: 'B · Proposed: a page of its own.',
+              note: 'The logo leads to it. No tab is marked and there is no row of pills, so the instrument gets the most room.', params: { nav: 'b' }, widths: ALL },
+            { id: 'place-a', title: 'A · “Today” inside Learn.',
+              note: 'Learn is marked and its row of pills is shown, with “Today” as the first of five. The instrument loses that row’s height.', params: { nav: 'a' }, widths: ALL },
+            { id: 'place-c', title: 'C · As A, with the pills in the header’s row.',
+              note: 'Only a wide window has the room for that (here 1280 px). On a phone, a tablet and a small laptop window C looks exactly like A.', params: { nav: 'c' }, widths: ALL }
+          ] },
+        { title: 'The tightest case: a small laptop window with a headline of two lines',
+          lead: 'A window of 1024 × 640 px is where the instrument has the least room. Here a long title takes two lines.',
+          states: [
+            { id: 'tight-b', title: 'B · Proposed', params: { nav: 'b', step: 'long' }, widths: [[1024, 640]] },
+            { id: 'tight-a', title: 'A · “Today” inside Learn', params: { nav: 'a', step: 'long' }, widths: [[1024, 640]] },
+            { id: 'tight-c', title: 'C · Pills in the header’s row', params: { nav: 'c', step: 'long' }, widths: [[1024, 640]] }
+          ] },
+        { title: '3 · Each instrument, on a brand-new profile',
+          lead: 'What a new player sees first, before anything is changed: the first level of the course as the headline, the key the app starts in (A Minor Pentatonic), ' +
+            'Help on Full so that every lit note carries its name, the Scale lock off, no keyboard connected, nothing practised yet. ' + SAME,
+          states: [
+            { id: 'piano', title: 'Piano: a keyboard. Two octaves where the keys stay wide enough, one on a phone.', params: Object.assign({ inst: 'piano' }, FRESH), widths: ALL },
+            { id: 'guitar', title: 'Guitar: a neck with six strings, from the nut. The highest string is on top, as tab is written.', params: Object.assign({ inst: 'guitar' }, FRESH), widths: ALL },
+            { id: 'bass', title: 'Bass: a neck with four strings.', params: Object.assign({ inst: 'bass' }, FRESH), widths: ALL },
+            { id: 'drums', title: 'Drums: the eight pads. The course has only theory for drums so far, so the headline is “Chords in a key · Theory”.',
+              note: 'Pads have no key: the picture does not change with the key bar.', params: Object.assign({ inst: 'drums' }, FRESH), widths: ALL }
+          ] },
+        { title: '4 · Other next steps, and the rest',
+          states: [
+            { id: 'lesson', title: 'A Keys lesson from your own plan: the button says “Start”, because a tap starts the run.',
+              note: 'The keyboard shows the key in the bar, here C Major. It follows the bar, not the headline.', params: { step: 'lesson' }, widths: PLD },
+            { id: 'tuner', title: 'A step the app cannot start for you: the button says where it takes you, “Open the Tuner”.',
+              note: 'With a plan of your own the line at the bottom also counts its blocks.', params: { step: 'tuner' }, widths: PLD },
+            { id: 'two-lines', title: 'A headline of two lines: the longest one the course has.',
+              note: 'In the small laptop window (1024 × 640) this headline fits one line; the next picture is the two-line test there.', params: { step: 'two' }, widths: [[390, 844], [820, 1180], [1280, 800]] },
+            { id: 'long-title', title: 'A title of 80 letters is cut after two lines, and the line under it carries the whole title.',
+              note: 'In the small laptop window the 80 letters just fit two lines, so nothing is cut there.', params: { step: 'long' }, widths: ALL },
+            { id: 'goal', title: 'Today’s goal is reached: the line at the bottom says so in words, and the dot on the Learn tab is gone.', params: { day: 'goal' }, widths: PD },
+            { id: 'more', title: '“Something else”, opened: the other steps and the ways into your instrument.',
+              note: 'The list opens under the button and the page then scrolls; it is closed again at every visit.', params: { more: 1, step: 'tuner' }, widths: PD },
+            { id: 'help-none', title: 'Help set to None: the home still shows the scale, so the picture is never empty.', params: { help: 0 }, widths: PD },
+            { id: 'black-root', title: 'Another key, D♭ Natural Minor: the picture follows the key bar, here with the root on a black key.',
+              params: { key: 'Db-aeolian', help: 4 }, widths: PD },
+            { id: 'small', title: 'A very small phone (360 × 640): the page scrolls a little, and the instrument keeps 140 px.', params: {}, widths: [[360, 640]] }
+          ] }
+      ]
+    });
+    contactExtras();
+    return;
+  }
+
+  // what the contact view adds to mock.js's: the measured line under each frame, the three
+  // placements side by side, the table of their numbers
+  function contactExtras() {
+    var frames = document.querySelectorAll('.mk-frame'), i;
+    for (i = 0; i < frames.length; i++) {
+      var p = document.createElement('p');
+      p.className = 'mk-measure';
+      p.textContent = 'The instrument’s height appears here when this picture has loaded.';
+      frames[i].appendChild(p);
+    }
+    ['place-b', 'tight-b'].forEach(function (id) {
+      var st = el(id);
+      if (!st) return;
+      st.parentNode.classList.add('mk-compare');
+      // these pictures are compared with each other: load them at once
+      Array.prototype.forEach.call(st.parentNode.querySelectorAll('iframe'), function (f) { f.loading = 'eager'; });
+    });
+    // the table under "three ways": filled from what the pictures measured
+    var sum = null, cells = {};
+    var first = el('place-b');
+    if (first && !Mock.q('only', '')) {
+      sum = document.createElement('div');
+      sum.className = 'mk-sum';
+      var rows = SIZES.map(function (s) {
+        return '<tr><th scope="row">' + s[0] + ' × ' + s[1] + '</th>' + ['b', 'a', 'c'].map(function (n) { return '<td data-cell="' + n + '-' + s[0] + '">…</td>'; }).join('') + '</tr>';
+      }).join('') + '<tr><th scope="row">1024 × 640, headline of two lines</th>' + ['b', 'a', 'c'].map(function (n) { return '<td data-cell="' + n + '-tight">…</td>'; }).join('') + '</tr>';
+      sum.innerHTML = '<table><caption>How high the instrument is and how much of the window that is, measured in the dark pictures below. ' +
+        'The aim: the instrument takes at least a quarter of the window (22 % in the small laptop window, 1024 × 640) and is never lower than the headline. ' +
+        'On a device with a touch screen the controls above the page are a little higher, so the two desktop sizes come out a few pixels lower there than with a mouse.</caption>' +
+        '<thead><tr><th scope="col">Window</th><th scope="col">B · proposed</th><th scope="col">A · “Today” in Learn</th><th scope="col">C · pills in the header’s row</th></tr></thead><tbody>' + rows + '</tbody></table>';
+      first.parentNode.insertBefore(sum, first);
+      Array.prototype.forEach.call(sum.querySelectorAll('[data-cell]'), function (td) { cells[td.getAttribute('data-cell')] = td; });
+    }
+    var say = function (m) {
+      var bad = [], floor = m.scrolls && m.hero <= 140.5;      // the page scrolls and the instrument keeps its lowest height
+      if (!m.ok.lines) bad.push('the headline has ' + m.lines + ' lines');
+      if (!m.ok.first) bad.push('the instrument is not whole on the first screen');
+      if (!m.ok.share && !floor) bad.push('under the minimum of ' + m.min + ' %');
+      if (!m.ok.h1 && !floor) bad.push('lower than the headline (' + Math.round(m.h1) + ' px)');
+      if (m.sideways) bad.push('the page scrolls sideways');
+      return '<b>Instrument ' + Math.round(m.hero) + ' px</b> · <b>' + m.share + ' %</b> of the window’s ' + m.h + ' px' +
+        (floor ? '<br>The page scrolls here; the instrument keeps its lowest height.' : '') +
+        (bad.length ? '<br><span class="mk-bad">Not met: ' + bad.join('; ') + '.</span>' : '');
+    };
+    window.addEventListener('message', function (e) {
+      var m = e.data && e.data.slHome;
+      if (!m) return;
+      var all = document.querySelectorAll('.mk-view > iframe'), k;
+      for (k = 0; k < all.length; k++) {
+        if (all[k].contentWindow !== e.source) continue;
+        var fig = all[k].parentNode.parentNode, line = fig.querySelector('.mk-measure');
+        if (line) line.innerHTML = say(m);
+        var state = fig.parentNode.parentNode.id, dark = /theme=dark/.test(all[k].getAttribute('src'));
+        var cell = dark && /^place-/.test(state) ? cells[m.nav + '-' + m.w] : dark && /^tight-/.test(state) ? cells[m.nav + '-tight'] : null;
+        if (cell) {
+          var short = !m.ok.first ? 'not whole on the first screen' : !m.ok.share ? 'under ' + m.min + ' %' : !m.ok.h1 ? 'lower than the headline' : '';
+          cell.innerHTML = Math.round(m.hero) + ' px · ' + m.share + ' %' + (short ? '<small class="mk-bad">' + short + '</small>' : '') +
+            (m.nav === 'c' ? '<small>' + (m.pills === 'in-the-header-row' ? 'pills in the header’s row' : 'pills in a row of their own, as A') + '</small>' : '');
+        }
+      }
+    });
+    // in three columns a frame is as wide as its column allows (mock.js sized it for the whole page)
+    var fit = function () {
+      var cap = parseFloat(Mock.q('zoom', '')) || (window.innerWidth >= 1100 ? 0.5 : 1);
+      Array.prototype.forEach.call(document.querySelectorAll('.mk-compare'), function (g) {
+        if (getComputedStyle(g).gridTemplateColumns.split(' ').length < 3) return;
+        Array.prototype.forEach.call(g.querySelectorAll('.mk-state'), function (st) {
+          var room = st.clientWidth;
+          Array.prototype.forEach.call(st.querySelectorAll('.mk-view'), function (v) {
+            var w = +v.getAttribute('data-w'), h = +v.getAttribute('data-h'), s = Math.min(cap, 1, room / w);
+            v.style.width = Math.floor(w * s) + 'px';
+            v.style.height = Math.floor(h * s) + 'px';
+            v.firstChild.style.transform = 'scale(' + s + ')';
+          });
+        });
+      });
+    };
+    fit();
+    window.addEventListener('resize', fit);
+  }
+
+  // =====================================================================================
+  // One picture: the home
+  // =====================================================================================
+  var stepId = q('step', 'course'), day = q('day', 'some'), more = q('more', '') === '1';
+  // the shell: the home's page id, the key a step starts from, the goal's dot on the Learn tab
+  // (js/xp.js:30: shown while something was practised and today's goal is still open)
+  var given = { page: 'home', fixed: ['page'], goal: day === 'some' };
+  if (stepId === 'lesson') { given.root = 0; given.scale = 'major'; }      // "C major · RH" was practised before: the bar is in C Major
+  var o = Mock.shellOpts(given);
+  var inst = D.INSTRUMENTS.filter(function (x) { return x.id === o.inst; })[0];
+  var kind = o.inst === 'guitar' ? 'neck6' : o.inst === 'bass' ? 'neck4' : o.inst === 'drums' ? 'pads' : 'keyboard';      // B9.1: SLHero.keyboard for Piano, Synth, Voice and Other
+  var keyName = Mock.keyName(o.root, o.scale, 'plain');
+
+  function arrow(size) { return icon('right', size); }      // js/app.js ICONS.right
+
+  // ---- the next step, as a provider of js/home.js gives it (B9.1) -------------------------
+  // title: the course's is the unit's and the mode's name (js/quiz.js:955, :1000, :1052), a plan
+  //   block's is its own (js/practiceplan.js:10, :123).
+  // facts: where the tap leads, and the minutes when the step knows them.
+  // action: "Start" only when the tap begins a run; otherwise the words name the page.
+  var LONG = 'Bach, Prelude in C major: bars 1 to 8, hands separate, then slowly both together';      // 80 letters
+  var COURSE = { title: o.inst === 'drums' ? 'Chords in a key · Theory' : 'Natural notes · Treble clef',
+    facts: ['Exercises', 'Level 1', '<b>10</b> questions'], action: 'Start', run: true };
+  var LAST_LESSON = { title: 'C major · RH', facts: ['Keys lesson', 'your last one'], action: 'Start', run: true };
+  var STEPS = {
+    course: COURSE,
+    lesson: { title: 'C major · RH', facts: ['Keys lesson', '<b>5</b> min', 'from your plan'], action: 'Start', run: true, plan: [0, 3] },
+    tuner: { title: 'Tune up', facts: ['Tuner', '<b>2</b> min', 'from your plan'], action: 'Open the Tuner', run: false, plan: [0, 3] },
+    two: { title: 'Diminished, augmented & sus · Ear training', facts: ['Exercises', 'Level 1', '<b>10</b> questions'], action: 'Start', run: true },
+    long: { title: LONG, facts: ['Woodshed', '<b>5</b> min', 'from your plan'], action: 'Open the Woodshed', run: false, plan: [1, 3] }
+  };
+  var step = STEPS[stepId] || COURSE;
+  var title = q('title', '') || step.title;
+  // "Something else": the steps of the other providers, then the ways into the instrument
+  // (js/learn-instruments.js:21-28, word for word; the two small lines that step B8 rewords
+  // are in the words of docs/plans/phase-b/WORDING.md)
+  var ENTRIES = {
+    piano: [['Keys scale lessons', 'Keyboard lessons'], ['Wait / Tempo practice', 'Performance practice']],
+    synth: [['Keys scale lessons', 'Keyboard lessons'], ['Synth keyboard', 'Instrument'], ['Wait / Tempo practice', 'Performance practice']],
+    guitar: [['Guitar fretboard', 'Guitar'], ['Guitar tab & notation', 'Guitar'], ['Performance practice', 'Performance practice']],
+    bass: [['Bass fretboard exercises', 'Four-string bass'], ['Bass performance practice', 'Performance practice'], ['Guitar tab reference', 'Shared reference · six-string guitar']],
+    drums: [['Drum pads', 'Drums'], ['Drum & rhythm library', 'Rhythm practice']],
+    voice: [['Ear-training exercises', 'Shared ear training'], ['Sing single notes', 'Microphone or on-screen keys'], ['Pitch tuner', 'Pitch reference']],
+    other: [['Performance practice', 'Counts for “Other”'], ['Circle of fifths', 'Shared theory']]
+  };
+  var others = [];
+  if (step.plan) others.push(COURSE);
+  if ((o.inst === 'piano' || o.inst === 'synth') && day !== 'fresh' && stepId !== 'lesson') others.push(LAST_LESSON);
+  var plain = function (html) { return html.replace(/<[^>]+>/g, ''); };
+  var rows = others.map(function (s) {
+    return '<li><button type="button" class="sl-row"><span class="sl-row-main"><b>' + esc(s.title) + '</b><small>' + s.facts.map(plain).join(' · ') + '</small></span>' +
+      '<span class="sl-row-state">' + esc(s.action) + '</span>' + (s.run ? icon('play', 16) : arrow(18)) + '</button></li>';
+  }).concat((ENTRIES[o.inst] || ENTRIES.piano).map(function (e) {
+    return '<li><button type="button" class="sl-row"><span class="sl-row-main"><b>' + esc(e[0]) + '</b><small>' + esc(e[1]) + '</small></span>' + arrow(18) + '</button></li>';
+  })).join('');
+
+  // ---- the footer line (B9.1): each part only when there is a number for it --------------
+  var foot = '';
+  if (day === 'fresh') foot = '<span class="sl-footline-part">Nothing practised yet today</span>';
+  else {
+    var goalMet = day === 'goal', mins = goalMet ? 12 : 6, of = 10, streak = goalMet ? 5 : 4;      // 10 = the app's daily goal (js/practice-progress.js:21)
+    foot = goalMet
+      ? '<span class="sl-footline-part is-done">' + icon('check', 18) + '<span>Goal reached: <b>' + mins + '</b> of ' + of + ' min today</span></span>'
+      : '<span class="sl-footline-part"><span class="sl-ring" style="--p:' + Math.round(100 * mins / of) + '" aria-hidden="true"></span><span><b>' + mins + '</b> of ' + of + ' min today</span></span>';
+    foot += '<span class="sl-footline-part">' + icon('flame', 18) + '<span><b>' + streak + '</b>-day streak</span></span>';
+    if (step.plan) foot += '<span class="sl-footline-part"><span>Plan: <b>' + step.plan[0] + '</b> of ' + step.plan[1] + ' blocks done</span></span>';
+  }
+
+  var heroLabel = kind === 'pads' ? 'Drum pads' : (kind === 'keyboard' ? 'Keyboard' : kind === 'neck4' ? 'Bass neck' : 'Guitar neck') + ', ' + keyName;
+  // a line of the headline never starts with the dot that parts the two names
+  var titleHtml = esc(title).replace(/ · /g, ' · ');
+  var main =
+    '<div class="home-head">' +
+      '<p class="sl-eyebrow" id="home-eyebrow">Next · ' + esc(inst.label) + '</p>' +
+      '<h1 id="home-title">' + titleHtml + '</h1>' +
+      '<p id="home-detail">' + step.facts.map(function (f) { return '<span>' + f + '</span>'; }).join('') + '</p>' +
+      '<div class="home-cta">' +
+        '<button type="button" id="home-start" class="btn primary sl-hero-btn">' + (step.run ? icon('play', 18) : '') + '<span>' + esc(step.action) + '</span>' + (step.run ? '' : arrow(20)) + '</button>' +
+        '<details class="sl-fold" id="home-more"' + (more ? ' open' : '') + '><summary><span>Something else</span></summary>' +
+          '<div class="home-more-body"><ul class="sl-rows">' + rows + '</ul></div></details>' +
+      '</div>' +
+    '</div>' +
+    '<div class="sl-hero" id="home-hero" role="img" aria-label="' + esc(heroLabel) + '"></div>' +
+    '<p class="sl-footline" id="home-foot">' + foot + '</p>';
+
+  document.documentElement.classList.add('is-home');
+  Mock.page({ shell: given, main: main, title: 'The home · soundLAB 2.0 drawings' });
+
+  // "Change this picture", under the page (drawing-only): the parameters as chips (Mock.change)
+  document.querySelector('main').insertAdjacentHTML('afterend', Mock.change([
+    ['inst', 'Instrument', o.inst, [['piano', 'Piano'], ['guitar', 'Guitar'], ['bass', 'Bass'], ['drums', 'Drums']]],
+    ['nav', 'Where it sits', o.nav, [['b', 'B · a page of its own'], ['a', 'A · “Today” in Learn'], ['c', 'C · pills in the header’s row']]],
+    ['step', 'Next step', STEPS[stepId] ? stepId : 'course', [['course', 'The course'], ['lesson', 'A Keys lesson'], ['tuner', 'The Tuner'], ['two', 'Two lines'], ['long', '80 letters']]],
+    ['day', 'Today', day === 'fresh' || day === 'goal' ? day : 'some', [['some', 'Some minutes'], ['fresh', 'Nothing yet'], ['goal', 'Goal reached']]],
+    ['theme', 'Theme', q('theme', ''), [['dark', 'Dark'], ['light', 'Light']]]
+  ]));
+
+  // ---- the instrument: drawn to suit the box it is given ----------------------------------
+  // The model: the scale of the key bar's key, no "now" and no "next" (D21). The home is never
+  // empty, so it shows the dots at every Help level (help = at least Colors); labels at Full.
+  var model = SLHero.sample({ root: o.root, steps: D.SCALES[o.scale].steps, help: Math.max(3, o.help), mode: o.colors,
+    intervals: D.COLORS.INTERVALS, notes: D.COLORS.NOTES });
+  function drawHero() {
+    var box = el('home-hero');
+    box.style.maxHeight = '';
+    box.innerHTML = '';                                  // empty, it is as high as the room that is left
+    var cs = getComputedStyle(box);
+    var padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight), padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+    var W = box.clientWidth - padX, H = Math.max(0, box.clientHeight - padY), html, most;
+    if (kind === 'keyboard') {
+      // two octaves from the root where a key stays at least 36 px wide, else one; a key is
+      // never longer than six and a half times its width (a piano's key is about that)
+      var NAMES = 20;                                    // the row of octave names under the keys
+      var octaves = W / 15 >= 36 ? 2 : 1, keyW = W / (octaves * 7 + 1);
+      most = Math.round(keyW * 6.5) + NAMES;
+      html = SLHero.keyboard(model, { from: 48 + o.root, octaves: octaves, label: heroLabel });
+    } else if (kind === 'pads') {
+      // the app's 4 x 2; a pad is at most square, or 100 px high where it is narrower than that
+      var gap = window.innerWidth > 900 ? 12 : 8, padW = (W - 3 * gap) / 4;
+      most = Math.round(2 * Math.min(padW * 1.3, Math.max(padW, 100)) + gap);
+      var lanes = SLHero.LANES.map(function (l, i) { return { name: l.name, midi: l.midi, color: i < 7 ? D.COLORS.DEGREES[i] : D.COLORS.PAD_NEUTRAL }; });      // js/pads.js:36-38: the seven degree colours and a neutral eighth
+      html = SLHero.pads(model, { lanes: lanes, cols: 4, label: heroLabel });
+    } else {
+      // a neck from the nut. Its height fills the box up to 1.75 times the drawing's own size;
+      // then as many frets as fill the width (4 to 15), each as wide as that leaves
+      var bass = kind === 'neck4', strings = bass ? [28, 33, 38, 43] : [40, 45, 50, 55, 59, 64];      // E1 A1 D2 G2 (js/learn-instruments.js:14)
+      var GAP = bass ? 36 : 30, unitsH = 60 + (strings.length - 1) * GAP;      // mock-hero.js: 26 above the first string, 34 under the last
+      // (and never so high that four frets would get narrower than 40 units: the dots need the room)
+      var scale = Math.min(Math.max(H, 140 - padY) / unitsH, 1.75, W / (86 + 4 * 40)), unitsW = W / scale;
+      var frets = Math.max(4, Math.min(15, Math.round((unitsW - 86) / 56)));
+      most = Math.round(unitsH * scale);
+      html = SLHero.neck(model, { strings: strings, frets: frets, fretW: (unitsW - 86) / frets, gap: GAP, label: heroLabel });
+    }
+    if (most < H) box.style.maxHeight = (most + padY) + 'px';
+    // keys at least 60 px wide and 220 px long, and pads at least 160 px wide and about 90 px
+    // high, take the larger marks
+    var tall = Math.min(H, most);
+    box.classList.toggle('is-roomy', kind === 'keyboard' ? W / 15 >= 60 && tall >= 220 : kind === 'pads' && W / 4 >= 160 && tall / 2 >= 96);
+    box.innerHTML = html;
+  }
+
+  // ---- what the page measures on itself -----------------------------------------------------
+  function measure() {
+    var r = function (id) { return el(id).getBoundingClientRect(); };
+    var h1 = el('home-title'), lh = parseFloat(getComputedStyle(h1).lineHeight) || 1;
+    var tab = el('tabbar-m'), tabH = tab && getComputedStyle(tab).display !== 'none' ? tab.offsetHeight : 0;
+    var bar = el('ctxbar').getBoundingClientRect(), limit = window.innerHeight - tabH;
+    var hero = r('home-hero'), btn = r('home-start'), head = document.querySelector('.topbar'), sub = el('subnav');
+    var round = function (n) { return Math.round(n * 10) / 10; };
+    var m = {
+      w: window.innerWidth, h: window.innerHeight, nav: o.nav, inst: o.inst, step: stepId, day: day, theme: q('theme', ''),
+      title: title, lines: Math.round(r('home-title').height / lh), cut: h1.classList.contains('is-cut'),
+      h1: round(r('home-title').height), block: round(r('home-detail').bottom - r('home-eyebrow').top),
+      hero: round(hero.height), share: round(100 * hero.height / window.innerHeight),
+      heroTop: round(hero.top), heroBottom: round(hero.bottom), buttonBottom: round(btn.bottom), footBottom: round(r('home-foot').bottom),
+      firstScreenEnds: limit, above: round(bar.bottom), tabBar: tabH,
+      pills: sub.hidden ? 'none' : (head.getAttribute('data-pills') || 'own-row'),
+      scrolls: document.documentElement.scrollHeight - tabH > window.innerHeight + 1 && r('home-foot').bottom > limit + 0.5,
+      sideways: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+      min: window.innerWidth > 900 && window.innerHeight < 700 ? 22 : 25
+    };
+    m.ok = {
+      lines: m.lines <= 2,
+      first: btn.bottom <= limit + 0.5 && hero.bottom <= limit + 0.5 && hero.top >= bar.bottom - 0.5 && window.scrollY === 0,
+      h1: m.hero >= m.h1,
+      block: m.hero >= m.block,
+      share: m.share >= m.min
+    };
+    return m;
+  }
+
+  function layout() {
+    var root = document.documentElement, tab = el('tabbar-m');
+    // the heights above the page and of the bottom tab bar: the page fills what is between
+    root.style.setProperty('--home-above', (document.querySelector('main').getBoundingClientRect().top + window.scrollY) + 'px');
+    root.style.setProperty('--home-below', (tab && getComputedStyle(tab).display !== 'none' ? tab.offsetHeight : 0) + 'px');
+    // a headline that was cut: the line under it carries the whole title
+    var h1 = el('home-title'), det = el('home-detail'), full = det.querySelector('.home-full');
+    if (full) det.removeChild(full);
+    h1.classList.remove('is-cut');
+    // (its height without the cut, against two of its lines: with a line height under 1 the
+    // scroll height says "more" even when nothing is cut)
+    h1.classList.add('is-whole');
+    var whole = h1.getBoundingClientRect().height, lh = parseFloat(getComputedStyle(h1).lineHeight) || 1;
+    h1.classList.remove('is-whole');
+    if (whole > 2 * lh + 1) {
+      h1.classList.add('is-cut');
+      det.insertAdjacentHTML('afterbegin', '<span class="home-full">' + esc(title) + '</span>');
+    }
+    drawHero();
+    var m = measure();
+    window.HomeMeasure = m;
+    el('home-hero').setAttribute('data-height', m.hero);
+    el('home-hero').setAttribute('data-share', m.share);
+    if (window.parent !== window) window.parent.postMessage({ slHome: m }, '*');
+  }
+  layout();
+  window.addEventListener('resize', layout);
+  window.addEventListener('load', layout);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(layout);
+})();
+</script>
+</body>
+</html>

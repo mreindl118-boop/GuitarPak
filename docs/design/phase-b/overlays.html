@@ -1,0 +1,661 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Sheets, messages and the tour · soundLAB 2.0 drawings</title>
+<!--
+  soundLAB 2.0 Phase B, step B1b: everything that lies over a page, drawn before it is built
+  (docs/plans/phase-b/PLAN.md, table B1b.1; decisions D23, D24, D25, D26; steps B5b, B7a, B7b, B8).
+
+    1  the sheet: a panel on the right (440 px) above 900 px, a bottom sheet at 900 px and below,
+       with the real contents of the Metronome sheet (js/metronome.js), the Keyboard lights sheet
+       (js/lights.js as it is after B5b: no Help level, no colour switch) and the new Instrument
+       sheet (js/learn-instruments.js, D23)
+    2  the message stack (D25): one message, two, a long one, also above an open sheet
+    3  the pedal's confirmation (#remote-hud, js/remote.js)
+    4  the help tour's card and the welcome card (js/help.js, D26)
+    5  the empty, loading and error states (.sl-empty, .sl-loading, .error)
+
+  Opened without ?w= it shows every state at 390, 820 and 1280 px, dark and light.
+  Opened with ?w= it is one state, laid out for the window it is given.
+  The shell, the frames and the shared parameters are mock.js's; the components are mock.css's.
+  Read their header comments first.
+
+  THIS DRAWING'S OWN PARAMETERS (beside the shell's: sheet, met, bpm, lights, colors, inst, page, key)
+    sheet=metronome   fold=sounds|trainer|all   a fold of the sheet is open
+                      sig=4/4|6/8|12/8 …        the time signature: one beat dot per beat
+                      met=1                     the click is running (the shell's parameter)
+    sheet=lights      lights=scale|off|kbd|none what is connected (the shell's parameter)
+                      colors=interval|note      which swatches the sheet shows (the shell's parameter)
+                      bt=1                      with lights=none: the Android app is looking for a
+                                                Bluetooth keyboard (the loading state of part 5)
+    sheet=instrument  inst=piano|guitar|…       the instrument (the shell's parameter)
+                      list=1                    the list of instruments, drawn open
+                      about=1                   the fold "About instrument categories" is open
+                      run=1                     an Exercises run is on: the instrument cannot change
+    at=end            the open sheet is scrolled to its end
+    msg=<id>[,<id>]   the messages in the stack, from the top down:
+                      nothing lock lockoff goal back sound update apk unsaved
+    hud=start|nextlesson|back|stop|works        the pedal's confirmation
+    tour=welcome|met|bar|lumi|tap               a card of the help tour
+    state=empty|error|failed                    the page's content (page=shed for the first two)
+
+  Every text is the app's own, copied from the line named beside it. Where a step of the plan
+  rewords a line before this part is built, the text here is that step's wording
+  (docs/plans/phase-b/WORDING.md); the script says so line by line. Three texts are new and
+  marked "new": the sheet's line "Help level and note colors are in the bar at the top." (B5b,
+  in the app's spelling), and the two labels "Practising" and "Where to practise" of the
+  Instrument sheet.
+
+  The styles in this file are drawing-only: first what the modules themselves inject in the
+  app (decision D8: js/metronome.js, js/lights.js, js/learn-instruments.js, js/remote.js),
+  written from tokens as their steps will write it; then what only lays out this drawing (mk-).
+  The components (rows in a sheet, the message with its group of buttons, the tour card with
+  the X in its first row) are in mock.css.
+-->
+<link rel="icon" href="../../../icons/icon.svg">
+<link rel="stylesheet" href="../../../css/tokens.css">
+<link rel="stylesheet" href="mock.css">
+<style>
+/* drawing-only */
+
+/* 1 · What the modules inject themselves (D8), as their steps will write it from tokens.
+       Not for mock.css: it stays with its module. */
+
+/* ---- js/metronome.js (B7a): the Metronome sheet. Every id of today is kept ---- */
+.met-main { display: grid; grid-template-columns: minmax(0, 1fr); justify-items: center; gap: var(--sl-space-4); text-align: center; }
+.met-bpmrow { display: flex; align-items: center; justify-content: center; gap: var(--sl-space-2); width: 100%; }
+.met-read { display: grid; flex: 1 1 auto; justify-items: center; gap: var(--sl-space-1); min-width: 0; }
+#met-bpm-display { min-width: 3ch; }                 /* three digits wide: 99 to 100 BPM never moves the row */
+.met-unit {
+  color: var(--sl-ink-muted);
+  font-family: var(--sl-font-cond);
+  font-size: var(--sl-text-xs);
+  font-weight: var(--sl-weight-cond);
+  line-height: 1;
+  letter-spacing: var(--sl-caps-ls);
+  text-transform: uppercase;
+}
+:where(.sl-skin) .btn.met-step { flex: 0 0 auto; width: var(--sl-control-h); padding: 0; font-variant-numeric: tabular-nums; }
+.met-wide { width: 100%; }
+/* a beat dot is a full-size control; the dot inside it shows accent (a thick ring),
+   normal, muted (dashed) and the beat that sounds now (filled and larger) */
+.met-dots { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; width: 100%; }
+.met-dot {
+  display: grid;
+  place-items: center;
+  width: var(--sl-control-h);
+  height: var(--sl-control-h);
+  padding: 0;
+  border: 0;
+  border-radius: var(--sl-radius-pill);
+  background: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.met-dot::before {
+  content: '';
+  width: var(--sl-space-5);
+  height: var(--sl-space-5);
+  border: 2px solid var(--sl-line-control);
+  border-radius: var(--sl-radius-pill);
+  background: var(--sl-surface-2);
+  transition: transform var(--sl-dur-fast) var(--sl-ease), background-color var(--sl-dur-fast) var(--sl-ease), border-color var(--sl-dur-fast) var(--sl-ease);
+}
+@media (hover: hover) { .met-dot:hover::before { border-color: var(--sl-ink-soft); } }
+.met-dot.met-acc::before { border: var(--sl-space-1) solid var(--sl-accent-text); background: var(--sl-accent-soft); }
+.met-dot.met-mute::before { border-style: dashed; background: transparent; }
+.met-dot.met-on::before { border: 2px solid var(--sl-accent-deep); background: var(--sl-accent); transform: scale(1.25); box-shadow: 0 0 var(--sl-space-3) var(--sl-accent-glow-color); }
+.met-dot.met-mute.met-on::before { border: 2px solid var(--sl-ink-muted); background: var(--sl-ink-muted); box-shadow: none; }
+.met-go { display: flex; gap: var(--sl-space-3); width: 100%; }
+:where(.sl-skin) .met-go > .btn { min-height: calc(var(--sl-control-h) + var(--sl-space-3)); }
+.met-go > #met-startstop { flex: 1 1 auto; font-size: var(--sl-text-lg); }
+.met-go > .met-tap { flex: 0 0 auto; min-width: calc(var(--sl-space-8) + var(--sl-space-5)); touch-action: manipulation; }
+.met-opts {
+  display: grid;
+  grid-template-columns: calc(var(--sl-space-8) + var(--sl-space-5)) minmax(0, 1fr);
+  align-items: end;
+  gap: var(--sl-space-3) var(--sl-space-4);
+  width: 100%;
+  text-align: left;
+}
+.met-opts > .field:last-child { grid-column: 1 / -1; }
+#met-vol-val { font-variant-numeric: tabular-nums; }
+.met-main + .met-more { margin-top: var(--sl-space-5); }
+.met-more > .row { display: grid; grid-template-columns: minmax(0, 1fr); align-items: end; gap: var(--sl-space-3); }
+#met-trbox > .row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.met-check { display: inline-flex; grid-column: 1 / -1; align-items: center; gap: var(--sl-space-3); min-height: var(--sl-control-h); cursor: pointer; }
+.met-hint { padding-top: var(--sl-space-4); border-top: 1px solid var(--sl-line-strong); text-align: center; }
+
+/* ---- js/lights.js (B5b, B7a): the Keyboard lights sheet ---- */
+.lc-sec { display: grid; gap: var(--sl-space-3); }
+.lc-sec + .lc-sec { margin-top: var(--sl-space-5); padding-top: var(--sl-space-5); border-top: 1px solid var(--sl-line-strong); }
+.lc-sec > .btn { justify-self: start; }
+.lc-status { display: flex; align-items: center; gap: var(--sl-space-2); color: var(--sl-ink); font-size: var(--sl-text-md); font-weight: var(--sl-weight-medium); }
+.lc-status::before {                                  /* the dot of the header's status chip: filled = connected */
+  content: '';
+  flex: 0 0 auto;
+  width: var(--sl-space-2);
+  height: var(--sl-space-2);
+  border: 1px solid var(--sl-line-control);
+  border-radius: var(--sl-radius-pill);
+}
+.lc-status.ok::before { border-color: var(--sl-ok); background: var(--sl-ok); }
+.lc-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sl-space-2) var(--sl-space-4); }
+.lc-lab { flex: 0 0 auto; min-width: calc(var(--sl-space-8) + var(--sl-space-4)); color: var(--sl-ink-soft); font-size: var(--sl-text-sm); font-weight: var(--sl-weight-medium); }
+.lc-degs { display: flex; flex-wrap: wrap; gap: calc(var(--sl-space-1) + 2px); }
+.lc-deg { display: grid; justify-items: center; gap: 2px; }
+.lc-deg > i {                                         /* top: the colour on screen; bottom: the colour the LUMI shows */
+  display: block;
+  width: calc(var(--sl-space-5) + var(--sl-space-1));
+  height: var(--sl-space-3);
+  border-radius: calc(var(--sl-space-1) - 1px);
+  background: var(--c);
+  box-shadow: inset 0 0 0 1px var(--sl-line-control);
+}
+.lc-deg > b { margin-top: 2px; color: var(--sl-ink-muted); font-size: var(--sl-text-xs); line-height: 1; }
+.lc-notes { gap: var(--sl-space-1); }
+.lc-notes .lc-deg > i { width: var(--sl-space-5); }
+#lc-bright { flex: 1 1 calc(var(--sl-space-8) * 2); width: auto; min-width: 0; }
+.lc-val { min-width: var(--sl-space-7); color: var(--sl-ink); font-size: var(--sl-text-sm); font-variant-numeric: tabular-nums; text-align: right; }
+.lc-acts { display: flex; flex-wrap: wrap; gap: var(--sl-space-2); }
+.lc-sec > .sl-loading { padding: var(--sl-space-4) 0 0; }
+
+/* ---- js/learn-instruments.js (B8): the Instrument sheet ---- */
+#learn-instruments { display: grid; gap: var(--sl-space-4); }
+.learn-inst-links { display: grid; gap: var(--sl-space-2); }
+.learn-inst-session { display: grid; justify-items: start; gap: var(--sl-space-3); padding: var(--sl-space-3) var(--sl-space-4); border: 1px solid var(--sl-line-control); border-radius: var(--sl-radius-md); background: var(--sl-surface); }
+.learn-inst-session:empty { display: none; }
+.learn-inst-category { color: var(--sl-accent-text); font-weight: var(--sl-weight-medium); }
+#learn-instruments > details.tips { border-bottom: 1px solid var(--sl-line-strong); }
+
+/* ---- js/remote.js (B7b): the pedal's confirmation. Its place (38 % from the top) and its
+        width rule are today's (tests/remote.test.js:196-205) ---- */
+#remote-hud {
+  position: fixed;
+  top: 38%;
+  left: var(--sl-gutter);
+  right: var(--sl-gutter);
+  z-index: var(--sl-z-toast);
+  display: flex;
+  align-items: center;
+  gap: var(--sl-space-3);
+  box-sizing: border-box;
+  width: fit-content;
+  max-width: calc(100vw - var(--sl-gutter) * 2);
+  margin: 0 auto;
+  padding: var(--sl-space-3) var(--sl-space-5);
+  border: 2px solid var(--sl-accent-text);
+  border-radius: var(--sl-radius-pill);
+  background: var(--sl-surface);
+  color: var(--sl-ink);
+  box-shadow: var(--sl-shadow-2);
+  font-family: var(--sl-font-display);
+  font-size: clamp(var(--sl-text-xl), 6.4vw, var(--sl-display-sm));
+  font-weight: var(--sl-weight-regular);
+  line-height: 1.15;
+  letter-spacing: 0.04em;
+  opacity: 0;
+  transform: translateY(-50%) scale(0.96);
+  pointer-events: none;
+  transition: opacity var(--sl-dur) var(--sl-ease), transform var(--sl-dur) var(--sl-ease);
+}
+#remote-hud.show { opacity: 1; transform: translateY(-50%) scale(1); }
+#remote-hud > .ic { flex: 0 0 auto; color: var(--sl-accent-text); }
+#remote-hud > span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; max-height: 2.4em; overflow: hidden; overflow-wrap: anywhere; text-align: center; }
+@media (max-width: 640px) { #remote-hud { border-radius: var(--sl-radius-lg); } }
+
+/* 2 · What only lays out this drawing */
+
+/* the open list of the Instrument select: a real one is drawn by the phone or the computer */
+.mk-listbox { display: grid; gap: 2px; margin-top: calc(-1 * var(--sl-space-3)); padding: var(--sl-space-1); border: 1px solid var(--sl-line-control); border-radius: var(--sl-radius-md); background: var(--sl-surface); box-shadow: var(--sl-shadow-2); }
+.mk-listbox > span { display: flex; align-items: center; gap: var(--sl-space-2); min-height: calc(var(--sl-space-6) + var(--sl-space-1)); padding: 0 var(--sl-space-3); border-radius: var(--sl-radius-sm); color: var(--sl-ink); font-size: var(--sl-text-md); }
+.mk-listbox > span.is-on { background: var(--sl-accent-soft); font-weight: var(--sl-weight-medium); }
+.mk-listbox > span > .ic { margin-left: auto; color: var(--sl-accent-text); }
+.mk-listbox > span.mk-listbox-group {
+  min-height: 0;
+  margin-top: var(--sl-space-1);
+  padding-top: var(--sl-space-3);
+  padding-bottom: var(--sl-space-1);
+  border-top: 1px solid var(--sl-line-strong);
+  border-radius: 0;
+  color: var(--sl-ink-muted);
+  font-family: var(--sl-font-cond);
+  font-size: var(--sl-text-xs);
+  font-weight: var(--sl-weight-cond);
+  letter-spacing: var(--sl-caps-ls);
+  text-transform: uppercase;
+}
+.mk-listbox > span.is-in { padding-left: var(--sl-space-5); }
+
+/* a page body for the states of part 5: a headline, a line, a row of tools, cards */
+.mk-page { display: grid; align-content: start; gap: var(--sl-space-4); max-width: calc(var(--sl-space-8) * 12); margin: 0 auto; }
+.mk-page .card > h2 + p { margin-bottom: var(--sl-space-2); }
+</style>
+<script src="mock.js"></script>
+<script src="mock-hero.js"></script>
+</head>
+<body>
+<noscript>This drawing is built by a script (mock.js). Please switch JavaScript on.</noscript>
+<script>
+(function () {
+  'use strict';
+  var q = Mock.q, esc = Mock.esc, D = Mock.DATA;
+  var TITLE = 'Sheets, messages and the tour · soundLAB 2.0 drawings';
+
+  var icon = Mock.icon;      // every icon is mock.js's (one of them, alert, is new: see there)
+  function options(list, selected) {
+    return list.map(function (o) { return '<option value="' + esc(o[0]) + '"' + (o[0] === selected ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join('');
+  }
+  function seg(label, attr, list, on) {      // a segmented control: [value, text] pairs, one of them on
+    return '<div class="seg" role="group" aria-label="' + esc(label) + '">' + list.map(function (o) {
+      return '<button type="button" ' + attr + '="' + o[0] + '"' + (o[0] === on ? ' class="active"' : '') + ' aria-pressed="' + (o[0] === on) + '">' + esc(o[1]) + '</button>';
+    }).join('') + '</div>';
+  }
+
+  // ==== 1 · THE SHEETS' BODIES ============================================================
+
+  // ---- Metronome: the markup of js/metronome.js:124-182, id for id. Changed for the new look:
+  //      the readout is .sl-readout, the two folds are details.sl-fold, a beat dot is a full-size
+  //      control. The texts are the file's own.
+  function metronomeBody(o) {
+    var sig = /^\d{1,2}\/\d{1,2}$/.test(q('sig', '')) ? q('sig', '') : '4/4', beats = Math.max(1, Math.min(32, parseInt(sig, 10)));
+    var fold = q('fold', ''), sounds = fold === 'sounds' || fold === 'all', trainer = fold === 'trainer' || fold === 'all';
+    var dots = '';
+    for (var i = 0; i < beats; i++) {
+      // beat 1 is the accent (js/metronome.js defaultLevels); while it runs the drawing mutes the last
+      // beat and lights the third, so that all four looks of a dot are in one picture
+      var cls = 'met-dot' + (i === 0 ? ' met-acc' : '') + (o.met && beats > 2 && i === beats - 1 ? ' met-mute' : '') + (o.met && i === Math.min(2, beats - 1) ? ' met-on' : '');
+      dots += '<button type="button" class="' + cls + '" title="Beat ' + (i + 1) + ' — click to cycle accent / normal / muted"></button>';
+    }
+    var SOUNDS = [['beep', 'Beep'], ['wood', 'Woodblock'], ['tick', 'Tick'], ['clave', 'Clave'], ['bell', 'Cowbell']];      // :43
+    var SUBDIVS = [['quarter', 'Quarter (beats only)'], ['eighth', 'Eighth'], ['triplet', 'Triplet'], ['sixteenth', 'Sixteenth']];      // :44-49
+    // the trainer's line: js/metronome.js:512-530
+    var status = !trainer ? 'Off — enable to raise the tempo automatically while the metronome runs.'
+      : o.met ? 'Running: +5 BPM in 3 bars (target 160 BPM).' : '+5 BPM every 4 bars until 160 BPM.';
+    return '<div class="met-main">' +
+      '<div class="met-bpmrow">' +
+        '<button class="btn met-step" id="met-m5" type="button" aria-label="5 BPM slower">&minus;5</button>' +
+        '<button class="btn met-step" id="met-m1" type="button" aria-label="1 BPM slower">&minus;1</button>' +
+        '<div class="met-read"><div class="sl-readout" id="met-bpm-display">' + o.bpm + '</div><div class="met-unit">BPM</div></div>' +
+        '<button class="btn met-step" id="met-p1" type="button" aria-label="1 BPM faster">+1</button>' +
+        '<button class="btn met-step" id="met-p5" type="button" aria-label="5 BPM faster">+5</button>' +
+      '</div>' +
+      '<input type="range" id="met-bpm-slider" class="met-wide" min="30" max="280" step="1" value="' + o.bpm + '" aria-label="Tempo">' +
+      '<div class="met-dots" id="met-dots" title="Tap a dot: accent / normal / muted">' + dots + '</div>' +
+      '<div class="met-go">' +
+        '<button class="btn primary" id="met-startstop" type="button">' + (o.met ? 'Stop' : 'Start') + '</button>' +
+        '<button class="btn met-tap" id="met-tap" type="button" title="Tap the beat to set the tempo">Tap</button>' +
+      '</div>' +
+      '<div class="met-opts">' +
+        '<label class="field">Time<input type="text" id="met-sig" list="met-sig-list" maxlength="5" autocomplete="off" value="' + esc(sig) + '" ' +
+          'title="Type any signature, e.g. 7/16, 11/8, 13/4 — beats over 1, 2, 4, 8, 16 or 32">' +
+          '<datalist id="met-sig-list">' + ['2/4', '3/4', '4/4', '5/4', '6/8', '7/8', '9/8', '12/8'].map(function (s) { return '<option value="' + s + '">'; }).join('') + '</datalist></label>' +
+        '<label class="field">Subdivision<select id="met-subdiv">' + options(SUBDIVS, 'quarter') + '</select></label>' +
+        '<label class="field"><span>Volume <span id="met-vol-val">80</span>%</span><input type="range" id="met-vol" min="0" max="100" step="1" value="80"></label>' +
+      '</div>' +
+      '<div class="error" id="met-err" hidden></div>' +
+      '</div>' +
+      '<details class="met-more sl-fold"' + (sounds ? ' open' : '') + '><summary>Click sounds</summary><div class="row met-mt">' +
+        '<label class="field">Bar tone (beat 1)<select id="met-snd-acc">' + options(SOUNDS, sounds ? 'bell' : 'beep') + '</select></label>' +
+        '<label class="field">Beat tone<select id="met-snd-beat">' + options(SOUNDS, sounds ? 'wood' : 'beep') + '</select></label>' +
+        '<label class="field">Upbeat tone<select id="met-snd-sub">' + options(SOUNDS, sounds ? 'tick' : 'beep') + '</select></label>' +
+      '</div></details>' +
+      '<details class="met-more sl-fold" id="met-trbox"' + (trainer ? ' open' : '') + '><summary>Tempo trainer</summary><div class="row met-mt">' +
+        '<label class="met-check"><input type="checkbox" id="met-tr-on"' + (trainer ? ' checked' : '') + '> Enable</label>' +
+        '<label class="field">+N BPM<input type="number" id="met-tr-inc" class="met-num" min="1" max="20" step="1" value="5"></label>' +
+        '<label class="field">Every M bars<input type="number" id="met-tr-bars" class="met-num" min="1" max="16" step="1" value="4"></label>' +
+        '<label class="field">Target BPM<input type="number" id="met-tr-target" class="met-num" min="30" max="280" step="1" value="160"></label>' +
+      '</div><div class="muted small met-mt" id="met-tr-status">' + status + '</div></details>' +
+      '<p class="muted small met-hint">Space starts and stops it. It keeps playing when you close this.</p>';
+  }
+
+  // ---- Keyboard lights: js/lights.js:68-128 as it is after B5b (the Help level and the colour
+  //      switch are gone, lines 41-49 and 77-87) and B7a. Reworded by those steps, as
+  //      WORDING.md proposes: lines 96 and 116-118 (B5a), 105-108 and 113 (B7a).
+  var NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];      // js/lights.js:33
+  function lightsBody(o) {
+    var kind = o.lights === 'none' ? 'connect' : 'ok', lumi = o.lights === 'scale' || o.lights === 'off', byNote = o.colors === 'note';
+    var status = kind === 'connect' ? 'No keyboard connected.' : lumi ? 'ROLI LUMI · playing C3–B4' : 'LED keyboard · playing C3–C8';      // :59, :65-66
+    var h = '<div class="lc-sec">' +
+      '<p class="muted small">Help level and note colors are in the bar at the top.</p>' +      // new (B5b), in the app's spelling
+      '<p class="lc-status ' + kind + '">' + status + '</p>';
+    if (kind === 'connect') {
+      h += '<button type="button" class="btn sm primary" id="lc-connect">Connect keyboard</button>';
+      if (q('bt', '') === '1') {      // the Android app (m.native): its Bluetooth search, js/lights.js:92, :161
+        h += '<div class="lc-acts"><button type="button" class="btn sm" id="lc-bt">Find a Bluetooth keyboard</button></div>' +
+          '<div class="sl-loading" role="status"><b>Looking for Bluetooth MIDI keyboards…</b></div>';
+      }
+    } else if (lumi) {
+      var sw = byNote ? D.COLORS.NOTES.map(function (c, i) { return { c: c, lab: NOTE_NAMES[i], title: NOTE_NAMES[i] }; })
+        : D.COLORS.DEGREES.map(function (c, i) { return { c: c, lab: i ? String(i + 1) : 'R', title: 'Degree ' + (i + 1) }; });
+      h += '<p class="muted small">Switch the LUMI lights on and off in the key bar. Brightness and colors are set here.</p>' +      // :96
+        '<div class="lc-row"><span class="lc-lab">Colors</span><span class="lc-degs' + (byNote ? ' lc-notes' : '') + '" aria-label="' + (byNote ? 'Note' : 'Scale degree') + ' colors on screen and on the LUMI">' +
+          sw.map(function (s) { return '<span class="lc-deg" title="' + s.title + '"><i style="--c:' + s.c + '"></i><i style="--c:' + s.c + '"></i><b>' + s.lab + '</b></span>'; }).join('') + '</span></div>' +
+        '<p class="muted small">' + (byNote
+          ? 'Every key of the scale lights in its note color. Top swatch: the color on screen. Bottom swatch: the color the LUMI shows. Keys outside the scale stay dark.'      // :105
+          : 'Every key lights in the color of its scale degree. Top swatch: the color on screen. Bottom swatch: the color the LUMI shows.') +      // :106
+          ' A note keeps its color while you play it. Right and wrong are shown by a mark, never by another color. Change the colors of the natural notes in the Neck’s settings.</p>' +      // :107-108
+        '<div class="lc-row"><label class="lc-lab" for="lc-bright">Brightness</label><input type="range" id="lc-bright" min="10" max="100" step="5" value="80"><span class="lc-val" id="lc-brightv">80%</span></div>' +
+        '<div class="lc-row"><span class="lc-lab">Octave keys</span>' + seg('What the LUMI octave buttons do', 'data-lcoct', [['1', 'Switch hands'], ['0', 'Octave only']], '1') + '</div>' +
+        '<p class="muted small">Press octave down below C3 for the left-hand view, back up for the right hand. The keys still play as normal. The switch happens on the first note you play after pressing.</p>' +
+        '<div class="lc-row"><span class="lc-lab">During a lesson</span>' + seg('What the LUMI lights during a lesson', 'data-lcdisp', [['1', 'Only the notes to play'], ['0', 'Scale and notes to play']], '1') + '</div>' +      // :113
+        '<p class="muted small">In a lesson the LUMI lights only the note to play; the next one blinks. The colors follow “Color notes by” in the key bar. Brightness changes the lights only, never the sound.</p>';      // :116, :118
+    } else {
+      h += '<div class="lc-row"><span class="lc-lab">Other key lights</span>' + seg('Other keyboard lights', 'data-lcon', [['1', 'On'], ['0', 'Off']], '1') + '</div>' +
+        '<p class="muted small">Your keyboard lights the scale keys (home key brightest) and the keys to play.</p>';      // :120
+    }
+    if (kind === 'ok') {
+      h += '<div class="lc-row"><span class="lc-lab">Keyboard</span>' + seg('Keyboard type', 'data-lctype', [['', 'Auto'], ['1', 'LUMI'], ['0', 'Other']], '') + '</div>' +
+        '<div class="lc-acts"><button type="button" class="btn sm" id="lc-test"' + (o.lights === 'off' ? ' disabled' : '') + '>Test lights</button>' +
+        '<button type="button" class="btn sm" id="lc-resend">Re-send</button></div>';
+    }
+    h += '</div>' +
+      '<div class="lc-sec"><h3>Hands-free</h3>' +
+      '<p class="muted small">Move practice on from a pedal, a synth button or a page turner (Next / Back / Stop).</p>' +      // :131
+      '<div class="lc-acts"><button type="button" class="btn sm" id="lc-remote">Set up</button></div></div>';
+    return h;
+  }
+
+  // ---- Instrument (B8, D23): the section #learn-instruments of js/learn-instruments.js, mounted
+  //      into the sheet. The select, the entry buttons and the note keep their ids and texts.
+  //      Two of the entries' small lines are B8's own rewording (WORDING.md: lines 26 and 27).
+  var NOTES = {      // js/learn-instruments.js:11-19
+    piano: 'Keyboard note exercises, shared notation and ear training, plus the actual keys scale lessons.',
+    synth: 'Keyboard note exercises and keys lessons. Synth technique and patch programming are not a separate quiz curriculum.',
+    guitar: 'Six-string guitar fretboard exercises, shared notation and ear training, and guitar practice tools.',
+    bass: 'Four-string bass exercises use E1–A1–D2–G2. Shared notation and ear training also apply to bass.',
+    drums: 'Shared theory is available here. Dedicated drum quiz levels are not available yet; use the drum pads and rhythm library for playing.',
+    voice: 'Shared notation, pitch and ear training. Use monophonic pitch practice for sung notes; this is not a vocal technique curriculum.',
+    other: 'Shared notation, ear training and theory, with an explicit Other instrument credit category.'
+  };
+  var ENTRIES = {      // js/learn-instruments.js:20-28: [label, the small line]
+    piano: [['Keys scale lessons', 'Keyboard lessons'], ['Wait / Tempo practice', 'Performance practice']],
+    synth: [['Keys scale lessons', 'Keyboard lessons'], ['Synth keyboard', 'Instrument'], ['Wait / Tempo practice', 'Performance practice']],
+    guitar: [['Guitar fretboard', 'Guitar'], ['Guitar tab & notation', 'Guitar'], ['Performance practice', 'Performance practice']],
+    bass: [['Bass fretboard exercises', 'Four-string bass'], ['Bass performance practice', 'Performance practice'], ['Guitar tab reference', 'Shared reference · six-string guitar']],
+    drums: [['Drum pads', 'Drums'], ['Drum & rhythm library', 'Rhythm practice']],
+    voice: [['Ear-training exercises', 'Shared ear training'], ['Sing single notes', 'Microphone or on-screen keys'], ['Pitch tuner', 'Pitch reference']],
+    other: [['Performance practice', 'Counts for “Other”'], ['Circle of fifths', 'Shared theory']]
+  };
+  var FIRST = ['piano', 'guitar', 'bass', 'drums'], MORE = ['synth', 'voice', 'other'];      // D23
+  function instLabel(id) { return D.INSTRUMENTS.filter(function (i) { return i.id === id; })[0].label; }
+  function instrumentBody(o) {
+    var running = q('run', '') === '1', name = instLabel(o.inst);
+    var opt = function (id) { return '<option value="' + id + '"' + (id === o.inst ? ' selected' : '') + '>' + instLabel(id) + '</option>'; };
+    var h = '<section id="learn-instruments" aria-label="Learn instrument category">' +
+      '<label class="field">Practising<select id="learn-instrument" aria-label="Learn instrument"' + (running ? ' disabled' : '') + '>' +      // new: the chip's word (D23); today "Instrument", which is the sheet's title now
+        FIRST.map(opt).join('') + '<optgroup label="More">' + MORE.map(opt).join('') + '</optgroup></select></label>';
+    if (q('list', '') === '1') {      // drawing-only: what the closed select holds, in its order
+      var line = function (id, inside) { return '<span class="' + (id === o.inst ? 'is-on' : '') + (inside ? ' is-in' : '') + '">' + instLabel(id) + (id === o.inst ? icon('check', 16) : '') + '</span>'; };
+      h += '<div class="mk-listbox" aria-hidden="true">' + FIRST.map(function (id) { return line(id, false); }).join('') +
+        '<span class="mk-listbox-group">More</span>' + MORE.map(function (id) { return line(id, true); }).join('') + '</div>';
+    }
+    // the run's line stands under the select it greys, not at the sheet's end
+    h += '<div class="learn-inst-session" id="learn-instrument-session" role="status">' + (running
+      ? '<span class="small">Current exercise: ' + name + '. End it before changing categories.</span>' +
+        '<button class="btn sm" id="learn-stop-exercise" type="button">End exercise to switch instrument</button>' : '') + '</div>';
+    h += '<h3 id="learn-instrument-go">Where to practise</h3>' +      // new: a label for the entry buttons, which are rows here
+      '<div id="learn-instrument-links" class="learn-inst-links sl-rows" role="group" aria-labelledby="learn-instrument-go">' + ENTRIES[o.inst].map(function (e, i) {
+        return '<button class="sl-row" type="button" data-learn-entry="' + i + '"' + (running ? ' disabled' : '') + '>' +
+          '<span class="sl-row-main"><b>' + esc(e[0]) + '</b><small>' + esc(e[1]) + '</small></span>' + icon('right', 18) + '</button>';
+      }).join('') + '</div>';
+    h += '<details class="tips"' + (q('about', '') === '1' ? ' open' : '') + '><summary>About instrument categories</summary>' +
+      '<p id="learn-instrument-note" class="small"><span class="learn-inst-category">' + name + '</span> · ' + esc(NOTES[o.inst]) + '</p>' +
+      '<p class="small muted">Notation, ear training and theory are shared content. Each run keeps the instrument selected at its start. Earlier unassigned history remains Legacy / unassigned.</p>' +      // :51
+      '</details></section>';
+    return h;
+  }
+
+  // ==== 2 · THE MESSAGES (D25): one component, one stack ====================================
+  // Each keeps the id it has today. A message with buttons holds its words and one group of buttons.
+  function messages(o) {
+    var key = Mock.keyName(o.root, o.scale, 'plain');
+    return {
+      // js/remote.js:44, through App.toast: a pedal press on a page that has nothing to move on
+      nothing: { id: 'app-toast', text: 'Nothing to move on here' },
+      // decision D16: what a flip of the lock in the bar says
+      lock: { id: 'app-toast', text: 'Scale lock on: only ' + key + ' notes sound' },
+      lockoff: { id: 'app-toast', text: 'Scale lock off: every note sounds' },
+      // js/quiz.js:2888-2889
+      goal: { id: 'xp-toast', text: 'Today counts: 5 minutes played. 3-day streak.' },
+      // js/app.js:1457
+      back: { id: 'back-hint', text: 'Press Back again to leave soundLAB.' },
+      // js/app.js:1791
+      sound: { id: 'snd-hint', text: 'Your keyboard is connected. Click or tap anywhere to turn on sound — browsers keep audio off until you interact with the page.' },
+      // js/app.js:185-187, :193-215
+      update: { id: 'app-update', text: 'soundLAB v2.0.1 is available.', acts: [['Update now', 'primary'], ['Later', '']] },
+      apk: { id: 'app-update', text: 'A new soundLAB Android app (v0.76.0) is available.', acts: [['Download', 'primary'], ['Later', '']] },
+      // js/xp.js:78
+      unsaved: { id: 'lesson-progress-unsaved', bad: true, text: 'Lesson progress was not saved. Retry or export the original observations before closing this page.',
+        acts: [['Retry save', ''], ['Export unsaved', '']] }
+    };
+  }
+  function stack(o) {
+    var all = messages(o), seen = {};
+    return q('msg', '').split(',').map(function (id) { return all[id]; }).filter(function (m) {
+      if (!m || seen[m.id]) return false;      // an id exists once: #app-toast holds one text at a time
+      seen[m.id] = true; return true;
+    }).map(Mock.toast).join('');
+  }
+
+  // ==== 3 · THE PEDAL'S CONFIRMATION (js/remote.js:216-232) =================================
+  var HUDS = {
+    start: ['next', 'Start'],                                        // js/keylessons.js:200: Next starts the lesson
+    nextlesson: ['next', 'Next lesson: C major · Left hand'],        // js/keylessons.js:192
+    back: ['back', 'Listen again'],                                  // js/keylessons.js:157
+    stop: ['stop', 'Stopped'],                                       // js/keylessons.js:158
+    works: ['next', 'Next works']                                    // js/remote.js:190: in Settings a press is only a test
+  };
+  function hud() {
+    var h = HUDS[q('hud', '')];
+    if (!h) return '';
+    return '<div id="remote-hud" class="sl-skin show" role="status" aria-live="polite" aria-atomic="true" data-action="' + h[0] + '">' +
+      icon({ next: 'right', back: 'left', stop: 'stop' }[h[0]], 22) + '<span>' + esc(h[1]) + '</span></div>';
+  }
+
+  // ==== 4 · THE HELP TOUR (js/help.js:162-232) ==============================================
+  // The card's parts and its buttons are today's. New with B7b: the layer is a dialog and carries
+  // .sl-skin. Proposed here: the X sits in the card (mock.css, "Tour card").
+  var TOURS = {
+    // the welcome, card 1 of 5 (js/help.js:244)
+    welcome: { n: 1, of: 5, t: 'Welcome to soundLAB', x: 'Start with Exercises: a short theory and ear-training course you answer by playing. Around it: guitar, keys, songs, the jam band and the tuner.' },
+    // the welcome, card 4 of 5 (js/help.js:247): a control at the top edge
+    met: { sel: '#met-btn', n: 4, of: 5, t: 'The metronome', x: 'Always one tap away in the top corner: it opens over any page and keeps playing when you close it.' },
+    // the Neck's tour, card 2 of 3 (js/help.js:40), pointed at the key bar and reworded by B5a
+    bar: { sel: '#ctxbar', n: 2, of: 3, t: 'Pick your key and scale', x: 'The bar under the top row holds key, tempo, Scale lock, lights and Help; it is the same on every page. With Scale lock on, notes outside the scale make no sound.' },
+    // the Piano's tour, its last card (js/help.js:61): a control near the bottom, and the longest text there is
+    lumi: { sel: '.mk-quiet-folds > details:last-child', n: 8, of: 8, t: 'Notes and triads on the LUMI', x: 'Under the lessons, closed until you open it. It shows a note or a triad to play and moves on when you play exactly those notes. It starts with on-screen answers; a connected LUMI or MODX can be the answer keyboard. While the section is open, the pedal works here and the lessons’ double-tap on the lowest key is paused; the double-tap key from Settings › Hands-free control works here too when it is on, in Simulated mode. Starting a lesson or the runner closes it.' },
+    // the metronome sheet's tour, card 2 of 4 (js/help.js:34): a tour over an open sheet
+    tap: { sel: '#met-tap', n: 2, of: 4, t: 'Tap tempo', x: 'Tap along to a song and the BPM follows your taps. −5 / −1 / +1 / +5 and the slider fine-tune it.' }
+  };
+  function tour() {
+    var st = TOURS[q('tour', '')];
+    if (!st) return '';
+    var last = st.n === st.of;
+    return '<div id="hp-ov" class="sl-skin' + (st.sel ? ' is-spot' : '') + '" role="dialog" aria-modal="true" aria-labelledby="hp-title">' +
+      '<div class="hp-ring"></div>' +
+      '<div class="hp-card card">' +
+        '<div class="hp-head"><div class="hp-t" id="hp-title">' + esc(st.t) + '</div>' +
+          '<button type="button" class="hp-close btn sm icon-btn" aria-label="Close help">' + icon('close', 20) + '</button></div>' +
+        '<div class="hp-x">' + esc(st.x) + '</div>' +
+        '<div class="row spread"><span class="muted small">' + st.n + ' of ' + st.of + '</span><span class="row tight">' +
+          (st.n > 1 ? '<button type="button" class="btn sm" id="hp-back">Back</button>' : '') +
+          '<button type="button" class="btn sm primary" id="hp-next">' + (last ? 'Done' : 'Next') + '</button></span></div>' +
+      '</div></div>';
+  }
+  // the ring around the target and the card beside it: the arithmetic of js/help.js:164-213, with
+  // the gutter token's 16 px to the window's edges, and the ring kept inside the window
+  function placeTour() {
+    var ov = document.getElementById('hp-ov'), st = TOURS[q('tour', '')];
+    if (!ov || !st) return;
+    var ring = ov.querySelector('.hp-ring'), card = ov.querySelector('.hp-card'), rect = null, W = window.innerWidth, H = window.innerHeight;
+    var target = st.sel ? document.querySelector(st.sel) : null;
+    if (target) {
+      var r = target.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < H) rect = r;
+    }
+    ov.classList.toggle('is-spot', !!rect);
+    if (rect) {
+      var l = Math.max(4, rect.left - 6), t = Math.max(4, rect.top - 6);
+      ring.style.display = '';
+      ring.style.left = l + 'px';
+      ring.style.top = t + 'px';
+      ring.style.width = (Math.min(W - 4, rect.right + 6) - l) + 'px';
+      ring.style.height = (Math.min(H - 4, rect.bottom + 6) - t) + 'px';
+    } else ring.style.display = 'none';
+    card.style.left = '50%';
+    card.style.top = '50%';
+    card.style.transform = 'translate(-50%,-50%)';
+    if (rect) {
+      var ch = card.offsetHeight, cw = card.offsetWidth, m = 16;
+      var left = Math.max(m, Math.min(W - cw - m, rect.left + rect.width / 2 - cw / 2));
+      var top = rect.bottom + 14;
+      if (top + ch > H - m) top = rect.top - ch - 14;
+      if (top < m) top = Math.max(m, (H - ch) / 2);
+      card.style.transform = 'none';
+      card.style.left = left + 'px';
+      card.style.top = top + 'px';
+    }
+  }
+
+  // ==== 5 · EMPTY, LOADING, ERROR: the page's content =======================================
+  // The Woodshed's library with nothing in it (js/woodshed.js:1150-1197), and the same page after
+  // a file that is not a MIDI file was refused (:1393 with the message of :233).
+  function shedMain(error) {
+    return '<div class="mk-page">' +
+      '<div class="mk-quiet-head"><p class="sl-eyebrow">Train · Woodshed</p><h1>Woodshed</h1></div>' +
+      '<p class="sl-hint">Pick something to practice — every run is scored (Perfect ±30ms). Calibrate once per input for honest timing.</p>' +
+      '<div class="row tight">' + ['+ Scale (your key)', '+ Hanon', '+ Pentatonic fours', '+ MIDI file', '+ Paste tab', 'Calibrate timing'].map(function (t) {
+        return '<button type="button" class="btn sm">' + t + '</button>'; }).join('') + '</div>' +
+      (error ? '<div class="error" id="ws-msg" role="alert">' + icon('alert', 20) + '<span>MIDI import failed: not a MIDI file</span></div>' : '') +
+      '<div class="card"><h2>Shared source library</h2>' +
+        '<p class="muted small">Practice credit: Piano. Source instrument describes the score, not your XP category.</p>' +
+        '<div id="ws-lib"><div class="sl-empty">' + icon('note', 28) + '<b>Nothing yet</b><span>Generate an exercise above, import a MIDI file, or paste a tab.</span></div></div>' +
+      '</div></div>';
+  }
+  // a page whose script did not load: the box stands in place of the page (js/app.js:1815)
+  function failedMain(page) {
+    return '<div class="mk-page"><div class="error" role="alert">' + icon('alert', 20) + '<span>Module "' + esc(page) + '" failed to load (script error?). Check the console.</span></div></div>';
+  }
+
+  // ==== ONE STATE ===========================================================================
+  if (Mock.single) {
+    var o = Mock.shellOpts({});
+    var bodies = { metronome: metronomeBody, lights: lightsBody, instrument: instrumentBody };
+    var state = q('state', '');
+    var main = state === 'empty' ? shedMain(false) : state === 'error' ? shedMain(true) : state === 'failed' ? failedMain(o.page) : null;
+    Mock.page({ title: TITLE, shell: { sheetBody: bodies[o.sheet] ? bodies[o.sheet](o) : '' }, main: main, after: hud() + tour() });
+    var messagesHtml = stack(o);
+    if (messagesHtml) document.getElementById('sl-toasts').innerHTML = messagesHtml;
+    // what the app does while a sheet or the tour is open: the key bar takes no tap (B5a)
+    var bar = document.getElementById('ctxbar');
+    if (bar && (o.sheet || q('tour', ''))) { bar.inert = true; bar.setAttribute('aria-disabled', 'true'); }
+    // during an Exercises run the chip in the header carries a lock (B8)
+    var chip = document.getElementById('inst-btn');
+    if (chip && q('run', '') === '1') chip.insertAdjacentHTML('beforeend', Mock.icon('lock', 14, 'sl-kchip-lock'));
+    var after = function () {
+      if (q('at', '') === 'end') { var body = document.querySelector('.sheet:not([hidden]) .sheet-body'); if (body) body.scrollTop = body.scrollHeight; }
+      placeTour();
+    };
+    after();
+    window.addEventListener('resize', after);
+    window.addEventListener('load', after);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(after);
+    return;
+  }
+
+  // ==== THE CONTACT VIEW: every state, in the order the owner should meet them =============
+  var W3 = [390, 820, 1280], W2 = [390, 1280];
+  Mock.contact({
+    title: 'Sheets, messages and the tour',
+    lead: [
+      'Everything that lies over a page for a moment: the three sheets, the short messages, the pedal’s answer, the help tour, ' +
+        'and what a page shows when it has nothing yet, is waiting, or has failed.',
+      'None of these waits for a yes. They are built as drawn here unless you say what to change. ' +
+        'The <b>Instrument</b> sheet belongs to the header’s question: it is what the instrument button there opens.',
+      'The sentences in these pictures are the app’s own. Some are already in the plainer words the wording list proposes for them, ' +
+        'and two labels are new: “Practising” and “Where to practise”, both in the Instrument sheet.'
+    ],
+    groups: [
+      { title: '1 · Sheets',
+        lead: 'Three things open over the page you are on: the metronome, your keyboard’s lights, and your instrument. ' +
+          'On a phone and a tablet a sheet comes up from the bottom. On a wide screen it is a panel on the right, and the page stays readable beside it.',
+        states: [
+          { id: 'met', title: 'The metronome. It opens over any page and keeps clicking after you close it.',
+            note: 'The time signature (“Time”) is set here now; it has left the bar at the top.', params: { sheet: 'metronome' }, widths: W3 },
+          { id: 'met-run', title: 'The click is running: Start has become Stop, and a dot lights on every beat.',
+            note: 'A tap on a beat dot makes it an accent (thick ring), a normal beat, or a silent one (dashed). The metronome in the corner stays lit while the click runs.',
+            params: { sheet: 'metronome', met: 1 }, widths: W3 },
+          { id: 'met-trainer', title: 'Scrolled down: the tempo trainer, opened, says what it will do next.',
+            params: { sheet: 'metronome', met: 1, fold: 'trainer', at: 'end' }, widths: W3 },
+          { id: 'met-sounds', title: 'Six beats in the bar (6/8), and “Click sounds” opened: a sound each for the bar’s first beat, the other beats and the upbeats.',
+            params: { sheet: 'metronome', sig: '6/8', fold: 'sounds', at: 'end' }, widths: W3 },
+          { id: 'lights', title: 'Keyboard lights, with a LUMI connected: its colors, brightness, and what it does during a lesson.',
+            note: 'Help level and note colors are no longer here. They are set in the bar at the top, and the sheet’s first line says so.', params: { sheet: 'lights' }, widths: W3 },
+          { id: 'lights-end', title: 'The same sheet, scrolled to its end.', params: { sheet: 'lights', at: 'end' }, widths: W2 },
+          { id: 'lights-note', title: 'With “Color notes by: Note name” the sheet shows the twelve note colors.', params: { sheet: 'lights', colors: 'note' }, widths: [390] },
+          { id: 'lights-off', title: 'The LUMI’s lights are switched off in the bar: the light test is greyed, with a dashed edge.',
+            params: { sheet: 'lights', lights: 'off', at: 'end' }, widths: W2 },
+          { id: 'lights-none', title: 'No keyboard connected: one sentence and one button.', params: { sheet: 'lights', lights: 'none' }, widths: W2 },
+          { id: 'lights-kbd', title: 'A keyboard with lit keys that is not a LUMI.', params: { sheet: 'lights', lights: 'kbd' }, widths: W2 },
+          { id: 'inst', title: 'Instrument: what you practise, and where that practice starts.',
+            note: 'The button in the header opens it from every page. What you pick decides the Exercises you get and whose progress a run counts for.', params: { sheet: 'instrument' }, widths: W3 },
+          { id: 'inst-list', title: 'The list, opened: Piano, Guitar, Bass and Drums first. Synth, Voice and Other are under “More”.',
+            note: 'Your phone or computer draws this list in its own way; the order is what counts.', params: { sheet: 'instrument', list: 1 }, widths: W2 },
+          { id: 'inst-bass', title: 'Bass.', params: { sheet: 'instrument', inst: 'bass' }, widths: W2 },
+          { id: 'inst-drums', title: 'Drums, with the explanation opened.', params: { sheet: 'instrument', inst: 'drums', about: 1 }, widths: W2 },
+          { id: 'inst-voice', title: 'Voice, one of the three under “More”.', params: { sheet: 'instrument', inst: 'voice' }, widths: [390] },
+          { id: 'inst-run', title: 'During an Exercises run the instrument cannot change. The sheet says why and offers the way out.',
+            note: 'The button in the header carries a small lock meanwhile.', params: { sheet: 'instrument', run: 1, page: 'quiz' }, widths: W2 }
+        ] },
+      { title: '2 · Messages',
+        lead: 'Short messages come up from the bottom, above the tabs. Today five kinds share one spot and cover each other. ' +
+          'Now they stack, and they lie on top of an open sheet instead of behind it.',
+        states: [
+          { id: 'msg-one', title: 'One message: the Next pedal was pressed on a page that has nothing to move on.', params: { msg: 'nothing', page: 'chart' }, widths: W3 },
+          { id: 'msg-two', title: 'Two at once: the Scale lock was flipped while an update waits. Neither covers the other.',
+            note: 'A message with buttons stays lowest, so its buttons do not move when a short message comes and goes.', params: { msg: 'lock,update' }, widths: W3 },
+          { id: 'msg-long', title: 'A long one: a key was played before the browser allowed sound.', params: { msg: 'sound' }, widths: W3 },
+          { id: 'msg-back', title: 'Back, pressed on the first page.', params: { msg: 'back' }, widths: [390, 820] },
+          { id: 'msg-unsaved', title: 'Progress could not be saved. This box stays until you have retried or exported.', params: { msg: 'unsaved', page: 'quiz' }, widths: W3 },
+          { id: 'msg-sheet', title: 'A message while a sheet is open: it lies on top of the sheet.',
+            note: 'On a wide screen it moves to the left, beside the panel.', params: { sheet: 'lights', msg: 'sound' }, widths: W3 },
+          { id: 'msg-many', title: 'The most that is likely to meet: four.', params: { msg: 'goal,lockoff,back,update' }, widths: W2 }
+        ] },
+      { title: '3 · The pedal’s answer',
+        lead: 'A pedal, a synth button or a page turner can press Next, Back and Stop. Each press that did something says what it did, ' +
+          'large enough to read from the piano bench, for about a second.',
+        states: [
+          { id: 'hud', title: 'Next started the lesson.', params: { hud: 'start' }, widths: W3 },
+          { id: 'hud-long', title: 'A long answer: on a phone it takes two lines and stays inside the screen.', params: { hud: 'nextlesson' }, widths: [[375, 812], 820, 1280] },
+          { id: 'hud-back', title: 'Back played the lesson to you once more.', note: 'The arrow points the way the pedal went.', params: { hud: 'back' }, widths: W2 },
+          { id: 'hud-stop', title: 'Stop ended the run: a square in place of the arrow.', params: { hud: 'stop' }, widths: W2 },
+          { id: 'hud-works', title: 'In Settings a press only shows that the pedal works.', params: { hud: 'works', page: 'settings' }, widths: W2 }
+        ] },
+      { title: '4 · The help tour and the welcome',
+        lead: 'The ? in the header explains the page you are on, card by card. A card that is about one control points at it: ' +
+          'the control keeps its full light and everything around it is dimmed.',
+        states: [
+          { id: 'welcome', title: 'The welcome at the very first start: five short cards. This is the first.', params: { tour: 'welcome' }, widths: W3 },
+          { id: 'tour-met', title: 'A card that points at a control at the top: the metronome in the corner.', params: { tour: 'met' }, widths: W3 },
+          { id: 'tour-bar', title: 'A card about the bar under the header.', params: { tour: 'bar' }, widths: W3 },
+          { id: 'tour-lumi', title: 'A control near the bottom, and the longest text of any tour: the card stands above the control.', params: { tour: 'lumi' }, widths: W3 },
+          { id: 'tour-tap', title: 'A sheet has its own tour: “Tap tempo” in the metronome.', params: { tour: 'tap', sheet: 'metronome' }, widths: W2 }
+        ] },
+      { title: '5 · Nothing yet, waiting, failed',
+        lead: 'Three moments that every page has. Each says in words what is the case and what to do; none is a color alone.',
+        states: [
+          { id: 'empty', title: 'Nothing yet: the Woodshed’s library before the first piece.', params: { state: 'empty', page: 'shed' }, widths: W3 },
+          { id: 'loading', title: 'Waiting: the Android app is looking for a Bluetooth keyboard.', params: { sheet: 'lights', lights: 'none', bt: 1 }, widths: W3 },
+          { id: 'error', title: 'Failed: a file that is not a MIDI file was refused.', params: { state: 'error', page: 'shed' }, widths: W3 },
+          { id: 'failed', title: 'A page that could not load says so where its content would be.', params: { state: 'failed' }, widths: W2 }
+        ] }
+    ]
+  });
+})();
+</script>
+</body>
+</html>

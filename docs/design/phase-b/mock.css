@@ -235,6 +235,7 @@
 }
 @media (hover: hover) { .sl-hero-btn:hover { transform: translateY(-1px); } }
 .sl-hero-btn:active { transform: translateY(1px); box-shadow: none; }
+.sl-hero-btn > .ic { flex: 0 0 auto; }      /* an icon before or after the words keeps its size */
 .sl-hero-btn:focus-visible { outline: 2px solid transparent; outline-offset: 2px; box-shadow: var(--sl-focus); }
 .sl-hero-btn:disabled,
 .sl-hero-btn[aria-disabled="true"] {
@@ -245,6 +246,10 @@
   cursor: not-allowed;
   transform: none;
 }
+
+/* a small button keeps its small type and takes the full control height where the dense tier
+   is not allowed (D9): in a sheet, in a message, in the tour card */
+:where(.sl-skin) :is(.sheet-body, .sl-toast, .hp-card) .btn.sm { min-height: var(--sl-control-h); min-width: var(--sl-control-h); }
 
 /* ---- Icon button: square, 44 / 48 px, never the dense tier, needs a name -- */
 :where(.sl-skin) :is(.icon-btn, .btn.icon-btn, .btn.sm.icon-btn) {
@@ -426,6 +431,8 @@
   accent-color: var(--sl-accent);
   cursor: pointer;
 }
+/* a native checkbox (the metronome's "Enable", a page's own check boxes) */
+:where(.sl-skin) input[type="checkbox"] { flex: 0 0 auto; width: var(--sl-space-5); height: var(--sl-space-5); margin: 0; accent-color: var(--sl-accent); cursor: pointer; }
 
 /* ---- Switch: .sl-switch, a button with aria-pressed. The knob moves, the
         fill changes, and a word stands beside it ---------------------------- */
@@ -568,9 +575,22 @@
   text-transform: none;
 }
 :where(.sl-skin) .card h2::before { content: none; }
+/* a small heading inside a card, and the label of a section inside a sheet's body */
+:where(.sl-skin) :is(.card, .sheet-body) h3 {
+  margin: 0;
+  color: var(--sl-ink-soft);
+  font-family: var(--sl-font-cond);
+  font-size: var(--sl-text-xs);
+  font-weight: var(--sl-weight-cond);
+  line-height: 1.2;
+  letter-spacing: var(--sl-caps-ls);
+  text-transform: uppercase;
+}
 @media (max-width: 640px) { :where(.sl-skin) .card { padding: var(--sl-space-4); } }
 
-/* ---- Rows: .sl-rows, .sl-row, done = a check mark and the word "Done" ----- */
+/* ---- Rows: .sl-rows, .sl-row, done = a check mark and the word "Done".
+        The dense height is for the rows of a list in a card or a fold (D9); in a
+        sheet a row takes the full control height ------------------------------- */
 .sl-rows { display: grid; gap: var(--sl-space-1); margin: 0; padding: 0; list-style: none; }
 .sl-row {
   display: flex;
@@ -584,11 +604,34 @@
   color: var(--sl-ink);
   font-size: var(--sl-text-sm);
 }
-@media (hover: hover) { :is(a, button).sl-row:hover { border-color: var(--sl-line-control); } }
-:is(a, button).sl-row { width: 100%; text-align: left; text-decoration: none; cursor: pointer; }
+.sheet-body .sl-row { min-height: var(--sl-control-h); padding-top: var(--sl-space-2); padding-bottom: var(--sl-space-2); }
+/* a row that is a control (a link or a button) carries a control's boundary (3:1 on every
+   ground); where it does not stand in a card it takes the card's surface, or it would melt
+   into its ground in the light theme (a sheet, the page) */
+:is(a, button).sl-row { width: 100%; border-color: var(--sl-line-control); font-family: var(--sl-font-body); text-align: left; text-decoration: none; cursor: pointer; }
+:is(a, button).sl-row:not(.card *) { background: var(--sl-surface); }
+@media (hover: hover) { :is(a, button).sl-row:hover { border-color: var(--sl-ink-soft); } }
 :is(a, button).sl-row:active { background: var(--sl-surface-sunken); }
+:is(a, button).sl-row > .ic { flex: 0 0 auto; color: var(--sl-ink-muted); }
+/* the row that is chosen in a list of rows: a fill, an amber boundary and a check mark */
+:is(a, button).sl-row[aria-pressed="true"] { border-color: var(--sl-accent-deep); background: var(--sl-accent-soft); }
+:is(a, button).sl-row[aria-pressed="true"]::before {
+  content: '';
+  flex: 0 0 auto;
+  width: calc(var(--sl-space-1) + 1px);
+  height: calc(var(--sl-space-2) + 1px);
+  margin: 0 var(--sl-space-1) var(--sl-space-1);
+  border: solid currentColor;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+:is(a, button).sl-row:disabled { border: 1px dashed var(--sl-line-control); background: transparent; color: var(--sl-ink-muted); cursor: not-allowed; }
+/* a row's parts: its name with a smaller line under it, its state, the buttons at its end */
 .sl-row-main { flex: 1 1 auto; min-width: 0; }
+.sl-row-main > b { display: block; line-height: 1.3; }
+.sl-row-main > small { display: block; margin-top: 2px; color: var(--sl-ink-muted); font-size: var(--sl-text-xs); font-weight: var(--sl-weight-regular); line-height: 1.3; }
 .sl-row-state { flex: 0 0 auto; color: var(--sl-ink-muted); font-size: var(--sl-text-xs); }
+.sl-row-acts { display: flex; flex: 0 1 auto; flex-wrap: wrap; align-items: center; gap: var(--sl-space-2); min-width: 0; margin-left: auto; }
 .sl-row.is-done { background: transparent; border-color: var(--sl-line-strong); color: var(--sl-ink-soft); }
 .sl-row.is-done .sl-row-state { color: var(--sl-ok); }
 .sl-row.is-done .sl-row-state::before {
@@ -636,11 +679,19 @@
 @media (hover: hover) { :where(.sl-skin) :is(details.sl-fold, details.tips) > summary:hover { color: var(--sl-accent-text); } }
 :where(.sl-skin) :is(details.sl-fold, details.tips) > summary:active { background: var(--sl-surface-sunken); }
 :where(.sl-skin) :is(details.sl-fold, details.tips) > :not(summary) { padding: 0 var(--sl-space-1) var(--sl-space-4); }
+/* the last fold of a run of folds closes the run with a line */
+:where(.sl-skin) :is(details.sl-fold, details.tips):last-of-type { border-bottom: 1px solid var(--sl-line-strong); }
+/* details.tips inside a card or inside a fold's body stands without lines: a quiet disclosure */
+:where(.sl-skin) :is(.card, details) details.tips { border: 0; }
+:where(.sl-skin) :is(.card, details) details.tips > summary { justify-content: flex-start; padding: 0; color: var(--sl-ink-soft); font-size: var(--sl-text-sm); }
+:where(.sl-skin) :is(.card, details) details.tips > summary::after { order: -1; margin: 0 var(--sl-space-2) var(--sl-space-1) var(--sl-space-1); }
+:where(.sl-skin) :is(.card, details) details.tips > :not(summary) { padding: 0 0 var(--sl-space-2); }
 
 /* ---- Tile and ring: .sl-tile, .sl-ring (--p is the share, 0 to 100) ------- */
 .sl-tile { display: grid; gap: var(--sl-space-1); padding: var(--sl-space-3) var(--sl-space-4); border-radius: var(--sl-radius-md); background: var(--sl-surface-2); }
 .sl-tile-num { font-family: var(--sl-font-display); font-size: var(--sl-display-sm); line-height: 1; font-variant-numeric: tabular-nums; }
 .sl-tile-label { color: var(--sl-ink-muted); font-size: var(--sl-text-xs); }
+.sl-tile-note { color: var(--sl-ink-muted); font-size: var(--sl-text-xs); line-height: 1.35; }      /* a line of explanation under the number */
 .sl-ring {
   --p: 0;
   display: inline-block;
@@ -691,6 +742,12 @@
   font-size: var(--sl-text-sm);
 }
 .sl-footline b { color: var(--sl-ink); }
+/* a part of the line that pairs a mark (the goal ring, an icon) with its words; the ring is
+   smaller inside the line; a reached goal says so in words, with a check mark in the status colour */
+.sl-footline-part { display: inline-flex; align-items: center; gap: var(--sl-space-2); min-width: 0; }
+.sl-footline .sl-ring { width: var(--sl-space-5); height: var(--sl-space-5); }
+.sl-footline .ic { flex: 0 0 auto; color: var(--sl-ink-muted); }
+.sl-footline-part.is-done .ic { color: var(--sl-ok); }
 
 /* ---- Hint and screen-reader text (.hint and .sr keep working) -------------- */
 .sl-hint, :where(.sl-skin) .hint { color: var(--sl-ink-muted); font-size: var(--sl-text-sm); line-height: var(--sl-leading); }
@@ -746,7 +803,9 @@
   color: var(--sl-ink);
   font-size: var(--sl-text-sm);
 }
-:where(.sl-skin) .error .ic { color: var(--sl-bad); }
+:where(.sl-skin) .error[hidden] { display: none; }
+:where(.sl-skin) .error .ic { flex: 0 0 auto; color: var(--sl-bad); }
+.sl-empty > .ic { color: var(--sl-ink-muted); }
 
 /* ---- Two-tap confirm: .sl-confirm, armed for 3 s ---------------------------- */
 .sl-confirm { position: relative; overflow: hidden; }
@@ -780,10 +839,12 @@
 .fb-field { display: inline-flex; align-items: center; gap: var(--sl-space-2); color: var(--sl-ink-soft); font-size: var(--sl-text-sm); }
 .jam-now { color: var(--sl-accent-text); font-weight: var(--sl-weight-medium); }
 
-/* ---- Instrument heroes: .sl-hero, .sl-kbd, .sl-neck, .sl-pads.
-        A first draft; mock-hero.js draws the instruments and owns the inner parts.
-        The lighting vocabulary (D30) as classes on a key, a fret position or a pad;
-        the note's colour arrives as --c. No ring, outline or glow in the accent here. */
+/* ---- Instrument heroes: .sl-hero, .sl-kbd, .sl-neck, .sl-pads (Appendix B; D29-D31).
+        The markup comes from mock-hero.js (the first draft of js/hero.js).
+        The lighting vocabulary (D30) is a class on a key, a spot of the neck or a pad;
+        the note's colour arrives as --c on that element. Keys, strings and pads are the
+        instrument, not chrome: they look the same in both themes, on --sl-stage.
+        No ring, outline or glow in the accent here. ---------------------------------- */
 .sl-hero {
   position: relative;
   padding: var(--sl-space-4);
@@ -791,11 +852,11 @@
   background: var(--sl-stage);
   color: var(--sl-ink-on-stage);
 }
-/* a keyboard is a grid with three columns for each ivory key: an ivory key spans three, an
-   ebony key spans the two around a boundary. The ebony keys are written after the ivory
-   ones, so they lie over them without a layer number. The drawing code sets each
-   key's grid-column and the grid's column count inline. */
-.sl-kbd { display: grid; width: 100%; height: 100%; }
+
+/* -- keyboard: a grid with three columns for each ivory key. An ivory key spans three, an
+      ebony key the two around a boundary; the ebony keys are written after the ivory
+      ones, so they lie on top without a layer number. Second row: the octaves' names. -- */
+.sl-kbd { display: grid; grid-template-rows: minmax(0, 1fr) auto; width: 100%; height: 100%; }
 .sl-key {
   position: relative;
   grid-row: 1;
@@ -806,6 +867,10 @@
   background: var(--sl-key-white);
 }
 .sl-key + .sl-key { border-left: 0; }
+/* a key is the measure of what stands on it: cqw below is a share of the key's own width, so
+   that the root's ring and a label get thinner and smaller on a narrow key (two octaves on a
+   phone) and never swallow the dot. Where a browser does not know the unit, the line before holds. */
+.sl-key { container-type: inline-size; }
 .sl-key.sl-key-b {
   align-self: start;
   height: 62%;
@@ -815,35 +880,181 @@
   background: var(--sl-key-black);
   box-shadow: var(--sl-shadow-1);
 }
-.sl-dot {                                  /* in the scale: a dot in the note's colour with a dark ring */
+.sl-kbd-name {
+  grid-row: 2;
+  padding-top: var(--sl-space-2);
+  color: var(--sl-ink-on-stage);
+  font-family: var(--sl-font-cond);
+  font-size: var(--sl-text-xs);
+  font-weight: var(--sl-weight-cond);
+  line-height: 1;
+  letter-spacing: var(--sl-caps-ls);
+  text-align: center;
+}
+/* in the scale: a dot in the note's colour with a dark ring (the ring is the border, so the
+   dot never reaches past its key); at Help Full its label stands inside */
+.sl-dot {
   position: absolute;
   left: 50%;
   bottom: 12%;
+  box-sizing: border-box;
   display: grid;
   place-items: center;
-  width: min(72%, var(--sl-space-5));
+  width: min(86%, calc(var(--sl-space-5) + var(--sl-space-1)));
   aspect-ratio: 1;
   transform: translateX(-50%);
+  border: 2px solid var(--sl-ink-on-color);
   border-radius: var(--sl-radius-pill);
   background: var(--c);
-  box-shadow: 0 0 0 2px var(--sl-ink-on-color);
+  box-shadow: none;
   color: var(--sl-ink-on-color);
   font-family: var(--sl-font-cond);
   font-size: var(--sl-text-xs);
   font-weight: var(--sl-weight-cond-bold);
   line-height: 1;
 }
-.sl-dot.is-ink-light { color: var(--sl-ink-on-color-light); }
-.is-root > .sl-dot { box-shadow: 0 0 0 var(--sl-space-1) var(--sl-ink-on-color); }            /* the root: a thicker ring */
-.sl-key-b > .sl-dot { bottom: 10%; width: min(78%, var(--sl-space-5)); box-shadow: 0 0 0 2px var(--sl-key-white); }
-.sl-key-b.is-root > .sl-dot { box-shadow: 0 0 0 var(--sl-space-1) var(--sl-key-white); }
-:is(.sl-key, .sl-key-b).is-now { background: var(--c); box-shadow: inset 0 0 0 calc(var(--sl-space-1) - 1px) var(--sl-ink-on-color); }   /* now: the key is filled */
-:is(.sl-key, .sl-key-b).is-now > .sl-dot { background: transparent; box-shadow: none; }
-.is-next > .sl-dot { background: transparent; box-shadow: inset 0 0 0 calc(var(--sl-space-1) - 1px) var(--c), 0 0 0 1px var(--sl-ink-on-color); }   /* next: an empty ring */
-:is(.sl-key, .sl-key-b).is-press { background: var(--sl-key-press); box-shadow: inset 0 calc(-1 * var(--sl-space-1)) 0 var(--sl-key-line); }
-:is(.sl-key, .sl-key-b).is-right { background: var(--sl-ok); }
-:is(.sl-key, .sl-key-b).is-wrong { background: var(--sl-bad); }
-.sl-neck, .sl-pads { position: relative; width: 100%; }
+/* a light label carries a hairline outline in the dark ink: on two colours neither ink
+   alone reaches 4.5:1 (4.38 and 4.43), the outline is what the label is read against */
+.sl-dot.is-ink-light {
+  color: var(--sl-ink-on-color-light);
+  text-shadow: 1px 0 0 var(--sl-ink-on-color), -1px 0 0 var(--sl-ink-on-color), 0 1px 0 var(--sl-ink-on-color), 0 -1px 0 var(--sl-ink-on-color);
+}
+.sl-key-b > .sl-dot { bottom: 10%; width: min(86%, calc(var(--sl-space-5) + var(--sl-space-1))); box-shadow: none; }
+/* the root: a thicker ring, and around it a fine line in the note's own colour, which is
+   what shows the ring on an ebony key */
+.is-root > .sl-dot { width: min(80%, var(--sl-space-6)); border-width: var(--sl-space-1); box-shadow: 0 0 0 2px var(--c); }
+.is-root > .sl-dot { border-width: clamp(2px, 12cqw, var(--sl-space-1)); }
+.sl-key-b.is-root > .sl-dot { box-shadow: 0 0 0 2px var(--c); }
+/* now: the whole key is filled with its colour and has an ink ring; the label stays */
+.sl-key.is-now { background: var(--c); box-shadow: inset 0 0 0 calc(var(--sl-space-1) - 1px) var(--sl-ink-on-color); }
+.sl-key.is-now.is-root { box-shadow: inset 0 0 0 calc(var(--sl-space-1) + 1px) var(--sl-ink-on-color); }
+.sl-key.is-now > .sl-dot { border-color: transparent; background: transparent; box-shadow: none; }
+/* next: an empty ring in the note's colour, between two dark hairlines so that a yellow
+   ring reads on ivory; its label stands on the key */
+.sl-key.is-next > .sl-dot {
+  border: calc(var(--sl-space-1) - 1px) solid var(--c);
+  background: transparent;
+  box-shadow: 0 0 0 1px var(--sl-ink-on-color), inset 0 0 0 1px var(--sl-ink-on-color);
+  color: var(--sl-ink-on-color);
+}
+.sl-key.sl-key-b.is-next > .sl-dot { box-shadow: none; color: var(--sl-key-white); }
+.sl-key.is-next.is-root > .sl-dot { border-width: calc(var(--sl-space-1) + 1px); }
+/* held down: the key takes its colour (a key outside the scale --sl-key-press), no ring,
+   and its front edge shows */
+.sl-key.is-press { background: var(--c, var(--sl-key-press)); box-shadow: inset 0 calc(-1 * var(--sl-space-2)) 0 var(--sl-key-line); }
+.sl-key.is-press > .sl-dot { border-color: transparent; background: transparent; box-shadow: none; }
+/* right and wrong: the judgement colour with its mark. Ring and mark take --sl-bg, the
+   surface the status colours are made to read on, so they hold in both themes */
+.sl-key.is-right { background: var(--sl-ok); box-shadow: inset 0 0 0 calc(var(--sl-space-1) - 1px) var(--sl-bg); }
+.sl-key.is-wrong { background: var(--sl-bad); box-shadow: inset 0 0 0 calc(var(--sl-space-1) - 1px) var(--sl-bg); }
+.sl-mark {
+  position: relative;
+  display: block;
+  flex: 0 0 auto;
+  width: calc(var(--sl-space-5) - var(--sl-space-1));
+  aspect-ratio: 1;
+  color: var(--sl-bg);
+}
+.sl-key > .sl-mark { position: absolute; left: 50%; bottom: 12%; width: min(80%, calc(var(--sl-space-5) - var(--sl-space-1))); transform: translateX(-50%); }
+.sl-key-b > .sl-mark { bottom: 10%; }
+.is-right > .sl-mark::before {            /* a check mark */
+  content: '';
+  position: absolute;
+  left: 34%;
+  top: 6%;
+  width: 34%;
+  height: 68%;
+  border: solid currentColor;
+  border-width: 0 calc(var(--sl-space-1) - 1px) calc(var(--sl-space-1) - 1px) 0;
+  transform: rotate(45deg);
+}
+.is-wrong > .sl-mark::before,             /* a cross */
+.is-wrong > .sl-mark::after {
+  content: '';
+  position: absolute;
+  left: calc(50% - (var(--sl-space-1) - 1px) / 2);
+  top: 4%;
+  width: calc(var(--sl-space-1) - 1px);
+  height: 92%;
+  border-radius: var(--sl-radius-pill);
+  background: currentColor;
+  transform: rotate(45deg);
+}
+.is-wrong > .sl-mark::after { transform: rotate(-45deg); }
+
+/* -- neck: an SVG in its own units (a fret is 46 wide, two strings are 30 apart). It fills
+      the width it is given; upright it is turned as one group and its texts turned back.
+      Everything is drawn on the stage, which is dark in both themes. -- */
+.sl-neck { display: block; width: 100%; height: auto; }
+.sl-neck-inlay { fill: var(--sl-fret); }
+.sl-neck-fret { stroke: var(--sl-fret); stroke-width: 2px; }
+.sl-neck-nut { stroke: var(--sl-nut); stroke-width: calc(var(--sl-space-1) + 2px); stroke-linecap: round; }
+.sl-neck-string { stroke: var(--sl-string); }
+.sl-neck-name,
+.sl-neck-num,
+.sl-pos-label { font-family: var(--sl-font-cond); font-size: var(--sl-text-xs); line-height: 1; }
+.sl-neck-name,
+.sl-neck-num { fill: var(--sl-ink-on-stage); font-weight: var(--sl-weight-cond); }
+/* in the scale: a dot in the note's colour; its dark ring is the circle's stroke, which
+   parts it from the string and the wires behind it */
+.sl-pos-dot { fill: var(--c); stroke: var(--sl-ink-on-color); stroke-width: 2px; }
+.sl-pos-label { fill: var(--sl-ink-on-color); font-weight: var(--sl-weight-cond-bold); }
+.sl-pos-label.is-ink-light { fill: var(--sl-ink-on-color-light); paint-order: stroke; stroke: var(--sl-ink-on-color); stroke-width: 2px; stroke-linejoin: round; }
+/* the root: a thicker ring, and a fine line in the note's own colour that hugs it (the
+   stage is dark, so the dark ring alone would not show) */
+.sl-pos.is-root > .sl-pos-dot { stroke-width: var(--sl-space-1); }
+.sl-pos-rim { fill: none; stroke: var(--c); stroke-width: 2px; }
+/* now: a ring in the stage's ink that stands off the dot */
+.sl-pos-ring { fill: none; stroke: var(--sl-ink-on-stage); stroke-width: calc(var(--sl-space-1) - 1px); }
+/* next: an empty ring in the note's colour */
+.sl-pos.is-next > .sl-pos-dot { fill: var(--sl-stage); stroke: var(--c); stroke-width: calc(var(--sl-space-1) - 1px); }
+.sl-pos.is-next.is-root > .sl-pos-dot { stroke-width: calc(var(--sl-space-1) + 1px); }
+.sl-pos.is-next > .sl-pos-label { fill: var(--sl-ink-on-stage); }
+/* held down: a larger dot without a ring; right and wrong as on a key */
+.sl-pos.is-press > .sl-pos-dot { fill: var(--c, var(--sl-key-press)); stroke: none; }
+.sl-pos.is-right > .sl-pos-dot { fill: var(--sl-ok); stroke: var(--sl-bg); }
+.sl-pos.is-wrong > .sl-pos-dot { fill: var(--sl-bad); stroke: var(--sl-bg); }
+.sl-pos-mark { fill: none; stroke: var(--sl-bg); stroke-width: calc(var(--sl-space-1) - 1px); stroke-linecap: round; stroke-linejoin: round; }
+
+/* -- pads: a grid of pads (the app's 4 x 2). A pad is a control: its boundary is the
+      control's line, which holds 3:1 on the stage in both themes. -- */
+.sl-pads { display: grid; grid-auto-rows: minmax(0, 1fr); gap: var(--sl-space-3); width: 100%; height: 100%; }
+.sl-pad {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sl-space-1);
+  min-width: 0;
+  min-height: calc(var(--sl-control-h) + var(--sl-space-5));
+  padding: var(--sl-space-2) var(--sl-space-1);
+  border: 1px solid var(--sl-line-control);
+  border-radius: var(--sl-radius-md);
+  background: var(--sl-key-black);
+  color: var(--sl-ink-on-stage);
+  text-align: center;
+}
+.sl-pad-dot {                             /* the pad's colour: a dot with a dark ring */
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  width: calc(var(--sl-space-4) + var(--sl-space-1));
+  aspect-ratio: 1;
+  border: 2px solid var(--sl-ink-on-color);
+  border-radius: var(--sl-radius-pill);
+  background: var(--c);
+}
+.sl-pad-name { font-family: var(--sl-font-body); font-size: var(--sl-text-sm); font-weight: var(--sl-weight-medium); line-height: 1.15; }
+.sl-pad-hint { font-family: var(--sl-font-body); font-size: var(--sl-text-xs); line-height: 1.15; font-variant-numeric: tabular-nums; }
+.sl-pad.is-now { background: var(--c); box-shadow: inset 0 0 0 calc(var(--sl-space-1) - 1px) var(--sl-ink-on-color); color: var(--sl-ink-on-color); }
+.sl-pad.is-next { box-shadow: inset 0 0 0 calc(var(--sl-space-1) - 1px) var(--c); }
+.sl-pad.is-press { background: var(--c, var(--sl-key-press)); box-shadow: inset 0 var(--sl-space-1) 0 var(--sl-key-line); color: var(--sl-ink-on-color); }
+/* a pad's colour is one of the seven degree colours or the crash's grey: on each of them
+   one of the two inks alone holds 4.5:1, so a pad's name needs no outline */
+.sl-pad.is-now.is-ink-light,
+.sl-pad.is-press.is-ink-light { color: var(--sl-ink-on-color-light); }
+.sl-pad.is-right { background: var(--sl-ok); box-shadow: inset 0 0 0 calc(var(--sl-space-1) - 1px) var(--sl-bg); color: var(--sl-bg); }
+.sl-pad.is-wrong { background: var(--sl-bad); box-shadow: inset 0 0 0 calc(var(--sl-space-1) - 1px) var(--sl-bg); color: var(--sl-bg); }
 
 /* ==========================================================================
    4 · The shell (Appendix A): header, tabs and pills, key bar, sheets,
@@ -1158,6 +1369,8 @@ html.bar-hidden .sl-keybar {                /* the header is gone: the bar is th
 .sl-keybar.has-labels .sl-kchip-label + .ic { display: none; }      /* the label says what the icon said */
 .sl-kchip-caret { margin-right: calc(-1 * var(--sl-space-1)); color: var(--sl-ink-muted); transition: transform var(--sl-dur) var(--sl-ease); }
 .sl-kchip[aria-expanded="true"] .sl-kchip-caret { transform: rotate(180deg); }
+/* the small lock in the instrument chip while an Exercises run is on: the instrument cannot change (B8) */
+.sl-kchip > .sl-kchip-lock { margin-left: calc(-1 * var(--sl-space-1)); color: var(--sl-ink-muted); }
 /* two lines in one chip: a small label over the value ("Practising" over "Guitar", the tempo over "BPM") */
 .sl-kchip-stack { display: grid; justify-items: start; gap: 2px; text-align: left; }
 .sl-kchip-stack > .sl-kchip-label { display: block; }
@@ -1418,6 +1631,23 @@ html.bar-hidden .sl-keybar {                /* the header is gone: the bar is th
   .sl-skin .brand .tag { padding: 2px calc(var(--sl-space-1) + 2px); letter-spacing: var(--sl-caps-ls); }
   #inst-btn, #cx-toggle { gap: calc(var(--sl-space-1) + 2px); margin-right: 0; padding: 0 var(--sl-space-3) 0 var(--sl-space-2); font-size: var(--sl-text-sm); }
 }
+/* Gear's key button (#cx-toggle, D14) never breaks the header's row. Up to 900 px, where no
+   tabs stand in that row, the tools take the room the wordmark leaves and the button is the
+   part that gives way. Script first picks a form of the key's name that fits (mock.js settle:
+   the plain name, the short name, the short name without the caret, class is-tight); cutting
+   the name with an ellipsis is the last resort. */
+@media (max-width: 900px) {
+  :root[data-app="gear"] .sl-skin .tb-tools { flex: 1 1 0; min-width: 0; justify-content: flex-end; }
+  #cx-toggle { flex: 0 1 auto; min-width: 0; }
+  #cx-toggle .sl-kchip-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  #cx-toggle.is-tight { padding: 0 var(--sl-space-2); }
+  #cx-toggle.is-tight .sl-kchip-caret { display: none; }
+}
+/* 640 px and narrower: the button's words take the face and size of the key bar's five chips,
+   so that the same name looks the same in the header and in the bar, and the same names fit */
+@media (max-width: 640px) {
+  #cx-toggle { font-family: var(--sl-font-cond); font-size: clamp(var(--sl-text-sm), 4.1vw, var(--sl-text-md)); font-weight: var(--sl-weight-cond); }
+}
 
 /* ---- Sheet (D24): a panel on the right, 440 px, above 900 px; a bottom sheet
         at 900 px and below -------------------------------------------------- */
@@ -1513,9 +1743,18 @@ html.bar-hidden .sl-keybar {                /* the header is gone: the bar is th
 .sl-toast[hidden] { display: none; }
 .sl-toast-bad { border-color: var(--sl-bad); }
 .sl-toast-bad .ic { color: var(--sl-bad); }
+.sl-toast > .ic { flex: 0 0 auto; }
+/* a message with buttons is its words, then ONE group of buttons (.sl-toast-acts); the group
+   drops under the words when the two do not fit in a row */
+.sl-toast { flex-wrap: wrap; }
+.sl-toast > :is(span, p):not([class]) { flex: 1 1 0; min-width: min(100%, calc(var(--sl-space-8) * 3)); margin: 0; }
+.sl-toast-acts { display: flex; flex: 0 0 auto; flex-wrap: wrap; gap: var(--sl-space-2); margin-left: auto; }
 .sl-toast-action { justify-content: space-between; }
-.sl-toast-action > :first-child { flex: 1 1 auto; min-width: 0; }
-@media (min-width: 901px) { .sl-toasts { bottom: var(--sl-space-5); } }
+@media (min-width: 901px) {
+  .sl-toasts { bottom: var(--sl-space-5); }
+  /* above 900 px a sheet is a panel on the right: the messages stand beside it, over the page */
+  body:has(> .sheet:not([hidden])) .sl-toasts { right: calc(440px + var(--sl-space-5)); }
+}
 @media (max-width: 640px) { .sl-toast { max-width: none; } }
 
 /* ---- Tour card (D26): the classes of js/help.js, the layer #hp-ov.sl-skin -- */
@@ -1537,6 +1776,17 @@ html.bar-hidden .sl-keybar {                /* the header is gone: the bar is th
 .hp-t { margin-bottom: var(--sl-space-2); font-family: var(--sl-font-cond); font-size: var(--sl-text-lg); font-weight: var(--sl-weight-cond-bold); line-height: 1.2; }
 .hp-x { color: var(--sl-ink-soft); font-size: var(--sl-text-sm); line-height: var(--sl-leading); }
 #hp-ov .hp-close { position: absolute; top: calc(var(--sl-space-3) + env(safe-area-inset-top, 0px)); right: var(--sl-space-3); }
+/* the title and the X share the card's first row (.hp-head): an X at the window's corner would
+   lie on the metronome button, which the welcome's fourth card points at */
+#hp-ov .hp-card { padding-top: var(--sl-space-2); }
+.hp-head { display: flex; align-items: center; gap: var(--sl-space-2); min-height: var(--sl-control-h); }
+.hp-head > .hp-t { flex: 1 1 auto; min-width: 0; margin: 0; }
+#hp-ov .hp-head > .hp-close { position: static; margin-right: calc(-1 * var(--sl-space-3)); }
+.hp-card > .row { margin-top: var(--sl-space-3); }
+/* a card that points at a control (#hp-ov.is-spot, set by script): the control keeps its full
+   light, and the ring's own shadow dims everything around it */
+#hp-ov.is-spot { background: transparent; }
+#hp-ov.is-spot > .hp-ring { box-shadow: var(--sl-accent-glow), 0 0 0 100vmax var(--sl-overlay); }
 
 /* ==========================================================================
    5 · drawing-only: none of this goes into the app
@@ -1584,6 +1834,14 @@ body { margin: 0; min-height: 100vh; font-family: var(--sl-font-body); color: va
   line-height: var(--sl-leading);
 }
 .mk-note a { color: var(--sl-accent-text); }
+
+/* "Change this picture", a fold under a picture opened alone: the drawing's parameters as chips,
+   and the way back to all pictures */
+.mk-change-body { display: grid; gap: var(--sl-space-3); }
+.mk-change .mk-tools-label { flex: 0 0 calc(var(--sl-space-8) + var(--sl-space-5)); }
+@media (max-width: 640px) { .mk-change .mk-tools-label { flex-basis: 100%; } }
+.mk-back { color: var(--sl-ink-muted); font-size: var(--sl-text-sm); }
+.mk-back a { color: var(--sl-accent-text); }
 
 /* the contact view: every state of a drawing as labelled, scaled frames */
 .mk-contact { max-width: none; padding: var(--sl-space-5) var(--sl-gutter) var(--sl-space-8); }

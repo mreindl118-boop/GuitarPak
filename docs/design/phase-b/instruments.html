@@ -1,0 +1,624 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Instruments and their lights · soundLAB 2.0 drawings</title>
+<!--
+  soundLAB 2.0 Phase B, step B1b: keyboard, neck and pads with lit notes, drawn before they
+  are built (docs/plans/phase-b/PLAN.md, table B1b.1; decisions D12, D29, D30, D31, D32).
+  This drawing answers the owner's gate G4 (step B16, and B16p if he picks the other colours):
+  is this how "play this now", "next" and the root should look, and which colours?
+
+  Opened without ?w= it shows every picture at every width it needs, dark and light.
+  Opened with ?w= it is one picture, laid out for the window it is given.
+  The instruments are drawn by mock-hero.js (the first draft of js/hero.js); the shared
+  parameters and the contact view are in mock.js. Read their header comments first.
+
+  THIS DRAWING'S PARAMETERS
+    view=intro|rootnow|states|help|modes|necks   which picture (left out: intro)
+        intro     one instrument with "in the scale", "play this now", "next" and the root,
+                  each named in plain words, in both sets of colours side by side
+        rootnow   the root is the note to play now, beside the amber Start button
+        states    every state of decision D30, one small instrument per state
+        help      the five Help levels          modes   Color notes by: Degree | Note name
+        necks     6 and 4 strings (and 5), with and without fret wires
+    hero=keyboard|neck|pads|all     which instrument (left out: all)
+    palette=app|tokens|both         the colours (left out: both)
+        app     today's seven colours as a page shows them, after the snap to the LUMI's
+                colour table (tests/colors.test.js:16; Mock.DATA.COLORS)
+        tokens  the red-first set the token file held before B1a (git show
+                a914df2:css/tokens.css, lines 43-49), as the LUMI's table shows it
+    help=0…4   colors=interval|note   key=A-dorian     as in every drawing (mock.js);
+               this drawing starts at Help Full, the app's own first value (js/app.js:1267)
+    grey=1     the picture without colour (a CSS filter): what still tells the states apart
+    upright=1  the necks standing (the nut on top)      labels=3   labels from Colors up
+    next=2     "next" at Target too (see "the Help level" in mock-hero.js)
+
+  The instruments' own rules are in mock.css ("Instrument heroes"); the style block below lays
+  out this drawing only.
+-->
+<link rel="icon" href="../../../icons/icon.svg">
+<link rel="stylesheet" href="../../../css/tokens.css">
+<link rel="stylesheet" href="mock.css">
+<style>
+/* drawing-only */
+.mk-inst {
+  display: grid;
+  gap: var(--sl-space-6);
+  max-width: calc(var(--sl-space-8) * 17);
+  margin: 0 auto;
+  padding: var(--sl-space-5) calc(var(--sl-gutter) + env(safe-area-inset-right, 0px)) var(--sl-space-6) calc(var(--sl-gutter) + env(safe-area-inset-left, 0px));
+}
+.mk-grey .mk-inst { filter: grayscale(1); }
+.mk-part { display: grid; gap: var(--sl-space-4); min-width: 0; }
+.mk-part + .mk-part { padding-top: var(--sl-space-6); border-top: 1px solid var(--sl-line-strong); }
+.mk-head { display: grid; gap: var(--sl-space-2); }
+.mk-head > p:not(.sl-eyebrow) { max-width: 68ch; color: var(--sl-ink-soft); }
+.mk-ask { max-width: 68ch; padding-left: var(--sl-space-4); border-left: 2px solid var(--sl-accent-text); color: var(--sl-ink); }
+
+/* two sets of colours side by side above 900 px, one under the other below */
+.mk-pair { display: grid; gap: var(--sl-space-5); min-width: 0; }
+.mk-fig { display: grid; align-content: start; gap: var(--sl-space-3); min-width: 0; margin: 0; }
+.mk-fig-cap { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--sl-space-3); }
+.mk-fig-cap b,
+.mk-side-text b,
+.mk-card figcaption b,
+.mk-legend li > div > b {
+  font-family: var(--sl-font-cond);
+  font-size: var(--sl-text-lg);
+  font-weight: var(--sl-weight-cond-bold);
+  line-height: 1.2;
+}
+.mk-fig-cap span { color: var(--sl-ink-muted); font-size: var(--sl-text-sm); }
+.mk-cta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sl-space-2) var(--sl-space-4); }
+.mk-cta-note { color: var(--sl-ink-muted); font-size: var(--sl-text-sm); }
+
+/* the stage of each instrument */
+.mk-hero-kbd { height: calc(var(--sl-space-8) * 3); padding: 0 var(--sl-space-3) var(--sl-space-3); }
+.mk-hero-neck { padding: var(--sl-space-3); }
+.mk-hero-neck .sl-neck.is-upright { width: min(100%, calc(var(--sl-space-8) * 3)); margin: 0 auto; }
+.mk-hero-pads { height: calc(var(--sl-space-8) * 3 + var(--sl-space-5)); }
+
+/* the four things, each with the small piece of the instrument that shows it */
+.mk-legend {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);      /* one column, two from 600 px, four from 1100 px: never three and one */
+  gap: var(--sl-space-4) var(--sl-space-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.mk-legend li { display: grid; grid-template-columns: var(--sl-space-8) minmax(0, 1fr); align-items: center; gap: var(--sl-space-3); }
+.mk-legend li > div > b { display: block; font-size: var(--sl-text-md); }
+.mk-legend li > div > span { color: var(--sl-ink-soft); font-size: var(--sl-text-sm); }
+.mk-glyph { display: block; justify-self: center; border-radius: var(--sl-radius-sm); }
+.mk-glyph.is-keyboard { width: var(--sl-space-7); height: calc(var(--sl-space-8) - var(--sl-space-2)); padding: 0 var(--sl-space-2) var(--sl-space-2); }
+.mk-glyph.is-keyboard.is-two { width: var(--sl-space-8); }
+.mk-glyph.is-neck { width: var(--sl-space-8); padding: var(--sl-space-1); }
+.mk-glyph.is-pads { width: var(--sl-space-8); height: calc(var(--sl-space-7) + var(--sl-space-2)); padding: var(--sl-space-1); }
+.mk-glyph .sl-pad { min-height: 0; padding: 0; border-radius: var(--sl-radius-sm); }
+.mk-glyph .sl-pad-name { font-size: var(--sl-text-xs); }
+
+/* a set of colours with its Start button, and the small pictures beside it */
+.mk-set { display: grid; gap: var(--sl-space-4); min-width: 0; }
+.mk-set + .mk-set { padding-top: var(--sl-space-5); border-top: 1px solid var(--sl-line-strong); }
+.mk-side { display: grid; justify-items: start; gap: var(--sl-space-3); }      /* the words, then the button under them */
+.mk-side-text { display: grid; gap: var(--sl-space-1); min-width: 0; }
+.mk-side-text span { color: var(--sl-ink-muted); font-size: var(--sl-text-sm); }
+.mk-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, calc(var(--sl-space-8) * 3 + var(--sl-space-5))), 1fr)); gap: var(--sl-space-5) var(--sl-space-4); min-width: 0; }
+.mk-cards.is-wide { grid-template-columns: repeat(auto-fill, minmax(min(100%, calc(var(--sl-space-8) * 4 + var(--sl-space-4))), 1fr)); }
+.mk-cards.is-full { grid-template-columns: repeat(auto-fill, minmax(min(100%, calc(var(--sl-space-8) * 7 + var(--sl-space-6))), 1fr)); }
+/* standing necks: every neck at the same scale, so a card is as wide as its neck */
+.mk-cards.is-upright { display: flex; flex-wrap: wrap; align-items: flex-start; }
+.mk-cards.is-upright .mk-card { width: min-content; }
+.mk-cards.is-upright .mk-hero-neck .sl-neck.is-upright { width: auto; height: calc(var(--sl-space-8) * 6); margin: 0; }
+.mk-card { display: grid; align-content: start; gap: var(--sl-space-2); min-width: 0; margin: 0; }
+.mk-card figcaption { display: grid; gap: var(--sl-space-1); }
+.mk-card figcaption b { font-size: var(--sl-text-md); }
+.mk-card figcaption span { color: var(--sl-ink-muted); font-size: var(--sl-text-sm); }
+.mk-card .sl-hero { border-radius: var(--sl-radius-md); }
+.mk-card .mk-hero-kbd { height: calc(var(--sl-space-8) * 2 + var(--sl-space-2)); padding: 0 var(--sl-space-2) var(--sl-space-2); }
+.mk-card .mk-hero-neck { padding: var(--sl-space-2); }
+.mk-card .mk-hero-pads { height: calc(var(--sl-space-8) * 2 + var(--sl-space-5)); padding: var(--sl-space-2); }
+.mk-card .sl-pads { gap: var(--sl-space-2); }
+.mk-card .sl-pad { min-height: 0; padding: var(--sl-space-1) 2px; border-radius: var(--sl-radius-sm); }
+.mk-cards.is-full .mk-card { max-width: calc(var(--sl-space-8) * 10 + var(--sl-space-7)); }
+
+@media (max-width: 640px) {
+  .mk-inst { gap: var(--sl-space-5); }
+  .mk-hero-kbd { height: calc(var(--sl-space-8) * 2 + var(--sl-space-6)); padding: 0 var(--sl-space-2) var(--sl-space-2); }
+  .mk-hero-neck { padding: var(--sl-space-2); }
+  .mk-hero-pads { height: calc(var(--sl-space-8) * 2 + var(--sl-space-6)); padding: var(--sl-space-3); }
+  .mk-hero-pads .sl-pads { gap: var(--sl-space-2); }
+  .mk-hero-pads .sl-pad { min-height: 0; }
+}
+@media (min-width: 600px) { .mk-legend { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1100px) { .mk-legend { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 599px) {      /* the width under which the script draws one position (NARROW) */
+  .mk-cards.is-upright .mk-hero-neck .sl-neck.is-upright { height: calc(var(--sl-space-8) * 3 + var(--sl-space-4)); }
+}
+@media (min-width: 901px) {
+  .mk-inst { gap: var(--sl-space-7); padding: var(--sl-space-6) var(--sl-space-6) var(--sl-space-7); }
+  .mk-pair.is-two { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sl-space-6); }
+  .mk-set.is-beside { grid-template-columns: calc(var(--sl-space-8) * 3) minmax(0, 1fr); align-items: start; gap: var(--sl-space-6); }
+  .mk-set.is-beside > .mk-side { gap: var(--sl-space-4); }
+  .mk-set:not(.is-beside) > .mk-side { display: flex; align-items: center; gap: var(--sl-space-5); }
+}
+</style>
+<script src="mock.js"></script>
+<script src="mock-hero.js"></script>
+</head>
+<body>
+<noscript>This drawing is built by a script (mock.js, mock-hero.js). Please switch JavaScript on.</noscript>
+<script>
+(function () {
+  'use strict';
+  var D = Mock.DATA, esc = Mock.esc, q = Mock.q;
+
+  // ---- the two sets of colours (decision D12; the owner picks one at gate G4) ---------
+  // The colours themselves are data and are held in one place, Mock.DATA.COLORS (mock.js):
+  // app: what a page shows today. tokens: the red-first set css/tokens.css held before step
+  // B1a, as the LUMI's colour table shows it (COLORS.MOCKUP; the comment there says how it was
+  // made). "Note name" colours are a set of their own in the app (NOTE_DEFAULTS,
+  // js/app.js:1293) and step B16p would not change them, so both palettes share them.
+  var PALETTES = {
+    app: { id: 'app', name: 'Today’s colours', line: 'The root is amber, like the Start button.', padLine: 'The first colour is amber, like the Start button.',
+      degrees: D.COLORS.DEGREES, intervals: D.COLORS.INTERVALS, notes: D.COLORS.NOTES },
+    tokens: { id: 'tokens', name: 'The mockup’s colours', line: 'The root is red.', padLine: 'The first colour is red.',
+      degrees: D.COLORS.MOCKUP.DEGREES, intervals: D.COLORS.MOCKUP.INTERVALS, notes: D.COLORS.NOTES }
+  };
+  var PAD_EIGHTH = D.COLORS.PAD_NEUTRAL;      // js/pads.js:37: the crash is the eighth pad and has no degree colour
+  var HEROES = ['keyboard', 'neck', 'pads'];
+  var HERO_NAME = { keyboard: 'Keyboard', neck: 'Neck', pads: 'Pads' };
+
+  // =====================================================================================
+  // The contact view: every picture at every width it needs, dark and light
+  // =====================================================================================
+  if (!Mock.single) {
+    var ALL = [360, 390, 640, 820, 1024, 1280];
+    // The window heights: a picture is shown whole, so its frame is as high as its page.
+    // Measured with the script named in the step's report; a width that is not listed
+    // takes the device's own height (Mock.DATA.SIZES).
+    var HEIGHTS = {
+      'intro-keyboard': { 360: 1420, 390: 1400, 640: 1170, 820: 1260, 1024: 940, 1280: 860 },
+      'intro-neck': { 360: 1580, 390: 1590, 640: 1260, 820: 1360, 1024: 870, 1280: 850 },
+      'intro-pads': { 360: 1390, 390: 1320, 640: 1170, 820: 1290, 1024: 930, 1280: 860 },
+      'rootnow-keyboard': { 390: 1020, 820: 1020, 1280: 700 },
+      'rootnow-neck': { 390: 1180, 820: 1140, 1280: 690 },
+      'rootnow-pads': { 390: 950, 1280: 700 },
+      'grey-keyboard': { 390: 1400, 1280: 860 },
+      'grey-neck': { 390: 1590, 1280: 850 },
+      'grey-pads': { 390: 1320, 1280: 860 },
+      'grey-states': { 1280: 1330 },
+      'states-keyboard-app': { 390: 2790, 820: 1460, 1024: 1540, 1280: 1330 },
+      'states-keyboard-tokens': { 390: 2790, 1280: 1330 },
+      'states-neck-app': { 390: 3370, 820: 1320, 1024: 1760, 1280: 1290 },
+      'states-neck-tokens': { 390: 3370, 1280: 1290 },
+      'states-pads-app': { 390: 2140, 820: 1400, 1280: 1300 },
+      'states-pads-tokens': { 390: 2140, 1280: 1300 },
+      'help-keyboard': { 390: 1620, 820: 950, 1280: 820 },
+      'help-keyboard-tokens': { 1280: 820 },
+      'help-neck': { 390: 2240, 1280: 970 },
+      'help-neck-tokens': { 1280: 970 },
+      'help-pads': { 390: 1680, 1280: 1080 },
+      'help-pads-tokens': { 1280: 1080 },
+      'modes-keyboard': { 390: 1630, 820: 1580, 1280: 1010 },
+      'modes-neck': { 390: 2130, 1280: 1110 },
+      'states-keyboard-note': { 1280: 1330 },
+      'states-neck-note': { 1280: 1290 },
+      'necks-flat': { 390: 2070, 820: 1990, 1024: 1950, 1280: 1180 },
+      'necks-upright': { 390: 1550, 820: 1550, 1280: 990 },
+      'necks-tokens': { 390: 2070, 1280: 1180 }
+    };
+    var sized = function (id, widths) { return widths.map(function (w) { var h = HEIGHTS[id] && HEIGHTS[id][w]; return h ? [w, h] : w; }); };
+    var st = function (id, title, note, params, widths) { return { id: id, title: title, note: note, params: params, widths: sized(id, widths) }; };
+    Mock.contact({
+      title: 'Instruments and their lights',
+      lead: [
+        'Keyboard, neck and pads as soundLAB 2.0 will draw them, with the notes lit. The key is A Dorian everywhere.',
+        'Two questions wait for your yes, or for what you want changed: <b>is this how “play this now”, “next” and the root should look?</b> ' +
+          'And <b>which colours</b>: today’s, where the root is amber like the Start button, or the mockup’s, where the root is red?',
+        'The colours are the ones a LUMI shows. The first three pictures are the ones to judge; the rest is every case, for completeness.'
+      ],
+      groups: [
+        { title: '1 · What the lights mean',
+          lead: 'One keyboard, one neck and one set of pads. Each shows the same four things, in both sets of colours.',
+          states: [
+            st('intro-keyboard', 'Keyboard: in the scale, play this now, next, and the root.', 'Today’s colours come first, the mockup’s second; on a wide screen they stand side by side.', { view: 'intro', hero: 'keyboard' }, ALL),
+            st('intro-neck', 'Neck: the same four things on a guitar.', 'On a phone the neck shows one position; from a tablet up, twelve frets.', { view: 'intro', hero: 'neck' }, ALL),
+            st('intro-pads', 'Pads: the pad to hit now, and the next one.', 'A pad is a drum, not a note, so the pads have no root.', { view: 'intro', hero: 'pads' }, ALL)
+          ] },
+        { title: '2 · The root beside the Start button',
+          lead: 'The moment the two sets of colours differ most: the root is the note to play now. ' +
+            'In today’s colours the largest amber shape is then a key, right beside the amber button.',
+          states: [
+            st('rootnow-keyboard', 'Keyboard: the root A is the key to play now.', '', { view: 'rootnow', hero: 'keyboard' }, [390, 820, 1280]),
+            st('rootnow-neck', 'Neck: the root A is the note to play now.', '', { view: 'rootnow', hero: 'neck' }, [390, 820, 1280]),
+            st('rootnow-pads', 'Pads: the Kick, which has the first colour, is the pad to hit now.', '', { view: 'rootnow', hero: 'pads' }, [390, 1280])
+          ] },
+        { title: '3 · Without colour',
+          lead: 'The same pictures in grey. “In the scale”, “play this now”, “next” and the root must still be told apart by their shape.',
+          states: [
+            st('grey-keyboard', 'Keyboard in grey.', '', { view: 'intro', hero: 'keyboard', grey: 1 }, [390, 1280]),
+            st('grey-neck', 'Neck in grey.', '', { view: 'intro', hero: 'neck', grey: 1 }, [390, 1280]),
+            st('grey-pads', 'Pads in grey.', '', { view: 'intro', hero: 'pads', grey: 1 }, [390, 1280]),
+            st('grey-states', 'Every state of the keyboard in grey.', '', { view: 'states', hero: 'keyboard', palette: 'app', grey: 1 }, [1280])
+          ] },
+        { title: '4 · Every state',
+          lead: 'One small instrument per case: in the scale, now, next, the root as now and as next, a held key, right and wrong.',
+          states: [
+            st('states-keyboard-app', 'Keyboard, today’s colours.', '', { view: 'states', hero: 'keyboard', palette: 'app' }, [390, 820, 1024, 1280]),
+            st('states-keyboard-tokens', 'Keyboard, the mockup’s colours.', '', { view: 'states', hero: 'keyboard', palette: 'tokens' }, [390, 1280]),
+            st('states-neck-app', 'Neck, today’s colours.', '', { view: 'states', hero: 'neck', palette: 'app' }, [390, 820, 1024, 1280]),
+            st('states-neck-tokens', 'Neck, the mockup’s colours.', '', { view: 'states', hero: 'neck', palette: 'tokens' }, [390, 1280]),
+            st('states-pads-app', 'Pads, today’s colours.', '', { view: 'states', hero: 'pads', palette: 'app' }, [390, 820, 1280]),
+            st('states-pads-tokens', 'Pads, the mockup’s colours.', '', { view: 'states', hero: 'pads', palette: 'tokens' }, [390, 1280])
+          ] },
+        { title: '5 · The five Help levels',
+          lead: 'Help decides how much lights up, the same on screen and on a LUMI: Full, Colors, Target, Tonic, None. ' +
+            'Every picture has a note to play now and a next one, so you see which level shows them.',
+          states: [
+            st('help-keyboard', 'Keyboard at the five levels, today’s colours.', '', { view: 'help', hero: 'keyboard', palette: 'app' }, [390, 820, 1280]),
+            st('help-keyboard-tokens', 'Keyboard at the five levels, the mockup’s colours.', '', { view: 'help', hero: 'keyboard', palette: 'tokens' }, [1280]),
+            st('help-neck', 'Neck at the five levels, today’s colours.', '', { view: 'help', hero: 'neck', palette: 'app' }, [390, 1280]),
+            st('help-neck-tokens', 'Neck at the five levels, the mockup’s colours.', '', { view: 'help', hero: 'neck', palette: 'tokens' }, [1280]),
+            st('help-pads', 'Pads at the five levels, today’s colours.', 'A pad has no root, so Tonic shows nothing.', { view: 'help', hero: 'pads', palette: 'app' }, [390, 1280]),
+            st('help-pads-tokens', 'Pads at the five levels, the mockup’s colours.', '', { view: 'help', hero: 'pads', palette: 'tokens' }, [1280])
+          ] },
+        { title: '6 · Color notes by: Degree or Note name',
+          lead: 'Degree: the 1 has the same colour in every key. Note name: every C has the same colour in every key. ' +
+            'The two sets of colours differ in Degree only.',
+          states: [
+            st('modes-keyboard', 'Keyboard in both ways of colouring.', '', { view: 'modes', hero: 'keyboard' }, [390, 820, 1280]),
+            st('modes-neck', 'Neck in both ways of colouring.', '', { view: 'modes', hero: 'neck' }, [390, 1280]),
+            st('states-keyboard-note', 'Every state of the keyboard, coloured by note name.', '', { view: 'states', hero: 'keyboard', palette: 'app', colors: 'note' }, [1280]),
+            st('states-neck-note', 'Every state of the neck, coloured by note name.', '', { view: 'states', hero: 'neck', palette: 'app', colors: 'note' }, [1280])
+          ] },
+        { title: '7 · Necks',
+          lead: 'One drawing for guitar and bass: six, four or five strings, with fret wires or without, lying flat or standing.',
+          states: [
+            st('necks-flat', 'Lying flat: the nut on the left, the highest string on top, as tab is written.', '', { view: 'necks', palette: 'app' }, [390, 820, 1024, 1280]),
+            st('necks-upright', 'Standing: the nut on top, the lowest string on the left.', '', { view: 'necks', palette: 'app', upright: 1 }, [390, 820, 1280]),
+            st('necks-tokens', 'Lying flat, in the mockup’s colours.', '', { view: 'necks', palette: 'tokens' }, [390, 1280])
+          ] }
+      ]
+    });
+    return;
+  }
+
+  // =====================================================================================
+  // One picture
+  // =====================================================================================
+  var VIEWS = ['intro', 'rootnow', 'states', 'help', 'modes', 'necks'];
+  var view = VIEWS.indexOf(q('view', 'intro')) !== -1 ? q('view', 'intro') : 'intro';
+  var heroQ = q('hero', 'all'), heroes = HEROES.indexOf(heroQ) !== -1 ? [heroQ] : HEROES.slice();
+  var palQ = q('palette', 'both'), pals = PALETTES[palQ] ? [PALETTES[palQ]] : [PALETTES.app, PALETTES.tokens];
+  var o = Mock.shellOpts({ help: view === 'necks' ? 3 : 4 });      // key, help and colors from the URL, as in every drawing
+  var upright = q('upright', '') === '1', grey = q('grey', '') === '1';
+  var labelsFrom = q('labels', '') === '3' ? 3 : null, nextFrom = q('next', '') === '2' ? 2 : null;
+  document.documentElement.classList.toggle('mk-grey', grey);
+
+  var steps = D.SCALES[o.scale].steps, n = steps.length, flat = [1, 3, 5, 6, 8, 10].indexOf(o.root) !== -1;
+  var keyName = Mock.keyName(o.root, o.scale, 'plain');
+  var pc = function (p) { return ((p % 12) + 12) % 12; };
+  var name = function (p) { return Mock.pcName(pc(p), flat); };
+  var tonic = 48 + o.root;                                          // the root between C3 and B3
+  var deg = function (i) { return tonic + steps[((i % n) + n) % n] + 12 * Math.floor(i / n); };
+  var iNow = Math.min(4, n - 2), iNext = iNow + 1;                  // in A Dorian: E, then F#
+  var scaleNames = steps.map(function (s) { return name(o.root + s); }).join(' ');
+
+  function model(pal, extra, help) {
+    var spec = { root: o.root, steps: steps, help: help == null ? o.help : help, mode: o.colors, intervals: pal.intervals, notes: pal.notes,
+      labelsFrom: labelsFrom, nextFrom: nextFrom }, k;
+    for (k in extra || {}) if (Object.prototype.hasOwnProperty.call(extra, k)) spec[k] = extra[k];
+    return SLHero.sample(spec);
+  }
+
+  // ---- what each instrument is drawn with at this window's width -------------------------
+  // "phone" here is a window too narrow for two octaves or twelve frets (under 600 px): it
+  // gets one octave and one position of the neck. The layout's own breakpoints are in the CSS.
+  var NARROW = 600;
+  var phone = window.innerWidth < NARROW;
+  var GUITAR = [40, 45, 50, 55, 59, 64], BASS4 = [28, 33, 38, 43], BASS5 = [23, 28, 33, 38, 43];
+  function rootFret(strings) { return pc(o.root - strings[0]); }
+  function position(strings) { var f = rootFret(strings); return f >= 2 ? f - 1 : 0; }      // the fret a five-fret position starts at
+  // a spot of the neck that has this pitch class, near the string asked for and inside the drawn part
+  function spot(strings, pitchClass, win, prefer) {
+    var order = strings.map(function (x, i) { return i; }).sort(function (a, b) { return Math.abs(a - prefer) - Math.abs(b - prefer); });
+    for (var i = 0; i < order.length; i++) for (var f = Math.max(win[0], 1); f <= win[1]; f++) if (pc(strings[order[i]] + f) === pc(pitchClass)) return { string: order[i], fret: f };
+    return null;
+  }
+  // the spots the pictures light: inside one position, or inside the frets [lo, hi] that are drawn
+  function neckPlaces(strings, lo, hi) {
+    var p = position(strings), win = [p || 1, (p || 1) + 4];
+    if (hi && (win[0] < lo || win[1] > hi)) win = [lo, hi];
+    return { root: spot(strings, o.root, win, 0), now: spot(strings, o.root + steps[iNow], win, 1), next: spot(strings, o.root + steps[iNext % n], win, 2),
+      third: spot(strings, o.root + steps[2 % n], win, 1), out: spot(strings, o.root + steps[2 % n] + 1, win, 1), second: spot(strings, o.root + steps[1], win, 0),
+      last: spot(strings, o.root + steps[n - 1], win, strings.length > 4 ? 3 : 2), root2: spot(strings, o.root, win, strings.length - 1) };
+  }
+  function spotWords(strings, s) { return !s ? name(o.root) : name(strings[s.string] + s.fret) + ', on the ' + name(strings[s.string]) + ' string at fret ' + s.fret; }
+  function lanes(pal) { return SLHero.LANES.map(function (l, i) { return { name: l.name, hint: l.hint, midi: l.midi, color: i < 7 ? pal.degrees[i] : PAD_EIGHTH }; }); }
+
+  // ---- the three instruments on their stage ---------------------------------------------------
+  function kbd(pal, extra, opts, help) {
+    return '<div class="sl-hero mk-hero-kbd">' + SLHero.keyboard(model(pal, extra, help), opts) + '</div>';
+  }
+  function neck(pal, extra, opts, help) {
+    return '<div class="sl-hero mk-hero-neck">' + SLHero.neck(model(pal, extra, help), opts) + '</div>';
+  }
+  function pads(pal, extra, help) {
+    return '<div class="sl-hero mk-hero-pads">' + SLHero.pads(model(pal, extra, help), { lanes: lanes(pal) }) + '</div>';
+  }
+  function start() { return '<button type="button" class="btn primary sl-hero-btn">' + Mock.icon('play', 18) + '<span>Start</span></button>'; }      // the home's button, class for class
+  // one octave on a phone and in a small picture, two in a large one; both begin on the root
+  function octave(count) { return { from: tonic, octaves: count }; }
+  function neckOpts(strings, size, extra) {
+    var p = position(strings), opts = size === 'full' ? { strings: strings, frets: 12, upright: upright } : { strings: strings, frets: 5, first: p || 0, upright: upright }, k;
+    for (k in extra || {}) if (Object.prototype.hasOwnProperty.call(extra, k)) opts[k] = extra[k];
+    return opts;
+  }
+
+  // ---- building blocks of the page --------------------------------------------------------------
+  // the one line under a set's name: what its first colour is. Pads are coloured by lane, so the
+  // way notes are coloured does not touch them; by note name both sets are the same.
+  function setLine(pal, hero) {
+    if (hero === 'pads') return pal.padLine;
+    if (view === 'modes') return 'In Degree, ' + pal.line.charAt(0).toLowerCase() + pal.line.slice(1);
+    return o.colors === 'note' ? 'Coloured by note name: the same in both sets.' : pal.line;
+  }
+  function headBlock(eyebrow, title, paras) {
+    return '<header class="mk-head"><p class="sl-eyebrow">' + esc(eyebrow) + '</p><h1>' + esc(title) + '</h1>' +
+      (paras || []).map(function (p) { return '<p>' + p + '</p>'; }).join('') + '</header>';
+  }
+  // a large picture per set of colours, each under its own Start button
+  function pair(hero, draw) {
+    var isPads = hero === 'pads';
+    return '<div class="mk-pair' + (pals.length > 1 ? ' is-two' : '') + '">' + pals.map(function (pal) {
+      return '<figure class="mk-fig" data-palette="' + pal.id + '"><figcaption class="mk-fig-cap"><b>' + pal.name + '</b><span>' + setLine(pal, hero) + '</span></figcaption>' +
+        '<div class="mk-cta">' + start() + '<span class="mk-cta-note">' + (isPads ? 'The Kick has the first colour' : esc(keyName) + ' · the root is ' + name(o.root)) + '</span></div>' + draw(pal) + '</figure>';
+    }).join('') + '</div>';
+  }
+  // the small pictures of one set of colours, with its Start button beside them
+  function sets(hero, cls, cards, beside) {
+    var isPads = hero === 'pads';
+    return pals.map(function (pal) {
+      return '<section class="mk-set' + (beside === false ? '' : ' is-beside') + '" data-palette="' + pal.id + '"><div class="mk-side">' +
+        '<div class="mk-side-text"><b>' + pal.name + '</b><span>' + setLine(pal, hero) + '</span>' + (isPads ? '' : '<span>' + esc(keyName) + '</span>') + '</div>' + start() + '</div>' +
+        '<div class="mk-cards' + (cls ? ' ' + cls : '') + '">' + cards(pal).map(function (c) {
+          return '<figure class="mk-card">' + c[2] + '<figcaption><b>' + c[0] + '</b>' + (c[1] ? '<span>' + c[1] + '</span>' : '') + '</figcaption></figure>';
+        }).join('') + '</div></section>';
+    }).join('');
+  }
+  function legend(items) {
+    return '<ul class="mk-legend">' + items.map(function (it) {
+      return '<li>' + it[0] + '<div><b>' + it[1] + '</b><span>' + it[2] + '</span></div></li>';
+    }).join('') + '</ul>';
+  }
+  // the small piece of an instrument that stands beside a line of the legend
+  function glyphKey(pal, midi, state, isRoot) {
+    var black = [1, 3, 6, 8, 10].indexOf(pc(midi)) !== -1, extra = { steps: [pc(midi - o.root)] };
+    if (state) extra[state] = [midi];
+    var m = model(pal, extra, 4);
+    if (!isRoot) m.root = null;
+    return '<span class="mk-glyph sl-hero is-keyboard' + (black ? ' is-two' : '') + '">' + SLHero.keyboard(m, { from: midi, to: midi, names: false }) + '</span>';
+  }
+  function glyphNeck(pal, strings, s, state, isRoot) {
+    var extra = { steps: [pc(strings[s.string] + s.fret - o.root)] };
+    if (state) extra[state] = [{ string: 0, fret: s.fret }];
+    var m = model(pal, extra, 4);
+    if (!isRoot) m.root = null;
+    return '<span class="mk-glyph sl-hero is-neck">' + SLHero.neck(m, { strings: [strings[s.string]], frets: 1, first: s.fret, names: false, numbers: false }) + '</span>';
+  }
+  function glyphPad(pal, lane, state) {
+    var extra = {}, l = lanes(pal)[lane];
+    if (state) extra[state] = [{ lane: 0 }];
+    return '<span class="mk-glyph sl-hero is-pads">' + SLHero.pads(model(pal, extra, 4), { lanes: [{ name: l.name, color: l.color }], cols: 1 }) + '</span>';
+  }
+
+  // =====================================================================================
+  // The views
+  // =====================================================================================
+  var P0 = pals[0];      // the set of colours the legend's small pieces are drawn in
+  var both = pals.length > 1;
+
+  function intro(hero) {
+    var h = '';
+    if (hero === 'keyboard') {
+      var now = deg(iNow), next = deg(iNext), oct = phone ? 1 : 2;
+      h += headBlock('Keyboard · ' + keyName, 'Four things a key tells you', ['The colours are the ones a LUMI shows. The amber Start button stands beside the keys, as it will on the home page.']);
+      h += pair(hero, function (pal) { return kbd(pal, { now: [now], next: [next] }, octave(oct)); });
+      h += legend([
+        [glyphKey(P0, deg(1), '', false), 'In the scale', 'A dot in the note’s colour. ' + esc(keyName) + ' has ' + scaleNames + '.'],
+        [glyphKey(P0, now, 'now', false), 'Play this now', 'The whole key is filled with its colour. Here it is ' + name(now) + '.'],
+        [glyphKey(P0, next, 'next', false), 'Next', 'An empty ring in the note’s colour. Here it is ' + name(next) + '.'],
+        [glyphKey(P0, tonic, '', true), 'The root', 'A thicker ring. In ' + esc(keyName) + ' the root is ' + name(o.root) + '.']
+      ]);
+    } else if (hero === 'neck') {
+      var pl = neckPlaces(GUITAR);
+      h += headBlock('Neck · ' + keyName, 'The same four things on a guitar', [phone ? 'One position of the neck, frets ' + (position(GUITAR) || 1) + ' to ' + ((position(GUITAR) || 1) + 4) + '. The highest string is on top, as tab is written.'
+        : 'Twelve frets from the nut. The highest string is on top, as tab is written.']);
+      h += pair(hero, function (pal) { return neck(pal, { now: [pl.now], next: [pl.next] }, neckOpts(GUITAR, phone ? 'position' : 'full')); });
+      h += legend([
+        [glyphNeck(P0, GUITAR, pl.second, '', false), 'In the scale', 'A dot in the note’s colour, on every string.'],
+        [glyphNeck(P0, GUITAR, pl.now, 'now', false), 'Play this now', 'A bright ring that stands off the dot. Here it is ' + spotWords(GUITAR, pl.now) + '.'],
+        [glyphNeck(P0, GUITAR, pl.next, 'next', false), 'Next', 'An empty ring in the note’s colour. Here it is ' + spotWords(GUITAR, pl.next) + '.'],
+        [glyphNeck(P0, GUITAR, pl.root, '', true), 'The root', 'A thicker ring, with a fine line in the note’s colour around it. Here it is ' + name(o.root) + '.']
+      ]);
+    } else {
+      h += headBlock('Pads', 'The pad to hit now, and the next one', ['Eight pads, each with its own colour. A pad is a drum, not a note, so the pads have no root.']);
+      h += pair(hero, function (pal) { return pads(pal, { now: [{ lane: 1 }], next: [{ lane: 3 }] }); });
+      h += legend([
+        [glyphPad(P0, 0, ''), 'Every pad has its colour', 'A dot in the pad’s colour, over its name.'],
+        [glyphPad(P0, 1, 'now'), 'Hit this now', 'The whole pad is filled with its colour. Here it is the Snare.'],
+        [glyphPad(P0, 3, 'next'), 'Next', 'An empty ring in the pad’s colour. Here it is the Hat.']
+      ]);
+    }
+    if (both) {
+      h += hero === 'pads'
+        ? '<p class="mk-ask"><b>Two questions.</b> Is this how “hit this now” and “next” should look? And which colours: today’s, where the first colour is amber like the Start button, or the mockup’s, where it is red?</p>'
+        : '<p class="mk-ask"><b>Two questions.</b> Is this how “play this now”, “next” and the root should look? And which colours: today’s, where the root is amber like the Start button, or the mockup’s, where the root is red?</p>';
+    }
+    return h;
+  }
+
+  function rootnow(hero) {
+    var h = '';
+    if (hero === 'keyboard') {
+      h += headBlock('Keyboard · ' + keyName, 'The root is the key to play now', ['Now the root key is filled. In today’s colours it is amber, beside the amber Start button; in the mockup’s colours it is red. The ring of the root is thicker.']);
+      h += pair(hero, function (pal) { return kbd(pal, { now: [phone ? tonic : tonic + 12], next: [phone ? deg(1) : deg(n + 1)] }, octave(phone ? 1 : 2)); });
+    } else if (hero === 'neck') {
+      var pl = neckPlaces(GUITAR);
+      h += headBlock('Neck · ' + keyName, 'The root is the note to play now', ['The root has its thicker ring and the bright ring of “now” around it. Here it is ' + spotWords(GUITAR, pl.root) + '.']);
+      h += pair(hero, function (pal) { return neck(pal, { now: [pl.root], next: [pl.second] }, neckOpts(GUITAR, phone ? 'position' : 'full')); });
+    } else {
+      h += headBlock('Pads', 'The Kick is the pad to hit now', ['The Kick has the first colour of the set: amber today, red in the mockup’s colours.']);
+      h += pair(hero, function (pal) { return pads(pal, { now: [{ lane: 0 }], next: [{ lane: 1 }] }); });
+    }
+    return h;
+  }
+
+  function states(hero) {
+    var title = { keyboard: 'Every state of a key', neck: 'Every state of a spot on the neck', pads: 'Every state of a pad' }[hero];
+    var h = headBlock(HERO_NAME[hero] + (hero === 'pads' ? '' : ' · ' + keyName), title,
+      [hero === 'pads' ? 'Help is set to ' + D.HELP_NAMES[o.help] + '. A held pad, right and wrong show at every Help level.'
+        : 'Help is set to ' + D.HELP_NAMES[o.help] + (o.help >= 4 ? ', so every lit note carries its label' : '') + '. A held ' + (hero === 'neck' ? 'note' : 'key') + ', right and wrong show at every Help level.']);
+    if (hero === 'keyboard') {
+      var one = octave(1), black = deg(iNext);      // in A Dorian the 6, F#, is a black key
+      h += sets(hero, '', function (pal) {
+        var k = function (extra) { return kbd(pal, extra, one); };
+        return [
+          ['In the scale', 'A dot in the note’s colour with a dark ring. The root’s ring is thicker.', k({})],
+          ['Play this now', 'The whole key is filled with its colour and has a dark ring.', k({ now: [deg(iNow)] })],
+          ['Play this now, a black key', 'The same on an ebony key.', k({ now: [black] })],
+          ['Next', 'An empty ring in the note’s colour. It blinks slowly, and stands still where the device asks for less motion.', k({ now: [deg(iNow - 1)], next: [deg(iNow)] })],
+          ['Next, a black key', 'The ring reads on ebony without its dark hairlines.', k({ now: [deg(iNow)], next: [black] })],
+          ['The root is the key to play now', 'Filled, with a thicker ring.', k({ now: [tonic], next: [deg(1)] })],
+          ['The root is next', 'An empty ring, thicker than the others.', k({ now: [deg(n - 1)], next: [tonic + 12] })],
+          ['Held down', 'A key you hold takes its colour, without a ring. A key outside the scale turns grey.', k({ press: [deg(2), deg(2) + 1] })],
+          ['Right', 'Green with a check mark.', k({ right: [deg(iNow), black] })],
+          ['Wrong', 'Red with a cross.', k({ wrong: [deg(iNow) + 1, deg(iNow) + 4] })]
+        ];
+      });
+    } else if (hero === 'neck') {
+      var pl = neckPlaces(GUITAR), no = neckOpts(GUITAR, 'position');
+      h += sets(hero, '', function (pal) {
+        var k = function (extra) { return neck(pal, extra, no); };
+        return [
+          ['In the scale', 'A dot in the note’s colour. The root has a thicker ring and a fine line in its colour.', k({})],
+          ['Play this now', 'A bright ring that stands off the dot.', k({ now: [pl.now] })],
+          ['Next', 'An empty ring in the note’s colour.', k({ now: [pl.now], next: [pl.next] })],
+          ['The root is the note to play now', 'The root’s thicker ring, inside the bright ring of “now”.', k({ now: [pl.root], next: [pl.second] })],
+          ['The root is next', 'An empty ring, thicker than the others.', k({ now: [pl.last], next: [pl.root2] })],
+          ['Held down', 'A larger dot without a ring. A spot outside the scale turns grey.', k({ press: [pl.third, pl.out] })],
+          ['Right', 'Green with a check mark.', k({ right: [pl.now] })],
+          ['Wrong', 'Red with a cross.', k({ wrong: [pl.out] })]
+        ];
+      });
+    } else {
+      h += sets(hero, 'is-wide', function (pal) {
+        var k = function (extra) { return pads(pal, extra); };
+        return [
+          ['At rest', 'Every pad shows its colour as a dot.', k({})],
+          ['Hit this now', 'The whole pad is filled with its colour and has a dark ring.', k({ now: [{ lane: 1 }] })],
+          ['Next', 'An empty ring in the pad’s colour.', k({ now: [{ lane: 1 }], next: [{ lane: 3 }] })],
+          ['The first colour is the pad to hit now', 'The Kick: amber today, red in the mockup’s colours.', k({ now: [{ lane: 0 }], next: [{ lane: 1 }] })],
+          ['Held down', 'A pad you hold takes its colour, without a ring.', k({ press: [{ lane: 5 }] })],
+          ['Right', 'Green with a check mark.', k({ right: [{ lane: 1 }] })],
+          ['Wrong', 'Red with a cross.', k({ wrong: [{ lane: 2 }] })]
+        ];
+      });
+    }
+    return h;
+  }
+
+  function helpView(hero) {
+    var words = {
+      keyboard: ['Nothing lights up: a bare keyboard.', 'Only the root.', 'The root, and the key to play now.', 'The scale’s dots, the root, now and next. No labels.', 'The scale’s dots with their labels, the root, now and next.'],
+      neck: ['Nothing lights up: the bare neck.', 'Only the root.', 'The root, and the note to play now.', 'The scale’s dots, the root, now and next. No labels.', 'The scale’s dots with their labels, the root, now and next.'],
+      pads: ['The pads without their colours.', 'The pads without their colours: pads have no root.', 'Only the pad to hit now.', 'Every pad’s colour, now and next.', 'Every pad’s colour, now and next.']
+    }[hero];
+    var h = headBlock(HERO_NAME[hero] + (hero === 'pads' ? '' : ' · ' + keyName), 'The five Help levels',
+      ['Each picture has a note to play now and a next one. A level that does not show them leaves them dark, on screen and on a LUMI.']);
+    var pl = neckPlaces(GUITAR);
+    h += sets(hero, hero === 'pads' ? 'is-wide' : '', function (pal) {
+      return [4, 3, 2, 1, 0].map(function (lv) {
+        var pic = hero === 'keyboard' ? kbd(pal, { now: [deg(iNow)], next: [deg(iNext)] }, octave(1), lv)
+          : hero === 'neck' ? neck(pal, { now: [pl.now], next: [pl.next] }, neckOpts(GUITAR, 'position'), lv)
+          : pads(pal, { now: [{ lane: 1 }], next: [{ lane: 3 }] }, lv);
+        return [D.HELP_NAMES[lv], words[lv], pic];
+      });
+    });
+    return h;
+  }
+
+  function modes(hero) {
+    var h = headBlock(HERO_NAME[hero] + ' · ' + keyName, 'Color notes by: Degree or Note name',
+      ['Degree: the 1 has the same colour in every key, and a lit note says R, 2, ♭3 … Note name: every C has the same colour in every key, and a lit note says its name. ' +
+        'The two sets of colours differ in Degree only.']);
+    var pl = neckPlaces(GUITAR), keep = o.colors;
+    h += sets(hero, phone ? '' : 'is-full', function (pal) {
+      var out = [['interval', 'Degree', 'Colour and label say which step of the scale a note is.'], ['note', 'Note name', 'Colour and label say which note it is.']].map(function (md) {
+        o.colors = md[0];
+        var pic = hero === 'keyboard' ? kbd(pal, { now: [deg(iNow)], next: [deg(iNext)] }, octave(phone ? 1 : 2))
+          : neck(pal, { now: [pl.now], next: [pl.next] }, neckOpts(GUITAR, phone ? 'position' : 'full'));
+        return [md[1], md[2], pic];
+      });
+      o.colors = keep;
+      return out;
+    }, false);
+    return h;
+  }
+
+  function necks() {
+    var size = phone ? 'position' : 'full';
+    var kinds = [
+      ['Guitar, six strings', 'E A D G B E.', GUITAR, false],
+      ['Six strings without fret wires', upright ? 'No fret wires.' : 'A note sits where the wire would be.', GUITAR, true],
+      ['Bass, four strings', 'E A D G.', BASS4, false],
+      ['Fretless bass, four strings', upright ? 'No fret wires.' : 'No fret wires: a note sits where the wire would be.', BASS4, true],
+      ['Fretless bass, five strings', 'B E A D G.', BASS5, true]
+    ];
+    var h = headBlock('Necks · ' + keyName, upright ? 'One neck drawing, standing' : 'One neck drawing, lying flat',
+      [upright ? 'The nut is on top and the lowest string on the left, as the app draws the neck on a phone today.' : 'The nut is on the left and the highest string on top, as tab is written.',
+        'Help is set to ' + D.HELP_NAMES[o.help] + '. Each neck has a note to play now and a next one.']);
+    h += sets('neck', upright ? 'is-upright' : 'is-full', function (pal) {
+      return kinds.map(function (kd) {
+        var opts = upright ? { strings: kd[2], frets: phone ? 5 : 7, upright: true, fretless: kd[3] } : neckOpts(kd[2], size, { fretless: kd[3] });
+        var pl = upright || !phone ? neckPlaces(kd[2], 1, opts.frets) : neckPlaces(kd[2]);
+        return [kd[0], kd[1], neck(pal, { now: [pl.now], next: [pl.next] }, opts)];
+      });
+    }, false);
+    return h;
+  }
+
+  // ---- "Change this picture": the parameters as chips (Mock.change)
+  function change() {
+    return Mock.change([
+      ['view', 'Picture', view, [['intro', 'The four things'], ['rootnow', 'Root as now'], ['states', 'Every state'], ['help', 'Help levels'], ['modes', 'Degree or note name'], ['necks', 'Necks']]],
+      view === 'necks' ? ['upright', 'Neck', upright ? 1 : 0, [[0, 'Lying flat'], [1, 'Standing']]]
+        : ['hero', 'Instrument', heroQ === 'all' || HEROES.indexOf(heroQ) === -1 ? 'all' : heroQ, [['all', 'All three'], ['keyboard', 'Keyboard'], ['neck', 'Neck'], ['pads', 'Pads']]],
+      ['palette', 'Colours', PALETTES[palQ] ? palQ : 'both', [['both', 'Both sets'], ['app', 'Today’s'], ['tokens', 'The mockup’s']]],
+      view === 'help' ? null : ['help', 'Help', o.help, [4, 3, 2, 1, 0].map(function (lv) { return [lv, D.HELP_NAMES[lv]]; })],
+      view === 'modes' ? null : ['colors', 'Color notes by', o.colors, [['interval', 'Degree'], ['note', 'Note name']]],
+      ['grey', 'Show', grey ? 1 : 0, [[0, 'In colour'], [1, 'In grey']]],
+      ['theme', 'Theme', q('theme', document.documentElement.getAttribute('data-theme') || 'dark'), [['dark', 'Dark'], ['light', 'Light']]]
+    ].filter(function (r) { return r; }));
+  }
+
+  function render() {
+    phone = window.innerWidth < NARROW;
+    var parts = (view === 'necks' ? ['neck'] : view === 'modes' ? heroes.filter(function (x) { return x !== 'pads'; }) : heroes).map(function (hero) {
+      var body = view === 'intro' ? intro(hero) : view === 'rootnow' ? rootnow(hero) : view === 'states' ? states(hero) : view === 'help' ? helpView(hero) : view === 'modes' ? modes(hero) : necks();
+      return '<section class="mk-part" data-hero="' + hero + '">' + body + '</section>';
+    });
+    if (!parts.length) parts = ['<section class="mk-part">' + modes('keyboard') + '</section>'];
+    document.body.innerHTML = '<div class="mk-inst sl-skin" role="main">' + parts.join('') + '<div class="mk-part">' + change() + '</div></div>';
+  }
+  render();
+  window.addEventListener('resize', function () { if ((window.innerWidth < NARROW) !== phone) render(); });
+})();
+</script>
+</body>
+</html>
