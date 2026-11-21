@@ -3,7 +3,7 @@
 Open **Practice → Woodshed → Guided performance**. **Melody and rhythm** and
 **Chord journey** generate original exercises in the treble-clef menu's selected
 root and scale. Library rows offer **Wait for Me** and **Play at Tempo** for
-generated scales, imported MIDI, Studio tracks and pasted ASCII tab.
+generated scales, imported MIDI and pasted ASCII tab.
 
 The player works without a physical keyboard or LUMI. Its piano roll, current
 notes, **Coming up**, playable keyboard and optional LUMI targets share one
@@ -47,8 +47,7 @@ are saved locally, up to 30 runs. **Stop** shows **partial results**, including
 **pending** notes; it does not manufacture misses or mark the piece completed.
 Loop statistics accumulate across passes and include pending notes in the
 current pass. Stop, navigation and unfinished loops do not save a completed
-summary. This player does not claim the older Woodshed modes' XP/Ideas export
-behavior.
+summary. This player does not claim the older Woodshed modes' XP behavior.
 
 ## Sound, display and color
 
@@ -93,8 +92,6 @@ you. Unavailable hardware cannot receive a cleanup message.
   1,500 notes with a warning. Controllers, programs, bends, lyrics and other
   metadata are not performance targets. Mixed-file channel-10 percussion is
   excluded from pitched material; percussion-only imports remain identified.
-- **Studio:** existing note pitches, positions, durations and velocities are
-  copied at the shared tempo. Recorded audio clips are not transcribed.
 - **ASCII tab:** standard tuning, frets 0–24 and aligned chord columns provide
   pitches. Onset groups become even eighths with approximate holds; rhythm,
   rests and techniques are not inferred. Timed results therefore describe the
