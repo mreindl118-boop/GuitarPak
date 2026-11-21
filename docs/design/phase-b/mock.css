@@ -278,8 +278,11 @@
   :where(.sl-skin) :is(.icon-btn, .btn.icon-btn, .btn.sm.icon-btn):hover { background: var(--sl-surface-2); border-color: transparent; color: var(--sl-ink); }
 }
 :where(.sl-skin) :is(.icon-btn, .btn.icon-btn, .btn.sm.icon-btn):active { background: var(--sl-surface-sunken); transform: none; }
+/* on: a fill and a boundary where the unlit button has neither. The boundary is 2 px, so that on
+   and off also differ where colours are forced; the button's name or its aria state says it in words */
 :where(.sl-skin) :is(.icon-btn, .btn.icon-btn, .btn.sm.icon-btn):is(.active, .on, [aria-pressed="true"], [aria-expanded="true"]) {
   background: var(--sl-accent-soft);
+  border-width: 2px;
   border-color: var(--sl-accent-deep);
   color: var(--sl-ink);
 }
@@ -335,11 +338,14 @@
 :where(.sl-skin) .btn.primary::before, :where(.sl-skin) .icon-btn::before { content: none; }      /* these two say "on" another way */
 
 /* ---- Segmented control: .seg. One sunken track; a wrapped control keeps
-        separate rounded segments ------------------------------------------- */
+        separate rounded segments. A segment's pill is drawn lower than the
+        track, and its tap area (::after) reaches the track's edges: 44 / 48 px
+        (D9). Rows of a wrapped control stand so far apart that the tap areas
+        of two rows meet and do not overlap ---------------------------------- */
 :where(.sl-skin) .seg {
   display: inline-flex;
   flex-wrap: wrap;
-  gap: var(--sl-space-1);
+  gap: calc(var(--sl-space-2) + 2px) var(--sl-space-1);
   padding: var(--sl-space-1);
   border: 1px solid var(--sl-line-control);
   border-radius: calc(var(--sl-control-h) / 2 + var(--sl-space-1));
@@ -350,7 +356,8 @@
   align-items: center;
   justify-content: center;
   flex: 1 1 auto;
-  min-height: calc(var(--sl-control-h) - var(--sl-space-2) - 2px);   /* the track is the 44 / 48 px control */
+  position: relative;
+  min-height: calc(var(--sl-control-h) - var(--sl-space-2) - 2px);   /* the pill; the tap area below makes it 44 / 48 px */
   min-width: var(--sl-control-h);
   padding: 0 var(--sl-space-4);
   border: 1px solid transparent;
@@ -364,6 +371,12 @@
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   transition: background-color var(--sl-dur-fast) var(--sl-ease), border-color var(--sl-dur-fast) var(--sl-ease), color var(--sl-dur-fast) var(--sl-ease);
+}
+/* the tap area: the track's padding, its line and the pill's own line above and below (::before is the check mark) */
+:where(.sl-skin) .seg > button::after {
+  content: '';
+  position: absolute;
+  inset: calc(-1 * var(--sl-space-1) - 2px) 0;
 }
 @media (hover: hover) { :where(.sl-skin) .seg > button:hover { color: var(--sl-ink); background: var(--sl-surface-2); } }
 :where(.sl-skin) .seg > button:active { background: var(--sl-surface); }
@@ -408,7 +421,8 @@
 @media (hover: hover) {
   :where(.sl-skin) :is(select, .select, input[type="text"], input[type="number"], input[type="search"], textarea):hover { border-color: var(--sl-ink-soft); }
 }
-:where(.sl-skin) :is(select, .select, input, textarea):disabled { border-style: dashed; color: var(--sl-ink-muted); cursor: not-allowed; }
+/* opacity: a browser's own sheet fades a disabled select (Chromium to 70 %), which takes the ink under 4.5:1 */
+:where(.sl-skin) :is(select, .select, input, textarea):disabled { border-style: dashed; color: var(--sl-ink-muted); cursor: not-allowed; opacity: 1; -webkit-text-fill-color: currentColor; }
 :where(.sl-skin) :is(input, textarea)[aria-invalid="true"] { border-color: var(--sl-bad); }
 /* the chevron of a select, drawn from two strokes in the ink colour: one rule for both themes.
    (D6 writes this one look with weight: :root .sl-skin select.) */
@@ -734,6 +748,13 @@
   line-height: var(--sl-leading-tight);
   letter-spacing: 0.01em;
   text-transform: uppercase;
+}
+/* a flat in a headline: Bebas Neue has capitals only, so "Db" would read "DB". The b of a flat is
+   set in the condensed face and stays lower case, as the app's chord names do */
+:where(.sl-skin) h1 .sl-flat {
+  font-family: var(--sl-font-cond);
+  font-weight: var(--sl-weight-cond-bold);
+  text-transform: none;
 }
 .sl-footline {
   display: flex;
@@ -1456,7 +1477,9 @@ html.bar-hidden .sl-keybar {                /* the header is gone: the bar is th
 #cx-pop-lights { justify-items: start; }
 #cx-pop-lights > #cx-tnote { max-width: 46ch; }
 /* the Help panel: the five levels, a sentence each, then "Color notes by" */
-.sl-pop .cx-levels { display: grid; border-radius: var(--sl-radius-md); }
+/* (a level is a row of 48 px and more: it needs no tap area beyond its box, and keeps the small gap) */
+.sl-pop .cx-levels { display: grid; gap: var(--sl-space-1); border-radius: var(--sl-radius-md); }
+.sl-pop .cx-levels > button::after { content: none; }
 .sl-pop .cx-levels > button {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -1844,8 +1867,8 @@ body { margin: 0; min-height: 100vh; font-family: var(--sl-font-body); color: va
 .mk-change-body { display: grid; gap: var(--sl-space-3); }
 .mk-change .mk-tools-label { flex: 0 0 calc(var(--sl-space-8) + var(--sl-space-5)); }
 @media (max-width: 640px) { .mk-change .mk-tools-label { flex-basis: 100%; } }
-.mk-back { color: var(--sl-ink-muted); font-size: var(--sl-text-sm); }
-.mk-back a { color: var(--sl-accent-text); }
+.mk-back { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--sl-space-3); color: var(--sl-ink-muted); font-size: var(--sl-text-sm); }
+.mk-back a { display: inline-flex; align-items: center; min-height: var(--sl-control-h); color: var(--sl-accent-text); }      /* a link is a tap target too */
 
 /* a question to the owner, set off by an amber line (instruments.html, index.html) */
 .mk-ask { max-width: 68ch; padding-left: var(--sl-space-4); border-left: 2px solid var(--sl-accent-text); color: var(--sl-ink); }

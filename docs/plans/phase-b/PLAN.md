@@ -2603,3 +2603,52 @@ for this plan:
   setting (Phase A1 removes the Studio). If it lands, B5a (the key bar) builds on that chip instead of the
   clef, B11 loses its tempo item, and A1's removal of `#space-btn` meets its new code.
 
+### B1b (from its review)
+
+What the drawings and `docs/DESIGN-SYSTEM.md` show differs from this plan's letter in the places below. The
+owner says yes or no to the drawings, so a later step builds and tests the drawn reading unless he decides
+otherwise; none of the decisions above is rewritten here.
+
+- **Help levels (changes B3.4; D32 and B13; D30 and B16).** The drawings, `mock-hero.js` and the specification
+  show what the app does today (`js/midi.js` `wanted()`, `js/piano.js`): Full = dots, labels, root, now, next;
+  Colors = dots, root, now, next; Target = the root and now; Tonic = the root; None = nothing. The letter differs
+  in three places: D30 has labels from Colors up; B3.4 and D32 have "next" at Target; B3.4 and D32 have no root
+  at Target. `SLHero.model` takes `labelsFrom` and `nextFrom` for the other reading. `tests/hero.test.js` (B3.4),
+  B13 and B16 assert the drawn reading (gate G4).
+- **Label contrast (changes B3.4, and L18 where it reads labels).** Neither ink token reaches 4.5:1 on `#7160f9`
+  (A# in Note name mode: light ink 4.43, dark ink 4.19) or on `#6e62fa` (the ♭7 of the mockup's palette: 4.38,
+  4.23). The drawings give a light label a hairline outline in `--sl-ink-on-color` (18.53:1 against the label).
+  B3.4's "a label's ink has 4.5:1 against its dot for the twelve colours in both modes" cannot pass as worded:
+  the test counts the outline for a label that carries one, and the owner's page names the two labels.
+- **The root's ring on a narrow key (changes L18, B16.4).** On a key narrower than about 34 px (the Piano page on
+  a phone: a root dot of 16 px beside scale dots of 18 px) the root's ring thins to 2 px, the width of a scale
+  dot's. There the root is told by the fine line in its own colour around the dot. L18's "the root's ring is
+  thicker" holds for keys from about 34 px; on a narrower key L18 asks for that line.
+- **A segment's tap area (changes L7 in B3).** A segment of `.seg` is drawn 38 / 34 px high inside its 48 / 44 px
+  track; its `::after` reaches the track's edges. L7 measures a segment by that tap area (`elementFromPoint`
+  along its height), not by its box.
+- **The header's height (changes B5a.1; B3).** `--sl-topbar-h` is not a token, and T2 fails on a `var(--sl-…)`
+  that `css/tokens.css` does not define. The drawings publish `--mk-topbar-h`. B5a either adds the token to
+  `css/tokens.css` (and to the suite's count) or publishes the height under a name outside `--sl-`; B3 does not
+  carry an `--mk-` name into `css/components.css`.
+- **The home's instrument is capped (changes B9.1, "takes the height that is left").** A key is at most six and
+  a half times as long as it is wide, a neck at most 1.75 times its drawing size, a pad at most 1.3 times as high
+  as wide and square from 100 px. Room beyond that stays empty between the button and the instrument (187 to
+  271 px at 820 × 1180). The home suite's case 2 (the share of the window) is unchanged; a check "the hero fills
+  the room" would fail on the approved picture.
+- **One primary button on the first screen (L8; B11, B12).** It holds at 390 × 844, 1024 × 640 and 1280 × 800,
+  the windows L8 names. At 360 × 740 the button of Piano ends at 751 px and that of Chords and the Plan at
+  727 px, under the tab bar (675 px). The step of each page decides whether the layout or the rule gives way.
+- **New in the component draft, for B3 to carry over.** `h1 .sl-flat` (the b of a flat key in a headline stays
+  lower case, in the condensed face: "Db", not "DB"; used by the home, B9, and the Piano page, B12). A disabled
+  select gets `opacity: 1` (Chromium fades it to 70 %, which took its text to 3.9:1 and 2.8:1). A lit icon button
+  has a 2 px boundary, and `#met-btn` is named "Metronome, running" while the click runs (B6 writes that name;
+  it is not a text of today's app). The neck leaves out an inlay that a lit spot on a neighbouring string would
+  cover in part.
+- **Beyond table B1b.1.** Two helper files, `mock.js` and `mock-hero.js` (the draft of `js/hero.js`; the call
+  form is `keyboard(model, opts)`). `shell.html` has a state `train`, `gear.html` a state `key-cut`. `.is-scale`
+  is written by the drawing functions and has no rule: the dot is the look. A card is drawn at
+  `--sl-radius-lg` (20 px), and `docs/DESIGN-SYSTEM.md` marks four passages as changed where B1b.2 and D44 name
+  two (also the card's radius and what the seven degree tokens hold).
+- **`WORDING.md`'s line numbers** are lines of the merged tree (2.1.0), not of `a914df2` as the rest of this
+  plan's; the texts 2.1.0 added are not in the list.

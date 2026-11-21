@@ -230,8 +230,8 @@
 }
 .mk-listbox > span.is-in { padding-left: var(--sl-space-5); }
 
-/* a page body for the states of part 5: a headline, a line, a row of tools, cards */
-.mk-page { display: grid; align-content: start; gap: var(--sl-space-4); max-width: calc(var(--sl-space-8) * 12); margin: 0 auto; }
+/* a page body for the states of part 5: a headline, a line, a row of tools, cards (as wide as a page of pages.html) */
+.mk-page { display: grid; align-content: start; gap: var(--sl-space-4); max-width: calc(var(--sl-space-8) * 16); margin: 0 auto; }
 .mk-page .card > h2 + p { margin-bottom: var(--sl-space-2); }
 </style>
 <script src="mock.js"></script>
@@ -526,10 +526,10 @@
   // a file that is not a MIDI file was refused (:1393 with the message of :233).
   function shedMain(error) {
     return '<div class="mk-page">' +
-      '<div class="mk-quiet-head"><p class="sl-eyebrow">Train · Woodshed</p><h1>Woodshed</h1></div>' +
+      '<div class="mk-quiet-head"><h1>Woodshed · piano</h1></div>' +      // one headline and no line over it, as pages.html draws this page (D28)
       '<p class="sl-hint">Pick something to practice — every run is scored (Perfect ±30ms). Calibrate once per input for honest timing.</p>' +
       '<div class="row tight">' + ['+ Scale (your key)', '+ Hanon', '+ Pentatonic fours', '+ MIDI file', '+ Paste tab', 'Calibrate timing'].map(function (t) {
-        return '<button type="button" class="btn sm">' + t + '</button>'; }).join('') + '</div>' +
+        return '<button type="button" class="btn">' + t + '</button>'; }).join('') + '</div>' +      // not in a list row: the default height (D9)
       (error ? '<div class="error" id="ws-msg" role="alert">' + icon('alert', 20) + '<span>MIDI import failed: not a MIDI file</span></div>' : '') +
       '<div class="card"><h2>Shared source library</h2>' +
         '<p class="muted small">Practice credit: Piano. Source instrument describes the score, not your XP category.</p>' +
@@ -648,9 +648,9 @@
       { title: '5 · Nothing yet, waiting, failed',
         lead: 'Three moments that every page has. Each says in words what is the case and what to do; none is a color alone.',
         states: [
-          { id: 'empty', title: 'Nothing yet: the Woodshed’s library before the first piece.', params: { state: 'empty', page: 'shed' }, widths: W3 },
+          { id: 'empty', title: 'Nothing yet: the Woodshed’s library before the first piece.', note: 'Only the headline, the add buttons and the library are drawn here; the whole page is in the Pages drawing.', params: { state: 'empty', page: 'shed' }, widths: W3 },
           { id: 'loading', title: 'Waiting: the Android app is looking for a Bluetooth keyboard.', params: { sheet: 'lights', lights: 'none', bt: 1 }, widths: W3 },
-          { id: 'error', title: 'Failed: a file that is not a MIDI file was refused.', params: { state: 'error', page: 'shed' }, widths: W3 },
+          { id: 'error', title: 'Failed: a file that is not a MIDI file was refused.', note: 'Only the headline, the add buttons and the library are drawn here.', params: { state: 'error', page: 'shed' }, widths: W3 },
           { id: 'failed', title: 'A page that could not load says so where its content would be.', params: { state: 'failed' }, widths: W2 }
         ] }
     ]

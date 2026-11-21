@@ -291,12 +291,26 @@
     };
     var s = '', col, r, i;
 
-    // inlays: one at frets 3, 5, 7, 9, 15, 17, 19, 21, two at 12 and 24, between two strings
+    // inlays: one at frets 3, 5, 7, 9, 15, 17, 19, 21, two at 12 and 24, between two strings.
+    // An inlay that a lit spot on a neighbouring string would cover in part is left out: half
+    // an inlay beside a dot reads as a fault of the dot
     var mid = (S - 1) / 2, odd = S % 2 === 1;
+    var reach = function (v, c) {      // how far a lit spot in the v-th row from the top reaches at this fret (its
+      if (v < 0 || v > S - 1) return 0;      // radius below plus half its line); 0 = nothing is lit there
+      var si = lefty ? v : S - 1 - v, fr = fretOf(c), q = m.at({ midi: strings[si] + fr, string: si, fret: fr });
+      if (!q.dot && !q.state) return 0;
+      return q.state === 'now' ? 20.5 : q.root && !q.state ? 16 : q.state === 'press' ? 14 : q.state ? 13.5 : 12.5;
+    };
+    var covered = function (yv, c) {
+      var a = Math.floor(yv), b = Math.ceil(yv), ra = reach(a, c), rb = reach(b, c);
+      return (ra && (yv - a) * GAP - 5 < ra) || (rb && (b - yv) * GAP - 5 < rb);
+    };
     for (col = 1; col <= N; col++) {
       var f = fretOf(col), ys = [3, 5, 7, 9, 15, 17, 19, 21].indexOf(f) !== -1 ? [odd ? mid - 0.5 : mid]
         : f === 12 || f === 24 ? (odd ? [mid - 1.5, mid + 1.5] : [mid - 1, mid + 1]) : [];
-      for (i = 0; i < ys.length; i++) s += '<circle class="sl-neck-inlay" cx="' + num(colX(col)) + '" cy="' + num(TOP + ys[i] * GAP) + '" r="5"/>';
+      for (i = 0; i < ys.length; i++) {
+        if (!covered(ys[i], col)) s += '<circle class="sl-neck-inlay" cx="' + num(colX(col)) + '" cy="' + num(TOP + ys[i] * GAP) + '" r="5"/>';
+      }
     }
     // fret wires; the nut, or at a position the wire the drawn part starts at
     if (!fretless) {

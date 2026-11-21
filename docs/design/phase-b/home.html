@@ -424,7 +424,7 @@
     guitar: [['Guitar fretboard', 'Guitar'], ['Guitar tab & notation', 'Guitar'], ['Performance practice', 'Performance practice']],
     bass: [['Bass fretboard exercises', 'Four-string bass'], ['Bass performance practice', 'Performance practice'], ['Guitar tab reference', 'Shared reference · six-string guitar']],
     drums: [['Drum pads', 'Drums'], ['Drum & rhythm library', 'Rhythm practice']],
-    voice: [['Ear-training exercises', 'Shared ear training'], ['Sing single notes', 'Microphone or on-screen keys'], ['Pitch tuner', 'Pitch reference']],
+    voice: [['Voice trainer', 'Pitch line, takes and scores'], ['Ear-training exercises', 'Shared ear training'], ['Sing single notes', 'Microphone or on-screen keys'], ['Pitch tuner', 'Pitch reference']],      // 2.1.0 added the first
     other: [['Performance practice', 'Counts for “Other”'], ['Circle of fifths', 'Shared theory']]
   };
   var others = [];
@@ -452,7 +452,8 @@
 
   var heroLabel = kind === 'pads' ? 'Drum pads' : (kind === 'keyboard' ? 'Keyboard' : kind === 'neck4' ? 'Bass neck' : 'Guitar neck') + ', ' + keyName;
   // a line of the headline never starts with the dot that parts the two names
-  var titleHtml = esc(title).replace(/ · /g, ' · ');
+  // (and the b of a flat key stays lower case in the capitals of the headline: Mock.flat)
+  var titleHtml = Mock.flat(esc(title)).replace(/ · /g, ' · ');
   var main =
     '<div class="home-head">' +
       '<p class="sl-eyebrow" id="home-eyebrow">Next · ' + esc(inst.label) + '</p>' +

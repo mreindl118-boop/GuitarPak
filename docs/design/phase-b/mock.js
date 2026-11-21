@@ -85,6 +85,7 @@
  *                    icon from here and carries no copy of its own
  *   Mock.wordmark()  the real wordmark SVG (index.html)
  *   Mock.keyName(root, scale, 'full'|'plain'|'short')    Mock.scaleName(scale, form)
+ *   Mock.flat(html)  wraps the b of a flat key ("Db") for a headline, so that capitals do not make it "DB"
  *   Mock.lockSentence(on, root, scale, 'full'|'mid'|'short')    Mock.lockMessage(on, root, scale)
  *   Mock.scaleNotes(root, scale)   the notes of a key: { pc, step, name, color, label }
  *   Mock.inkOn(hex)  'dark' or 'light': which ink reads on a note colour (SLHero.inkOn of mock-hero.js)
@@ -314,6 +315,9 @@
     return form === 'full' ? sc.name : form === 'short' ? (SCALE_SHORT[scaleId] || plain) : plain;
   }
   function keyName(rootPc, scaleId, form) { return ROOTS[((rootPc % 12) + 12) % 12] + ' ' + scaleName(scaleId, form || 'plain'); }
+  // a headline is set in capitals (Bebas Neue has no others), so the b of a flat key gets a span
+  // that keeps it lower case: "Db Natural Minor" must not read "DB NATURAL MINOR". Takes escaped text
+  function flat(html) { return String(html).replace(/\b([A-G])b(?![a-z])/g, '$1<span class="sl-flat">b</span>'); }
   function lockSentence(on, rootPc, scaleId, form) {
     if (!on) return form === 'full' ? 'OFF · every note sounds' : 'OFF';
     if (form === 'full') return 'ON · only ' + keyName(rootPc, scaleId, 'plain') + ' notes sound';
@@ -431,7 +435,7 @@
     h += '<a class="btn sm" id="app-switch" href="' + other.url + '" title="Open ' + other.name + '" aria-label="Open ' + other.name + '"' + go('app=' + app.other + '&page=&pop=&toast=&bar=') + '>' +
       icon(gear ? 'learn' : 'sliders', 20, 'tb-ic') + (gear ? 'soundLAB' : 'Gear') + '</a>';
     h += '</div>';
-    h += '<button type="button" class="btn sm icon-btn' + (o.met ? ' on' : '') + '" id="met-btn" aria-label="Metronome" title="Metronome" aria-haspopup="dialog" ' +
+    h += '<button type="button" class="btn sm icon-btn' + (o.met ? ' on' : '') + '" id="met-btn" aria-label="' + (o.met ? 'Metronome, running' : 'Metronome') + '" title="Metronome" aria-haspopup="dialog" ' +
       'aria-expanded="' + (o.sheet === 'metronome') + '" aria-controls="sheet-metronome">' + icon('metronome', 20) + '</button>';
     h += '</div>';
     h += '<div class="subnav sl-skin" id="subnav"' + (pills ? '' : ' hidden') + '>' + pills + '</div>';
@@ -543,7 +547,7 @@
       : o.page === 'piano' ? ['Chords and arpeggio', 'Practice a scale', 'Computer keys', 'Notes and triads on the LUMI'] : [];
     var folds = names.map(function (name) { return '<details class="sl-fold"><summary>' + name + '</summary></details>'; }).join('');
     return '<div class="mk-quiet' + (o.scrolled ? ' mk-quiet-tall' : '') + '">' +
-      '<div class="mk-quiet-head"><h1>' + title + '</h1></div>' +      // one headline and no line over it, as pages.html draws a page (D28)
+      '<div class="mk-quiet-head"><h1>' + flat(esc(title)) + '</h1></div>' +      // one headline and no line over it, as pages.html draws a page (D28)
       // the Voice page (soundLAB 2.1.0) has a pitch graph, not a keyboard, and is not drawn yet
       (o.page === 'vocal' ? '<p class="sl-hint">This page is not drawn yet. It gets the new look in a step of its own.</p>' : g ? quietKeys(o) : '') +
       '<div class="mk-quiet-folds">' + folds + '</div></div>';
@@ -807,7 +811,7 @@
     params: P, single: single, q: q, esc: esc, href: href, tierOf: tierOf,
     DATA: { SCALES: SCALES, SCALE_ORDER: SCALE_ORDER, SCALE_GROUPS: SCALE_GROUPS, SCALE_SHORT: SCALE_SHORT, ROOTS: ROOTS, COLORS: COLORS, APPS: APPS,
       PAGE_LABELS: PAGE_LABELS, PILL_LABELS: PILL_LABELS, HELP_NAMES: HELP_NAMES, HELP_TEXT: HELP_TEXT, INSTRUMENTS: INSTRUMENTS, LIGHTS: LIGHTS, SIZES: SIZES },
-    icon: icon, wordmark: wordmark, keyName: keyName, scaleName: scaleName, lockSentence: lockSentence, lockMessage: lockMessage,
+    icon: icon, wordmark: wordmark, keyName: keyName, flat: flat, scaleName: scaleName, lockSentence: lockSentence, lockMessage: lockMessage,
     scaleNotes: scaleNotes, pcName: pcName, inkOn: inkOn,
     shellOpts: shellOpts, shell: shell, quietPage: quietPage, page: page, settle: settle, toast: toast,
     contact: contact, frames: function () { return frames.slice(); }, change: change, figure: figure, fit: fit

@@ -373,7 +373,10 @@ button .ic, .chip .ic { display: inline-block; }
           states: [
             { id: 'key-first', title: 'The key the app starts with, A Minor Pentatonic. On a phone the button says “A Min Pent”, as the key bar does.',
               note: 'The header stays in one row with every key. On the narrowest phone the little arrow goes when the name needs its room.',
-              params: { page: 'deck', key: 'A-minorPent' }, widths: [360, 390, 1280] }
+              params: { page: 'deck', key: 'A-minorPent' }, widths: [360, 390, 1280] },
+            { id: 'key-cut', title: 'Not settled: on the narrowest phone (360 px) five long key names are cut with “…”, here Db Harmonic Minor.',
+              note: 'The five are the Harmonic Minor keys of Db, Eb, Gb, Ab and Bb. Up to fourteen names are cut in a touch window just over 640 px wide (641 to about 648 px), where the header’s tools take more room.',
+              params: { page: 'deck', key: 'Db-harmonicMinor' }, widths: [360, 641] }
           ] }
       ]
     });

@@ -48,20 +48,22 @@ suites of Phase B check them by script.
    "Something else" or a sheet. Dashboards of cards were rejected as "too busy
    and too plain".
    - The home and every practice page have one `h1` and exactly one primary
-     button on the first screen.
+     button on the first screen at 390 × 844, 1024 × 640 and 1280 × 800.
    - On the home the headline, the button and the whole instrument are on the
      first screen without scrolling at 390 × 844, 1024 × 640 and 1280 × 800.
    - Every other choice is one tap away: the fold "Something else", a fold of
      the page, or a sheet. The first view is never a grid of cards.
    - The nine tool pages keep today's arrangement in Phase B and get one `h1`
-     and exactly one primary button on the first screen; cards are allowed
-     there. Making them shorter is content work of Phases C and D.
+     and exactly one primary button on the first screen at the same three
+     windows; cards are allowed there. Making them shorter is content work of
+     Phases C and D. (A phone lower than 844 px: see "Open points".)
 2. **The instrument is the hero.** Keyboard for a keys lesson, neck for guitar
    or bass, pads for drums, lit exactly as the LUMI (or the on-screen neck)
    will be: degree colors, filled key = play this now.
    - On the home and on a practice page the instrument is the largest element.
-     On the home it is at least as high as the headline and at least a quarter
-     of the window's height (22 % at 1024 × 640).
+     On the home it is at least as high as the headline block and at least a
+     quarter of the window's height (22 % at 1024 × 640). Both are measured on
+     the stage, the box `.sl-hero` with its padding (see "Page templates").
    - It spans the width on tablet and PC and is never cropped.
    - Its colours come from `App.colors`, the source the LUMI's lights take.
    - Keyboard, neck and pads say "in the scale", "now", "next", "the root",
@@ -209,6 +211,13 @@ Barlow Condensed 600 and 700, Bebas Neue 400. No new font file; a container
 that carries `.sl-skin` sets `font-synthesis-weight: none`, so a weight without
 a file is never faked. Caps only for Bebas headlines, the five tabs, the hero
 button and small field labels; everything else is sentence or title case.
+
+A flat in a headline. Bebas Neue has capitals only, so the key "Db Natural
+Minor" would read "DB NATURAL MINOR". In an `h1` the b of a flat key is wrapped,
+`D<span class="sl-flat">b</span>`: it is set in Barlow Condensed 700 and stays
+lower case, as the app's chord names do. A sharp needs nothing: the face has
+`#`. The flat sign "♭" is not used in a headline, because none of the three
+faces has it and a system font would draw it.
 
 | Token | Value | Use |
 |---|---|---|
@@ -433,15 +442,21 @@ carries the marker `.sl-skin`; their rules are written
 gets the marker in its own step, the shell's parts in theirs, soundLAB Gear's
 pages not before Phase H.
 
+What the marker itself sets on its container:
+
+| Class | Sets |
+|---|---|
+| `.sl-skin` | the body face (`--sl-font-body`, 16 px, weight 400, line height `--sl-leading`); `font-synthesis-weight: none`; the ink colour `--sl-ink`. Inside it buttons and fields inherit the face, `b` and `strong` are weight 500, a paragraph has no margin, and everything that takes the keyboard shows the one focus ring |
+
 States every control shares:
 
 | State | How it is drawn |
 |---|---|
 | Hover | only where the device hovers; the boundary goes to `--sl-ink-soft`, the fill one step up |
 | Pressed | the fill goes to `--sl-surface-sunken`; a button moves 1 px down |
-| On | class `active` or `aria-pressed="true"`: a fill (`--sl-accent-soft`) AND a boundary (`--sl-accent-deep`) AND a check mark or a word; never a colour alone |
+| On | class `active` or `aria-pressed="true"`: a fill (`--sl-accent-soft`) AND a boundary (`--sl-accent-deep`) AND a check mark or a word; never a colour alone. An icon button has no room for a mark: its boundary is 2 px where the unlit button has none, and its name or its aria state says it |
 | Focus | `:focus-visible` shows `--sl-focus`, with a transparent outline that survives forced colours |
-| Disabled | text stays readable (`--sl-ink-muted`), the boundary is dashed, the fill is gone |
+| Disabled | text stays readable (`--sl-ink-muted` at full strength: the rule sets `opacity: 1`, because a browser fades a disabled select by itself, Chromium to 70 %), the boundary is dashed, the fill is gone |
 
 Hover, pressed and focus are written in the draft stylesheet and are not drawn
 in any picture yet.
@@ -452,9 +467,9 @@ in any picture yet.
 |---|---|---|---|
 | Button | `.btn`; `.btn.primary`, `.btn.ghost`, `.btn.sm` | 48 / 44 px high (`--sl-control-h`), at least as wide; side padding 24 px (`--sl-space-5`); Barlow 500, 16 px; a pill | one `.btn.primary` per view: amber fill, `--sl-accent-ink` text, the glow on hover. `.ghost` has no fill and no boundary. `.sm` is the dense tier: 48 / 36 px, padding 16 px, 14 px text |
 | Hero button | `.sl-hero-btn` | 64 px (`--sl-control-h-hero`); side padding 32 px (`--sl-space-6`); Barlow Condensed 700, 20 px, caps | the one Start button of the home, with `--sl-accent-glow` under it |
-| Icon button | `.icon-btn` | 48 / 44 px square, never dense | needs an accessible name; on is also `.on` or `aria-expanded="true"` |
+| Icon button | `.icon-btn` | 48 / 44 px square, never dense | needs an accessible name; on is also `.on` or `aria-expanded="true"`: a fill and a 2 px boundary, no check mark. The metronome's name is "Metronome, running" while the click runs |
 | Chip | `.chip` | 48 / 44 px high; side padding 16 px; Barlow 500, 14 px | on = fill, amber boundary and a check mark before the words |
-| Segmented control | `.seg`, `.seg.sm` | the track is the control: 48 / 44 px (`.sm` 48 / 36 px); a segment inside it 38 / 34 px | a sunken track with 4 px padding; when it wraps, each segment keeps its own rounded shape |
+| Segmented control | `.seg`, `.seg.sm` | the track is 48 / 44 px (`.sm` 48 / 36 px). A segment's pill is drawn 38 / 34 px high, and its tap area reaches the track's edges: 48 / 44 px (`.sm` 48 / 36 px) | a sunken track with 4 px padding. The tap area is the segment's `::after` (`::before` is the check mark), and look case L7 measures a segment by it. When the control wraps, each segment keeps its own rounded shape and the rows stand 10 px apart, so that the tap areas of two rows meet and do not overlap |
 | Field | `label.field`, `.field`; `select`, `.select`, text and number inputs, `textarea` | 48 / 44 px high; radius 12 px (`--sl-radius-md`); 16 px text | the label is Barlow Condensed 600, 12 px, caps. The select's chevron is drawn in `--sl-ink-soft` and is the one look written with weight (`:root .sl-skin select`), because an old light-theme rule would otherwise win. Invalid: `aria-invalid="true"`, a `--sl-bad` boundary |
 | Range, checkbox | `input` | a range is 48 / 44 px high; a checkbox 24 px (`--sl-space-5`) | `accent-color` is `--sl-accent` |
 | Switch | `.sl-switch` | 48 / 44 px high; the track 44 × 24 px with an 18 px knob | a `button` with `aria-pressed`; the knob moves 20 px, the track fills with `--sl-accent`, and a word stands beside it |
@@ -527,6 +542,19 @@ a chip that opens a panel and a "more" mark.
 | Hint | `.sl-hint`; `.hint` keeps working | 14 px, muted | |
 | Screen-reader text | `.sl-sr`; `.sr` keeps working | | in the document, not on screen |
 
+```html
+<p class="sl-eyebrow">Next · Piano</p>
+<h1>D<span class="sl-flat">b</span> Natural Minor (Aeolian)</h1>
+
+<p class="sl-footline">
+  <span class="sl-footline-part"><span class="sl-ring" style="--p: 60" aria-hidden="true"></span><span><b>6</b> of 10 min today</span></span>
+  <span class="sl-footline-part">…icon…<span><b>4</b>-day streak</span></span>
+  <span class="sl-footline-part"><span>Plan: <b>1</b> of 4 blocks done</span></span>
+</p>
+<!-- the goal reached: the first part becomes -->
+<span class="sl-footline-part is-done">…check mark…<span>Goal reached: <b>10</b> of 10 min today</span></span>
+```
+
 ### Feedback
 
 | Component | Class | Size | Notes |
@@ -536,6 +564,20 @@ a chip that opens a panel and a "more" mark.
 | Error | `.error` | radius 12 px; a `--sl-bad` boundary | an icon and words on `--sl-surface` |
 | Two-tap confirm | `.sl-confirm`; armed `.is-armed` | the button's own | the first tap arms it for 3 s (15 × `--sl-dur`): the boundary and the words turn `--sl-bad` and a line runs out along the lower edge. Nothing is deleted on the first tap |
 | Message | `.sl-toasts`, `.sl-toast`; `.sl-toast-bad`, `.sl-toast-action` with `.sl-toast-acts` | at least 48 / 44 px high; at most 460 px wide, the window minus both gutters up to 640 px; radius 12 px | one stack for every message, above an open sheet (`--sl-z-toast`). A 4 px amber edge on the left says "a message". Buttons stand in one group that drops under the words when the row is too short |
+
+```html
+<div class="sl-empty">…icon…<b>Nothing yet</b><span>Generate an exercise above, import a MIDI file, or paste a tab.</span></div>
+<div class="sl-loading" role="status"><b>Looking for Bluetooth MIDI keyboards…</b></div>
+<div class="error" role="alert">…icon…<span>MIDI import failed: not a MIDI file</span></div>
+
+<button class="btn sl-confirm is-armed">Tap again to delete</button>
+
+<div class="sl-toast sl-toast-action" id="app-update" role="status">
+  <span>soundLAB v2.1.1 is available.</span>
+  <span class="sl-toast-acts"><button class="btn sm primary">Update now</button><button class="btn sm">Later</button></span>
+</div>
+<div class="sl-toast sl-toast-bad" role="status">…icon…<span>MIDI import failed: not a MIDI file</span></div>
+```
 
 Pictures: [one message](design/phase-b/overlays.html?w=390&theme=dark&touch=1&msg=nothing&page=chart),
 [a message over a sheet](design/phase-b/overlays.html?w=1280&theme=dark&sheet=lights&msg=sound),
@@ -557,7 +599,7 @@ code read today stay on the controls that survive.
 | Status chip | `.sl-status` with `.sl-status-dot`, `.sl-status-name`, `.sl-status-text`; `.is-connected` | 48 / 44 px; the dot 8 px | the keyboard's state in words: "LUMI · On", "LUMI · Off", "No keyboard". The dot is filled when a keyboard is connected and hollow when not |
 | Key bar | `.sl-keybar` | see "Layout" | five items, each a chip and a panel; sticks under the header and at the top edge when the header has slid away |
 | Key-bar chip | `.sl-kchip` with `.sl-kchip-label`, `.sl-kchip-value`, `.sl-kchip-caret`; two lines `.sl-kchip-stack` | 48 / 44 px; side padding 16 px; Barlow 500, 16 px | on is `.is-on` (fill, boundary and its word); a chip whose panel is open has `aria-expanded="true"` and a 2 px ink boundary |
-| Help dots | `.sl-dots` | four 8 px dots, 4 px apart | filled up to the level, hollow above it; always beside the level's name where there is room |
+| Help dots | `.sl-dots` | four 8 px dots, 4 px apart; 6 px dots, 3 px apart, in the chip of a window up to 640 px wide, where the level's name has no room | filled up to the level, hollow above it; always beside the level's name where there is room |
 | Popover | `.sl-pop`, `.sl-pop-title` | radius 20 px; padding 16 px; above 900 px at most 440 px wide, under its chip; up to 900 px a panel from the bottom, at most 576 px wide | closes on a tap outside, Escape, Back, a page change and a pedal press; one at a time |
 | Sheet | `.sheet`, `.sheet-card`, `.sheet-head`, `.sheet-body` | above 900 px a panel on the right, 440 px wide and as high as the window; up to 900 px a bottom sheet, at most 648 px wide and 88 % of the window high, top corners 20 px | modal: a scrim (`--sl-overlay`), the focus stays inside, Escape, Back and the pedal close it. The title is Bebas, 34 px |
 | Tour card | the layer `#hp-ov` carries `.sl-skin`; `.hp-ring`, `.hp-card`, `.hp-head`, `.hp-t`, `.hp-x`, `.hp-close` | the card is at most 320 px wide | a dialog with the focus in its card; the ring is 2 px of amber around the control it points at |
@@ -593,7 +635,31 @@ code read today stay on the controls that survive.
     <div class="sl-toast" id="app-toast" role="status">Scale lock on: only A Dorian notes sound</div>
   </div>
 </div>
+
+<button class="tabbar-btn active" data-group="gtheory" aria-current="page">
+  …icon…<span>Learn</span><span class="sl-goal-sr">, today’s goal is open</span>
+</button>
+<button class="subtab active" aria-current="page">Exercises</button>
+
+<div class="sl-pop" id="cx-pop-tempo">
+  <span class="sl-pop-title">Tempo</span>
+  …the click's button and the stepper…
+</div>
+
+<div id="hp-ov" class="sl-skin" role="dialog" aria-modal="true" aria-labelledby="hp-title">
+  <div class="hp-ring"></div>
+  <div class="hp-card card">
+    <div class="hp-head"><div class="hp-t" id="hp-title">Tap tempo</div>
+      <button class="hp-close btn sm icon-btn" aria-label="Close help">…icon…</button></div>
+    <div class="hp-x">…the step's sentence…</div>
+    <div class="row spread"><span class="muted small">2 of 5</span>
+      <span class="row tight"><button class="btn sm" id="hp-back">Back</button><button class="btn sm primary" id="hp-next">Next</button></span></div>
+  </div>
+</div>
 ```
+
+A card and a readout have no parts of their own: `<div class="card"><h2>…</h2>…</div>`
+and `<div class="sl-readout">120</div>`.
 
 The order of the shell's parts: the header (with the pill row as its second
 row), the key bar, the bottom tab bar, the sheets (Metronome, Keyboard lights
@@ -626,8 +692,19 @@ owners' steps.
 Three drawing functions share one lighting model: a keyboard (`.sl-kbd` of
 `.sl-key`), a neck (`.sl-neck`, an SVG) and pads (`.sl-pads` of `.sl-pad`),
 each inside a box with class `.sl-hero`, which is the stage: `--sl-stage`,
-radius 20 px, 16 px padding. A note's colour arrives as `--c` on its element.
-Keys, strings and pads look the same in both themes.
+radius 20 px. Its own rule gives it 16 px padding; every place that is drawn
+sets less: the home 12 px (8 px up to 640 px wide), and a page's keyboard none
+at the top, where the keys start at the stage's edge, and 12 px at the sides
+and under it on the Piano page (8 px at the sides in the instruments drawing). A note's colour
+arrives as `--c` on its element. Keys, strings and pads look the same in both
+themes. The markup inside the stage is whatever the three drawing functions
+return (`keyboard`, `neck`, `pads` of `mock-hero.js`, the draft of
+`js/hero.js`): a keyboard is `.sl-kbd` > `.sl-key` (an ebony key also
+`.sl-key-b`) > `.sl-dot` or `.sl-mark`, with `.sl-kbd-name` under each C; a
+neck is one SVG with a group `.sl-pos` per lit spot (`.sl-pos-dot`,
+`.sl-pos-rim`, `.sl-pos-ring`, `.sl-pos-label`, `.sl-pos-mark`); a pad is
+`.sl-pad` with `.sl-pad-dot`, `.sl-pad-name` and `.sl-pad-hint`. An inlay of the neck that a lit
+spot on a neighbouring string would cover in part is not drawn.
 
 **The vocabulary** (decision D30; gate G4). A state is a class on a key, on a
 spot of the neck or on a pad. "Now" can be told from "in the scale" without
@@ -635,8 +712,8 @@ colour: one is a filled key, the other a dot.
 
 | State | Class | On a key | On a neck | On a pad |
 |---|---|---|---|---|
-| In the scale | `.is-scale` | a 28 px dot (`.sl-dot`) in the note's colour with a 2 px dark ring | a dot with a 2 px dark ring | a 20 px dot with a 2 px dark ring |
-| The root | `.is-root` | a thicker ring, 4 px, on a 32 px dot, with a fine line in the note's own colour around it | the same | a pad has no root |
+| In the scale | `.is-scale` | a dot (`.sl-dot`) in the note's colour with a 2 px dark ring. The dot is 86 % of the key's width and at most 28 px; at most 36 px on the home's large keys (the home's script sets the class `is-roomy` on its stage; that rule is the home's own, in `home.html`, and reaches the component sheet with the home's step) | a dot with a 2 px dark ring | a 20 px dot with a 2 px dark ring |
+| The root | `.is-root` | a larger dot, 80 % of the key's width and at most 32 px (40 px on the home's large keys), with a thicker ring, 4 px, and a fine line in the note's own colour around it. On a narrow key the ring thins down to 2 px and the dot is no larger than a scale dot (the Piano page on a phone: 16 px beside 18 px): there the root is told by the line in its own colour, not by a thicker ring | the same | a pad has no root |
 | Play this now | `.is-now` | the whole key is filled with its colour, with a 3 px ring in dark ink inside its edge (5 px when it is the root) | a 3 px ring in the stage's ink that stands off the dot | the pad is filled, with the same ring |
 | Next | `.is-next` | an empty 3 px ring in the note's colour, between two dark hairlines on ivory | an empty 3 px ring in the note's colour | a 3 px ring in the pad's colour inside its edge |
 | Held down | `.is-press` | the key takes its colour, without a ring, and its front edge shows; a key outside the scale takes `--sl-key-press` | a larger dot without a ring | the pad takes its colour |
@@ -675,8 +752,10 @@ LUMI. Held, right and wrong show at every level.
 | 0 | None | nothing |
 
 This is what the app does today, and what the drawings show. The plan's letter
-differs in two places (labels from Colors up; "next" at Target too); the model
-takes both as numbers, and the owner sees the drawn reading at gate G4. The
+differs in three places (labels from Colors up; "next" at Target too; no root
+at Target); the model takes the first two as numbers, the owner sees the drawn
+reading at gate G4, and the plan records it under "Changes made while
+building". The
 home's picture is never empty: it draws the scale at every Help level, marks no
 "now" note and does not sound.
 
@@ -728,8 +807,14 @@ page of its own outside the tabs, without a pill row):
 
 - The headline is cut after two lines; the detail line then carries the whole
   title.
-- The instrument takes all the height that is left between the button and the
-  footer line and is never lower than 140 px.
+- The instrument takes the height that is left between the button and the
+  footer line, up to the largest height its proportions allow, and is never
+  lower than 140 px. A key is at most six and a half times as long as it is
+  wide; a neck is at most 1.75 times its drawing size; a pad is at most 1.3
+  times as high as it is wide, and at most square once it is 100 px wide. The
+  instrument stands on the footer line; room beyond its largest height stays
+  empty between the button and the instrument: 187 to 271 px at 820 × 1180,
+  up to 128 px at 390 × 844 (drums), 51 px at 1280 × 800 for the bass neck.
 - The button and the whole instrument are on the first screen.
 
 | Window | Pointer | Headline, one / two lines | Hero with a one-line headline | With two lines | With an 80-letter title | Needs |
@@ -743,7 +828,14 @@ page of its own outside the tabs, without a pill row):
 | 360 × 740 | touch | 40.5 / 80.9 px | 210.2 px, 28.4 % | 175.3 px, 23.7 % | 140 px, 18.9 % | 25 % |
 
 Each cell is the lowest of the four instruments (piano, guitar, bass, drums);
-the share is of the window's height. The plan names 390 × 844, 1024 × 640 and
+the share is of the window's height. The height is the stage's, the box
+`#home-hero` with its padding of 12 px (8 px up to 640 px wide); the instrument
+drawn inside is lower by that padding at the top and at the bottom. The
+narrowest case of "at least as high as the headline block" is 1280 × 800 with
+a two-line headline: the block from the eyebrow to the detail line is
+244.5 px, the stage 257.5 px with a mouse and 249.5 px with touch, so the rule
+holds by 13 and 5 px, and the keyboard inside the padding (233.5 and 225.5 px)
+is lower than the block. The plan names 390 × 844, 1024 × 640 and
 1280 × 800: all hold. 360 × 740 is not a size the plan names, and there
 placement B misses the quarter with a two-line headline and with the 80-letter
 title; the owner's page says so. Placements A and C make the home the pill
@@ -882,10 +974,20 @@ A sheet and the tour are dialogs that keep the focus inside.
 
 - The home at 360 × 740 with a two-line headline (23.7 %) or an 80-letter title
   (18.9 %) is under the quarter.
+- On an upright tablet (820 × 1180) the home leaves 187 to 271 px empty
+  between the button and the instrument, because the instrument stops at its
+  largest height; not settled whether that room is shared out above the words
+  instead.
+- On a phone lower than 816 px the primary button of the Piano page is under
+  the first screen, and lower than 792 px that of Chords and the Plan: at
+  360 × 740 it ends at 751 px on Piano and at 727 px on Chords and the Plan,
+  and the tab bar starts at 675 px. 360 × 740 is not a size the plan names;
+  the step of each page (B11, B12) decides whether the layout or the rule gives
+  way.
 - Two labels are under 4.5:1 by their ink alone and are read against their
   outline (A# in Note name mode; ♭7 in the mockup's palette).
-- In soundLAB Gear the header's key button cuts some key names on a 360 px
-  phone.
+- In soundLAB Gear the header's key button cuts five key names on a 360 px
+  phone, and up to fourteen in a touch window 641 to about 648 px wide.
 - Not drawn: hover, pressed and focus states; the Voice page; the weak-spot map
   on Exercises' Progress tab; the home for Voice, Synth and Other.
 - The "it failed" icon of the drawings was written from memory; it is compared
@@ -909,7 +1011,7 @@ soundLAB 2.1.0: 15 pages, and the Train tab is Woodshed, Voice, Tuner.
 | [instruments.html](design/phase-b/instruments.html) | keyboard, neck and pads in every state, at the five Help levels, in two palettes: 29 states | G4 |
 | [overlays.html](design/phase-b/overlays.html) | the three sheets, the message stack, the pedal's confirmation, the tour card, empty, loading, error: 37 states | |
 | [pages.html](design/phase-b/pages.html) | the Piano page, Chords, Exercises' start, the Woodshed's library, the Plan, a row at three heights, Settings: 17 states | owner's questions 6 and 7 |
-| [gear.html](design/phase-b/gear.html) | soundLAB Gear's Deck and Hub as they are today inside the new header: 5 states | owner's question 5 |
+| [gear.html](design/phase-b/gear.html) | soundLAB Gear's Deck and Hub as they are today inside the new header: 6 states | owner's question 5 |
 | `mock.css` | the drawings' styles: tokens only, the plan's class names; the first draft of `css/components.css` | |
 | `mock.js` | the shell, the sample data, the contact view | |
 | `mock-hero.js` | the three instruments and the lighting model; the first draft of `js/hero.js` | |

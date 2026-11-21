@@ -6,19 +6,21 @@ today and break that rule: 227 rows, 214 for soundLAB and 13 for soundLAB Gear. 
 screen shows it. It says where the text is in the code, where the user sees it, what it says today, a proposal
 in plain words, whether a suite reads the text, and which step rewords it.
 
-Nothing in the app changes with this file. Line numbers are lines of commit `0133287` (B1a, the tree this
-list was written on: `git show 0133287:<file>`), and the three lines the plan names (`js/woodshed.js:1140`,
-`js/practiceplan.js:292`, `js/quiz.js:2088`) are where they were in `a914df2`.
+Nothing in the app changes with this file. Line numbers are lines of the tree this branch holds, with soundLAB
+2.1.0 merged underneath (21 November 2026). The list was written on commit `0133287` (B1a), before that merge;
+the review of B1b moved every reference to today's line by the line's exact content. The three lines the
+plan's rule 16 names are `js/woodshed.js:1140`, `js/practiceplan.js:297` and `js/quiz.js:2132` in this tree
+(the plan gives them as lines of `a914df2`: `:1140`, `:292`, `:2088`).
 
-**After soundLAB 2.1.0** (merged underneath this branch on 21 November 2026; the rows were written before it):
+**What soundLAB 2.1.0 changed for this list:**
 
-- In the merged tree 108 of the 542 line numbers of this list have moved: `js/quiz.js` 52, `js/practiceplan.js`
-  34, `js/help.js` 12, `js/midi.js` 8, `js/fretboard.js` 1, `js/settings.js` 1. Find a row by its text, not by
-  its number. The lines of `tests/` named under "Pinned by" may have moved in the same way.
-- Three listed lines changed with 2.1.0, and the texts of their rows are still shown:
+- 127 of its 632 line numbers moved, in `js/quiz.js`, `js/practiceplan.js`, `js/midi.js`, `js/help.js`,
+  `js/settings.js` and `js/fretboard.js`. The lines of `tests/` named under "Pinned by" did not move. No row
+  was dropped: every listed text is still in the code.
+- Three listed lines changed their code, and the texts of their rows are still shown:
   `js/learn-instruments.js:26` (Voice has a new first button, "Voice trainer · Pitch line, takes and scores",
-  so "Monophonic pitch practice" is now its third button, not its second); `js/practiceplan.js:86` (the words
-  for singing left the pattern, the message is the same); `js/practiceplan.js:284` (the same sentence, on a
+  so "Monophonic pitch practice" is now its third button, not its second); `js/practiceplan.js:88` (the words
+  for singing left the pattern, the message is the same); `js/practiceplan.js:289` (the same sentence, on a
   line that moved).
 - What 2.1.0 added was not read for this list: the Voice page (`js/vocal.js`), the MIDI guitar block in
   Settings (`js/midiguitar.js`) and the weak-spot map on Exercises' Progress tab (`js/quiz.js`). The step that
@@ -105,19 +107,19 @@ than rule 16 gives a page step, and needs a yes.
 
 | Name today | Proposal | Rows that carry it | Suite lines that pin one of these rows | Phase B |
 |---|---|---|---|---|
-| Consistency level, consistency XP, decay | Habit level, habit points, “fades” | `js/quiz.js:1902`, `js/quiz.js:2088`, `js/quiz.js:2093`, `js/practice-progress-ui.js:56`, `js/practice-progress-ui.js:116`, `js/practice-progress-ui.js:117`, `js/practice-progress-ui.js:61`, `js/practice-progress-ui.js:9-19`, `js/practice-progress-ui.js:64-65`, `js/performance-player.js:67`, `js/help.js:85` | `tests/learn-instruments.test.js:195`, `tests/practice-progress-ui.test.js:63`, `tests/performance-progress.test.js:53` | waits; † on `js/quiz.js:1902`, `js/practice-progress-ui.js:116`, `js/practice-progress-ui.js:61` |
-| engaged minutes, engaged practice | minutes practised, time practised | `js/quiz.js:1898`, `js/quiz.js:1901`, `js/quiz.js:2409`, `js/quiz.js:2034`, `js/quiz.js:2090`, `js/quiz.js:2091`, `js/quiz.js:2093`, `js/quiz.js:2094`, `js/quiz.js:2098`, `js/quiz.js:2237`, `js/quiz.js:2238`, `js/practice-progress-ui.js:119`, `js/practice-progress-ui.js:126`, `js/practice-progress-ui.js:128-129`, `js/practice-progress-ui.js:90-94`, `js/practice-progress-ui.js:101-103`, `js/practice-progress-ui.js:9-19` | `tests/game.test.js:126`, `tests/practice.test.js:99`, `tests/practice.test.js:100`, `tests/practice.test.js:101`, `tests/practice-progress-ui.test.js:74` | waits; † on `js/quiz.js:1898`, `js/quiz.js:1901`, `js/practice-progress-ui.js:119`, `js/practice-progress-ui.js:126`, `js/practice-progress-ui.js:90-94`, `js/practice-progress-ui.js:101-103` |
-| Lifetime earned XP, Lifetime | All-time XP, All time | `js/quiz.js:1898`, `js/quiz.js:2089`, `js/practice-progress-ui.js:116`, `js/performance-player.js:67` | `tests/learn-instruments.test.js:195`, `tests/practice.test.js:99`, `tests/performance-progress.test.js:53` | waits; † on `js/quiz.js:1898`, `js/practice-progress-ui.js:116` |
+| Consistency level, consistency XP, decay | Habit level, habit points, “fades” | `js/quiz.js:1946`, `js/quiz.js:2132`, `js/quiz.js:2137`, `js/practice-progress-ui.js:56`, `js/practice-progress-ui.js:116`, `js/practice-progress-ui.js:117`, `js/practice-progress-ui.js:61`, `js/practice-progress-ui.js:9-19`, `js/practice-progress-ui.js:64-65`, `js/performance-player.js:67`, `js/help.js:91` | `tests/learn-instruments.test.js:195`, `tests/practice-progress-ui.test.js:63`, `tests/performance-progress.test.js:53` | waits; † on `js/quiz.js:1946`, `js/practice-progress-ui.js:116`, `js/practice-progress-ui.js:61` |
+| engaged minutes, engaged practice | minutes practised, time practised | `js/quiz.js:1942`, `js/quiz.js:1945`, `js/quiz.js:2453`, `js/quiz.js:2078`, `js/quiz.js:2134`, `js/quiz.js:2135`, `js/quiz.js:2137`, `js/quiz.js:2138`, `js/quiz.js:2142`, `js/quiz.js:2281`, `js/quiz.js:2282`, `js/practice-progress-ui.js:119`, `js/practice-progress-ui.js:126`, `js/practice-progress-ui.js:128-129`, `js/practice-progress-ui.js:90-94`, `js/practice-progress-ui.js:101-103`, `js/practice-progress-ui.js:9-19` | `tests/game.test.js:126`, `tests/practice.test.js:99`, `tests/practice.test.js:100`, `tests/practice.test.js:101`, `tests/practice-progress-ui.test.js:74` | waits; † on `js/quiz.js:1942`, `js/quiz.js:1945`, `js/practice-progress-ui.js:119`, `js/practice-progress-ui.js:126`, `js/practice-progress-ui.js:90-94`, `js/practice-progress-ui.js:101-103` |
+| Lifetime earned XP, Lifetime | All-time XP, All time | `js/quiz.js:1942`, `js/quiz.js:2133`, `js/practice-progress-ui.js:116`, `js/performance-player.js:67` | `tests/learn-instruments.test.js:195`, `tests/practice.test.js:99`, `tests/performance-progress.test.js:53` | waits; † on `js/quiz.js:1942`, `js/practice-progress-ui.js:116` |
 | Observed tempo, Completed tempo | Tempo you practised at, Tempo of finished runs | `js/practice-progress-ui.js:122`, `js/practice-progress-ui.js:123`, `js/practice-progress-ui.js:101-103` | not pinned | waits; † on `js/practice-progress-ui.js:122`, `js/practice-progress-ui.js:123`, `js/practice-progress-ui.js:101-103` |
 | raw accuracy | notes right | `js/practice-progress-ui.js:120`, `js/practice-progress-ui.js:128-129`, `js/practice-progress-ui.js:101-103` | `tests/practice-progress-ui.test.js:57`, `tests/practice-progress-ui.test.js:77`, `tests/practice-progress-ui.test.js:74` | waits; † on `js/practice-progress-ui.js:101-103` |
-| Legacy / unassigned | Earlier practice | `js/learn-instruments.js:51`, `js/help.js:84`, `js/quiz.js:1196` | `tests/learn-instruments.test.js:194`, `tests/practice.test.js:102` | waits |
-| Credit, Credit category, Completion category, Practice credit | Counts for, Counted for | `js/quiz.js:1414`, `js/quiz.js:1580`, `js/keylessons.js:538`, `js/woodshed.js:1183` | `tests/learn-instruments.test.js:72`, `tests/instrument-xp.test.js:102`, `tests/instrument-xp.test.js:110` | waits |
+| Legacy / unassigned | Earlier practice | `js/learn-instruments.js:51`, `js/help.js:90`, `js/quiz.js:1240` | `tests/learn-instruments.test.js:194`, `tests/practice.test.js:102` | waits |
+| Credit, Credit category, Completion category, Practice credit | Counts for, Counted for | `js/quiz.js:1458`, `js/quiz.js:1624`, `js/keylessons.js:538`, `js/woodshed.js:1183` | `tests/learn-instruments.test.js:72`, `tests/instrument-xp.test.js:102`, `tests/instrument-xp.test.js:110` | waits |
 
 Three things the plan itself changes leave stragglers that it does not list:
 
 - **“LUMI Display” becomes “LUMI lights”** on the switch (`js/app.js:1675`). The old name stays in
-  `js/midi.js:450` (the status sentence shown beside that switch; B5a.2 keeps “the status sentences of
-  `js/midi.js:448`”, and lines 448 to 450 are one expression), in `js/help.js:129` (a
+  `js/midi.js:495` (the status sentence shown beside that switch; B5a.2 keeps “the status sentences of
+  `js/midi.js:493`”, and lines 448 to 450 are one expression), in `js/help.js:135` (a
   tour step’s title) and in `js/performance-player.js:217`. B5a also edits `js/lumi-practice.js:183`, `:378`
   and `:480`, `js/lights.js:96` and `:118` and `js/keylessons.js:575` only to say “the key bar” for “the clef
   menu”; each of them names “LUMI Display” too. The rows of this list give all of them the new name.
@@ -150,15 +152,15 @@ Today these texts sit in a dropdown behind the clef button, on every page of bot
 | `js/app.js:1679` | Key, scale & tempo dropdown, second switch | Scale Lock | A switch “Scale lock” with its state as a sentence beside it: “ON · only A Dorian notes sound” / “OFF · every note sounds” (B5a) | S | not pinned | B5a (plan) |
 | `index.html:55`<br>`gear.html:54` | Tooltip of the LUMI Display switch | Show the selected scale and practice targets on the configured LUMI; independent of Scale Lock | Lights the scale and the notes to play on your LUMI. Scale lock does not change the lights. | R | not pinned | B5a (plan) |
 | `index.html:56`<br>`gear.html:55` | Tooltip of the Scale Lock switch | Block out-of-scale pitched notes across instruments, playback and musical MIDI output; drums and recorded/live audio are separate | Notes outside the scale make no sound, anywhere in soundLAB. Drums and audio you record always sound. | P | not pinned | B5a (plan) |
-| `js/midi.js:448` | Three places: the note under the switches in the dropdown, the status line of the Lights & help sheet, the “LUMI Display:” line of the guided performance player. Shown while LUMI Display is on and no LUMI was chosen | Choose a LUMI display output on the Piano page…, under Notes and triads on the LUMI (MIDI must be connected). | No LUMI chosen yet. Connect your keyboard, then pick your LUMI on the Piano page under “Notes and triads on the LUMI”. | S | `tests/gear.test.js:654`<br>`tests/gear.test.js:664`<br>`tests/context-global.test.js:85` | Phase C or D |
-| `js/midi.js:449` | The same three places, while the chosen LUMI is not connected | The configured LUMI display is disconnected or unavailable; no fallback is used. | Your LUMI is not connected. No other keyboard is lit in its place. | R | not pinned | Phase C or D |
-| `js/midi.js:450` | The same three places, with a LUMI connected | LUMI Display is off. / LUMI Display is on: …. | LUMI lights are off. / LUMI lights are on: …. | S | not pinned | Phase C or D |
+| `js/midi.js:493` | Three places: the note under the switches in the dropdown, the status line of the Lights & help sheet, the “LUMI Display:” line of the guided performance player. Shown while LUMI Display is on and no LUMI was chosen | Choose a LUMI display output on the Piano page…, under Notes and triads on the LUMI (MIDI must be connected). | No LUMI chosen yet. Connect your keyboard, then pick your LUMI on the Piano page under “Notes and triads on the LUMI”. | S | `tests/gear.test.js:654`<br>`tests/gear.test.js:664`<br>`tests/context-global.test.js:85` | Phase C or D |
+| `js/midi.js:494` | The same three places, while the chosen LUMI is not connected | The configured LUMI display is disconnected or unavailable; no fallback is used. | Your LUMI is not connected. No other keyboard is lit in its place. | R | not pinned | Phase C or D |
+| `js/midi.js:495` | The same three places, with a LUMI connected | LUMI Display is off. / LUMI Display is on: …. | LUMI lights are off. / LUMI lights are on: …. | S | not pinned | Phase C or D |
 
 Notes:
 
 - `index.html:55`: B4 moves the bar’s markup from the two HTML files into js/shell.js unchanged; B5a rewrites it there. The same holds for index.html:56.
-- `js/midi.js:448`: `tests/gear.test.js:654` and `:664` pin the sentence; `tests/context-global.test.js:85` accepts any of “unconfigured”, “select”, “configured”, “connect”. B5a.2 of the plan keeps this sentence as it is.
-- `js/midi.js:450`: B5a renames the switch to “LUMI lights” and shows this sentence in the lights panel beside it. Unless B5a takes the line along, the panel then says “LUMI lights” and “LUMI Display is on” side by side (see “Names that change in every place at once”).
+- `js/midi.js:493`: `tests/gear.test.js:654` and `:664` pin the sentence; `tests/context-global.test.js:85` accepts any of “unconfigured”, “select”, “configured”, “connect”. B5a.2 of the plan keeps this sentence as it is.
+- `js/midi.js:495`: B5a renames the switch to “LUMI lights” and shows this sentence in the lights panel beside it. Unless B5a takes the line along, the panel then says “LUMI lights” and “LUMI Display is on” side by side (see “Names that change in every place at once”).
 
 ## Shell: the instrument bar above the Learn pages (the Instrument sheet from B8 on)
 
@@ -168,7 +170,7 @@ Notes:
 |---|---|---|---|---|---|---|
 | `js/learn-instruments.js:17` | Bar above the four Learn pages, fold “About instrument categories”, with Voice chosen | Shared notation, pitch and ear training. Use monophonic pitch practice for sung notes; this is not a vocal technique curriculum. | Notation, pitch and ear training. To practise sung notes, use “Sing single notes”. soundLAB does not teach singing technique. | R | not pinned | Phase C or D |
 | `js/learn-instruments.js:18` | The same fold, with Other chosen | Shared notation, ear training and theory, with an explicit Other instrument credit category. | Notation, ear training and theory. What you practise is counted for “Other”. | R | not pinned | Phase C or D |
-| `js/learn-instruments.js:26` | Bar above the four Learn pages, second button with Voice chosen (label and the small line under it) | Monophonic pitch practice · Audio or virtual input | Sing single notes · Microphone or on-screen keys | R | not pinned | B8 |
+| `js/learn-instruments.js:26` | Bar above the four Learn pages, third button with Voice chosen (label and the small line under it) | Monophonic pitch practice · Audio or virtual input | Sing single notes · Microphone or on-screen keys | R | not pinned | B8 |
 | `js/learn-instruments.js:27` | Bar above the four Learn pages, small line under “Performance practice” with Other chosen | Explicit instrument selection | Counts for “Other” | R | not pinned | B8 |
 | `js/learn-instruments.js:51` | Bar above the four Learn pages, fold “About instrument categories” | Notation, ear training and theory are shared content. Each run keeps the instrument selected at its start. Earlier unassigned history remains Legacy / unassigned. | Notation, ear training and theory are the same for every instrument. A run counts for the instrument you had picked when it started. Practice from before you picked an instrument is kept on its own, as “Earlier practice”. | W | not pinned | Phase C or D |
 
@@ -208,15 +210,15 @@ Notes:
 | `js/help.js:40` | Help tour of the Neck page, step 2 “Pick your key and scale” | Tap the clef for the shared key and scale. Scale Lock blocks out-of-scale pitched notes across tools, playback and MIDI; drums and recorded/live audio keep their own sound. LUMI Display independently shows the selected scale and practice targets on the configured LUMI. Its connection status appears here. | The bar under the top row holds key, tempo, Scale lock, lights and Help; it is the same on every page (the plan’s sentence, B5a). Add: “With Scale lock on, notes outside the scale make no sound.” | R | not pinned | B5a (plan) |
 | `js/help.js:61` | Help tour of the Piano page, step “Notes and triads on the LUMI” | …the double-tap key from Settings › Hands-free control works here too when it is on, in Simulated mode.… | …the double-tap key from Settings › Hands-free control works here too when it is on, while you answer on screen.… | R | not pinned | Phase C or D |
 | `js/help.js:77` | Help tour of the Woodshed, step 3 “Feed it music” | …PDFs and images are not parsed scores.… | …soundLAB cannot read notes from a PDF or a picture.… | R | not pinned | B5a (plan) |
-| `js/help.js:84` | Help tour of Exercises, step 2 “Your instrument” | …a run keeps the instrument it started with, and history from before instruments were tracked stays as Legacy / unassigned. | …a run counts for the instrument it started with, and practice from before you picked an instrument is kept on its own, as “Earlier practice”. | W | not pinned | Phase C or D |
-| `js/help.js:85` | Help tour of Exercises, step 3 “Your day” | …XP raises your consistency level: a habit meter that fades after a break, not a skill level.… | …XP raises your habit level: it fades after a break and is not a skill level.… | S | not pinned | Phase C or D |
-| `js/help.js:129` | Help tour of the Lights & help sheet, the title of step 3 | LUMI Display | LUMI lights | S | not pinned | Phase C or D |
+| `js/help.js:90` | Help tour of Exercises, step 2 “Your instrument” | …a run keeps the instrument it started with, and history from before instruments were tracked stays as Legacy / unassigned. | …a run counts for the instrument it started with, and practice from before you picked an instrument is kept on its own, as “Earlier practice”. | W | not pinned | Phase C or D |
+| `js/help.js:91` | Help tour of Exercises, step 3 “Your day” | …XP raises your consistency level: a habit meter that fades after a break, not a skill level.… | …XP raises your habit level: it fades after a break and is not a skill level.… | S | not pinned | Phase C or D |
+| `js/help.js:135` | Help tour of the Lights & help sheet, the title of step 3 | LUMI Display | LUMI lights | S | not pinned | Phase C or D |
 
 Notes:
 
-- `js/help.js:84`: B8 edits this line for another reason (the step then points at the instrument button, plan B8.1). The name “Legacy / unassigned” waits with the Exercises card that carries it (js/quiz.js:1196, pinned).
-- `js/help.js:85`: The name is explained here. The line is listed because it has to follow if “Consistency level” gets another name.
-- `js/help.js:129`: B5a renames the switch to “LUMI lights” (js/app.js:1675). From then on this title names something that is gone; B5b edits lines 126-128 of this file and can take it along.
+- `js/help.js:90`: B8 edits this line for another reason (the step then points at the instrument button, plan B8.1). The name “Legacy / unassigned” waits with the Exercises card that carries it (js/quiz.js:1240, pinned).
+- `js/help.js:91`: The name is explained here. The line is listed because it has to follow if “Consistency level” gets another name.
+- `js/help.js:135`: B5a renames the switch to “LUMI lights” (js/app.js:1675). From then on this title names something that is gone; B5b edits lines 126-128 of this file and can take it along.
 
 ## Learn › Exercises
 
@@ -224,35 +226,35 @@ Notes:
 
 | Line | Where it is shown | Today | Proposal | Why | Pinned by | Step |
 |---|---|---|---|---|---|---|
-| `js/quiz.js:1191` | Exercises start, a box above the numbers, only after saving a level failed | Practice progress has not been saved. … session(s) are retained for retry. No unconfirmed XP is shown as earned. | Your practice could not be saved. 2 sessions are waiting; their XP is added as soon as saving works. | P | `tests/learn-instruments.test.js:170` | Phase C or D |
-| `js/quiz.js:1196` | Exercises › Progress, last card | Legacy / unassigned · … earlier course records · … historical XP. These records are preserved separately; they are not copied into any instrument category. | Earlier practice · 14 levels and 77 XP from before you picked an instrument. They are kept here and are not added to any instrument. | W | `tests/learn-instruments.test.js:194`<br>`tests/practice.test.js:102` | Phase C or D |
-| `js/quiz.js:1414` | Exercises, while a level runs: the small line under the level’s name | Credit category: … · … | Counts for: Bass · Four-string bass | R | `tests/learn-instruments.test.js:72` | Phase C or D |
-| `js/quiz.js:1438` | Exercises, while a level runs with LUMI lights on, for a question without notes | LUMI: this exercise has no playable note target. | LUMI: this question has no note to light. | P | `tests/lumi-contexts.test.js:233` | Phase C or D |
-| `js/quiz.js:1580` | Exercises, the result of a level: the small line above the card | Completion category: … · … | Counted for: Bass · Four-string bass | R | not pinned | Phase C or D |
-| `js/quiz.js:1898` | Exercises start, the line under the three numbers at the top | Daily goal: … engaged minutes. Lifetime: … XP. | Daily goal: 10 minutes of practice. All time: 1,240 XP. | R | not pinned | Phase C or D † |
-| `js/quiz.js:1901` | Exercises start, second number at the top (the goal ring) | engaged minutes today | minutes practised today | R | not pinned | Phase C or D † |
-| `js/quiz.js:1902` | Exercises start, third number at the top | Consistency level … | Habit level 3 (the level rises when you practise often and fades after a break: the Exercises tour already says so) | S | not pinned | Phase C or D † |
-| `js/quiz.js:2034` | Exercises › Progress, “This week”: tooltip of a day | engaged-minute goal reached / no daily goal recorded | daily goal reached / daily goal not reached | R | not pinned | Phase C or D |
-| `js/quiz.js:2078` | Exercises › Progress, the Keys lessons card (Piano and Synth only) | Shared keys lesson content · … timing and best-score observations only. Curriculum levels are shared. | Keys scale lessons · Your best scores and timing as Piano. The level you reached is the same for Piano and Synth. | R | not pinned | Phase C or D |
-| `js/quiz.js:2088` | Exercises › Progress, first tile | Consistency level · … consistency XP; not a measured skill level | Habit level · 1,240 habit points. It fades after a break and does not measure skill. | S | `tests/learn-instruments.test.js:195` | Phase C or D |
-| `js/quiz.js:2089` | Exercises › Progress, second tile | Lifetime earned XP · … earned today; lifetime earnings do not decay | All-time XP · 12 today. All-time XP never goes down. | R | `tests/learn-instruments.test.js:195`<br>`tests/practice.test.js:99` | Phase C or D |
-| `js/quiz.js:2090` | Exercises › Progress, third tile (Streak), small line | Best … days meeting the engaged-minute goal | Best: 12 days in a row with the daily goal reached | R | not pinned | Phase C or D |
-| `js/quiz.js:2091` | Exercises › Progress, fourth tile | Engaged practice | Time practised | R | `tests/practice.test.js:99`<br>`tests/practice.test.js:100` | Phase C or D |
-| `js/quiz.js:2093` | Exercises › Progress, card “This week” | A day counts when this instrument reaches its engaged-minute goal. Planned breaks and consistency settings are shared with Practice progress. | A day counts when you reach your daily goal on this instrument. Breaks you plan and the habit-level settings are in the Woodshed, under Practice progress. | R | not pinned | Phase C or D |
-| `js/quiz.js:2094` | Exercises › Progress, card “Daily goal” | … of … engaged minutes today | 4.5 of 10 minutes practised today | R | not pinned | Phase C or D |
-| `js/quiz.js:2096` | Exercises › Progress, card “Daily goal”, the note under the button | This is the same instrument XP balance used by guided practice. Configured rates apply to bounded active practice time. Correct knowledge answers are tracked separately from musical note accuracy and timing. | Exercises and the Woodshed add to the same XP for this instrument. You earn XP for each minute you spend answering or playing. Right answers here and right notes in the Woodshed are counted separately. | R | not pinned | Phase C or D |
-| `js/quiz.js:2097` | Exercises › Progress, card “Earned XP per day” | Last 14 days · recorded instrument earnings | Last 14 days · on this instrument | P | not pinned | Phase C or D |
-| `js/quiz.js:2098` | Exercises › Progress, card with the minutes chart | Engaged practice time · Minutes per day, last 14 days · canonical instrument history, counted once | Time practised · Minutes per day on this instrument, last 14 days | W | `tests/practice.test.js:101` | Phase C or D |
-| `js/quiz.js:2101` | Exercises › Progress, card “Answer speed”, the note under the table | …A background or modal pause starts a fresh visible response attempt; covered time is excluded. | …Time while soundLAB is in the background, or while something covers the question, is not counted. | R | not pinned | Phase C or D |
-| `js/quiz.js:2237` | Exercises › Progress, minutes chart: the tip of a bar | …: … measured engaged minutes | Today: 4.5 minutes practised | R | not pinned | Phase C or D |
-| `js/quiz.js:2238` | Exercises › Progress, minutes chart: its name for screen readers and the head of its table | Engaged practice minutes per day over the last 14 days · Engaged minutes | Minutes practised per day over the last 14 days · Minutes practised | R | `tests/practice.test.js:101` | Phase C or D |
-| `js/quiz.js:2409` | Exercises, the result of a level: the note with the star | … of … engaged minutes toward today’s instrument goal. | 4.5 of 10 minutes towards today’s goal. | R | `tests/game.test.js:126` | Phase C or D |
+| `js/quiz.js:1235` | Exercises start, a box above the numbers, only after saving a level failed | Practice progress has not been saved. … session(s) are retained for retry. No unconfirmed XP is shown as earned. | Your practice could not be saved. 2 sessions are waiting; their XP is added as soon as saving works. | P | `tests/learn-instruments.test.js:170` | Phase C or D |
+| `js/quiz.js:1240` | Exercises › Progress, last card | Legacy / unassigned · … earlier course records · … historical XP. These records are preserved separately; they are not copied into any instrument category. | Earlier practice · 14 levels and 77 XP from before you picked an instrument. They are kept here and are not added to any instrument. | W | `tests/learn-instruments.test.js:194`<br>`tests/practice.test.js:102` | Phase C or D |
+| `js/quiz.js:1458` | Exercises, while a level runs: the small line under the level’s name | Credit category: … · … | Counts for: Bass · Four-string bass | R | `tests/learn-instruments.test.js:72` | Phase C or D |
+| `js/quiz.js:1482` | Exercises, while a level runs with LUMI lights on, for a question without notes | LUMI: this exercise has no playable note target. | LUMI: this question has no note to light. | P | `tests/lumi-contexts.test.js:233` | Phase C or D |
+| `js/quiz.js:1624` | Exercises, the result of a level: the small line above the card | Completion category: … · … | Counted for: Bass · Four-string bass | R | not pinned | Phase C or D |
+| `js/quiz.js:1942` | Exercises start, the line under the three numbers at the top | Daily goal: … engaged minutes. Lifetime: … XP. | Daily goal: 10 minutes of practice. All time: 1,240 XP. | R | not pinned | Phase C or D † |
+| `js/quiz.js:1945` | Exercises start, second number at the top (the goal ring) | engaged minutes today | minutes practised today | R | not pinned | Phase C or D † |
+| `js/quiz.js:1946` | Exercises start, third number at the top | Consistency level … | Habit level 3 (the level rises when you practise often and fades after a break: the Exercises tour already says so) | S | not pinned | Phase C or D † |
+| `js/quiz.js:2078` | Exercises › Progress, “This week”: tooltip of a day | engaged-minute goal reached / no daily goal recorded | daily goal reached / daily goal not reached | R | not pinned | Phase C or D |
+| `js/quiz.js:2122` | Exercises › Progress, the Keys lessons card (Piano and Synth only) | Shared keys lesson content · … timing and best-score observations only. Curriculum levels are shared. | Keys scale lessons · Your best scores and timing as Piano. The level you reached is the same for Piano and Synth. | R | not pinned | Phase C or D |
+| `js/quiz.js:2132` | Exercises › Progress, first tile | Consistency level · … consistency XP; not a measured skill level | Habit level · 1,240 habit points. It fades after a break and does not measure skill. | S | `tests/learn-instruments.test.js:195` | Phase C or D |
+| `js/quiz.js:2133` | Exercises › Progress, second tile | Lifetime earned XP · … earned today; lifetime earnings do not decay | All-time XP · 12 today. All-time XP never goes down. | R | `tests/learn-instruments.test.js:195`<br>`tests/practice.test.js:99` | Phase C or D |
+| `js/quiz.js:2134` | Exercises › Progress, third tile (Streak), small line | Best … days meeting the engaged-minute goal | Best: 12 days in a row with the daily goal reached | R | not pinned | Phase C or D |
+| `js/quiz.js:2135` | Exercises › Progress, fourth tile | Engaged practice | Time practised | R | `tests/practice.test.js:99`<br>`tests/practice.test.js:100` | Phase C or D |
+| `js/quiz.js:2137` | Exercises › Progress, card “This week” | A day counts when this instrument reaches its engaged-minute goal. Planned breaks and consistency settings are shared with Practice progress. | A day counts when you reach your daily goal on this instrument. Breaks you plan and the habit-level settings are in the Woodshed, under Practice progress. | R | not pinned | Phase C or D |
+| `js/quiz.js:2138` | Exercises › Progress, card “Daily goal” | … of … engaged minutes today | 4.5 of 10 minutes practised today | R | not pinned | Phase C or D |
+| `js/quiz.js:2140` | Exercises › Progress, card “Daily goal”, the note under the button | This is the same instrument XP balance used by guided practice. Configured rates apply to bounded active practice time. Correct knowledge answers are tracked separately from musical note accuracy and timing. | Exercises and the Woodshed add to the same XP for this instrument. You earn XP for each minute you spend answering or playing. Right answers here and right notes in the Woodshed are counted separately. | R | not pinned | Phase C or D |
+| `js/quiz.js:2141` | Exercises › Progress, card “Earned XP per day” | Last 14 days · recorded instrument earnings | Last 14 days · on this instrument | P | not pinned | Phase C or D |
+| `js/quiz.js:2142` | Exercises › Progress, card with the minutes chart | Engaged practice time · Minutes per day, last 14 days · canonical instrument history, counted once | Time practised · Minutes per day on this instrument, last 14 days | W | `tests/practice.test.js:101` | Phase C or D |
+| `js/quiz.js:2145` | Exercises › Progress, card “Answer speed”, the note under the table | …A background or modal pause starts a fresh visible response attempt; covered time is excluded. | …Time while soundLAB is in the background, or while something covers the question, is not counted. | R | not pinned | Phase C or D |
+| `js/quiz.js:2281` | Exercises › Progress, minutes chart: the tip of a bar | …: … measured engaged minutes | Today: 4.5 minutes practised | R | not pinned | Phase C or D |
+| `js/quiz.js:2282` | Exercises › Progress, minutes chart: its name for screen readers and the head of its table | Engaged practice minutes per day over the last 14 days · Engaged minutes | Minutes practised per day over the last 14 days · Minutes practised | R | `tests/practice.test.js:101` | Phase C or D |
+| `js/quiz.js:2453` | Exercises, the result of a level: the note with the star | … of … engaged minutes toward today’s instrument goal. | 4.5 of 10 minutes towards today’s goal. | R | `tests/game.test.js:126` | Phase C or D |
 | `js/xp.js:86` | Exercises › Progress, under the minutes chart: the name of the one row “Last 7 days” | Explicit … practice | Piano practice | R | `tests/practice.test.js:100` | Phase C or D |
 
 Notes:
 
-- `js/quiz.js:1438`: The check wants “no … note” or “no … pitch”; the proposal still passes it.
-- `js/quiz.js:2088`: One of the three lines the plan names (“Consistency level”). Pinned, and the name is one of those that change in every place at once.
+- `js/quiz.js:1482`: The check wants “no … note” or “no … pitch”; the proposal still passes it.
+- `js/quiz.js:2132`: One of the three lines the plan names (“Consistency level”). Pinned, and the name is one of those that change in every place at once.
 
 ## Learn › Chords
 
@@ -268,37 +270,37 @@ Nothing found: no text of this page uses a listed word or names a setting instea
 
 | Line | Where it is shown | Today | Proposal | Why | Pinned by | Step |
 |---|---|---|---|---|---|---|
-| `js/practiceplan.js:25` | Plan, wherever a block or a plan from before instruments were tracked is named: the line under “Today’s … session”, the list of blocks for other instruments, the refusal to start a block | Legacy keyboard context / Legacy / unassigned | Keys (older plan) / No instrument (older plan) | W | not pinned | Phase C or D |
-| `js/practiceplan.js:86-87` | Plan, preview and “What soundLAB can’t do yet”: the reason beside a line of the notes | No matching guided module for this assignment. / No matching guided module. | soundLAB has no exercise for this yet. | W | not pinned | Phase C or D |
-| `js/practiceplan.js:90` | Plan, preview and “What soundLAB can’t do yet”: the reason beside a line of the notes | This explicit technique or octave range has no matching guided lesson. | soundLAB has no lesson for this technique or this many octaves yet. | R | not pinned | Phase C or D |
-| `js/practiceplan.js:91` | Plan, preview and “What soundLAB can’t do yet”: the reason beside a line of the notes | No graded arpeggio lesson is available through the current lesson hook. | soundLAB has no arpeggio lessons yet. | R | not pinned | Phase C or D |
-| `js/practiceplan.js:94` | Plan, a guitar scale block of an accepted plan, its small line | Runner uses the shared key, scale and tempo. This casual tool has no automated progress timer. | Opens the Neck’s runner in your key and tempo. soundLAB does not time this block. | P | not pinned | Phase C or D |
-| `js/practiceplan.js:106` | Plan, preview and “What soundLAB can’t do yet”: the reason beside a line of the notes | Exact lesson speed/level needs selection in Keys; no public setup hook exists. | The plan cannot set the speed level yet: pick it yourself on the Piano page. | R | not pinned | Phase C or D |
-| `js/practiceplan.js:110` | Plan, preview and “What soundLAB can’t do yet”: the reason beside a line of the notes | This warm-up hook opens the six-string guitar fretboard; choose a matching instrument-specific exercise instead. | This warm-up is for six-string guitar. Pick an exercise for your instrument instead. | R | not pinned | Phase C or D |
-| `js/practiceplan.js:112` | Plan, preview and “What soundLAB can’t do yet”: the reason beside a line of the notes | Direct selection/import of this score needs a Woodshed setup hook. | The plan cannot open this piece for you yet: choose or import it in the Woodshed. | R | not pinned | Phase C or D |
-| `js/practiceplan.js:113` | Plan, preview and “What soundLAB can’t do yet”: the reason beside a line of the notes | Exact Exercises topic/ear-mode selection needs a public setup hook. | The plan cannot open this topic for you yet: choose it in Exercises. | R | not pinned | Phase C or D |
-| `js/practiceplan.js:122` | Plan, the starter plan’s block “Ear & theory”, its small line | Choose an available topic for the current Learn category. | Choose a topic for your instrument. | S | not pinned | B11 |
-| `js/practiceplan.js:185` | Plan, the status line after Start on a block of another instrument | This block is preserved for …. Choose that Learn category before launching. | This block is for Guitar. Switch to that instrument to start it. | S | not pinned | Phase C or D |
-| `js/practiceplan.js:255` | Plan, the status line after importing a Google Docs file without text | No Google Docs text runs found. Export as plain text instead. | No text found in this Google Docs file. Export the Doc as plain text (.txt) and import that. | P | not pinned | Phase C or D |
-| `js/practiceplan.js:261` | Plan, the name of the file “Export gaps” saves | soundlab-module-gaps-….json | soundlab-plan-missing-….json | W | `tests/practiceplan.test.js:377` | Phase C or D |
-| `js/practiceplan.js:267` | Plan, the preview after “Review mapping” | … practice blocks · … gaps | 4 practice blocks · 1 line without an exercise | P | not pinned | Phase C or D |
-| `js/practiceplan.js:282` | Plan, card “Today’s … session”, the line under the heading | … minutes suggested · accepted plan context: … | 15 minutes suggested · plan made for: Piano | W | `tests/practiceplan.test.js:215` | Phase C or D |
-| `js/practiceplan.js:284` | Plan, a block that soundLAB cannot time (the starter’s “Tune up”, a guitar scale), the line under its title, after “0 seconds recorded · ” | No automated timer or completion is available for this casual tool; opening it earns no progress. | Not timed: soundLAB cannot tell when this block is done, so it does not count towards the plan. | P | `tests/practiceplan.test.js:246` | Phase C or D |
-| `js/practiceplan.js:286` | Plan, card “Today’s … session”, the line under the blocks | … / … matching blocks measured complete. Time comes from recorded sessions for …; opening a page earns no minutes or XP. | 2 of 4 blocks done. Only time you play or answer as Piano counts; opening a page does not. | P | not pinned | B11 |
-| `js/practiceplan.js:286` | Plan, card “Today’s … session”, with a plan whose blocks are for another instrument | No matching blocks for this Learn category. Your accepted plan is preserved below. · … blocks preserved for other instrument contexts | No blocks for this instrument. Your plan is kept: see below. · 3 blocks for other instruments | W | `tests/practiceplan.test.js:215` | Phase C or D |
-| `js/practiceplan.js:289` | Plan, card “Last seven days” | … recorded minutes · … observed days | 34 minutes · 3 days with practice | R | not pinned | B11 |
-| `js/practiceplan.js:292` | Plan, card “Last seven days”, the line under the seven days | Only this instrument’s canonical observations are counted. Legacy / unassigned history remains separate. | Only practice on this instrument is counted. Practice from before you picked an instrument is not. | W | not pinned | B11 |
-| `js/practiceplan.js:293` | Plan, card “What soundLAB can’t do yet”: its button and its empty line | Export gaps · No gaps recorded. Unmatched assignments appear here after you accept notes. | Export this list · Nothing yet. Lines of your notes that soundLAB has no exercise for appear here. | P | not pinned | B11 |
-| `js/practiceplan.js:306` | Plan, fold “Teacher’s lesson notes”: a field’s label, the main button and the file button | Current Learn instrument · Review mapping · Import text / Docs JSON | Instrument · Show the plan · Import a text file or a Google Docs export | R | not pinned | Phase C or D |
-| `js/practiceplan.js:338` | Plan, the status line after the instrument was changed | Instrument changed. The previous block’s tracking ended; its original context and history are preserved. | Instrument changed. The block you had open is no longer timed; what you did so far is kept. | W | not pinned | Phase C or D |
+| `js/practiceplan.js:27` | Plan, wherever a block or a plan from before instruments were tracked is named: the line under “Today’s … session”, the list of blocks for other instruments, the refusal to start a block | Legacy keyboard context / Legacy / unassigned | Keys (older plan) / No instrument (older plan) | W | not pinned | Phase C or D |
+| `js/practiceplan.js:88-89` | Plan, preview and “What soundLAB can’t do yet”: the reason beside a line of the notes | No matching guided module for this assignment. / No matching guided module. | soundLAB has no exercise for this yet. | W | not pinned | Phase C or D |
+| `js/practiceplan.js:92` | Plan, preview and “What soundLAB can’t do yet”: the reason beside a line of the notes | This explicit technique or octave range has no matching guided lesson. | soundLAB has no lesson for this technique or this many octaves yet. | R | not pinned | Phase C or D |
+| `js/practiceplan.js:93` | Plan, preview and “What soundLAB can’t do yet”: the reason beside a line of the notes | No graded arpeggio lesson is available through the current lesson hook. | soundLAB has no arpeggio lessons yet. | R | not pinned | Phase C or D |
+| `js/practiceplan.js:96` | Plan, a guitar scale block of an accepted plan, its small line | Runner uses the shared key, scale and tempo. This casual tool has no automated progress timer. | Opens the Neck’s runner in your key and tempo. soundLAB does not time this block. | P | not pinned | Phase C or D |
+| `js/practiceplan.js:108` | Plan, preview and “What soundLAB can’t do yet”: the reason beside a line of the notes | Exact lesson speed/level needs selection in Keys; no public setup hook exists. | The plan cannot set the speed level yet: pick it yourself on the Piano page. | R | not pinned | Phase C or D |
+| `js/practiceplan.js:112` | Plan, preview and “What soundLAB can’t do yet”: the reason beside a line of the notes | This warm-up hook opens the six-string guitar fretboard; choose a matching instrument-specific exercise instead. | This warm-up is for six-string guitar. Pick an exercise for your instrument instead. | R | not pinned | Phase C or D |
+| `js/practiceplan.js:114` | Plan, preview and “What soundLAB can’t do yet”: the reason beside a line of the notes | Direct selection/import of this score needs a Woodshed setup hook. | The plan cannot open this piece for you yet: choose or import it in the Woodshed. | R | not pinned | Phase C or D |
+| `js/practiceplan.js:115` | Plan, preview and “What soundLAB can’t do yet”: the reason beside a line of the notes | Exact Exercises topic/ear-mode selection needs a public setup hook. | The plan cannot open this topic for you yet: choose it in Exercises. | R | not pinned | Phase C or D |
+| `js/practiceplan.js:124` | Plan, the starter plan’s block “Ear & theory”, its small line | Choose an available topic for the current Learn category. | Choose a topic for your instrument. | S | not pinned | B11 |
+| `js/practiceplan.js:190` | Plan, the status line after Start on a block of another instrument | This block is preserved for …. Choose that Learn category before launching. | This block is for Guitar. Switch to that instrument to start it. | S | not pinned | Phase C or D |
+| `js/practiceplan.js:260` | Plan, the status line after importing a Google Docs file without text | No Google Docs text runs found. Export as plain text instead. | No text found in this Google Docs file. Export the Doc as plain text (.txt) and import that. | P | not pinned | Phase C or D |
+| `js/practiceplan.js:266` | Plan, the name of the file “Export gaps” saves | soundlab-module-gaps-….json | soundlab-plan-missing-….json | W | `tests/practiceplan.test.js:377` | Phase C or D |
+| `js/practiceplan.js:272` | Plan, the preview after “Review mapping” | … practice blocks · … gaps | 4 practice blocks · 1 line without an exercise | P | not pinned | Phase C or D |
+| `js/practiceplan.js:287` | Plan, card “Today’s … session”, the line under the heading | … minutes suggested · accepted plan context: … | 15 minutes suggested · plan made for: Piano | W | `tests/practiceplan.test.js:215` | Phase C or D |
+| `js/practiceplan.js:289` | Plan, a block that soundLAB cannot time (the starter’s “Tune up”, a guitar scale), the line under its title, after “0 seconds recorded · ” | No automated timer or completion is available for this casual tool; opening it earns no progress. | Not timed: soundLAB cannot tell when this block is done, so it does not count towards the plan. | P | `tests/practiceplan.test.js:246` | Phase C or D |
+| `js/practiceplan.js:291` | Plan, card “Today’s … session”, the line under the blocks | … / … matching blocks measured complete. Time comes from recorded sessions for …; opening a page earns no minutes or XP. | 2 of 4 blocks done. Only time you play or answer as Piano counts; opening a page does not. | P | not pinned | B11 |
+| `js/practiceplan.js:291` | Plan, card “Today’s … session”, with a plan whose blocks are for another instrument | No matching blocks for this Learn category. Your accepted plan is preserved below. · … blocks preserved for other instrument contexts | No blocks for this instrument. Your plan is kept: see below. · 3 blocks for other instruments | W | `tests/practiceplan.test.js:215` | Phase C or D |
+| `js/practiceplan.js:294` | Plan, card “Last seven days” | … recorded minutes · … observed days | 34 minutes · 3 days with practice | R | not pinned | B11 |
+| `js/practiceplan.js:297` | Plan, card “Last seven days”, the line under the seven days | Only this instrument’s canonical observations are counted. Legacy / unassigned history remains separate. | Only practice on this instrument is counted. Practice from before you picked an instrument is not. | W | not pinned | B11 |
+| `js/practiceplan.js:298` | Plan, card “What soundLAB can’t do yet”: its button and its empty line | Export gaps · No gaps recorded. Unmatched assignments appear here after you accept notes. | Export this list · Nothing yet. Lines of your notes that soundLAB has no exercise for appear here. | P | not pinned | B11 |
+| `js/practiceplan.js:311` | Plan, fold “Teacher’s lesson notes”: a field’s label, the main button and the file button | Current Learn instrument · Review mapping · Import text / Docs JSON | Instrument · Show the plan · Import a text file or a Google Docs export | R | not pinned | Phase C or D |
+| `js/practiceplan.js:343` | Plan, the status line after the instrument was changed | Instrument changed. The previous block’s tracking ended; its original context and history are preserved. | Instrument changed. The block you had open is no longer timed; what you did so far is kept. | W | not pinned | Phase C or D |
 | `js/trainer.js:470` | Plan › Free practice, a message after “Open ear training” with Drums chosen | Ear training is not part of the … category. Pick another instrument in the Learn bar at the top of this page. | There is no ear training for Drums. Pick another instrument with the instrument button at the top. | S | `tests/trim.test.js:482` | Phase C or D |
 
 Notes:
 
-- `js/practiceplan.js:25`: Shown only for a plan saved before soundLAB kept an instrument with each plan.
-- `js/practiceplan.js:261`: The check wants “gap” or “practice” in the file’s name.
-- `js/practiceplan.js:282`: `tests/practiceplan.test.js:215` passes while the card holds “preserved” or “context”. This line and the “… blocks preserved for other instrument contexts” row change together with that check.
-- `js/practiceplan.js:292`: One of the three lines the plan names. Not pinned, on the first screen: B11 rewords it. The proposal describes the older practice instead of naming it, so it does not depend on the new name for “Legacy / unassigned”.
+- `js/practiceplan.js:27`: Shown only for a plan saved before soundLAB kept an instrument with each plan.
+- `js/practiceplan.js:266`: The check wants “gap” or “practice” in the file’s name.
+- `js/practiceplan.js:287`: `tests/practiceplan.test.js:215` passes while the card holds “preserved” or “context”. This line and the “… blocks preserved for other instrument contexts” row change together with that check.
+- `js/practiceplan.js:297`: One of the three lines the plan names. Not pinned, on the first screen: B11 rewords it. The proposal describes the older practice instead of naming it, so it does not depend on the new name for “Legacy / unassigned”.
 - `js/trainer.js:470`: B8 takes the Learn bar away: from then on this sentence points at something that is gone.
 
 ## Guitar › Neck, Tab, Notation
@@ -308,7 +310,7 @@ All three pages are `js/fretboard.js`.
 | Line | Where it is shown | Today | Proposal | Why | Pinned by | Step |
 |---|---|---|---|---|---|---|
 | `js/fretboard.js:235-236` | Neck, the settings fold, colors by note: tooltip of the five sharp-note swatches, and their name for screen readers | Derived blend of neighboring natural-note colors for … (name: Derived accidental color) | C# is a mix of the colors of C and D. Change those two to change it. (name: Color of C#, mixed from its neighbors) | P | not pinned | Phase C or D |
-| `js/fretboard.js:1883` | Neck, the settings fold, a checkbox | Jam: auto-switch mode | Follow the Jam band: show the mode that fits each chord | S | not pinned | Phase C or D |
+| `js/fretboard.js:1888` | Neck, the settings fold, a checkbox | Jam: auto-switch mode | Follow the Jam band: show the mode that fits each chord | S | not pinned | Phase C or D |
 
 ## Keys › Piano
 
@@ -530,7 +532,7 @@ read.
 
 **Never shown to the user.**
 
-- `js/midi.js:463`, `:616`, `:630`, `:679`, `:690`, `:702`, `:844`, `:1252`, `:1256`, `:1257` (“MIDI inventory
+- `js/midi.js:508`, `:661`, `:675`, `:724`, `:735`, `:747`, `:889`, `:1297`, `:1301`, `:1302` (“MIDI inventory
   changed.”, “Musical routes stopped.” and others): reasons handed to the event `midi:cleanup`, which nothing
   listens to.
 - `js/tonein.js:84`, `:96`, `:109`, `:131`, `:132` (“Tone input is paused while audio practice owns capture.”):
@@ -547,27 +549,27 @@ read.
   own text while the synth sound is on.
 - `js/scoreplayer.js:303`-`:306`, `:320` (“Choose a nonempty reviewed score …”): checks of `loadScore`. The
   Songs page is its only caller in this branch (`js/songs.js:739`) and passes a complete score.
-- `js/quiz.js:2977`, `js/app.js:1190`, `js/practice-input.js:101`: test hooks (`SLQuiz.lumiState`,
+- `js/quiz.js:3166`, `js/app.js:1190`, `js/practice-input.js:101`: test hooks (`SLQuiz.lumiState`,
   `App.addPage`, the suites’ simulated microphone).
 - `js/chordchart.js:478`, `js/songs.js:734`, `:755`, `js/synthdeck.js:1632` (“… is not in this build.”): shown
   only when a file of the app is missing, which the `assets` suite rules out.
-- `js/practiceplan.js:31` and the other one-word strings among the hits: ids, event names, file types, store
+- `js/practiceplan.js:33` and the other one-word strings among the hits: ids, event names, file types, store
   keys.
 
 **Shown, and left as it is.**
 
-- A music or gear word that is also on the word list: “ledger line” (`js/quiz.js:240`, `:243`, `:880`, `:958`,
-  `:962`); “Decay” of a synth sound (`js/midihub.js:77`, `js/synthtab.js:74`, `js/synthdeck-maps.js`); “Master
-  volume” (`js/settings.js:72`, `:331`); a drum pad’s “mapping” (`js/pads.js:172`, `js/help.js:123`);
+- A music or gear word that is also on the word list: “ledger line” (`js/quiz.js:247`, `:250`, `:924`, `:1002`,
+  `:1006`); “Decay” of a synth sound (`js/midihub.js:77`, `js/synthtab.js:74`, `js/synthdeck-maps.js`); “Master
+  volume” (`js/settings.js:72`, `:333`); a drum pad’s “mapping” (`js/pads.js:172`, `js/help.js:129`);
   “Unassigned” and “snapshot” as the Helix’s own names (`js/helix.js:63`).
 - A word that is explained where it stands: the Helix page’s messages about arming (`js/helix.js:98`, `:141`,
   `:159`, `:165`, `:166`, `:317`, `:900`-`:907`, `:972`, `:1037`, `:1085`, `:1086`, `:1091`, `:1104`: “Output
-  is disarmed: press Arm first. Nothing was sent.”) and its tour (`js/help.js:117`); only the bare badge and
+  is disarmed: press Arm first. Nothing was sent.”) and its tour (`js/help.js:123`); only the bare badge and
   button are listed. “? = from documentation, not checked on your synth” (`js/synthdeck.js:909`, `:947`,
   `:950`). “Latching button (every press switches on / off)” (`js/remote.js:356`). “the MIDI permission the
   browser blocked (SysEx)” (`js/lights.js:119`).
 - A name the user has to type or pick as it is: `use-winrt-midi-api` and `chrome://flags`
-  (`js/settings.js:160`), `node tools/helix-bridge.js` (`js/helix.js:699`, `js/help.js:116`), file types.
+  (`js/settings.js:162`), `node tools/helix-bridge.js` (`js/helix.js:699`, `js/help.js:122`), file types.
 - Technical, and plain enough: `js/learn-instruments.js:13`; `js/practice-router.js:93`-`:97`, `:134`, `:171`,
   `:175`, `:206`; `js/woodshed.js:309`, `:314`, `:324`-`:325`, `:332`, `:389`; `js/lumi-practice.js:184`,
   `:185`, `:211`-`:213`, `:235`, `:268`-`:272`, `:438`-`:452`; `js/performance-player.js:132`, `:202`;
@@ -580,7 +582,7 @@ read.
 **Outside this list by its own rule:** code comments, console messages, and aria texts that only repeat a
 visible label.
 
-**Not read sentence by sentence:** the lesson texts of the Exercises course (`js/quiz.js:1`-`:1100`, about 270
+**Not read sentence by sentence:** the lesson texts of the Exercises course (`js/quiz.js:1`-`:1144`, about 270
 strings of music theory), the Deck’s map data, `js/theory.js` and `js/daw/`. The two word lists ran over all
 of them; what they hit there were music and gear words (“ledger line”, “Ear hooks”, “Decay”, “Master”) and the
 map’s source notes.
@@ -593,7 +595,7 @@ map’s source notes.
 2. **The five words.** A plain `grep -rniE "\b(legacy|canonical|context|disclosure|module)" js index.html
    gear.html` finds 164 lines, comments and identifiers included, none of them in the two HTML files. As
    strings it is 28 strings on 24 lines: 21 lines are rows of this list, 3 are not shown
-   (`js/practiceplan.js:31`, `js/xp.js:21`, `:89`).
+   (`js/practiceplan.js:33`, `js/xp.js:21`, `:89`).
 3. **The word list** (92 patterns, case ignored, at the start of a word), run over the 22,005 strings:
    legacy, canonical, context, disclosure, module, unassigned, observ…, ingress, lease, leased, facade,
    payload, fallback, fall back, falls back, disarm…, arm, armed, arming, persist…, explicit, scoped, bounded,
@@ -635,7 +637,7 @@ map’s source notes.
 | B5a | 18 | 18 | 0 | `js/app.js:1670`, `js/app.js:1675`, `js/app.js:1679`, `index.html:55`, `index.html:56`, `js/lights.js:96`, `js/lights.js:116`, `js/lights.js:117`, `js/lights.js:118`, `js/help.js:40`, `js/help.js:77`, `js/keylessons.js:575`, `js/lumi-practice.js:428`, `js/lumi-practice.js:339-340`, `js/lumi-practice.js:378`, `js/lumi-practice.js:183`, `js/lumi-practice.js:480`, `js/performance-player.js:219` |
 | B7a | 4 | 0 | 4 | `js/lights.js:105`, `js/lights.js:106`, `js/lights.js:107-108`, `js/lights.js:113` |
 | B8 | 2 | 0 | 2 | `js/learn-instruments.js:26`, `js/learn-instruments.js:27` |
-| B11 | 5 | 0 | 5 | `js/practiceplan.js:122`, `js/practiceplan.js:286`, `js/practiceplan.js:289`, `js/practiceplan.js:292`, `js/practiceplan.js:293` |
+| B11 | 5 | 0 | 5 | `js/practiceplan.js:124`, `js/practiceplan.js:291`, `js/practiceplan.js:294`, `js/practiceplan.js:297`, `js/practiceplan.js:298` |
 | B14b | 3 | 0 | 3 | `js/songs.js:238`, `js/songs.js:559`, `js/songs.js:562` |
 | B17 | 1 | 0 | 1 | `js/settings.js:110` |
 | Phase C or D | 181 | — | — | — |

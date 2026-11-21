@@ -380,7 +380,7 @@ span.chip { cursor: default; }
 
     return '<div class="mk-pg pn-page">' +
       '<div class="pn-card">' +
-        '<div class="pn-headrow"><h1 class="pn-title" id="pn-title">' + esc(Mock.keyName(o.root, o.scale, 'full')) + '</h1>' +
+        '<div class="pn-headrow"><h1 class="pn-title" id="pn-title">' + Mock.flat(esc(Mock.keyName(o.root, o.scale, 'full'))) + '</h1>' +
           '<button type="button" class="btn sm icon-btn" id="pn-rotate" title="Rotate the keyboard (portrait / landscape)" aria-label="Rotate the keyboard">' + ic('rotate', 20) + '</button></div>' +
         '<div class="pn-stage sl-hero" id="pn-stage">' + kbd + '</div>' +
         '<div class="pn-under">' +

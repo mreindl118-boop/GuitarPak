@@ -78,6 +78,7 @@ html { background: var(--sl-bg); scroll-behavior: smooth; }
 .mk-choice > div { min-width: 0; }
 .mk-choice dd { margin: 0; color: var(--sl-ink-soft); line-height: var(--sl-leading); }
 @media (min-width: 641px) { .mk-choice { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.mk-limits { display: grid; gap: var(--sl-space-3); max-width: 68ch; margin: var(--sl-space-3) 0 0; padding-left: var(--sl-space-5); color: var(--sl-ink-soft); line-height: var(--sl-leading); }
 .mk-answer { max-width: 68ch; }
 .mk-answer > p.mk-example { padding: var(--sl-space-3) var(--sl-space-4); border-left: 2px solid var(--sl-accent-text); color: var(--sl-ink); }
 </style>
@@ -133,7 +134,7 @@ html { background: var(--sl-bg); scroll-behavior: smooth; }
   <h2>The header</h2>
   <p class="mk-ask"><b>Is this the header?</b></p>
   <h3>What is proposed</h3>
-  <p>The logo (a tap goes home), the five tabs, your instrument, the keyboard’s state in words (“LUMI · On”, “No keyboard”), help, settings, the way to Gear, and the metronome in the corner. On a phone the logo, your instrument and the metronome stay, and one “More” button holds Keyboard lights, Help, Settings and Gear; the tabs run along the bottom. At the beta address the word “beta” stands beside the logo, and “alpha” goes.</p>
+  <p>The logo (a tap goes home), the five tabs, your instrument, the keyboard’s state in words (“LUMI · On”, “No keyboard”), help, settings, the way to Gear, and the metronome in the corner. On a phone the logo, your instrument and the metronome stay, and one “More” button holds Keyboard lights, Help, Settings and Gear; the tabs run along the bottom. At the beta address the word “beta” stands beside the logo, and the “alpha” tag there goes. (The line at the foot of the page still says “soundLAB alpha”; that line is not changed here.)</p>
   <div class="mk-frames" data-frames='[{"file":"shell.html","q":"w=390&amp;touch=1&amp;pop=more","w":390,"h":844,"name":"Phone, “More” open"},{"file":"shell.html","q":"w=1280&amp;beta=1","w":1280,"h":800,"name":"Desktop, at the beta address"}]'></div>
   <ul class="mk-links">
     <li><a href="shell.html?only=more">“More” on a phone, all sizes</a></li>
@@ -163,7 +164,9 @@ html { background: var(--sl-bg); scroll-behavior: smooth; }
     <li><a href="home.html">Every picture of the home</a></li>
   </ul>
   <p class="mk-open"><b>Not settled</b>The plan wants the instrument to take at least a quarter of the screen. The proposed home keeps that in every window the plan names, but not everywhere. On the smallest phones (360 px wide) it is a little under a quarter with a two-line headline or with the goal reached, and under an invented title of 80 letters it drops to a fifth; on a desktop that long title also makes the words taller than the instrument. No title in the app is that long today, but a teacher’s own line could be.<span class="mk-more"><a href="home.html?only=long-title">The 80-letter title</a><a href="home.html?only=small">A very small phone</a></span></p>
-  <p class="mk-open"><b>Also yours to decide</b>The picture follows the key in the bar, not the headline. So “C major · RH” can stand over an A Dorian keyboard until you press Start.<span class="mk-more"><a href="home.html?only=lesson">A Keys lesson as the next step</a></span></p>
+  <p class="mk-open"><b>Not settled either: the other choice has less room</b>As “Today” inside Learn the home keeps Learn’s row of pills, and on a phone and on a laptop the instrument loses that row’s height, about 50 px. In a small laptop window (1024 × 640) with a touch screen and a two-line headline it is then 140 px, 21.9 % of the window, just under the 22 % the plan asks for there (23 % with a mouse). Under the 80-letter title on an ordinary phone (390 px wide) it drops to a fifth, where the proposed home keeps its quarter.<span class="mk-more"><a href="home.html?only=tight-a">“Today” inside Learn in a small laptop window</a></span></p>
+  <p class="mk-open"><b>Not settled: an iPad held upright</b>A key or a neck that is stretched too far looks wrong, so the picture stops at its largest size. On an upright iPad (820 × 1180) that leaves an empty band between “Start” and the instrument, about a fifth of the screen high (187 to 271 px, depending on the instrument). The room could be shared out above the words instead.<span class="mk-more"><a href="home.html?only=guitar">For guitar, with the upright tablet</a></span></p>
+  <p class="mk-open"><b>Also yours to decide</b>The picture follows the key in the bar, not the headline. So “C major · RH” can stand over an A Dorian keyboard until you press Start.<span class="mk-more"><a href="home.html?w=390&amp;step=lesson&amp;key=A-dorian">“C major · RH” over an A Dorian keyboard</a><a href="home.html?only=lesson">A Keys lesson as the next step</a></span></p>
   <p class="mk-waits"><b>What waits for your answer</b>The step that builds the home.</p>
 </section>
 
@@ -214,11 +217,12 @@ html { background: var(--sl-bg); scroll-behavior: smooth; }
       <p>Gear gets the new header, sheets and messages. Its key bar stays folded behind one button, as it is behind the clef today, so that a stray touch during a gig cannot switch the Scale lock. Its four pages look exactly as today until Phase H redesigns them, so for a while the frame and the pages will not match.</p>
       <dl class="mk-choice"><div><dt>Goes ahead</dt><dd>New frame, today’s pages.</dd></div><div><dt>The other choice</dt><dd>Re-colour Gear’s pages now. It is cheap, but nobody has checked those screens for readability.</dd></div></dl>
       <ul class="mk-links"><li><a href="gear.html?only=deck">Picture: the Deck in the new header</a></li><li><a href="gear.html?only=deck-open">Picture: its key bar open</a></li><li><a href="gear.html">Every picture of Gear</a></li></ul>
-      <p class="mk-open"><b>Not settled</b>On a small phone (360 px wide) five long key names, such as “Db Harm Minor”, are cut with “…” in Gear’s key button.<span class="mk-more"><a href="gear.html?only=key-first">The key button on a phone</a></span></p></li>
+      <p class="mk-open"><b>Not settled</b>On a small phone (360 px wide) five long key names, such as “Db Harm Minor”, are cut with “…” in Gear’s key button. Up to fourteen are cut in a touch window just over 640 px wide (641 to about 648 px).<span class="mk-more"><a href="gear.html?only=key-cut">A cut key name</a><a href="gear.html?only=key-first">The key button on a phone</a></span></p></li>
     <li class="mk-item" id="p6"><h3><span class="mk-num">6</span>Nine pages keep today’s arrangement</h3>
       <p>Exercises’ start, Chords, Circle, Plan, Charts, Songs, Jam, the Woodshed’s library and the Tuner get the new colours, type, one headline, one main button and bigger controls. But they stay as long and as full as they are (Exercises’ start is about ten screens on a desktop). “One thing on screen” is built for the home, Piano, the neck pages, Pads, a question and a run. Making the nine shorter means deciding what leaves each page; that is planned for Phases C and D.</p>
       <dl class="mk-choice"><div><dt>Goes ahead</dt><dd>New look, same arrangement.</dd></div><div><dt>The other choice</dt><dd>Tell us which of them must be rebuilt now.</dd></div></dl>
-      <ul class="mk-links"><li><a href="pages.html?only=quiz">Picture: Exercises’ start</a></li><li><a href="pages.html?only=shed">Picture: the Woodshed</a></li><li><a href="pages.html?only=plan">Picture: the Plan</a></li><li><a href="pages.html?only=chords">Picture: Chords</a></li><li><a href="pages.html?only=piano">Picture: Piano, rebuilt</a></li></ul></li>
+      <ul class="mk-links"><li><a href="pages.html?only=quiz">Picture: Exercises’ start</a></li><li><a href="pages.html?only=shed">Picture: the Woodshed</a></li><li><a href="pages.html?only=plan">Picture: the Plan</a></li><li><a href="pages.html?only=chords">Picture: Chords</a></li><li><a href="pages.html?only=piano">Picture: Piano, rebuilt</a></li></ul>
+      <p class="mk-open"><b>Not settled</b>On a short phone (360 × 740) the main button of Piano, Chords and the Plan is below the first screen; you scroll once to reach it. On a 390 × 844 phone, on a tablet and on a desktop it is on the first screen.<span class="mk-more"><a href="pages.html?only=piano">Piano</a><a href="pages.html?only=chords">Chords</a></span></p></li>
     <li class="mk-item" id="p7"><h3><span class="mk-num">7</span>Smaller rows for the mouse</h3>
       <p>The design says every control is 44 px high. In long lists (the Woodshed’s library, Settings, Piano’s folded rows) the plan would use 36 px when you work with a mouse, and 44 or 48 px as soon as the device has a touch screen.</p>
       <dl class="mk-choice"><div><dt>Goes ahead</dt><dd>36 px with a mouse, in long lists only.</dd></div><div><dt>The other choice</dt><dd>Say no and every row is 44 px.</dd></div></dl>
@@ -234,7 +238,7 @@ html { background: var(--sl-bg); scroll-behavior: smooth; }
     <li class="mk-item" id="p10"><h3><span class="mk-num">10</span>Chords follows the one tempo</h3>
       <p>Its own tempo box will show and set the tempo of the key bar. The open change named at the top (pull request #112) already does this; if it is merged first, nothing is left to do here.</p>
       <dl class="mk-choice"><div><dt>Goes ahead</dt><dd>Yes.</dd></div><div><dt>The other choice</dt><dd>Chords keeps a tempo of its own.</dd></div></dl>
-      <ul class="mk-links"><li><a href="pages.html?only=chords-2">Picture: Chords, with its tempo box</a></li></ul></li>
+      <ul class="mk-links"><li><a href="pages.html?only=chords-2">Picture: Chords; its tempo box is in the desktop picture</a></li></ul></li>
     <li class="mk-item" id="p11"><h3><span class="mk-num">11</span>The Help level also works on the guitar neck</h3>
       <p>In this phase, because the Help control is in the key bar on every page.</p>
       <dl class="mk-choice"><div><dt>Goes ahead</dt><dd>The neck obeys Help: Full, Colors, Target, Tonic, None.</dd></div><div><dt>The other choice</dt><dd>Leave it for Phase C; the neck then only gets the new look.</dd></div></dl>
@@ -244,7 +248,7 @@ html { background: var(--sl-bg); scroll-behavior: smooth; }
       <dl class="mk-choice"><div><dt>Goes ahead</dt><dd>Page by page.</dd></div><div><dt>The other choice</dt><dd>We hold the page steps back and you merge them together. That makes one very large merge.</dd></div></dl>
       <ul class="mk-links"><li><a href="gear.html?only=hub">Picture: what a new frame around an old page looks like</a></li></ul></li>
     <li class="mk-item" id="p13"><h3><span class="mk-num">13</span>How you see a step, and how fast the pile grows</h3>
-      <p>When this page was written, the five pull requests of the trim (Phase A) and the first two of this phase were still waiting to be merged, and this phase adds 24. We open at most three at a time and stop at three points (after these drawings, after the groundwork, after the home) until you have merged. Each pull request has a link that shows that step alone. The beta address shows a step only after you merged it; that is the only way to try it on your iPad or phone. Pictures are never put among the app’s files on GitHub, because those are published as a whole.</p>
+      <p>When this page was written, the five pull requests of the trim (Phase A) and the first two of this phase were still waiting to be merged, and this phase adds 24. We open at most three at a time and stop at three points (after these drawings, after the groundwork, after the home) until you have merged. Each pull request has a link that shows that step alone. The beta address shows a step only after you merged it; that is the only way to try it on your iPad or phone. Pictures are never put among the app’s files on GitHub, because those are published as a whole. From the step after these drawings on, the automatic test run on GitHub may take up to 40 minutes, where it stops at 30 today, because it has more to check.</p>
       <dl class="mk-choice"><div><dt>Proposed</dt><dd>Each pull request comes with a private claude.ai page of before and after pictures at phone, tablet and desktop width, dark and light. Publishing such a page needs your yes once.</dd></div><div><dt>Also possible, each only with your yes</dt><dd>A second preview address for the newest step that is not merged yet, or pictures uploaded by the automatic test run. Both change how the app is published.</dd></div></dl></li>
   </ol>
 
@@ -272,6 +276,17 @@ html { background: var(--sl-bg); scroll-behavior: smooth; }
       <p>CLAUDE.md, the notes every Claude session reads first, has a paragraph at the top that the trim was told not to touch, because another pull request was rewriting it. That pull request is merged, and two of the paragraph’s sentences are no longer true.</p>
       <dl class="mk-choice"><div><dt>Goes ahead</dt><dd>It stays untouched, and a new section says what is out of date.</dd></div><div><dt>The other choice</dt><dd>Say yes and we correct the two sentences.</dd></div></dl></li>
   </ol>
+</section>
+
+<section class="mk-group" id="limits">
+  <h2>What these drawings do not show</h2>
+  <p>Four things to keep in mind while you look. None of them needs an answer.</p>
+  <ul class="mk-limits">
+    <li><b>Seen in one browser only.</b> Every drawing was looked at in Chrome’s engine on a computer, with a pretended touch screen for the phone and tablet sizes. Nothing was tried on a real phone, iPad or Windows PC, nor in Safari or Firefox. If something looks wrong on your device, that is worth a line in your answer.</li>
+    <li><b>Still pictures.</b> How a button looks under the mouse, while it is pressed, and when the keyboard’s focus is on it is written down but not drawn.</li>
+    <li><b>The pads on a LUMI.</b> The pads drawing shows the screen. On a LUMI the eight pad keys light in one orange and flash white on a hit, not in the eight colours of the picture. That is as today and is not changed in this phase.</li>
+    <li><b>Not drawn yet.</b> The Voice page, the weak-spot map in Exercises, and the home for Voice, Synth and Other.</li>
+  </ul>
 </section>
 
 <section class="mk-group mk-answer" id="answer">
