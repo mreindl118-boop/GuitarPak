@@ -1,6 +1,11 @@
 // Keys page: Help levels (coloration scheme on/off), colored key presses,
 // and the scale lessons — metronome count-in, note + timing judging, scoring,
-// level-up, progress capture, stop on leaving the page.
+// level-up, progress capture, stop on leaving the page. 2.0 folds: the Sound
+// picker (#pn-voice: the grand piano or a synth, App.keys.setVoice) that
+// replaced the Synth pill, and the LUMI section under the lessons (#pn-lumi,
+// OPEN = OWNER: a lesson or the runner starting closes it and stops its
+// session; opening it stops them; App.keysLessons.halt keeps the credit
+// instrument).
 const { chromium } = require('playwright');
 const env = require('./env');
 let fails = 0;
@@ -279,6 +284,148 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
     return { rows, page: App.active, sel: document.querySelector('.kl-title b').textContent };
   });
   ok(pg.rows.sort().join() === 'f-l,g-r' && pg.page === 'piano' && /F major · Left hand/.test(pg.sel), 'Exercises Progress lists keys lessons and opens one on the Keys page: ' + JSON.stringify(pg));
+
+  console.log('# Sound picker: the grand piano or a synth sound');
+  const snd = await page.evaluate(() => {
+    const sel = document.getElementById('pn-voice'), o = {};
+    const stored = () => [App.store.get('pn.voice', null), App.store.get('pn.synthPreset', null)].join();
+    // every note the synth voice is asked to play (the sampled grand never goes through it)
+    // …and every release it gets: one note (its pitch) or all of them ('all')
+    const synth = [], offs = [], make = DAW.createSynth;
+    DAW.createSynth = function () {
+      const s = make.apply(this, arguments), on = s.noteOn, off = s.noteOff, all = s.allNotesOff;
+      s.noteOn = function (pitch) { synth.push(pitch); return on.apply(this, arguments); };
+      s.noteOff = function (pitch) { offs.push(pitch); return off.apply(this, arguments); };
+      s.allNotesOff = function () { offs.push('all'); return all.apply(this, arguments); };
+      return s;
+    };
+    const tap = n => { App.emit('midi:note', { on: true, midi: n, vel: 90 }); App.emit('midi:note', { on: false, midi: n }); return synth.splice(0); };
+    o.label = sel.closest('label').firstChild.textContent.trim();
+    o.options = [...sel.options].map(p => p.value);
+    o.presets = DAW.SYNTH_PRESETS.map(p => p.id);
+    o.first = sel.value;
+    // chosen in the picker
+    sel.value = 'pad'; sel.dispatchEvent(new Event('change', { bubbles: true }));
+    o.picked = stored(); o.padNotes = tap(60);
+    // chosen from outside the page
+    o.toPiano = App.keys.setVoice('piano'); o.piano = sel.value + '|' + stored(); o.pianoNotes = tap(62);
+    o.toSaw = App.keys.setVoice('saw'); o.saw = sel.value + '|' + stored(); o.sawNotes = tap(64);
+    // a key held while the SAME synth is picked again (the Learn bar's "Synth keyboard" entry does
+    // that): the held note is forgotten, so the synth must be silenced or the note drones on
+    App.emit('midi:note', { on: true, midi: 65, vel: 90 }); offs.length = 0;
+    o.again = App.keys.setVoice('saw');
+    App.emit('midi:note', { on: false, midi: 65 });
+    o.heldOff = offs.splice(0); synth.splice(0);
+    // …and while another synth is picked
+    App.emit('midi:note', { on: true, midi: 67, vel: 90 }); offs.length = 0;
+    App.keys.setVoice('pad');
+    App.emit('midi:note', { on: false, midi: 67 });
+    o.swapOff = offs.splice(0); synth.splice(0);
+    App.keys.setVoice('saw');
+    o.unknown = App.keys.setVoice('theremin'); o.after = sel.value + '|' + stored();
+    App.keys.setVoice('piano');
+    DAW.createSynth = make;
+    o.pill = !!document.getElementById('panel-synth');
+    return o;
+  });
+  ok(snd.label === 'Sound' && snd.first === 'piano' && snd.options.join() === ['piano'].concat(snd.presets).join() && snd.presets.includes('saw') && snd.presets.includes('pad') && !snd.pill,
+    'the picker is labelled Sound and lists the grand piano plus every synth sound; no Synth page: ' + JSON.stringify(snd.options));
+  ok(snd.picked === 'pad,pad' && snd.padNotes.includes(60), 'choosing a synth in #pn-voice stores pn.voice (and the last synth sound) and plays the synth: ' + JSON.stringify([snd.picked, snd.padNotes]));
+  ok(snd.toPiano === true && snd.piano === 'piano|piano,pad' && snd.pianoNotes.length === 0, 'App.keys.setVoice(\'piano\') switches back to the grand; the last synth sound is kept: ' + snd.piano);
+  ok(snd.toSaw === true && snd.saw === 'saw|saw,saw' && snd.sawNotes.includes(64), 'App.keys.setVoice(\'saw\') selects that synth, stores it and plays it: ' + snd.saw);
+  ok(snd.again === true && (snd.heldOff.includes('all') || snd.heldOff.includes(65)) && (snd.swapOff.includes('all') || snd.swapOff.includes(67)),
+    'a key held while a synth sound is picked (the same one again, or another) is released on the synth: nothing drones on: ' + JSON.stringify([snd.heldOff, snd.swapOff]));
+  ok(snd.unknown === false && snd.after === 'saw|saw,saw', 'an unknown sound id returns false and changes nothing: ' + snd.after);
+
+  console.log('# LUMI section under the lessons: open = owner');
+  const own = await page.evaluate(async () => {
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+    const box = document.getElementById('pn-lumi'), lp = App.lumiPractice, S = () => SLLumiPractice.snapshot();
+    // open or fold the section and let its 'toggle' event run (it is async; piano.js acts on it);
+    // the 1 s fallback only keeps a missing event from hanging the run
+    const fold = open => box.open === open ? wait(0) : new Promise(done => { box.addEventListener('toggle', () => done(), { once: true }); box.open = open; setTimeout(done, 1000); });
+    const playing = () => /Pause/.test(document.getElementById('pn-play').textContent);
+    const said = () => document.getElementById('lp-status').textContent;
+    const o = {};
+    o.closed = box.tagName === 'DETAILS' && !box.open && !lp.open && box.previousElementSibling.id === 'pn-lessons' && !!box.querySelector('#pn-lumi-body #lp-start');
+
+    // a lesson starting closes the section and stops its simulated session
+    await fold(true);
+    o.shown = lp.open && S().visible;
+    document.getElementById('lp-start').click();
+    o.session1 = S().running && S().mode === 'simulated' && lp.running;
+    document.getElementById('kl-start').click();
+    o.lesson1 = !!App.keysLessons.run && !box.open && !lp.open && !S().running && !S().visible && !lp.running;
+    await wait(80); // the fold's 'toggle' event has run: the lesson goes on
+    o.said1 = said(); // read after that event: its hide() must leave the reason standing
+    o.goesOn1 = !!App.keysLessons.run && App.keysLessons.view === 'run';
+    o.focus1 = getComputedStyle(box).display; // focus mode folds the section away with the other page controls
+
+    // opening the section stops a lesson run
+    await fold(true);
+    o.openStopsLesson = !App.keysLessons.run && App.keysLessons.view === 'list' && !document.documentElement.classList.contains('kl-running') && lp.open && S().visible;
+
+    // the runner starting closes the section and stops its session
+    document.getElementById('lp-start').click();
+    o.session2 = S().running;
+    document.getElementById('pn-play').click();
+    o.runner2 = !box.open && !lp.open && !S().running && !lp.running;
+    await wait(80);
+    o.said2 = said(); // after the fold's 'toggle' event, as above
+    o.goesOn2 = App.keys.runnerBusy() && playing();
+
+    // opening the section stops the runner
+    await fold(true);
+    o.openStopsRunner = !App.keys.runnerBusy() && !playing() && lp.open && S().visible;
+
+    // folded by hand: its session stops
+    document.getElementById('lp-start').click();
+    o.session3 = S().running;
+    await fold(false);
+    o.handFold = !S().running && !S().visible && !lp.open;
+
+    // left open on another page: open is the fold state alone; it is live again on return
+    await fold(true);
+    document.getElementById('lp-start').click();
+    App.switchTo('fretboard'); await wait(50);
+    o.away = lp.open && box.open && !S().running && !S().visible;
+    App.switchTo('piano'); await wait(50);
+    o.back = lp.open && S().visible && !S().running;
+    await fold(false);
+
+    // App.keysLessons.halt() stops a run and keeps the entry instrument; stop() forgets it
+    App.keysLessons.open('f-l', 'synth');
+    App.keysLessons.start(false);
+    o.credit = [App.keysLessons.run.instrument];
+    App.keysLessons.halt();
+    o.halted = !App.keysLessons.run && App.keysLessons.view === 'list';
+    App.keysLessons.start(false);
+    o.credit.push(App.keysLessons.run.instrument);
+    await fold(true); // the section opening halts the run the same way
+    o.haltedByOpen = !App.keysLessons.run;
+    App.keysLessons.start(false);
+    o.credit.push(App.keysLessons.run.instrument);
+    App.keysLessons.stop();
+    App.keysLessons.start(false);
+    o.credit.push(App.keysLessons.run.instrument);
+    App.keysLessons.stop();
+    await wait(80);
+    o.end = !box.open && !lp.open && !App.keysLessons.run && !App.keys.runnerBusy();
+    return o;
+  });
+  ok(own.closed, 'the LUMI section sits under the lessons, closed by default');
+  ok(own.shown && own.session1 && own.lesson1 && own.said1 === 'A lesson started. LUMI session stopped.' && own.goesOn1,
+    'starting a lesson closes an open LUMI section and stops its simulated session: ' + JSON.stringify([own.shown, own.session1, own.lesson1, own.said1, own.goesOn1]));
+  ok(own.focus1 === 'none', 'a lesson run\u2019s focus mode hides the section: ' + own.focus1);
+  ok(own.openStopsLesson, 'opening the section stops a lesson run (back to the list, focus mode off)');
+  ok(own.session2 && own.runner2 && own.said2 === 'The runner started. LUMI session stopped.' && own.goesOn2,
+    'starting the runner closes an open LUMI section and stops its simulated session: ' + JSON.stringify([own.session2, own.runner2, own.said2, own.goesOn2]));
+  ok(own.openStopsRunner, 'opening the section stops the runner');
+  ok(own.session3 && own.handFold, 'folding the section by hand stops its session');
+  ok(own.away && own.back, 'left open on another page it stays open (session stopped) and is live again on the Keys page');
+  ok(own.halted && own.haltedByOpen && own.credit.join() === 'synth,synth,synth,piano',
+    'App.keysLessons.halt() (and the section opening) stops a run and keeps the entry instrument; stop() forgets it: ' + own.credit.join());
+  ok(own.end, 'afterwards: section closed, no lesson run, no runner');
   ok(errs.length === 0, 'no page errors' + (errs.length ? ': ' + errs.join(' | ') : ''));
 
   await browser.close();

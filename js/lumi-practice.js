@@ -2,7 +2,12 @@
  * Recovered from b8ccb55 (origin/codex/midi-hub-release-0.78.0-20261019).
  * No global MIDI selection, Thru, SysEx, or note event bus. A temporary
  * exact-output keybed lease renders target/correct/wrong instructional frames.
- * Registers 'lumipractice'; all state is intentionally session-only.
+ * 2.0: no page of its own. js/piano.js mounts it into the folded section
+ * #pn-lumi under the Keys lessons (init into #pn-lumi-body) and drives it
+ * through App.lumiPractice. OPEN = OWNER: while the section is open it alone
+ * answers the pedal; opening it or starting a session stops a lesson run and
+ * the Keys runner, and a lesson or the runner starting closes it. All state
+ * is intentionally session-only.
  */
 (function () {
   'use strict';
@@ -16,7 +21,7 @@
   var outputLease = null, leasedOutputId = '';
   var status = 'Ready for simulated practice. Device output is OFF.';
   var result = 'Start a session, then play or select the target notes and check your answer.';
-  var outputStatus = 'OFF — no device messages sent by this page.';
+  var outputStatus = 'OFF — no device messages sent by this section.';
   var mockStatus = 'Simulated display idle. No device ports are used.';
   var NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
 
@@ -239,7 +244,16 @@
   }
   function start() {
     stop('Preparing a fresh session.');
+    // the host calls show() from the section's toggle event, one task after
+    // it opens. A Start that lands in between finds the section open and on
+    // screen, which is what "visible" means
+    if (!visible && onScreen()) show();
     if (!visible) return;
+    // open = owner: a session starting ends a lesson run and the Keys runner
+    // (they share the pedal and the key lights). Guarded: the fixture suite
+    // loads this file alone into a mock App
+    if (App.keysLessons && App.keysLessons.halt) App.keysLessons.halt();
+    if (App.keys && App.keys.stopRunner) App.keys.stopRunner();
     if (mode === 'hardware' && (!supportsPorts() || !attachInput())) {
       status = 'Choose an available synth or LUMI answer input. Independent ports require an enabled Web MIDI backend; native bridges are unsupported here.';
       paint(); return;
@@ -258,8 +272,9 @@
       (judged.extra.length ? ' Unexpected: ' + names(judged.extra) + '.' : '') + (!actual.length ? ' No answer notes held.' : '');
     paint();
   }
-  // CONTROLLER REMOTE (js/remote.js, app.js onRemote): a pedal or a synth
-  // button does what the session buttons do. NEXT = Start / Check answer,
+  // CONTROLLER REMOTE (js/remote.js; js/piano.js onRemote asks this section
+  // INSTEAD of the lessons and the runner while it is open): a pedal or a
+  // synth button does what the session buttons do. NEXT = Start / Check answer,
   // then Next target (manual) / skip this target, uncounted (Wait until
   // correct); STOP = Stop & release notes; no Back (no earlier target). Test,
   // arm, disarm and the synth sound route stay on-screen acknowledgements.
@@ -308,7 +323,7 @@
     if (lostOutput) { outputId = ''; tested = null; armed = false; }
     fillPorts('input', 'inputs', inputId, 'Choose LUMI or MODX answer input…');
     fillPorts('output', 'outputs', outputId, 'None — display output OFF');
-    text('ports-status', supportsPorts() ? 'Independent Web MIDI ports available. Synth answer inputs and LUMI display outputs are independent; LUMI input is optional; mixed and virtual names are excluded. Other ROLI devices do not qualify. Both choices apply only to this page.' :
+    text('ports-status', supportsPorts() ? 'Independent Web MIDI ports available. Synth answer inputs and LUMI display outputs are independent; LUMI input is optional; mixed and virtual names are excluded. Other ROLI devices do not qualify. Both choices apply only to this section.' :
       (midi().native ? 'Native MIDI bridge: independent port routing is unsupported. Simulated practice remains available.' : 'Independent ports unavailable. Enable Web MIDI in Settings, then refresh ports; simulated practice remains available.'));
     paint();
   }
@@ -482,15 +497,45 @@
     document.addEventListener('visibilitychange', function () { if (document.hidden) stop('App hidden. Session stopped and output disarmed.'); });
     buildKeys(); refreshPorts(); paint();
   }
-  App.register('lumipractice', {
+  // THE SECTION (2.0): js/piano.js hosts this in <details id="pn-lumi">.
+  // "visible" = the Piano page is shown AND the section is open (show / hide
+  // follow both). "open" is the fold state alone, so it stays true while
+  // another page is shown. Where no <details> holds the root (the fixture
+  // suite), open is the same as visible.
+  function box() { return root && typeof root.closest === 'function' ? root.closest('details') : null; }
+  function isOpen() { var d = box(); return d ? !!d.open : visible; }
+  function onScreen() { var d = box(); return !!(d && d.open && root.getClientRects().length); }
+  function busy() { return running || armed || !!tested || pending.length > 0 || !!outputLease || !!unsubscribe; }
+  function show() { visible = true; refreshPorts(); }
+  // the Piano page was left or the section was folded by hand. Not shown and
+  // nothing live = nothing to do: close() below already stopped it (the
+  // host's toggle listener calls hide() after it), or it was never opened
+  function hide() {
+    if (!visible && !busy()) return;
+    stop('Section closed or page left. Session stopped and output disarmed.'); visible = false;
+  }
+  // a lesson or the runner takes over: fold the section and stop the session
+  // with their message. Also folds a section left open on a page that is not
+  // showing. Nothing happens when it is already closed (and nothing is live).
+  function close(msg) {
+    var d = box();
+    if (!isOpen() && !busy()) return;
+    if (d && d.open) d.open = false;
+    stop(msg); visible = false;
+  }
+  App.lumiPractice = {
     init: init,
-    onShow: function () { visible = true; refreshPorts(); },
-    onHide: function () { stop('Practice page left. Session stopped and output disarmed.'); visible = false; },
-    onRemote: function (action) { return remote(action); },
+    show: show,
+    hide: hide,
+    close: close,
+    stop: stop,
+    remote: remote,
     // the double-tap key only in simulated mode: hardware answers arrive on
     // their own port subscription, which the remote's claim never sees
-    remoteKey: function () { return mode !== 'hardware'; }
-  });
+    remoteKey: function () { return mode !== 'hardware'; },
+    get open() { return isOpen(); },
+    get running() { return running; }
+  };
   window.SLLumiPractice = {
     noteName: noteName, compareNotes: compareNotes,
     snapshot: function () { return { mode: mode, visible: visible, running: running, inputId: inputId, outputId: outputId,

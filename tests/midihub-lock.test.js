@@ -1,4 +1,6 @@
 // Actual Hub + shared MIDI service with EventTarget fake ports. No hardware.
+// 2.0 Phase A3b: the Hub is a page of soundLAB Gear (gear.html, env.GEAR_URL). "Another page" is
+// Gear's Helix page: a soundLAB page id passed to App.switchTo there would leave for index.html.
 const { chromium } = require('playwright');
 const env = require('./env');
 let checks = 0;
@@ -32,8 +34,8 @@ const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
     });
     const page = await context.newPage(), errors = [];
     page.on('pageerror', e => errors.push(e.message));
-    await page.goto(env.URL);
-    await page.waitForFunction(() => window.App && App.midi.ready && typeof App.midi.flushMusicalOutputs === 'function');
+    await page.goto(env.GEAR_URL);
+    await page.waitForFunction(() => window.App && App.app === 'gear' && App.active === 'deck' && App.midi.ready && typeof App.midi.flushMusicalOutputs === 'function');
     await page.evaluate(() => {
       App.switchTo('midihub'); App.store.set('midihub.outId', 'sound');
       App.store.set('fb.root', 0); App.store.set('fb.scale', 'major'); App.scaleLock.set(true);
@@ -54,10 +56,10 @@ const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
     ok(ons.every(b => [0, 2, 4, 5, 7, 9, 11].includes(b[1] % 12) && b[2] === 87), 'disallowed pitches never reach selected synth; allowed pitch/velocity unchanged');
     ok(offs.every(b => b[2] === 23), 'forwarded physical Note Off release velocities survive post-rule pairing');
     const outsidePage = await page.evaluate(() => {
-      App.switchTo('quiz'); __clearSound(); __receive([0x90, 61, 87]); __receive([0x80, 61, 0]);
-      const sent = __sound(); App.switchTo('midihub'); return { sent, on: App.scaleLock.on, active: App.scaleLock.active };
+      App.switchTo('helix'); const page = App.active; __clearSound(); __receive([0x90, 61, 87]); __receive([0x80, 61, 0]);
+      const sent = __sound(); App.switchTo('midihub'); return { page, sent, on: App.scaleLock.on, active: App.scaleLock.active };
     });
-    ok(outsidePage.on && outsidePage.active && outsidePage.sent.length === 0, 'global scale lock has no Exercises-page forwarding exception');
+    ok(outsidePage.page === 'helix' && outsidePage.on && outsidePage.active && outsidePage.sent.length === 0, 'Thru stays locked on another page (Helix): the global scale lock has no forwarding exception away from the Hub');
     const virtual = await page.evaluate(() => { __clearSound(); tapHub(61); tapHub(62); return __sound(); });
     ok(virtual.length === 2 && same(virtual[0], [0x90, 62, 100]) && same(virtual[1], [0x80, 62, 0]), 'Hub virtual keyboard blocks C-sharp and keeps D on/off pair');
     const rules = await page.evaluate(() => {

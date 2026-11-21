@@ -1,12 +1,18 @@
+> 2.0: this page lives in soundLAB Gear (gear.html) since Phase A. Menu paths below are from before Phase A (1.x and the live 2.0.0).
+
 # Helix Stadium in soundLAB
 
-The **Helix** page (*Guitar › Helix*, `js/helix.js`) reads, writes and
-controls a Line 6 **Helix Stadium / Stadium XL**. It is built in since 0.82.0;
-it began as a plugin (`plugins/helix-stadium.js`, now a stub) and outgrew the
-100 KB plugin cap. Nothing connects when soundLAB starts: the page asks for
-MIDI access when you open it only once you have said yes to MIDI somewhere in
-soundLAB (otherwise *Connect MIDI* does), and the bridge connects only after you
-press *Connect bridge* once. It uses two routes at once:
+The **Helix** page (the *Helix* tab of soundLAB Gear, `gear.html`; the code is
+`js/helix.js`) reads, writes and controls a Line 6 **Helix Stadium / Stadium
+XL**. Before Phase A (1.x and the live 2.0.0) it was *Guitar › Helix* in
+soundLAB; from soundLAB the **Gear**
+button at the top opens Gear, and `gear.html#helix` opens this page directly.
+It is built in since 0.82.0; it began as a plug-in, before soundLAB 2.0
+removed the plug-in API. Nothing connects when soundLAB Gear starts: the page
+asks for MIDI access when you open it only once you have said yes to MIDI
+somewhere in soundLAB or Gear (otherwise *Connect MIDI* does), and the bridge
+connects only after you press *Connect bridge* once. It uses two routes at
+once:
 
 | Route | Needs | Gives |
 |---|---|---|
@@ -137,7 +143,7 @@ Snapshot CC* on the pedal. It answers no SysEx identity request.
 
 Reverse-engineered by the community (the
 [helixgen-core protocol reference](https://github.com/sheax0r/helixgen-core/blob/main/docs/helix-protocol.md)
-is the thorough one); what the bridge and plugin rely on, all verified against
+is the thorough one); what the bridge and the page rely on, all verified against
 a Stadium XL on firmware 1.1.0 (build 1274):
 
 - Three ZeroMQ sockets, ZMTP 3 with the `NULL` mechanism (no auth, cleartext):

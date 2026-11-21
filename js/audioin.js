@@ -22,14 +22,29 @@
  * A chosen input that is missing is never replaced by the system default
  * for Hear input on its own either: Hear input WAITS for it (no device open)
  * and the card offers "press On again to hear the system default instead".
- * Held = st.held + st.why 'mic' | 'fell' | 'perm'; held with no meter
- * holding the device releases it (no open microphone while nothing sounds).
+ * Held = st.held + st.why 'mic' | 'fell' | 'perm' | 'other'; held with no
+ * meter holding the device releases it (no open microphone while nothing
+ * sounds).
+ * ONE WINDOW PLAYS HEAR INPUT (2.0): soundLAB (index.html) and soundLAB Gear
+ * (gear.html) both load this file and read the same audio.monitor. Only the
+ * document that holds the Web Lock 'soundlab-hear-input' connects the input
+ * to the speakers; another one holds with why 'other' until On or Off is
+ * pressed in it (the press takes the lock) or the owner closes. The rule is
+ * spelled out above the lock code, near the end of this file.
+ * App.audioIn.mountSwitch(el) = Off / On + a status line for a page without
+ * the Settings card (Gear's Hub header).
+ * THE CHOSEN OUTPUT (audio.outId) is applied to the shared AudioContext here
+ * (applySink), for both apps: soundLAB's Settings card has the picker and
+ * calls it from its device list; soundLAB Gear has no Settings page, so this
+ * file looks at the list itself there (sinkWatch) — Gear's metronome, the
+ * Hub's Player and Hear input come out of the device chosen in soundLAB.
  * Bus: 'audioin:state' {on, monitor, want, device, label, error, msg, warn,
- * held, why, mic, paused} after every change; 'audioin:device' {id} when the
+ * held, why, mic, paused} after every change (also when audio.monitor was
+ * changed in another window); 'audioin:device' {id} when the
  * chosen input changes (tone-in re-opens on it). No getUserMedia (the
  * claude.ai viewer, old WebViews, a frame without the microphone permission
  * policy) = supported false + a status message, never an exception at boot.
- * Loaded right after tonein.js.
+ * Loaded right after tonein.js (soundLAB) / midirules.js (soundLAB Gear).
  */
 (function () {
   'use strict';
@@ -55,6 +70,16 @@
   var lastList = [];      // last enumerated audio inputs
   var prevIds = null;     // the input ids at the previous devicechange
   var hint = null;        // the "tap to start sound" note while the context is locked
+  // ONE WINDOW PLAYS HEAR INPUT (the rule is above askLock, near the end)
+  var LOCK = 'soundlab-hear-input';
+  var OTHER = 'Your other soundLAB window has Hear input. Press On to hear it here instead.';
+  var owner = false;      // this document has the lock (or there are no Web Locks here): only then is the input routed
+  var lockN = 0;          // lock requests made so far (each gets a number)
+  var mine = 0;           // the granted request this document holds (0 = none)
+  var waiting = 0;        // a plain request of this document that waits in the queue (0 = none)
+  var taking = null;      // On / Off pressed without the lock: the {steal: true} request in flight, {p}
+  var launched = false;   // the launch restore has had its turn (500 ms after load)
+  var GEAR = App.app === 'gear'; // soundLAB Gear (js/app.js APPS): no Settings card there
 
   function md() { return navigator.mediaDevices || null; }
   // a frame without the microphone permission policy refuses every capture
@@ -175,6 +200,7 @@
   // ---- the monitor route ----
   function route(on) {
     if (!gain) { monOn = false; return; }
+    if (on && !owner) on = false; // ONE WINDOW PLAYS HEAR INPUT: never from a window without the lock
     var dest;
     try { dest = App.getAudio().destination; } catch (e) { return; }
     if (on && !monOn) {
@@ -198,7 +224,14 @@
     st.held = false;
     st.why = '';
     st.msg = '';
-    if (want && st.fell && !ack) {
+    if (want && !owner) {
+      // ONE WINDOW PLAYS HEAR INPUT: another window has it (settle() lets the
+      // device go unless a meter holds it)
+      want = false;
+      st.held = true;
+      st.why = 'other';
+      st.msg = OTHER;
+    } else if (want && st.fell && !ack) {
       want = false;
       st.held = true;
       st.why = 'fell';
@@ -319,7 +352,9 @@
           emit();
         };
       }
-      // the grant made the device names readable: label + mic check
+      // the grant made the device names readable: label + mic check (and
+      // in Gear the chosen output, whose id was hidden until now)
+      if (GEAR) sinkWatch();
       return enumerate().then(function () {
         if (stream !== r.s) return snapshot();
         fellListed = st.fell && isListed(id);
@@ -341,8 +376,11 @@
         return snapshot();
       }
       st.error = inputError(err, false);
-      // a declined prompt switches Hear input off: no new prompt at every launch
-      if ((n === 'NotAllowedError' || n === 'SecurityError') && wantMonitor()) {
+      // a declined prompt switches Hear input off: no new prompt at every
+      // launch. Only in the window that has Hear input (owner): the input
+      // declined for a meter in another window must not switch off what
+      // that one is playing — it would go on sounding with every switch at Off
+      if ((n === 'NotAllowedError' || n === 'SecurityError') && wantMonitor() && owner) {
         App.store.set('audio.monitor', false);
         ack = false;
       }
@@ -401,22 +439,21 @@
     return snapshot();
   }
 
-  function setMonitor(on) {
-    on = !!on;
-    App.store.set('audio.monitor', on);
-    if (on) {
-      consent = true;
-      // On pressed again after the card said why it was held = allow it
-      if (st.held && (st.why === 'mic' || st.why === 'fell')) ack = true;
-      if (!stream) {
-        st.held = false;
-        st.why = '';
-        return open();
-      }
-      applyMonitor();
-      emit();
-      return Promise.resolve(snapshot());
+  // Hear input switched on / off in THIS window (it has the lock)
+  function monitorOn() {
+    consent = true;
+    // On pressed again after the card said why it was held = allow it
+    if (st.held && (st.why === 'mic' || st.why === 'fell')) ack = true;
+    if (!stream) {
+      st.held = false;
+      st.why = '';
+      return open();
     }
+    applyMonitor();
+    emit();
+    return Promise.resolve(snapshot());
+  }
+  function monitorOff() {
     ack = false;
     consent = false;
     route(false);
@@ -429,6 +466,17 @@
     if (!needed()) { close(); st.msg = ''; } else applyMonitor();
     emit();
     return Promise.resolve(snapshot());
+  }
+
+  function setMonitor(on) {
+    on = !!on;
+    App.store.set('audio.monitor', on);
+    if (owner && !taking) return on ? monitorOn() : monitorOff();
+    // another window has Hear input: the press brings it to this one first
+    // (ONE WINDOW PLAYS HEAR INPUT), then does what it always did. Presses
+    // made while the lock is on its way follow in the order they were made
+    if (st.why === 'other') { st.held = false; st.why = ''; st.msg = ''; } // "the other window has it" ends with this press
+    return takeLock().then(function () { return on ? monitorOn() : monitorOff(); });
   }
 
   function setGain(pct) {
@@ -455,6 +503,7 @@
     close();
     st.msg = '';
     st.error = '';
+    if (otherWaits()) return Promise.resolve(snapshot()); // not opened for Hear input alone: another window has it
     if (needed()) return open();
     emit();
     return Promise.resolve(snapshot());
@@ -468,6 +517,7 @@
     App.store.set('audio.monitor', false);
     close();
     st.msg = '';
+    if (!owner) takeLock(); // Hear input may be sounding in another window: taking the lock stops it there (lostLock)
     emit();
     return snapshot();
   }
@@ -487,10 +537,12 @@
   // ---- plug / unplug / coming back to the app ----
   // re-open when something needs the input and it can be opened as wanted:
   // a parked microphone or a permission hold waits for the user; a missing
-  // chosen input waits until it is listed again
+  // chosen input waits until it is listed again; Hear input that another
+  // window has opens nothing (a meter still gets its device, never routed)
   function reopen(list, newly) {
     if (stream || opening || !needed()) return;
-    if (st.held && st.why !== 'fell') return;
+    if (otherWaits()) return;
+    if (st.held && st.why !== 'fell' && !(st.why === 'other' && holding())) return;
     // the last open failed (busy, permission): only a chosen input that has
     // just appeared is worth another try — not every unrelated devicechange
     if (st.error && !newly) return;
@@ -500,6 +552,7 @@
   }
 
   function onDeviceChange() {
+    if (GEAR) sinkWatch(); // the chosen output may be back (soundLAB: the Settings card does this)
     enumerate().then(function (list) {
       var ids = list.map(function (d) { return d.deviceId; });
       var want = wantId(), listed = !!want && ids.indexOf(want) !== -1;
@@ -546,6 +599,7 @@
         emit();
       }
     } else if (needed() && !stream && !opening) {
+      if (otherWaits()) return; // another window has Hear input: nothing to open here
       enumerate().then(reopen);
     }
   });
@@ -561,12 +615,16 @@
     } catch (e) { /* no permissions API */ }
     return Promise.resolve('unknown');
   }
-  setTimeout(function () {
+  // (also run when this window gets the Hear-input lock from the queue: the
+  // window that had it closed — see tookOver)
+  function restore() {
     try {
       if (!wantMonitor() || stream || opening) return;
       if (!supported()) { st.error = 'Audio input is not available here (this browser or viewer does not allow it).'; emit(); return; }
+      if (otherWaits()) return; // another window has Hear input: held, nothing opened
       permState().then(function (s) {
         if (!wantMonitor() || stream || opening) return;
+        if (otherWaits()) return; // the lock went while the permission was read
         if (s === 'denied') {
           App.store.set('audio.monitor', false);
           st.msg = 'Hear input was switched off: the audio-input permission is blocked for soundLAB.';
@@ -585,7 +643,252 @@
         open();
       });
     } catch (e) { /* fail soft */ }
-  }, 500);
+  }
+  setTimeout(function () { launched = true; restore(); }, 500);
+
+  // ---- ONE WINDOW PLAYS HEAR INPUT (soundLAB + soundLAB Gear side by side) ----
+  // audio.monitor is ONE stored switch that every document reads: each would
+  // restore it at launch and keep it sounding while hidden, so a synth on USB
+  // audio would play twice. The rule: only the document that holds the Web
+  // Lock LOCK (exclusive) connects the input to the speakers.
+  //  - every document asks for it at load (a plain request) and keeps it for
+  //    its lifetime once it has it, Hear input on or off. One window open =
+  //    it has the lock a few milliseconds after load (one round trip to the
+  //    browser; 3-50 ms measured), long before the launch restore at 500 ms,
+  //    and from then on every path in this file is the same as ever. A press
+  //    or a restore that comes before the answer ends in the same place.
+  //  - not the owner: Hear input is held (why 'other') and nothing is opened
+  //    for it alone — route(), applyMonitor(), reopen(), the return to
+  //    visible, the launch restore, setDevice(). A meter hold still opens
+  //    the device; it is never routed.
+  //  - On or Off pressed in a window that is not the owner takes the lock
+  //    first ({steal: true}): the press makes THAT window the one that plays.
+  //  - the window it was taken from reads audio.monitor again: still on = it
+  //    stops, says where Hear input went and waits in the queue; off = it
+  //    switches off too. That is how Off in one window stops the other: the
+  //    lock carries the news, the stored switch is only read.
+  //  - a browser may hand a window the lock news BEFORE the value the other
+  //    window just stored (seen in Chromium with two tabs), and a
+  //    press in the window that has the lock sends no lock news at all. So
+  //    one 'storage' listener keeps what a window SAYS in step (storeChanged):
+  //    an 'other' hold exists exactly while the switch is on and another
+  //    window has the lock. It never routes, opens or steals anything.
+  //  - the owner closes: the next window in the queue gets the lock and, if
+  //    audio.monitor is on, restores it like a launch (permission check
+  //    first; a microphone waits for a press).
+  //  - no Web Locks, or the request is refused (the claude.ai viewer frame,
+  //    old WebViews): owner from the start, everything as before.
+  // Nothing is stored; a window that closes frees its lock.
+  function lockApi() { try { var l = navigator.locks; return l && typeof l.request === 'function' ? l : null; } catch (e) { return null; } }
+
+  function holdOther() {
+    if (st.held && st.why === 'other' && st.msg === OTHER) return false;
+    st.held = true;
+    st.why = 'other';
+    st.msg = OTHER;
+    return true;
+  }
+  // Hear input is all that wants the device and another window has it: say
+  // so instead of opening it
+  function otherWaits() {
+    if (owner || holding() || !wantMonitor()) return false;
+    if (holdOther()) emit();
+    return true;
+  }
+
+  // one request for the lock. got() runs once this document has it — or once
+  // it is known that there are no Web Locks here (then every window plays,
+  // as before). The promise handed to the lock never settles, so the lock
+  // stays until the document closes or another window takes it; the request
+  // then rejects (AbortError) and lostLock() runs
+  function askLock(steal, got) {
+    var api = lockApi(), id = ++lockN, had = false, p = null;
+    function have() {
+      had = true;
+      mine = id;
+      if (waiting === id) waiting = 0;
+      owner = true;
+      try { got(); } catch (e) { console.error('audioin', e); }
+    }
+    if (!api) { have(); return; }
+    if (!steal) waiting = id;
+    try {
+      p = api.request(LOCK, steal ? { steal: true } : { mode: 'exclusive' }, function () {
+        have();
+        return new Promise(function () { /* kept for the lifetime of this document */ });
+      });
+    } catch (e) { p = null; }
+    if (!p || typeof p.then !== 'function') { have(); return; }
+    p.then(null, function () {
+      if (!had) { have(); return; } // refused (a frame that may not use locks): as before
+      if (mine !== id) return;      // this window's own newer request has it
+      mine = 0;
+      if (taking) return;           // ...or is about to (On / Off pressed here): its grant follows
+      owner = false;
+      lostLock();
+    });
+  }
+
+  // On / Off pressed in a window without the lock: take it. One request at a
+  // time; every press made while it is out waits for the same answer
+  function takeLock() {
+    if (taking) return taking.p;
+    var t = taking = { p: null };
+    t.p = new Promise(function (done) {
+      askLock(true, function () { if (taking === t) taking = null; done(); });
+    });
+    return t.p;
+  }
+
+  // the lock came from the queue: at load (the launch restore follows on its
+  // own timer), or later because the window that had it closed
+  function tookOver() {
+    var want = wantMonitor(), was = st.why === 'other';
+    if (was && (!stream || !want)) { st.held = false; st.why = ''; st.msg = ''; } // no other window has it any more
+    if (want && stream) { applyMonitor(); settle(); }  // open for a meter: only the route was missing
+    else if (want && launched && !opening) restore();  // like a launch: the permission check first
+    if (was || (want && stream)) emit();
+  }
+
+  // another window pressed On or Off and has the lock now
+  function lostLock() {
+    // getting it back from the queue is an automatic path: a microphone
+    // waits for a press again (FEEDBACK SAFETY)
+    consent = false;
+    ack = false;
+    if (wantMonitor()) {
+      // On was pressed there: stop here and say where Hear input went
+      if (stream) { applyMonitor(); settle(); } else holdOther();
+      emit();
+    } else {
+      monitorOff(); // Off was pressed there: off here too (the store already says so)
+    }
+    // back into the queue: this window plays again when that one closes
+    if (!waiting) askLock(false, tookOver);
+  }
+
+  // audio.monitor changed in another window (key null = the store was
+  // cleared). Matched by suffix, so the storage prefix may change
+  function storeChanged(e) {
+    var k = e ? e.key : null;
+    if (k != null && !/audio\.monitor$/.test(k)) return;
+    if (launched && !owner && !taking) {
+      if (stream) { applyMonitor(); settle(); } // open for a meter: the hold follows the switch
+      else if (!wantMonitor()) { if (st.why === 'other') { st.held = false; st.why = ''; st.msg = ''; } }
+      else if (!opening && !holding()) holdOther();
+    }
+    emit(); // the views read the switch again (the Settings card, the Hub's switch)
+  }
+  try { window.addEventListener('storage', storeChanged); } catch (e) { /* no window events here */ }
+
+  askLock(false, tookOver);
+
+  // ---- a Hear input switch for a page without the Settings card ----
+  // (soundLAB Gear's Hub header, #mh-hearin.) Off / On + one status line;
+  // the input, the level and the meter stay in soundLAB › Settings. Safe to
+  // call again, on the same element or on the new one after the page
+  // re-rendered: one bus listener for all of them, one click listener each.
+  var switches = [], switchWired = false;
+  function paintSwitch(el) {
+    var s = snapshot(), held = s.want && s.held;
+    var bs = el.querySelectorAll('button[data-hear]');
+    for (var i = 0; i < bs.length; i++) {
+      var act = (bs[i].getAttribute('data-hear') === 'on') === s.want;
+      bs[i].classList.toggle('active', act && !held);
+      bs[i].classList.toggle('held', act && held); // On, but paused: not lit (the Settings card's class)
+      bs[i].setAttribute('aria-pressed', String(act));
+      bs[i].title = act && held ? 'On, but paused. The note beside it says why.' : '';
+    }
+    var line = el.querySelector('[data-hear-status]');
+    if (!line) return;
+    var txt = s.error || s.msg;
+    if (!txt) {
+      if (s.monitor) {
+        txt = s.paused
+          ? 'Tap anywhere to turn on sound. The browser keeps audio off until you touch the page.'
+          : 'Hearing “' + (s.label || 'the input') + '” through this computer.';
+      } else {
+        txt = s.want ? 'Starting…' : 'Off.';
+      }
+    }
+    line.textContent = txt + (s.warn ? ' ' + s.warn : '');
+  }
+  function paintSwitches() { switches.forEach(paintSwitch); }
+  function mountSwitch(el) {
+    if (!el) return null;
+    // the page re-rendered: forget the elements that are gone
+    switches = switches.filter(function (x) { return x !== el && document.body && document.body.contains(x); });
+    switches.push(el);
+    if (!el.querySelector('[data-hear-status]')) {
+      el.innerHTML =
+        '<span class="ctl-label">Hear input</span> ' +
+        '<span class="seg" role="group" aria-label="Hear input">' +
+          '<button type="button" data-hear="off">Off</button><button type="button" data-hear="on">On</button>' +
+        '</span> ' +
+        '<span class="muted small"><span data-hear-status aria-live="polite"></span> ' +
+          'Input, level and meter: <a href="index.html#settings" style="color:inherit">soundLAB › Settings</a>.</span>';
+    }
+    if (!el._hearSwitch) {
+      el._hearSwitch = true;
+      el.addEventListener('click', function (e) {
+        var b = e.target && e.target.closest ? e.target.closest('button[data-hear]') : null;
+        if (!b || !el.contains(b)) return;
+        setMonitor(b.getAttribute('data-hear') === 'on').then(paintSwitches, paintSwitches);
+        paintSwitch(el);
+      });
+    }
+    if (!switchWired) {
+      switchWired = true;
+      App.on('audioin:state', paintSwitches); // also sent when the switch changed in the other window (storeChanged)
+    }
+    paintSwitch(el);
+    return el;
+  }
+
+  // ---- the chosen OUTPUT (audio.outId) ----
+  // Applied to the shared context at the first gesture after launch (no
+  // AudioContext before one) and again when the device comes back after an
+  // unplug (force: the context fell back). refused() = the browser said no.
+  // Nothing here asks for a permission: an output the browser does not list
+  // is simply not applied.
+  var sinkWait = false;
+  function applySink(force, refused) {
+    var id = App.store.get('audio.outId', '');
+    if (!id) return;
+    function go() {
+      try {
+        var ctx = App.getAudio();
+        if (typeof ctx.setSinkId !== 'function' || (!force && ctx.sinkId === id)) return;
+        ctx.setSinkId(id).catch(function () { if (refused) refused(); });
+      } catch (e) { /* no audio here */ }
+    }
+    var ua = navigator.userActivation;
+    if (!ua || ua.hasBeenActive) { go(); return; }
+    if (sinkWait) return;
+    sinkWait = true;
+    function once() {
+      document.removeEventListener('pointerdown', once, true);
+      document.removeEventListener('keydown', once, true);
+      sinkWait = false;
+      go();
+    }
+    document.addEventListener('pointerdown', once, true);
+    document.addEventListener('keydown', once, true);
+  }
+  // soundLAB Gear: nobody else looks at the output there (soundLAB's Settings
+  // card calls applySink from its own device list). At load, on every device
+  // change and after an input was granted (the ids are readable from then)
+  var outGone = false; // the chosen output was missing at the last look
+  function sinkWatch() {
+    var id = App.store.get('audio.outId', ''), m = md();
+    if (!id || !m || typeof m.enumerateDevices !== 'function') return;
+    Promise.resolve().then(function () { return m.enumerateDevices(); }).then(function (all) {
+      var there = (all || []).some(function (d) { return d.kind === 'audiooutput' && d.deviceId === id; });
+      if (there) applySink(outGone);
+      outGone = !there;
+    }).catch(function () { /* no device list here */ });
+  }
+  if (GEAR) sinkWatch();
 
   App.audioIn = {
     start: start,
@@ -595,6 +898,8 @@
     release: release,
     setDevice: setDevice,
     setMonitor: setMonitor,
+    mountSwitch: mountSwitch,
+    applySink: applySink, // (force, refused): the stored output onto the shared context
     setGain: setGain,
     level: level,
     devices: devices,
@@ -605,9 +910,9 @@
     get monitor() { return wantMonitor(); },
     get listError() { return listErr; },
     get holding() { return holding(); },
-    // test hook: the live graph
+    // test hook: the live graph (+ owner: this document has the Hear-input lock)
     _t: function () {
-      return { stream: stream, src: src, gain: gain, an: an, monOn: monOn, holds: Object.keys(holds), opening: !!opening };
+      return { stream: stream, src: src, gain: gain, an: an, monOn: monOn, holds: Object.keys(holds), opening: !!opening, owner: owner };
     }
   };
 })();

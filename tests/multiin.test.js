@@ -92,13 +92,8 @@ async function newPage(browser, seed) {
   });
   ok(y.lumi === false && y.notes === 0, 'MODX output + LUMI among the inputs: not treated as a LUMI, no note-on lights sent: ' + JSON.stringify(y));
 
-  console.log('# MIDI Hub input picker');
-  const h = await page.evaluate(() => {
-    App.switchTo('midihub');
-    const sel = [...document.querySelectorAll('select')].find(x => [...x.options].some(o => o.value === 'all'));
-    return sel ? { val: sel.value, first: sel.options[0].textContent } : null;
-  });
-  ok(h && h.val === 'all' && h.first === 'All keyboards', 'the Hub offers All keyboards and shows it selected: ' + JSON.stringify(h));
+  // 2.0 Phase A3b: the MIDI Hub's input picker is checked in tests/gear.test.js (the Hub is soundLAB Gear)
+  console.log('# Settings › MIDI input picker');
   const st = await page.evaluate(() => {
     App.switchTo('settings');
     const sel = document.getElementById('set-midi-in');

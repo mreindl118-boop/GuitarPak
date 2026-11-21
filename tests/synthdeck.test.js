@@ -7,6 +7,8 @@
 // load / cancel / edit / star / search / import / export / Hub reset), the LUMI
 // refusal, the lifecycle drains and the phone layout. Nothing may ever reach
 // the LUMI bucket.
+// 2.0 Phase A3b: the deck is in soundLAB Gear (gear.html, env.GEAR_URL), which boots on the Deck
+// page; the Hub is opened from there. "Another page" is Gear's Helix page.
 const { chromium } = require('playwright');
 const env = require('./env');
 let fails = 0;
@@ -50,8 +52,8 @@ async function newPage(browser, seed) {
   }, seed || {});
   const page = await ctx.newPage(), errs = [];
   page.on('pageerror', e => errs.push(e.message));
-  await page.goto(env.URL);
-  await page.waitForFunction(() => window.App && App.midi && App.midi.ready && App.midi.hasOutput && App.active === 'quiz');
+  await page.goto(env.GEAR_URL);
+  await page.waitForFunction(() => window.App && App.midi && App.midi.ready && App.midi.hasOutput && App.active === 'deck');
   return { ctx, page, errs };
 }
 
@@ -680,7 +682,7 @@ async function newPage(browser, seed) {
     const o = {};
     const mh = () => __q('.sdk-btn[data-ctl="msHold"]');
     __pd(mh(), 'pointerdown'); await __wait(10); o.held0 = App.synthDeck.held.slice();
-    __clear(); App.switchTo('piano'); await __wait(50);
+    __clear(); App.switchTo('helix'); await __wait(50); // another page of soundLAB Gear
     o.leave = __bytes(); o.held1 = App.synthDeck.held.slice();
     App.switchTo('midihub'); await __wait(100); o.showSent = __by.modx1.length - o.leave.length;
     // Reset Hub = remount: one tap = exactly one message

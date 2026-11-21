@@ -13,6 +13,15 @@
  * (fb:set), so the fretboard / piano / chords pages light up in the song's
  * key. Songs save to a local library (guitarlab.sg.lib).
  * DOM ids / CSS classes are prefixed sg-.
+ *
+ * 2.0 Phase A3b: THE PLAYER LIVES HERE in soundLAB. The score player
+ * (js/scoreplayer.js, a MIDI or MusicXML file on the synth) is mounted into
+ * #sg-player, under "Open a score": the MIDI Hub that used to hold it is in
+ * soundLAB Gear now (gear.html, where the Hub mounts its own copy; this file
+ * is not loaded there). The card is hidden until "Play on synth" sends it a
+ * file; it brings its own Synth out / Channel selects, and with no synth
+ * output it points at Settings > MIDI keyboard, because this page has no
+ * MIDI connect control. Leaving the page pauses it.
  */
 (function () {
   'use strict';
@@ -524,7 +533,10 @@
       '.sg-strip label{color:var(--label)}' +
       '.sg-tabout > .muted:only-child{white-space:normal;font-family:var(--font-body);font-size:14px}' +
       '#sg-file{display:none}' +
-      '.sg-open .sg-openbtn{min-height:40px}.sg-opendest .btn{min-height:40px}'
+      '.sg-open .sg-openbtn{min-height:40px}.sg-opendest .btn{min-height:40px}' +
+      // the Player card's Synth out / Channel row stays out of sight until MIDI is on
+      // (it is a .row, and .row's display:flex beats the hidden attribute)
+      '#sg-player #mh-plports[hidden]{display:none}'
     );
 
     rootEl.innerHTML =
@@ -534,11 +546,13 @@
         '<div class="row tight"><label class="btn sm primary sg-openbtn">Choose a file<input type="file" id="sg-openfile" accept=".mid,.midi,.musicxml,.xml,.mxl,.txt,audio/midi" hidden></label>' +
           '<span class="muted small" id="sg-openmsg" role="status">Nothing open yet.</span></div>' +
         '<div class="row tight sg-opendest" id="sg-opendest" hidden>' +
-          '<button type="button" class="btn sm primary" id="sg-opensynth" title="Play it on your synth from the MIDI Hub Player (tempo, key shifter, loop)">Play on synth</button>' +
+          '<button type="button" class="btn sm primary" id="sg-opensynth" title="Play it on your synth (tempo, key shifter, loop)">Play on synth</button>' +
           '<button type="button" class="btn sm" id="sg-openpractice" title="Practice it in the Woodshed (Wait for me / Play at tempo)">Practice</button>' +
           '<button type="button" class="btn sm" id="sg-opentab" title="Show it as guitar tab on this page">Open as tab</button>' +
         '</div>' +
       '</div>' +
+      // the Player card (js/scoreplayer.js renders it): out of sight until "Play on synth" sends it a file
+      '<div id="sg-player" hidden></div>' +
       '<div class="card">' +
         '<h2>Add a song</h2>' +
         '<div class="muted small" style="margin-bottom:8px">Paste an ASCII guitar tab (the six-line kind you can copy from any tab site) ' +
@@ -673,6 +687,32 @@
       loadSong(parsed);
     });
 
+    // ---- the Player (js/scoreplayer.js), mounted on this page in soundLAB ----
+    // One mount per document. ports: this page has no MIDI header, so the card
+    // gets its own Synth out / Channel selects. noOut + connect: there is no
+    // MIDI connect control here either, so the line and its button point at
+    // Settings. show: what "Play on synth" (and anyone else) calls to bring
+    // the card on screen.
+    var playerEl = document.getElementById('sg-player');
+    if (window.SLScorePlayer && playerEl) {
+      SLScorePlayer.mount(playerEl, {
+        ports: true,
+        noOut: 'No synth output yet. Connect your keyboard in Settings › MIDI keyboard.',
+        connect: { label: 'Open Settings', run: function () { App.switchTo('settings'); } },
+        show: function () { App.switchTo('songs'); playerEl.hidden = false; playerEl.scrollIntoView({ block: 'start' }); }
+      });
+      // "Open as tab" on the card lands on this same page (from the Hub it was
+      // a page switch): bring the new tab into view, or the tap shows nothing.
+      // The card's own handler runs first; cur only changes when it worked.
+      var tabWas = null;
+      playerEl.addEventListener('click', function (e) { if (e.target.closest('#mh-pltab')) tabWas = cur; }, true);
+      playerEl.addEventListener('click', function (e) {
+        if (e.target.closest('#mh-pltab') && cur && cur !== tabWas) els.tabout.closest('.card').scrollIntoView({ block: 'start' });
+      });
+      // a closed page leaves no note hanging (the Hub's rule for the Player)
+      window.addEventListener('pagehide', function () { SLScorePlayer.pause(); });
+    }
+
     // ---- One Open ----
     var opened = null; // {name, kind: 'midi'|'xml'|'tab', buf, text}
     var openMsg = document.getElementById('sg-openmsg'), openDest = document.getElementById('sg-opendest');
@@ -689,23 +729,24 @@
       };
       if (kind === 'tab') rd.readAsText(file); else rd.readAsArrayBuffer(file);
     });
-    // the Hub Player reads MIDI and MusicXML; a tab becomes a score at the shared tempo
+    // the score player (js/scoreplayer.js) reads MIDI and MusicXML; a tab becomes a score at the shared tempo
     function openedAsPlayer() {
-      var hub = window.SLMidiHub && SLMidiHub.player; if (!hub) return Promise.reject(new Error('The MIDI Hub is not loaded'));
-      if (opened.kind !== 'tab') return hub.loadFile(opened.name, opened.buf);
+      var player = window.SLScorePlayer; if (!player) return Promise.reject(new Error('The score player is not loaded'));
+      if (opened.kind !== 'tab') return player.loadFile(opened.name, opened.buf);
       var song = parseAsciiTab(opened.text); if (!song) return Promise.reject(new Error('No six-line tab found in that file'));
       var bpm = parseInt(App.store.get('met.bpm', 100), 10) || 100, notes = [];
       song.steps.forEach(function (s, i) { (s.notes || []).forEach(function (n) { if (typeof n.midi === 'number') notes.push({ t: i / 4, d: 0.25, m: n.midi, partId: 'tab', v: 100 }); }); });
-      return Promise.resolve(hub.loadScore({ title: opened.name.replace(/\.txt$/i, ''), bpm: bpm, len: song.steps.length / 4, rhythmKnown: true, notes: notes }));
+      return Promise.resolve(player.loadScore({ title: opened.name.replace(/\.txt$/i, ''), bpm: bpm, len: song.steps.length / 4, rhythmKnown: true, notes: notes }));
     }
     function openedAsMidiBytes() { // MIDI as is; MusicXML through the Player's reader; a tab is parsed here
       if (opened.kind === 'midi') return Promise.resolve(new Uint8Array(opened.buf));
-      if (opened.kind === 'xml') return openedAsPlayer().then(function () { return SLMidiHub.player.toMidiBytes(); });
+      if (opened.kind === 'xml') return openedAsPlayer().then(function () { return SLScorePlayer.toMidiBytes(); });
       return Promise.resolve(null);
     }
     document.getElementById('sg-opensynth').addEventListener('click', function () {
       if (!opened) return;
-      openedAsPlayer().then(function (sum) { SLMidiHub.player.show(); openSay('Playing on the synth: ' + ((sum && sum.title) || opened.name)); })
+      // loaded into the Player card below (#sg-player); Play is pressed there
+      openedAsPlayer().then(function (sum) { SLScorePlayer.show(); openSay('In the Player below: ' + ((sum && sum.title) || opened.name) + '. Press Play there.'); })
         .catch(function (e) { openSay(e && e.message ? e.message : 'Could not open that file.'); });
     });
     document.getElementById('sg-openpractice').addEventListener('click', function () {
@@ -828,13 +869,23 @@
     renderSong();
   }
 
-  function onHide() {
-    plPause();
+  // the Player card names the synth output and the Part: both are stored
+  // settings that the MIDI Hub in soundLAB Gear can change, so read them again
+  // when the page comes up (the Hub repainted its Player on show the same way)
+  function onShow() {
+    if (window.SLScorePlayer) SLScorePlayer.paint();
   }
 
-  // other pages (Score review, the MIDI Hub Player) hand music over as a
-  // MIDI file: fromMidi -> a song {name, steps, bars} with playable guitar
-  // positions (standard tuning), load() shows it here, toAscii() = the tab
+  function onHide() {
+    plPause();
+    // the score Player on this page stops with it (the Hub paused it the same way)
+    if (window.SLScorePlayer) SLScorePlayer.pause();
+  }
+
+  // the Player card on this page (js/scoreplayer.js, "Open as tab") and other
+  // pages (Score review) hand music over as a MIDI file: fromMidi -> a song
+  // {name, steps, bars} with playable guitar positions (standard tuning),
+  // load() shows it here, toAscii() = the tab
   App.songs = {
     fromMidi: function (bytes, name) { var s = parseMidiFile(bytes); if (!s) return null; s.name = String(name || 'From MIDI').slice(0, 120); return s; },
     load: function (song) {
@@ -850,6 +901,7 @@
 
   App.register('songs', {
     init: init,
+    onShow: onShow,
     onHide: onHide,
     onRemote: plRemote,
     remoteKey: plRemoteKey
