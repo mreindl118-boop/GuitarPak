@@ -111,6 +111,10 @@
       '</div>' +
       '<div class="card">' +
         '<h2>Studio</h2>' +
+        '<label class="set-check">' +
+          '<input type="checkbox" id="set-studio"><span>Show the Studio button in the top bar' +
+          '<small>The Studio is the old recording side: Timeline, Editor, Song, Ideas. Off by default now. Nothing in it is deleted.</small></span>' +
+        '</label>' +
         '<div class="set-sub">Retro-capture memory</div>' +
         '<div class="fb-field">' +
           '<div class="seg" id="set-retro">' +
@@ -286,6 +290,12 @@
     });
 
     // ---- studio prefs ----
+    var studioChk = document.getElementById('set-studio');
+    if (studioChk) {
+      studioChk.checked = App.studioShown();
+      studioChk.addEventListener('change', function () { App.setStudioShown(studioChk.checked); });
+      App.on('studio:shown', function (d) { studioChk.checked = !!(d && d.on); });
+    }
     var retroSeg = document.getElementById('set-retro');
     function paintRetro() {
       var v = parseInt(App.store.get('sd.retroSecs', 30), 10);

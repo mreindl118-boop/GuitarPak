@@ -1,6 +1,6 @@
 {
   "version": "0.75.0",
   "apk": "https://github.com/mreindl118-boop/GuitarPak/raw/main/releases/soundLAB-alpha.apk",
-  "web": "2.1.0",
-  "notes": "soundLAB 2.1: three new things that fit right into the pages you already use. Exercises now shows your weak spots and gives you more of the notes you miss. A MIDI guitar (like the Rock Band 3 Squier) is found with one strum and shows string and fret on the neck. And Train > Voice lets you sing and see your pitch, with key lights and Practice Plan sing blocks. Your progress and settings carry over."
+  "web": "2.2.0",
+  "notes": "soundLAB 2.2: the app now flows from page to page. Your key and tempo show in the top bar on every page. Tap them to change both once, or to jump to another tool in the same key. Chords and the Jam band now follow every scale, including pentatonic and blues. One tempo everywhere. The Studio button moved to Settings. Your progress and settings carry over."
 }

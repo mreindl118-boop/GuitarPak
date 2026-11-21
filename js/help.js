@@ -254,8 +254,8 @@
 
   function welcome() {
     openTour(null, [
-      { t: 'Welcome to soundLAB', x: 'Start with Exercises: a short theory and ear-training course you answer by playing. Around it are two workspaces: Practice (guitar, keys, jam band, tuner…) and the Studio (record ideas, build loops, finger-drum). The Studio button in the top corner switches between them.' },
-      { t: 'One musical brain', x: 'The clef button at the top opens key, scale and tempo, shared by EVERYTHING. Change it once and the fretboard re-colors, the jam re-harmonizes, and the Studio follows. Its metronome ▶ starts the click from any page.' },
+      { t: 'Welcome to soundLAB', x: 'Start with Exercises: a short theory and ear-training course you answer by playing. Around it are the tools: guitar, keys, synth, a jam band, a tuner. They all share one key and one tempo.' },
+      { t: 'One musical brain', x: 'The clef at the top always shows your key and tempo. They are shared by EVERYTHING. Tap it to change them once: the fretboard re-colors, the keys follow, the chords and the jam band move to the new key. Tap any page’s key title to do the same. Its metronome ▶ starts the click from any page.' },
       { t: 'Sections', x: 'The tabs — Learn, Guitar, Keys, Play, Practice (along the bottom on phones) — are the app’s sections. The pills at the top of the page switch pages inside a section (Neck / Tab / Notation, Piano / Synth / Pads…).' },
       { sel: '#met-btn', t: 'The metronome', x: 'Always one tap away in the top corner: it opens over any page and keeps playing when you close it.' },
       { t: 'Whenever you’re lost', x: 'Tap the ? in the top bar — it explains whichever page you’re on, step by step. Try it on every page once.' }
