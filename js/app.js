@@ -98,7 +98,7 @@ window.App = (function () {
   //            when an APK is actually built. Older APKs read nothing else, so
   //            this must never run ahead of the real file: when it did, the
   //            Android app kept downloading the same old APK in a loop.
-  var APP_VERSION = '2.1.0';
+  var APP_VERSION = '2.2.0';
   var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
 
   function verNum(v) {
@@ -808,6 +808,7 @@ window.App = (function () {
   // the clef button's dropdown (key / scale / mode / tempo / time + the
   // transport): open on tap, tucked away by a tap outside, Esc, Back, a page
   // switch or the top bar sliding away
+  var ctxOnOpen = null; // the context bar refreshes its page-aware row when it opens
   function ctxIsOpen() { return document.documentElement.classList.contains('ctx-open'); }
   function contextBlocked() {
     if (sheet || window.Help && Help.isOpen && Help.isOpen()) return true;
@@ -828,6 +829,7 @@ window.App = (function () {
     if (bar) bar.hidden = !on;
     if (on) {
       showBar();
+      if (ctxOnOpen) ctxOnOpen();
       var first = bar && bar.querySelector('select, input, button');
       if (first) { try { first.focus({ preventScroll: true }); } catch (e) { first.focus(); } }
     }
@@ -1206,12 +1208,23 @@ window.App = (function () {
         : icon('right', 14) + ' Studio';
       btn.setAttribute('aria-label', sp === 'studio' ? 'Back to the practice tools' : 'Over to the studio');
     }
+    paintSpaceBtn();
     populateNav();
     var next = tab || store.get(tabStoreKey(sp), SPACES[sp][0]);
     if (SPACES[sp].indexOf(next) === -1) next = SPACES[sp][0];
     switchTo(next);
     emit('space', { space: sp });
   }
+
+  // 2.x: the Studio (recording side) was cut from the plan, so its button no
+  // longer sits in the top bar. Settings > Studio brings it back (app.studio);
+  // while you ARE in the Studio it always shows, as the way home.
+  function studioShown() { return store.get('app.studio', false) === true; }
+  function paintSpaceBtn() {
+    var btn = document.getElementById('space-btn');
+    if (btn) btn.hidden = !(space === 'studio' || studioShown());
+  }
+  function setStudioShown(on) { store.set('app.studio', !!on); paintSpaceBtn(); emit('studio:shown', { on: !!on }); }
 
   function setSpace(sp, tab) {
     if (sp === space || !SPACES[sp] || wiping) return;
@@ -1344,9 +1357,16 @@ window.App = (function () {
         (sc ? sc.name.replace(/\s*\(.*\)$/, '') : '') + ' · ' + (parseInt(store.get('met.bpm', 120), 10) || 120) + ' BPM';
       cbtn.title = t;
       cbtn.setAttribute('aria-label', t);
+      var ck = document.getElementById('ctx-key'), ct = document.getElementById('ctx-tempo');
+      if (ck) ck.textContent = Theory.keyShort(curRoot(), curScale());
+      if (ct) ct.textContent = String(parseInt(store.get('met.bpm', 120), 10) || 120);
+      paintGo();
     }
     if (cbtn && cbar) {
-      cbtn.innerHTML = icon('clef', 28) + '<svg class="ctx-caret" viewBox="0 0 8 5" aria-hidden="true" focusable="false"><path d="m1 1 3 3 3-3"/></svg>';
+      // THE KEY CHIP: the key, scale and tempo the whole app is in, readable
+      // on every page - tap it (or any page's key title) to change them
+      cbtn.innerHTML = icon('clef', 28) + '<span class="ctx-key" id="ctx-key"></span><span class="ctx-tempo" id="ctx-tempo"></span>' +
+        '<svg class="ctx-caret" viewBox="0 0 8 5" aria-hidden="true" focusable="false"><path d="m1 1 3 3 3-3"/></svg>';
       // A disclosure contains form controls, so it is not an ARIA menu.
       cbtn.removeAttribute('aria-haspopup');
       cbar.setAttribute('role', 'region');
@@ -1375,8 +1395,38 @@ window.App = (function () {
         }
       });
       ['sheet', 'tour'].forEach(function (event) { on(event, syncContextAvailability); });
-      ['fb:set', 'tempo'].forEach(function (ev) { on(ev, paintCtxBtn); });
+      ['fb:set', 'fb:scale', 'tempo'].forEach(function (ev) { on(ev, paintCtxBtn); });
+      // any page's key title opens the same picker: one place, many doors
+      document.addEventListener('click', function (e) {
+        var link = e.target.closest && e.target.closest('[data-keylink]');
+        if (!link) return;
+        e.preventDefault();
+        setCtx(true);
+      });
     }
+
+    // "Use it on": the key travels with you - one tap to the same key on
+    // another tool (the page you are on is left out)
+    var GO = [['fretboard', 'Neck'], ['piano', 'Keys'], ['chords', 'Chords'], ['jam', 'Jam band'], ['theory', 'Circle'], ['vocal', 'Voice']];
+    var goRow = document.createElement('div');
+    goRow.className = 'cx-go'; goRow.id = 'cx-go';
+    if (cbar) cbar.appendChild(goRow);
+    function paintGo() {
+      if (!goRow.parentNode) return;
+      var h = '<span class="cx-go-label" id="cx-go-label">Use ' + Theory.keyShort(curRoot(), curScale()) + ' on</span>';
+      GO.forEach(function (g) {
+        if (g[0] === active || !modules[g[0]]) return;
+        h += '<button type="button" class="chip" data-cxgo="' + g[0] + '">' + g[1] + '</button>';
+      });
+      goRow.innerHTML = h;
+      goRow.hidden = space !== 'practice';
+    }
+    ctxOnOpen = paintGo;
+    on('space', paintGo);
+    goRow.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-cxgo]');
+      if (b) switchTo(b.getAttribute('data-cxgo'));
+    });
 
     // the dropdown's two toggles: the keyboard's LEDs show the scale, and
     // scale lock (only in-key notes play)
@@ -1552,6 +1602,9 @@ window.App = (function () {
   }
 
   function boot() {
+    // one tempo from the very first launch: pages used to fall back to their
+    // own default (100 here, 120 there) until something saved met.bpm
+    if (store.get('met.bpm', null) == null) store.set('met.bpm', 120);
     PANEL_ORDER.forEach(function (name) {
       var el = document.getElementById('panel-' + name);
       var mod = modules[name];
@@ -1754,6 +1807,8 @@ window.App = (function () {
     get active() { return active; },
     get space() { return space; },
     setSpace: setSpace,
+    studioShown: studioShown,
+    setStudioShown: setStudioShown,
     switchTo: switchTo,
     addPage: addPage,
     setVolume: setVolume,

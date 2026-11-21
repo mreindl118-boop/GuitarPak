@@ -5,7 +5,7 @@
 // live app, the 1.x 'guitarlab-*' caches it replaces.
 var BETA = /\/next\/$/.test(self.registration.scope);
 var PREFIX = BETA ? 'sl2-next-' : 'sl2-live-';
-var CACHE = PREFIX + 'v6';
+var CACHE = PREFIX + 'v7';
 var ASSETS = [
   '.',
   'index.html',

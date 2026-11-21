@@ -417,8 +417,29 @@ html:not(.ctx-open) .ctxbar, .ctxbar[hidden] { display: none; }
    height, ghost until hovered / open - so the corner reads as ONE toolset;
    the caret and the capture dot ride along in its corners */
 #ctx-btn { position: relative; }
+/* THE KEY CHIP: the clef names the key, scale and tempo the whole app is in
+   (it took the retired Studio button's place) */
+.tb-tools #ctx-btn.ctx-chip { width: auto; gap: 6px; padding: 0 22px 0 6px; color: var(--text); border-color: var(--ctl-border); background: var(--card2); font-weight: 600; font-size: 13.5px; white-space: nowrap; }
+.ctx-key { max-width: 15ch; overflow: hidden; text-overflow: ellipsis; }
+.ctx-tempo { color: var(--label); font-variant-numeric: tabular-nums; }
+.ctx-tempo::before { content: '\00b7'; margin-right: 6px; }
+@media (max-width: 1080px) and (min-width: 901px) { .ctx-tempo { display: none; } }
+@media (max-width: 640px) { .ctx-tempo { display: none; } .tb-tools #ctx-btn.ctx-chip { padding: 0 17px 0 2px; gap: 2px; font-size: 12.5px; } .ctx-chip .ic { width: 18px; height: 18px; } }
+@media (max-width: 380px) { .ctx-chip .ic { display: none; } .tb-tools #ctx-btn.ctx-chip { height: 34px; padding: 0 15px 0 8px; font-size: 12px; } .ctx-key { max-width: 11ch; } .ctx-chip .ctx-caret { right: 4px; } }
+/* a page's key title is a door to the same picker */
+:where(button.key-link:not(.chip)) { background: none; border: 0; padding: 0; margin: 0; font: inherit; color: inherit; letter-spacing: inherit; text-transform: inherit; }
+.key-link { cursor: pointer; display: inline-flex; align-items: center; gap: 7px; }
+.key-link::after { content: ''; flex: none; width: 6px; height: 6px; border-right: 1.5px solid var(--label); border-bottom: 1.5px solid var(--label); transform: translateY(-2px) rotate(45deg); }
+@media (hover: hover) { .key-link:hover { color: var(--accent-ink); } }
+.key-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
+/* "Use it on": the key travels to another tool */
+.cx-go { flex-basis: 100%; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-top: 12px; border-top: 1px solid var(--line-soft); }
+.cx-go[hidden] { display: none; }
+.cx-go-label { font-size: 12.5px; color: var(--muted); margin-right: 2px; }
+#space-btn[hidden] { display: none; }
 .ctx-caret { position: absolute; right: 2px; bottom: 4px; width: 7px; height: 5px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
 #ctx-btn[aria-expanded="true"] .ctx-caret { transform: rotate(180deg); }
+.ctx-chip .ctx-caret { right: 6px; bottom: calc(50% - 3px); }
 #ctx-btn:disabled { opacity: 0.5; }
 #ctxbar select, #ctxbar input[type="number"], #ctxbar button { min-height: 44px; }
 #ctxbar button { min-width: 44px; }

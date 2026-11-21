@@ -28,7 +28,7 @@ async function contextSnapshot(page) {
       enabled: !b.disabled, open: App.ctx(), expanded: b.getAttribute('aria-expanded'),
       label: b.getAttribute('aria-label'), region: bar.getAttribute('role'),
       labelled: !!bar.getAttribute('aria-label'), controls: b.getAttribute('aria-controls'),
-      width: r.width, height: r.height, likePeers: Math.abs(r.width - peer.width) < 1 && Math.abs(r.height - peer.height) < 1, noHeaderOverlap: brand.right <= tools.left + 1 || brand.bottom <= tools.top + 1,
+      width: r.width, height: r.height, likePeers: r.width >= peer.width - 1 && Math.abs(r.height - peer.height) < 1, /* flow pass: the clef is the key chip - same height, wide enough to name the key */ noHeaderOverlap: brand.right <= tools.left + 1 || brand.bottom <= tools.top + 1,
       inBounds: d.left >= 0 && d.right <= innerWidth + 1 && d.top >= 0 && d.bottom <= innerHeight + 1,
       unique: ['ctxbar', 'cx-root', 'cx-scale', 'cx-lock', 'cx-led'].every(id => document.querySelectorAll('#' + id).length === 1),
       targets: [...bar.querySelectorAll('select,input[type=number],button')].every(el => {

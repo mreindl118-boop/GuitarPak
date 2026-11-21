@@ -173,7 +173,7 @@
 
   function keyScale() {
     var v = App.store.get('fb.scale', 'major');
-    return (Theory.SCALES[v] && Theory.SCALES[v].steps.length === 7) ? v : 'major';
+    return Theory.parentScale(v); // pentatonic / blues -> the major or minor key around it
   }
 
   function diatonicChords() {
@@ -1073,7 +1073,7 @@
           '<div class="row tight" id="jam-ed-chords" style="margin-top:10px"></div>' +
         '</div>' +
         '<div class="row tight" style="margin-top:14px">' +
-          '<span class="chip" id="jam-keylabel" title="Key and scale come from the bar at the top — change them there and the whole song re-harmonizes, even while playing"></span>' +
+          '<button type="button" class="chip key-link" id="jam-keylabel" data-keylink title="Tap to change the key — the whole song re-harmonizes, even while playing"></button>' +
           '<span class="row tight" id="jam-palette"></span>' +
           '<button type="button" class="btn sm" id="jam-resume" style="display:none" title="Back to the song form">Resume form</button>' +
         '</div>' +
