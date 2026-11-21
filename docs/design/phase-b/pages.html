@@ -788,7 +788,7 @@ span.chip { cursor: default; }
         '</section>') +
       group('set-g-keys', 'keys', 'Keyboard and lights',
         '<section class="set-sec" id="set-midi-card"><h2>MIDI keyboard</h2>' +
-          note('Plug in a keyboard by USB or Bluetooth. soundLAB hears your notes, and a LUMI lights up the keys to play.') +
+          note('Plug in a keyboard (or a MIDI guitar) by USB, Bluetooth or a MIDI cable. soundLAB hears your notes, and a LUMI lights up the keys to play.') +      // js/settings.js:134 (2.1.0)
           '<div class="set-gear" id="set-midi-gear"><span class="muted small">Found:</span><span class="set-chip"><b>LUMI Keys BLOCK</b> key lights</span>' +
             '<span class="set-chip"><b>MODX8+-1</b> makes its own sound, so soundLAB stays quiet</span></div>' +
           '<div class="set-row is-end"><label class="field">Keyboard<select id="set-midi-in">' + options(['All keyboards', 'LUMI Keys BLOCK', 'MODX8+-1'], 'All keyboards') + '</select></label>' +
@@ -796,6 +796,9 @@ span.chip { cursor: default; }
             '<button type="button" class="btn sm" id="set-midi-test" title="Lights a short C major run on the keys">Light test</button></div>' +
           '<div class="set-sub">soundLAB plays my keys</div>' + seg('id="set-midi-voice" aria-label="soundLAB plays my keys"', ['Auto', 'Always', 'Never'], 0) +
           note('Auto: soundLAB plays notes from a LUMI or other silent keyboard, and stays quiet for a MODX or other synth that makes its own sound.', 'set-midi-voicenote') +
+          // soundLAB 2.1.0: a MIDI guitar is found by one strum (js/midiguitar.js paint(), no guitar found yet)
+          '<div id="set-guitar" class="set-sec"><div class="set-sub">MIDI guitar</div>' + note('Strum your MIDI guitar once: soundLAB finds it by itself.') +
+            '<details class="tips"><summary>Pick it by hand or hook it up</summary></details></div>' +
           '<details class="tips" id="set-midi-more"><summary>More MIDI options</summary>' +
             '<div class="set-sec"><div class="set-sub">Pitch bend</div>' + seg('id="set-midi-bend" aria-label="Pitch bend"', ['Off', '±2', '±12', '±48 (ROLI)'], 0) +
             // B5b: the button reads "Keyboard lights". The line beside it no longer names the Help level, which has left that sheet
@@ -827,7 +830,7 @@ span.chip { cursor: default; }
           note('Looked for earlier soundLAB data in this browser on 11/15/2026: there was nothing to copy.', 'set-backup-info') +
           '<div class="set-row"><button type="button" class="btn sm" id="set-backup-out">Export settings</button><label class="btn sm">Import settings</label>' +
             '<button type="button" class="btn sm" id="set-copy-again">Copy my earlier data again</button></div></section>' +
-        '<section class="set-sec"><h2>About</h2><div class="set-row"><span class="muted small">soundLAB v2.0.0 — updates are checked automatically at startup.</span>' +
+        '<section class="set-sec"><h2>About</h2><div class="set-row"><span class="muted small">soundLAB v2.1.0 — updates are checked automatically at startup.</span>' +
           '<button type="button" class="btn sm" id="set-update">Check now</button></div></section>') +
       '</div></div>';
   }
@@ -902,7 +905,7 @@ span.chip { cursor: default; }
   var TODAY = { piano: [1590, 2329], chords: [1603, 2010], quiz: [8072, 7938], shed: [2573, 4646], plan: [1997, 2744], settings: [3077, 3816] };
   var LEN = { 'chords-1280': 1588, 'chords-390': 2302, 'plan-1280': 1748, 'plan-390': 2248, 'quiz-1280': 8889, 'quiz-390': 9134, 'shed-1280': 2857, 'shed-390': 5363 };
   // the frames that are as long as their page (whole=1): Settings
-  var HEIGHTS = { 'rows': { 390: 2385, 1280: 1293 }, 'settings': { 390: 844, 1280: 3026 }, 'settings-data': { 390: 1180 }, 'settings-keys': { 390: 1329 }, 'settings-look': { 390: 990 }, 'settings-remote': { 390: 1437 }, 'settings-sound': { 390: 1874 } };
+  var HEIGHTS = { 'rows': { 390: 2385, 1280: 1293 }, 'settings': { 390: 844, 1280: 3136 }, 'settings-data': { 390: 1180 }, 'settings-keys': { 390: 1463 }, 'settings-look': { 390: 990 }, 'settings-remote': { 390: 1437 }, 'settings-sound': { 390: 1874 } };
   var px = function (n) { return n.toLocaleString('en-US'); };
   var screens = function (n, h) { return (Math.round(n / h * 10) / 10).toLocaleString('en-US'); };
   var after = {};

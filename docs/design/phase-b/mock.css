@@ -14,7 +14,11 @@
  *   --accent, …), no literal z-index and no literal duration. Three names are not tokens:
  *     --c             a note's colour, set inline on the element (App.colors is its only source, D12)
  *     --p             a share from 0 to 100, set inline (the goal ring, a meter)
- *     --sl-topbar-h   the header's height, published on <html> by script (B5a); 0 px without it
+ *     --mk-topbar-h   the header's height, published on <html> by script; 0 px without it. Step
+ *                     B5a plans the name --sl-topbar-h for it. That name is not used here: every
+ *                     --sl- name in the drawings is a token css/tokens.css defines, and that file
+ *                     is not this step's to change (B5a adds the token, or sets it from script
+ *                     under a name the tokens suite allows)
  *   Where no token exists a size is a calc() of tokens, or one of the few literals left: a
  *   hairline (1px, 2px), a percentage, 0, and the plan's own fixed numbers (the sheet's 440 px
  *   of D24, the message's 460 px of D25, the breakpoints).
@@ -1309,7 +1313,7 @@ html:not(.goal-due) .sl-goal-sr { display: none; }
 /* ---- Key bar (D16-D18): .sl-keybar, its chips .sl-kchip, the Help dots ----- */
 .sl-keybar {
   position: sticky;
-  top: var(--sl-topbar-h, 0px);            /* under the header; the header's height is published by script */
+  top: var(--mk-topbar-h, 0px);            /* under the header; the header's height is published by script */
   z-index: var(--sl-z-bar);
   display: flex;
   align-items: center;
@@ -1421,7 +1425,7 @@ html.bar-hidden .sl-keybar {                /* the header is gone: the bar is th
     left: var(--sl-space-5);
     width: max-content;
     max-width: min(440px, calc(100vw - var(--sl-space-5) * 2));
-    max-height: calc(100vh - var(--sl-topbar-h, 0px) - var(--sl-control-h) * 2);      /* never past the window's lower edge */
+    max-height: calc(100vh - var(--mk-topbar-h, 0px) - var(--sl-control-h) * 2);      /* never past the window's lower edge */
     overflow-y: auto;
     overscroll-behavior: contain;
   }

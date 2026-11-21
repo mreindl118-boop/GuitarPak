@@ -64,7 +64,7 @@
  *                       the app has too (step B5a):
  *     0. in Gear the header's key button takes the longest form of the key's name that leaves the
  *        header in one row: plain, short, short without the caret (data-fit on #cx-toggle);
- *     1. the header's height is published on <html> as --sl-topbar-h (the bar sticks under it);
+ *     1. the header's height is published on <html> as --mk-topbar-h (the bar sticks under it);
  *     2. the hidden attribute of the three panels that are panels on phones only (Tempo, Scale
  *        lock, More) follows the 640 px tier;
  *     3. the key bar takes the longest forms that fit its row, in this order: labels and the
@@ -93,6 +93,9 @@
  *   Mock.toast(t)    one message of the stack, as markup
  *   Mock.change(rows)   "Change this picture": a fold of chips under a picture opened alone, and the
  *                    way back to all pictures. rows = [[parameter, words, value, [[value, words], …]], …]
+ *   Mock.figure(f)   one labelled frame of a contact view, as markup: f = { url, w, h, title, caption, cap }
+ *   Mock.fit()       sizes every frame of the page (.mk-view) to the column of .mk-contact. The
+ *                    owner's page, index.html, builds its small pictures from these two
  *   Mock.q(name, fallback), Mock.esc(text), Mock.href(params), Mock.tierOf(width), Mock.single
  */
 (function () {
@@ -158,6 +161,7 @@
   function flatKey(pc) { return FLAT_KEYS.indexOf(pc) !== -1; }
   function pcName(pc, preferFlat) { pc = ((pc % 12) + 12) % 12; return preferFlat ? FLAT[pc] : SHARP[pc]; }
   var ROOTS = SHARP.map(function (n, pc) { return pcName(pc, flatKey(pc)); });       // the twelve names of the Key select
+  // PALETTE DATA BEGIN
   // THE TWO PALETTES' DATA: the only raw colours in the drawings' files besides the saved Gear
   // page (gear.html). A note's colour is data, not a token (decision D12): in the app it comes
   // from App.colors, here from this table, and it reaches an element as the inline property --c.
@@ -181,16 +185,18 @@
       INTERVALS: ['#ff5869', '#ff7950', '#ff9a37', '#ffb52c', '#ffd029', '#5ffe86', '#3ee9b9', '#26cbe9', '#3ea3f2', '#557cfc', '#6e62fa', '#8d4def']
     }
   };
-  // js/app.js:76-93 (APPS), :103-109 (SPACE_LABELS), :115-121 (SUB_LABELS)
+  // PALETTE DATA END (a script that counts raw colours skips the lines between the two marks)
+  // js/app.js:76-93 (APPS), :102-108 (SPACE_LABELS), :114-120 (SUB_LABELS), as of soundLAB 2.1.0:
+  // 15 pages, and Train is Woodshed | Voice | Tuner (the voice trainer, page id 'vocal')
   var APPS = {
     main: { url: 'index.html', name: 'soundLAB', other: 'gear',
-      pages: ['quiz', 'practiceplan', 'fretboard', 'tab', 'notation', 'chords', 'piano', 'chart', 'pads', 'songs', 'jam', 'shed', 'tuner', 'theory'],
+      pages: ['quiz', 'practiceplan', 'fretboard', 'tab', 'notation', 'chords', 'piano', 'chart', 'pads', 'songs', 'jam', 'shed', 'vocal', 'tuner', 'theory'],
       groups: [
         { id: 'gtheory', label: 'Learn', icon: 'learn', pages: ['quiz', 'chords', 'theory', 'practiceplan'] },
         { id: 'ginst', label: 'Guitar', icon: 'guitar', pages: ['fretboard', 'tab', 'notation'] },
         { id: 'gkeys', label: 'Keys', icon: 'keys', pages: ['piano', 'chart', 'pads'] },
         { id: 'gplay', label: 'Play', icon: 'note', pages: ['songs', 'jam'] },
-        { id: 'gprac', label: 'Train', icon: 'target', pages: ['shed', 'tuner'] }
+        { id: 'gprac', label: 'Train', icon: 'target', pages: ['shed', 'vocal', 'tuner'] }
       ] },
     gear: { url: 'gear.html', name: 'soundLAB Gear', other: 'main',
       pages: ['deck', 'liveset', 'midihub', 'helix'],
@@ -201,11 +207,11 @@
   };
   var PAGE_LABELS = { metronome: 'Metronome', fretboard: 'Fretboard', tab: 'Tab', notation: 'Notation', chords: 'Chords', piano: 'Piano',
     songs: 'Songs', jam: 'Jam', tuner: 'Tuner', theory: 'Theory', settings: 'Settings', shed: 'Shed', pads: 'Pads', quiz: 'Exercises',
-    midihub: 'MIDI Hub', deck: 'Synth deck', liveset: 'Live sets', practiceplan: 'Practice plan', helix: 'Helix Stadium', chart: 'Chord charts',
+    midihub: 'MIDI Hub', deck: 'Synth deck', liveset: 'Live sets', practiceplan: 'Practice plan', helix: 'Helix Stadium', chart: 'Chord charts', vocal: 'Voice trainer',
     home: 'Home' };                           // 'home' is the page B9 adds
   var PILL_LABELS = { fretboard: 'Neck', tab: 'Tab', notation: 'Notation', piano: 'Piano', chords: 'Chords', theory: 'Circle', songs: 'Songs',
     jam: 'Jam', shed: 'Woodshed', metronome: 'Metronome', tuner: 'Tuner', pads: 'Pads', quiz: 'Exercises', midihub: 'Hub', deck: 'Deck',
-    liveset: 'Live', practiceplan: 'Plan', helix: 'Helix', chart: 'Charts',
+    liveset: 'Live', practiceplan: 'Plan', helix: 'Helix', chart: 'Charts', vocal: 'Voice',
     home: 'Today' };                          // the fifth Learn pill of placements A and C (D20)
   // js/app.js:1264 (HELP_NAMES), js/lights.js:20-26 (a sentence per level)
   var HELP_NAMES = ['None', 'Tonic', 'Target', 'Colors', 'Full'];
@@ -538,13 +544,12 @@
   function quietPage(given) {
     var o = shellOpts(given), g = groupOf(o);
     var title = o.page === 'piano' ? keyName(o.root, o.scale, 'full') : (PAGE_LABELS[o.page] || o.page);      // js/piano.js:637
-    var eyebrow = (g ? g.label + ' · ' : '') + (PILL_LABELS[o.page] || PAGE_LABELS[o.page] || '');
     // the folds a page will have: Piano's (B12), the five groups of Settings (D27)
     var names = o.page === 'settings' ? ['Look', 'Sound', 'Keyboard and lights', 'Hands-free', 'Data and about']
       : o.page === 'piano' ? ['Chords and arpeggio', 'Practice a scale', 'Computer keys', 'Notes and triads on the LUMI'] : [];
     var folds = names.map(function (name) { return '<details class="sl-fold"><summary>' + name + '</summary></details>'; }).join('');
     return '<div class="mk-quiet' + (o.scrolled ? ' mk-quiet-tall' : '') + '">' +
-      '<div class="mk-quiet-head">' + (eyebrow && g ? '<p class="sl-eyebrow">' + eyebrow + '</p>' : '') + '<h1>' + title + '</h1></div>' +
+      '<div class="mk-quiet-head"><h1>' + title + '</h1></div>' +      // one headline and no line over it, as pages.html draws a page (D28)
       (g ? quietKeys(o) : '') +
       '<div class="mk-quiet-folds">' + folds + '</div></div>';
   }
@@ -577,7 +582,7 @@
     var stack = toasts.map(toast).join('');
     document.body.innerHTML = note + shell(def.shell) +
       '<main><section class="panel active sl-skin" id="panel-' + esc(o.page) + '">' + (def.main == null ? quietPage(def.shell) : def.main) + '</section></main>' +
-      (def.foot === false ? '' : '<footer class="foot">' + (o.app === 'gear' ? 'soundLAB Gear alpha' : 'soundLAB alpha') + ' — runs entirely in your browser · v2.0.0</footer>') +
+      (def.foot === false ? '' : '<footer class="foot">' + (o.app === 'gear' ? 'soundLAB Gear alpha' : 'soundLAB alpha') + ' — runs entirely in your browser · v2.1.0</footer>') +
       '<div id="sl-float" class="sl-skin"><div id="sl-toasts" class="sl-toasts">' + stack + '</div></div>' + (def.after || '');
     document.title = (def.title || document.title || 'soundLAB 2.0 drawing');
     settle(def.shell);
@@ -624,8 +629,8 @@
       f = Math.min(f, forms.length - 1);
       tg.setAttribute('data-fit', 'key-' + forms[f][0] + (forms[f][1] ? ' tight' : '') + (tgVal.scrollWidth > tgVal.clientWidth + 1 ? ' CUT' : ''));
     }
-    // 1. the header's height, for the key bar that sticks under it (--sl-topbar-h)
-    if (head) root.style.setProperty('--sl-topbar-h', (head.classList.contains('bar-hidden') ? 0 : head.offsetHeight) + 'px');
+    // 1. the header's height, for the key bar that sticks under it (--mk-topbar-h)
+    if (head) root.style.setProperty('--mk-topbar-h', (head.classList.contains('bar-hidden') ? 0 : head.offsetHeight) + 'px');
     if (!bar) return;
     // 2. the tier's panels: Tempo, Scale lock and More are panels at 640 px and below only,
     //    and the hidden attribute says whether each is shown (D16: "hidden is the hidden attribute")
@@ -725,9 +730,10 @@
   function contact(def) {
     var themes = P.theme === 'light' || P.theme === 'dark' ? [P.theme] : ['dark', 'light'], only = q('only', '');
     var h = '<main class="mk-contact sl-skin">';
-    h += '<header class="mk-contact-head"><p class="sl-eyebrow">' + esc(def.eyebrow || 'soundLAB 2.0 · Phase B drawings') + '</p><h1>' + esc(def.title) + '</h1>' +
+    h += '<header class="mk-contact-head"><p class="sl-eyebrow">' + esc(def.eyebrow || 'soundLAB 2.0 · the new look, drawn') + '</p><h1>' + esc(def.title) + '</h1>' +
       (def.lead || []).map(function (p) { return '<p>' + p + '</p>'; }).join('') +
       '<p class="sl-hint">Every picture is the real page at its real width, made smaller to fit this window. Tap the line above a picture to open it alone at this device’s own size.</p>' +
+      '<p class="mk-back"><a href="index.html">All drawings and questions</a></p>' +
       '<div class="mk-tools"><span class="mk-tools-label">Show</span>' +
       [['', 'Dark and light'], ['dark', 'Dark'], ['light', 'Light']].map(function (t) {
         var on = (P.theme || '') === t[0];
@@ -762,8 +768,7 @@
             for (k in s.params || {}) if (Object.prototype.hasOwnProperty.call(s.params, k)) params[k] = s.params[k];
             var url = href(params);
             frames.push({ id: s.id, w: w, h: ht, theme: theme, url: url });
-            h += '<figure class="mk-frame"><figcaption><a href="' + esc(url) + '"><b>' + w + ' px</b> ' + (tierOf(w) === 'phone' ? 'phone' : tierOf(w) === 'tablet' ? 'tablet' : 'desktop') + ' · ' + theme + '</a></figcaption>' +
-              '<div class="mk-view" data-w="' + w + '" data-h="' + ht + '"><iframe loading="lazy" title="' + esc(s.title) + ', ' + w + ' px, ' + theme + '" src="' + esc(url) + '" width="' + w + '" height="' + ht + '"></iframe></div></figure>';
+            h += figure({ url: url, w: w, h: ht, title: s.title + ', ' + w + ' px, ' + theme, caption: '<b>' + w + ' px</b> ' + tierOf(w) + ' · ' + theme });
           });
           h += '</div>';
         });
@@ -774,19 +779,30 @@
     h += '</main>';
     document.body.innerHTML = h;
     document.title = def.title + ' · soundLAB 2.0 drawings';
-    var layout = function () {
-      var wrap = document.querySelector('.mk-contact'), cs = getComputedStyle(wrap);
-      var avail = wrap.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
-      var cap = parseFloat(q('zoom', '')) || (window.innerWidth >= 1100 ? 0.5 : 1);
-      Array.prototype.forEach.call(document.querySelectorAll('.mk-view'), function (v) {
-        var w = +v.getAttribute('data-w'), ht = +v.getAttribute('data-h'), s = Math.min(cap, 1, avail / w);
-        v.style.width = Math.floor(w * s) + 'px';
-        v.style.height = Math.floor(ht * s) + 'px';
-        v.firstChild.style.transform = 'scale(' + s + ')';
-      });
-    };
-    layout();
-    window.addEventListener('resize', layout);
+    fit();
+    window.addEventListener('resize', fit);
+  }
+  // one frame: a caption that opens the picture alone, and under it the picture, a real page in
+  // an <iframe> at its real size (w x h), made smaller by fit(). f = { url, w, h, title,
+  // caption (markup), cap (the largest scale of this one frame, optional) }
+  function figure(f) {
+    return '<figure class="mk-frame"><figcaption><a href="' + esc(f.url) + '">' + (f.caption || esc(f.title)) + '</a></figcaption>' +
+      '<div class="mk-view" data-w="' + f.w + '" data-h="' + f.h + '"' + (f.cap ? ' data-cap="' + f.cap + '"' : '') + '><iframe loading="lazy" title="' + esc(f.title) +
+      '" src="' + esc(f.url) + '" width="' + f.w + '" height="' + f.h + '"></iframe></div></figure>';
+  }
+  // every frame of the page gets the largest scale that fits the page's column: at most 1, at
+  // most a half in a wide window (?zoom= sets another), at most its own data-cap
+  function fit() {
+    var wrap = document.querySelector('.mk-contact');
+    if (!wrap) return;
+    var cs = getComputedStyle(wrap), avail = wrap.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    var cap = parseFloat(q('zoom', '')) || (window.innerWidth >= 1100 ? 0.5 : 1);
+    Array.prototype.forEach.call(document.querySelectorAll('.mk-view'), function (v) {
+      var w = +v.getAttribute('data-w'), ht = +v.getAttribute('data-h'), own = parseFloat(v.getAttribute('data-cap')) || 1, s = Math.min(cap, own, 1, avail / w);
+      v.style.width = Math.floor(w * s) + 'px';
+      v.style.height = Math.floor(ht * s) + 'px';
+      v.firstChild.style.transform = 'scale(' + s + ')';
+    });
   }
 
   window.Mock = {
@@ -796,6 +812,6 @@
     icon: icon, wordmark: wordmark, keyName: keyName, scaleName: scaleName, lockSentence: lockSentence, lockMessage: lockMessage,
     scaleNotes: scaleNotes, pcName: pcName, inkOn: inkOn,
     shellOpts: shellOpts, shell: shell, quietPage: quietPage, page: page, settle: settle, toast: toast,
-    contact: contact, frames: function () { return frames.slice(); }, change: change
+    contact: contact, frames: function () { return frames.slice(); }, change: change, figure: figure, fit: fit
   };
 })();

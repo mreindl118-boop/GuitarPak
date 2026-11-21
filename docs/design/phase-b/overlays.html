@@ -115,9 +115,9 @@
 .met-go > .met-tap { flex: 0 0 auto; min-width: calc(var(--sl-space-8) + var(--sl-space-5)); touch-action: manipulation; }
 .met-opts {
   display: grid;
-  grid-template-columns: calc(var(--sl-space-8) + var(--sl-space-5)) minmax(0, 1fr);
+  grid-template-columns: calc(var(--sl-space-8) + var(--sl-space-3)) minmax(0, 1fr);      /* "12/8" fits; the rest is the Subdivision's, whose longest name is "Quarter (beats only)" */
   align-items: end;
-  gap: var(--sl-space-3) var(--sl-space-4);
+  gap: var(--sl-space-3);
   width: 100%;
   text-align: left;
 }
@@ -426,7 +426,7 @@
       // js/app.js:1791
       sound: { id: 'snd-hint', text: 'Your keyboard is connected. Click or tap anywhere to turn on sound — browsers keep audio off until you interact with the page.' },
       // js/app.js:185-187, :193-215
-      update: { id: 'app-update', text: 'soundLAB v2.0.1 is available.', acts: [['Update now', 'primary'], ['Later', '']] },
+      update: { id: 'app-update', text: 'soundLAB v2.1.1 is available.', acts: [['Update now', 'primary'], ['Later', '']] },
       apk: { id: 'app-update', text: 'A new soundLAB Android app (v0.76.0) is available.', acts: [['Download', 'primary'], ['Later', '']] },
       // js/xp.js:78
       unsaved: { id: 'lesson-progress-unsaved', bad: true, text: 'Lesson progress was not saved. Retry or export the original observations before closing this page.',
