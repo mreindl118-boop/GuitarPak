@@ -1317,7 +1317,7 @@
     rootEl.innerHTML =
       '<div class="card pn-card">' +
         '<div class="row tight spread">' +
-          '<h2 class="pn-title" id="pn-title"></h2>' +
+          '<h2 class="pn-title"><button type="button" class="key-link" id="pn-title" data-keylink title="Tap to change the key, scale or tempo for the whole app"></button></h2>' +
           '<span class="row tight">' +
             '<div class="seg" id="pn-assist" role="group" aria-label="Help level" title="How much the keyboard helps: Full shows colors, names, fingers and the next note; None is a plain keyboard">' +
               ASSIST_NAMES.map(function (nm, i) { return '<button type="button" data-pnassist="' + i + '">' + nm + '</button>'; }).reverse().join('') +
