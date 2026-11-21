@@ -5,6 +5,6 @@ set -e
 cd "$(dirname "$0")"
 rm -rf WebAssets
 mkdir -p WebAssets
-cp ../index.html ../manifest.webmanifest WebAssets/
-cp -R ../css ../js ../icons ../fonts ../samples WebAssets/
+cp ../index.html ../gear.html ../manifest.webmanifest WebAssets/
+cp -R ../css ../js ../icons ../fonts ../samples ../data WebAssets/
 echo "WebAssets ready: $(find WebAssets -type f | wc -l | tr -d ' ') files"

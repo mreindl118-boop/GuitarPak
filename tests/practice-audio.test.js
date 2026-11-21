@@ -12,9 +12,9 @@ const SCORE = { title: 'Original single-note audio fixture', instrument: 'guitar
   try {
     const context = await browser.newContext({ serviceWorkers: 'block', viewport: { width: 1280, height: 1000 } });
     await context.addInitScript(() => {
-      ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
-      localStorage.setItem('guitarlab.fb.root', '0'); localStorage.setItem('guitarlab.fb.scale', '"major"');
-      localStorage.setItem('guitarlab.midi.appSound', 'false'); localStorage.setItem('guitarlab.midi.voiceAuto', 'true');
+      ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true'));
+      localStorage.setItem('soundlab2.fb.root', '0'); localStorage.setItem('soundlab2.fb.scale', '"major"');
+      localStorage.setItem('soundlab2.midi.appSound', 'false'); localStorage.setItem('soundlab2.midi.voiceAuto', 'true');
       window.__gum = []; window.__fakeStreams = []; window.__mediaMode = 'success'; window.__resolveCapture = null;
       const mediaContext = new AudioContext();
       function fakeStream() {

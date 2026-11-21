@@ -9,10 +9,10 @@ const near = (a, b) => Math.abs(a-b)<0.00001;
  try {
   const context=await browser.newContext({serviceWorkers:'block',acceptDownloads:true});
   await context.addInitScript(()=>{
-   ['help.seen','help.done','qz.landed'].forEach(k=>localStorage.setItem('guitarlab.'+k,'true'));
+   ['help.seen','help.done','qz.landed'].forEach(k=>localStorage.setItem('soundlab2.'+k,'true'));
    const old={'xp.total':321,'xp.days':{'1999-01-01':{x:321,s:9,q:4,k:3,l:1,u:{old:[3,9000,4]}}},'xp.sprint':{old:8},'xp.jump':3,'xp.goal':100,'xp.frozen':['1999-01-02'],'xp.freeze':2,'xp.best':4,'qz.prog':{old:{s:3}},'kl.prog':{},'ws.xp':456};
-   for(const [k,v] of Object.entries(old))localStorage.setItem('guitarlab.'+k,JSON.stringify(v));
-   window.__legacy=Object.fromEntries(Object.keys(old).map(k=>[k,localStorage.getItem('guitarlab.'+k)]));
+   for(const [k,v] of Object.entries(old))localStorage.setItem('soundlab2.'+k,JSON.stringify(v));
+   window.__legacy=Object.fromEntries(Object.keys(old).map(k=>[k,localStorage.getItem('soundlab2.'+k)]));
   });
   const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto(env.URL);await page.waitForFunction(()=>window.SLXP&&App.practiceInstrument&&App.practiceProgress&&App.keysLessons);
@@ -24,10 +24,11 @@ const near = (a, b) => Math.abs(a-b)<0.00001;
    window.__answer=(id,answerId,ms=45000,instrument='piano')=>SLXP.answer({sessionId:id,instrument,answerId,ok:true,ms,unit:'note-name',kind:'choice'});
   });
   console.log('# one configured instrument balance, historical totals untouched');
-  const initial=await page.evaluate(()=>({legacy:SLXP.legacy(),scoped:SLXP.forInstrument('piano').total(),stored:Object.fromEntries(Object.keys(__legacy).map(k=>[k,localStorage.getItem('guitarlab.'+k)])),original:__legacy}));
+  const initial=await page.evaluate(()=>({legacy:SLXP.legacy(),scoped:SLXP.forInstrument('piano').total(),stored:Object.fromEntries(Object.keys(__legacy).map(k=>[k,localStorage.getItem('soundlab2.'+k)])),original:__legacy}));
   ok(initial.legacy.total===321&&initial.legacy.label==='Legacy / unassigned','historical global XP is explicitly legacy/unassigned');
   ok(initial.scoped===0,'new piano balance does not inherit historical global XP');
-  ok(JSON.stringify(initial.stored)===JSON.stringify(initial.original),'startup preserves every seeded historical key bytewise, including ancient days');
+  // every value must be a stored string: read under the wrong prefix both sides would be null and "equal"
+  ok(Object.keys(initial.original).length===11&&Object.values(initial.stored).every(v=>typeof v==='string')&&JSON.stringify(initial.stored)===JSON.stringify(initial.original),'startup preserves every seeded historical key bytewise, including ancient days');
   const knowledge=await page.evaluate(()=>{
    SLXP.beginSession({id:'knowledge-one',instrument:'piano',source:'quiz'});__step(1000);__answer('knowledge-one','a');__step(60000);__answer('knowledge-one','b');
    __answer('knowledge-one','b');const done=SLXP.finishLevel({sessionId:'knowledge-one',instrument:'piano',passed:true,perfect:true});
@@ -87,9 +88,9 @@ const near = (a, b) => Math.abs(a-b)<0.00001;
   console.log('# no background, duplicate, or historical global awards');
   const preserved=await page.evaluate(()=>{
    for(let i=0;i<200;i++)SLXP._tick();SLXP.refresh();App.xp.practice(600,'Guitar');
-   return {keys:Object.fromEntries(Object.keys(__legacy).map(k=>[k,localStorage.getItem('guitarlab.'+k)])),original:__legacy,legacy:SLXP.legacy().total};
+   return {keys:Object.fromEntries(Object.keys(__legacy).map(k=>[k,localStorage.getItem('soundlab2.'+k)])),original:__legacy,legacy:SLXP.legacy().total};
   });
-  ok(JSON.stringify(preserved.keys)===JSON.stringify(preserved.original)&&preserved.legacy===321,'wake ticks, refresh and retired anonymous practice cannot alter any historical key');
+  ok(Object.values(preserved.keys).every(v=>typeof v==='string')&&JSON.stringify(preserved.keys)===JSON.stringify(preserved.original)&&preserved.legacy===321,'wake ticks, refresh and retired anonymous practice cannot alter any historical key');
   console.log('# explicit shared-keyboard source context and cancellation');
   const lesson=await page.evaluate(()=>{
    App.emit('learn:lesson',{instrument:'synth',kind:'keys'});App.switchTo('piano');App.keysLessons.start(false);

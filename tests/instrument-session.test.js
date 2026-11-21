@@ -14,7 +14,7 @@ function same(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
   try {
     const context = await browser.newContext({ serviceWorkers: 'block' });
     await context.addInitScript(() => {
-      ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
+      ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true'));
       window.__deviceCalls = { midi: 0, audio: 0 };
       navigator.requestMIDIAccess = () => { __deviceCalls.midi++; return Promise.reject(new Error('Hardware unavailable in this simulation')); };
       if (navigator.mediaDevices) navigator.mediaDevices.getUserMedia = () => { __deviceCalls.audio++; return Promise.reject(new Error('Microphone unavailable in this simulation')); };
@@ -26,7 +26,7 @@ function same(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
     await page.evaluate(() => {
       window.__time = 0;
       window.__wall = () => Date.parse('2026-10-23T12:00:00Z') + __time * 1000;
-      localStorage.removeItem('guitarlab.' + PracticeProgress.storageKey);
+      localStorage.removeItem('soundlab2.' + PracticeProgress.storageKey);
       App.practiceProgress = new PracticeProgress({ store: App.store, now: __wall, timezone: () => 'UTC' });
       window.__submissions = [];
       const record = App.practiceProgress.recordSession.bind(App.practiceProgress);

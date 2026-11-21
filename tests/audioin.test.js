@@ -24,8 +24,8 @@ async function newPage(browser, seed, opts) {
   opts = opts || {};
   const ctx = await browser.newContext({ viewport: { width: 1200, height: 900 } });
   await ctx.addInitScript(([seed, noMedia, perm, boot]) => {
-    ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
-    for (const k in seed) localStorage.setItem('guitarlab.' + k, JSON.stringify(seed[k]));
+    ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true'));
+    for (const k in seed) localStorage.setItem('soundlab2.' + k, JSON.stringify(seed[k]));
     // graph spy: every edge between AudioNodes, kept current on disconnect
     const conn = AudioNode.prototype.connect, disc = AudioNode.prototype.disconnect;
     let edges = [];

@@ -1,6 +1,7 @@
 // MIDI Hub Control view: a mouse-wheel page scroll that passes over the big
 // knobs must not turn them (it sent CC7/CC74 down and the synth went quiet);
 // a knob that was clicked still turns with the wheel.
+// 2.0 Phase A3b: the Hub is a page of soundLAB Gear (gear.html), which boots on the Deck.
 const { chromium } = require('playwright');
 const env = require('./env');
 let fails = 0;
@@ -10,8 +11,8 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
   const browser = await chromium.launch({ executablePath: env.CHROMIUM });
   const ctx = await browser.newContext({ viewport: { width: 1200, height: 700 } });
   await ctx.addInitScript(() => {
-    ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
-    localStorage.setItem('guitarlab.lights.on', 'false');
+    ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true'));
+    localStorage.setItem('soundlab2.lights.on', 'false');
     window.__sent = [];
     const inp = { id: 'in1', name: 'MODX-1', state: 'connected', onmidimessage: null };
     const out = { id: 'out1', name: 'MODX-1', state: 'connected', send: b => window.__sent.push(Array.from(b)) };
@@ -20,8 +21,8 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
   });
   const page = await ctx.newPage(), errs = [];
   page.on('pageerror', e => errs.push(e.message));
-  await page.goto(env.URL);
-  await page.waitForFunction(() => window.App && App.midi && App.midi.ready && App.midi.hasOutput && App.active === 'quiz');
+  await page.goto(env.GEAR_URL);
+  await page.waitForFunction(() => window.App && App.midi && App.midi.ready && App.midi.hasOutput && App.active === 'deck');
   await page.evaluate(() => { App.switchTo('midihub'); });
   await page.waitForSelector('.mh-knob[data-cc="7"]', { state: 'visible' });
   const vol = page.locator('.mh-knob[data-cc="7"]');

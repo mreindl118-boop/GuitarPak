@@ -19,10 +19,10 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
     'kn:6': [1, 5, 4000], 'kf:0': [5, 5, 800]
   };
   await ctx.addInitScript((items) => {
-    localStorage.setItem('guitarlab.help.seen', 'true');
-    localStorage.setItem('guitarlab.help.done', 'true');
-    localStorage.setItem('guitarlab.qz.landed', 'true');
-    if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); localStorage.setItem('guitarlab.qz.items', JSON.stringify(items)); }
+    localStorage.setItem('soundlab2.help.seen', 'true');
+    localStorage.setItem('soundlab2.help.done', 'true');
+    localStorage.setItem('soundlab2.qz.landed', 'true');
+    if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); localStorage.setItem('soundlab2.qz.items', JSON.stringify(items)); }
   }, items);
   const page = await ctx.newPage();
   const errs = [];
@@ -86,7 +86,7 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
     SLQuiz.weakSpots.drill(['gn:6:3:2']);
     const q = SLQuiz.q;
     SLQuiz.pick(q.correct);
-    return JSON.parse(localStorage.getItem('guitarlab.qz.items'))['gn:6:3:2'];
+    return JSON.parse(localStorage.getItem('soundlab2.qz.items'))['gn:6:3:2'];
   });
   ok(sv && sv[0] === 1 && sv[1] === 1 && sv[2] > 0 && sv[3] > 19000, 'a right answer saves [right, asked, ms, day]: ' + JSON.stringify(sv));
 
@@ -124,11 +124,11 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
   // ---- regular levels: slow notes come up more often (no separate mode needed) ----
   const wt = await page.evaluate(() => {
     App.practiceInstrument.set('piano');
-    const st = JSON.parse(localStorage.getItem('guitarlab.qz.items'));
+    const st = JSON.parse(localStorage.getItem('soundlab2.qz.items'));
     // two keys, both always right: C fast, D slow
     for (const k in st) delete st[k];
     st['kn:0'] = [10, 10, 900]; st['kn:2'] = [10, 10, 5900];
-    localStorage.setItem('guitarlab.qz.items', JSON.stringify(st));
+    localStorage.setItem('soundlab2.qz.items', JSON.stringify(st));
     location.reload();
   }).catch(() => {});
   await page.waitForFunction(() => window.SLQuiz && App.practiceInstrument);

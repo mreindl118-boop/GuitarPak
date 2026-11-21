@@ -7,19 +7,63 @@ it is not required to be the keyboard you play. The treble-clef menu has two
 independent master toggles: **Scale Lock** controls pitched sound admission,
 and **LUMI Display** controls illumination. Both follow the selected root/scale.
 
-This page recovers the note/major-triad/minor-triad workflow from
+This practice recovers the note/major-triad/minor-triad workflow from
 `codex/midi-hub-release-0.78.0-20261019` at `b8ccb55`, adapting it to the current
 shared MIDI service and the same sole **LUMI Display** master used by Keys
-lessons, Songs, exercises and scale practice. The advanced page adds explicit
-port roles and safe test/arm controls; it does not add a second illumination
+lessons, Songs, exercises and scale practice. Its advanced controls add explicit
+port roles and safe test/arm controls; they do not add a second illumination
 master. There is no standalone text/matrix display implementation in this slice.
+Since soundLAB 2.0 it is a section of the Piano page, not a page of its own.
 
 Physical LUMI/synth behavior remains **EXPERIMENTAL / UNVERIFIED**. All reported
 validation uses cloud simulations; no hardware was connected or configured.
 
+## Where it is: a section on the Piano page
+
+LUMI practice has no pill and no page of its own in soundLAB 2.0. Open
+**Keys › Piano** and go below the scale lessons to the section
+**Notes and triads on the LUMI**. It is closed by default. If the app last
+closed on the former LUMI page, it opens the Piano page and says where the
+practice went.
+
+**Open = owner, one owner at a time.** Three things on the Piano page use the
+pedal and the key lights: the scale lessons, the scale runner and this section.
+Only one of them is active at a time.
+
+- **Opening the section** stops a lesson run and the runner. So does starting
+  a session.
+- **These close the section**, stop its session and disarm its outputs:
+  starting a lesson (Start, Listen, Retry or Next level), starting the runner,
+  and opening a lesson from the Practice plan or the Learn bar. The section
+  folds itself.
+- **While the section is open it owns the pedal.** Next and Stop act here (see
+  [Hands-free control](CONTROLLER-REMOTE.md)). A press with nothing to do here
+  does nothing: it never starts a lesson or the runner. The lessons'
+  lowest-key double-tap stands down too. A double-tap on the lesson card
+  itself starts the lesson like its Start button, so it closes the section.
+- **The double-tap key.** With the opt-in double-tap key on (Settings ›
+  Hands-free control) and simulated answers, the keyboard's lowest key is
+  reserved on the Piano page while the section is open: it is silent and not
+  graded. Close the section to get the key back. With hardware answers the key
+  isn't reserved.
+- **Closed, nothing changes** for the lessons, the runner, the pedal or the
+  double-tap.
+
+Leaving the Piano page, closing the section by hand, losing window focus and
+hiding the app stop the session and disarm its outputs, as leaving the old page
+did. The LUMI display output is still chosen in this section.
+
+For developers: `js/piano.js` mounts the module into `#pn-lumi-body` inside
+`<details id="pn-lumi">` and drives it through `App.lumiPractice` (`init`,
+`show`, `hide`, `close(msg)`, `stop`, `remote`, `remoteKey`, and the getters
+`open` and `running`). `open` is the fold state alone; the session only runs
+while the Piano page is shown and the section is open. The `lp-` ids, the
+`SLLumiPractice` test hook and the display leases are unchanged.
+
 ## Start with simulation
 
-1. Open **Keys → LUMI**. It starts in **SIMULATED — NO DEVICE I/O**, with
+1. Open **Keys › Piano** and the section **Notes and triads on the LUMI**,
+   below the lessons. It starts in **SIMULATED — NO DEVICE I/O**, with
    **Wait until correct** selected. Lesson input/sound choices, acknowledgements, tests, and
    armed routes are session-only. The two master toggles and the app's exact
    configured LUMI display output persist independently.
@@ -40,7 +84,7 @@ app-wide MIDI connections continue to obey Settings independently.
 
 The initial display window is MIDI **48–71 (C3–B4)**, with **60 = C4**. Choose a
 first note from 0 to 104 for any complete 24-note window. Match the physical
-LUMI octave manually; this page never operates its octave buttons. Exact pitches
+LUMI octave manually; this section never operates its octave buttons. Exact pitches
 and octaves are graded without folding or transposition. Sustain is not treated
 as a physically held answer; channel-specific note holds are tracked separately.
 
@@ -57,13 +101,13 @@ Simulated pad selection clears on advance as an explicit virtual release.
 ## Independent hardware routes
 
 Enable **Web MIDI** in Settings first. Native Android/iOS bridges remain
-unsupported for this page's independent routes; simulation remains available.
+unsupported for this section's independent routes; simulation remains available.
 
 Choose these routes explicitly; there is no first-port or global-output fallback:
 
 - **Synth answer INPUT:** the keyboard you physically play (for example MODX).
   Optional LUMI answer input is also available. Global/raw/output event buses
-  never supply answers; the page observes only the exact selected input port.
+  never supply answers; the section observes only the exact selected input port.
 - **Synth SOUND OUTPUT:** the synth that should sound the allowed notes.
   This route is optional and separate from the display. Select its sound output,
   start a lesson, acknowledge that you have manually set **Local Control OFF**
@@ -105,7 +149,7 @@ See [the shared palette and protocol evidence](NOTE-PALETTE.md). Wrong notes out
 24-key display window remain in the textual grading feedback, without sending
 out-of-window display notes. Hardware color appearance still needs verification.
 
-The page does not encode a second hardware protocol. It requests semantic
+The section does not encode a second hardware protocol. It requests semantic
 frames from the existing MIDI service's temporary exact-output lease. The
 service owns the LUMI velocity palette, frame diffing, original output object,
 channel/pitch tracking, and Note Off cleanup. Only changed frame notes are sent.
@@ -124,8 +168,9 @@ They do not send SysEx, custom programs, patch changes, or persistent hardware
 writes. Resuming the existing shared layout can include its normal LUMI SysEx
 mode/brightness messages; those remain governed by app-wide lighting settings.
 
-Stop, lesson leave/change, input/output/configuration change, MIDI inventory
-notification, disconnect, blur, page hide, or selected scale change cancels
+Stop, closing the section, leaving the Piano page, a scale lesson or the runner
+starting, lesson leave/change, input/output/configuration change, MIDI inventory
+notification, disconnect, blur, app hide, or selected scale change cancels
 queued advancement, stops synth routing, releases exact display frame notes,
 disarms output, and unsubscribes answers. Unplugged hardware cannot receive a
 Note Off; that uncertainty is reported. None of these events re-arms a route.
@@ -158,6 +203,8 @@ sustained frames, physical held notes, exact ownership/restoration, stale ports,
 timers/lifecycle cleanup, separate sound routing, scale-safe targets, and phone
 layout. `tests/midi-ports.test.js` verifies semantic frames and failed releases;
 `tests/practice-router.test.js` verifies synth scale blocking and cleanup.
+`tests/keys.test.js`, `tests/remote-keys.test.js` and `tests/remote-plan.test.js`
+cover the open = owner rule on the Piano page.
 These checks provide software evidence only. Physical color response, actual
 port names, octave alignment, Local Control behavior, and hardware sound remain
 unverified.
