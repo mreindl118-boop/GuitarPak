@@ -24,8 +24,14 @@ const stat = key => '[data-pgu-stat="' + key + '"]';
     const fixture = await page.evaluate(() => {
       window.__progressBase = Date.now(); window.__progressNow = __progressBase;
       App.practiceProgress = new PracticeProgress({ store: App.store, now: () => __progressNow, timezone: () => 'Etc/UTC', onChange: e => App.emit('practice:progress', e) });
+      // A session belongs to the calendar day it ENDED on (in the settings zone, Etc/UTC here), and
+      // "last N days" is today plus the N - 1 calendar days before it. So "offset days ago" must be a
+      // calendar day: a session ending 2 minutes before now is YESTERDAY'S during the first 2 minutes
+      // of the UTC day, which pushed every fixture one day back and out of its 7 / 30 / 90-day window.
+      // The newest fixture therefore never ends before today's midnight (it is still never after now).
+      window.__progressEnd = Math.max(__progressBase - 120000, Date.parse(App.practiceProgress.dayKey(__progressBase) + 'T00:00:00Z'));
       window.__addProgressFixture = (id, instrument, offset, minutes, expected, matched, extra, tempo, status, timed) => {
-        const end = __progressBase - 120000 - offset * 86400000;
+        const end = __progressEnd - offset * 86400000;
         const result = App.practiceProgress.recordSession({ id, instrument, startedAt: end - minutes * 60000, endedAt: end,
           engagedSeconds: minutes * 60, mode: timed ? 'tempo' : 'wait', status, expected, matched,
           missed: expected - matched, extra, wrong: extra, tempo, timingSamples: timed ? matched : 0,
@@ -179,7 +185,12 @@ const stat = key => '[data-pgu-stat="' + key + '"]';
     await player.goto(env.URL);
     await player.waitForFunction(() => window.PracticeProgress && window.PerformancePlayer && window.Woodshed);
     await player.evaluate(() => {
-      window.__xpEpoch = Date.now(); window.__xpAt = 0;
+      // The fixture clock (now = __xpEpoch + __xpAt seconds) runs for 30 s below. Keep that span inside
+      // ONE calendar day of the fixture zone (Etc/UTC): a run that crosses midnight is rightly split
+      // over two days (measured segments, two table rows), which is not what these checks are about.
+      // In the last minute of the UTC day the fixture clock therefore starts one minute earlier.
+      window.__xpEpoch = Date.now(); if (86400000 - __xpEpoch % 86400000 < 60000) __xpEpoch -= 60000;
+      window.__xpAt = 0;
       App.practiceProgress = new PracticeProgress({ store: App.store, now: () => __xpEpoch + __xpAt * 1000, timezone: () => 'Etc/UTC', onChange: e => App.emit('practice:progress', e) });
       window.__xpScore = { title: 'Original progress browser fixture', bpm: 120, len: 6,
         notes: [48, 50, 52, 53, 55, 57].map((m, i) => ({ m, t: i, d: 1, v: 90 })) };

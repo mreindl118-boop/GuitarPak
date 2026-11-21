@@ -534,7 +534,7 @@
         '<div class="row tight"><label class="btn sm primary sg-openbtn">Choose a file<input type="file" id="sg-openfile" accept=".mid,.midi,.musicxml,.xml,.mxl,.txt,audio/midi" hidden></label>' +
           '<span class="muted small" id="sg-openmsg" role="status">Nothing open yet.</span></div>' +
         '<div class="row tight sg-opendest" id="sg-opendest" hidden>' +
-          '<button type="button" class="btn sm primary" id="sg-opensynth" title="Play it on your synth from the MIDI Hub Player (tempo, key shifter, loop)">Play on synth</button>' +
+          '<button type="button" class="btn sm primary" id="sg-opensynth" title="Play it on your synth (tempo, key shifter, loop)">Play on synth</button>' +
           '<button type="button" class="btn sm" id="sg-openpractice" title="Practice it in the Woodshed (Wait for me / Play at tempo)">Practice</button>' +
           '<button type="button" class="btn sm" id="sg-opentab" title="Show it as guitar tab on this page">Open as tab</button>' +
         '</div>' +
@@ -689,23 +689,23 @@
       };
       if (kind === 'tab') rd.readAsText(file); else rd.readAsArrayBuffer(file);
     });
-    // the Hub Player reads MIDI and MusicXML; a tab becomes a score at the shared tempo
+    // the score player (js/scoreplayer.js) reads MIDI and MusicXML; a tab becomes a score at the shared tempo
     function openedAsPlayer() {
-      var hub = window.SLMidiHub && SLMidiHub.player; if (!hub) return Promise.reject(new Error('The MIDI Hub is not loaded'));
-      if (opened.kind !== 'tab') return hub.loadFile(opened.name, opened.buf);
+      var player = window.SLScorePlayer; if (!player) return Promise.reject(new Error('The score player is not loaded'));
+      if (opened.kind !== 'tab') return player.loadFile(opened.name, opened.buf);
       var song = parseAsciiTab(opened.text); if (!song) return Promise.reject(new Error('No six-line tab found in that file'));
       var bpm = parseInt(App.store.get('met.bpm', 100), 10) || 100, notes = [];
       song.steps.forEach(function (s, i) { (s.notes || []).forEach(function (n) { if (typeof n.midi === 'number') notes.push({ t: i / 4, d: 0.25, m: n.midi, partId: 'tab', v: 100 }); }); });
-      return Promise.resolve(hub.loadScore({ title: opened.name.replace(/\.txt$/i, ''), bpm: bpm, len: song.steps.length / 4, rhythmKnown: true, notes: notes }));
+      return Promise.resolve(player.loadScore({ title: opened.name.replace(/\.txt$/i, ''), bpm: bpm, len: song.steps.length / 4, rhythmKnown: true, notes: notes }));
     }
     function openedAsMidiBytes() { // MIDI as is; MusicXML through the Player's reader; a tab is parsed here
       if (opened.kind === 'midi') return Promise.resolve(new Uint8Array(opened.buf));
-      if (opened.kind === 'xml') return openedAsPlayer().then(function () { return SLMidiHub.player.toMidiBytes(); });
+      if (opened.kind === 'xml') return openedAsPlayer().then(function () { return SLScorePlayer.toMidiBytes(); });
       return Promise.resolve(null);
     }
     document.getElementById('sg-opensynth').addEventListener('click', function () {
       if (!opened) return;
-      openedAsPlayer().then(function (sum) { SLMidiHub.player.show(); openSay('Playing on the synth: ' + ((sum && sum.title) || opened.name)); })
+      openedAsPlayer().then(function (sum) { SLScorePlayer.show(); openSay('Playing on the synth: ' + ((sum && sum.title) || opened.name)); })
         .catch(function (e) { openSay(e && e.message ? e.message : 'Could not open that file.'); });
     });
     document.getElementById('sg-openpractice').addEventListener('click', function () {

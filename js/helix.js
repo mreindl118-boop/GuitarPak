@@ -1,11 +1,10 @@
 /* soundLAB HELIX STADIUM page ('helix', Guitar group pill "Helix"): read, write
- * and control a Line 6 Helix Stadium / Stadium XL. Built in since 0.82.0; it
- * began as plugins/helix-stadium.js and outgrew the 100 KB plugin cap.
+ * and control a Line 6 Helix Stadium / Stadium XL. Built in since 0.82.0.
  *
  * NOTHING CONNECTS AT BOOT: init only builds the DOM. Web MIDI is requested on
  * the first visit; the network bridge connects only after the user pressed
  * Connect bridge once (hx.bridgeAuto, default off) and retries only while the
- * page is visible. js/plugins.js skips an old stored copy of the plugin.
+ * page is visible.
  *
  * Two ways in, used together when both are there:
  *
@@ -1106,6 +1105,6 @@
     }
   });
 
-  window.SLHelix = { builtIn: true, CC: CC, MIX: MIX, cc: cc, pc: pc, rpc: rpc, get dev() { return dev; }, get st() { return st; }, get midi() { return midi; }, get bridge() { return br; }, useEditBuffer: useEditBuffer, slotLabel: slotLabel, onMidiIn: onMidiIn, showView: showView,
+  window.SLHelix = { CC: CC, MIX: MIX, cc: cc, pc: pc, rpc: rpc, get dev() { return dev; }, get st() { return st; }, get midi() { return midi; }, get bridge() { return br; }, useEditBuffer: useEditBuffer, slotLabel: slotLabel, onMidiIn: onMidiIn, showView: showView,
     get armed() { return armed(); }, arm: function (on) { setArmed(on !== false); }, favs: favs, recallBytes: recallBytes, addrOf: addrOf, isHelix: isHelix, shortName: shortName, get obs() { return obs; }, get rx() { return rx; } };
 })();
