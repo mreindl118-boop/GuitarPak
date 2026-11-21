@@ -1800,7 +1800,7 @@
         '<div class="row tight spread fb-toolbar">' +
           '<span class="row tight">' +
             '<button type="button" class="btn sm fb-gearbtn" id="fb-gear" title="Scale &amp; board settings" aria-label="Settings">' + App.icon('sliders', 15) + '</button>' +
-            '<span class="fb-title" id="fb-title"></span>' +
+            '<button type="button" class="fb-title key-link" id="fb-title" data-keylink title="Tap to change the key, scale or tempo for the whole app"></button>' +
             '<button type="button" class="chip" id="fb-jamchip" style="display:none" title="Tap to switch the board to this mode"></button>' +
           '</span>' +
           '<span class="row tight">' +
@@ -2223,7 +2223,7 @@
     rootEl.innerHTML =
       '<div class="card">' +
         '<div class="row tight spread">' +
-          '<span class="fb-title" id="fb-' + kind + '-title"></span>' +
+          '<button type="button" class="fb-title key-link" id="fb-' + kind + '-title" data-keylink title="Tap to change the key, scale or tempo for the whole app"></button>' +
           '<div class="row tight fb-vo" data-kind="' + (isTab ? 'tab' : 'sheet') + '">' +
             (isTab ?
               '<div class="seg"><button type="button" data-fbvori="h" title="Horizontal" aria-label="Horizontal tab">' + App.icon('right', 15) + '</button>' +
