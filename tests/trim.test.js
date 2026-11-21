@@ -22,7 +22,7 @@ const J = JSON.stringify;
 // ---- what this app is (A2 and A3b edit these lists) ----
 // the page list of js/app.js (PAGES), in its order; Settings is an overlay page
 const PAGES = ['quiz', 'practiceplan', 'fretboard', 'tab', 'notation', 'helix', 'chords', 'piano', 'chart', 'synth', 'pads',
-  'deck', 'liveset', 'midihub', 'lumipractice', 'songs', 'jam', 'shed', 'tuner', 'trainer', 'theory'];
+  'deck', 'liveset', 'midihub', 'lumipractice', 'songs', 'jam', 'shed', 'vocal', 'tuner', 'trainer', 'theory'];
 // pages that left the app: App.switchTo(id) goes home and says why (MOVED in js/app.js)
 const MOVED = { arrange: /Studio is no longer part of soundLAB\./, tracks: /Studio is no longer part of soundLAB\./,
   song: /Studio is no longer part of soundLAB\./, ideas: /Studio is no longer part of soundLAB\./ };
