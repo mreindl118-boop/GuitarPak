@@ -24,9 +24,9 @@ const MAP = {
   const browser = await chromium.launch({ executablePath: env.CHROMIUM, args: ['--autoplay-policy=no-user-gesture-required'] });
   const ctx = await browser.newContext({ viewport: { width: 1200, height: 900 } });
   await ctx.addInitScript((map) => {
-    ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
-    localStorage.setItem('guitarlab.remote.map', JSON.stringify(map));
-    localStorage.setItem('guitarlab.remote.dbl', 'false');
+    ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true'));
+    localStorage.setItem('soundlab2.remote.map', JSON.stringify(map));
+    localStorage.setItem('soundlab2.remote.dbl', 'false');
     const mkIn = (id, name) => ({ id, name, state: 'connected', onmidimessage: null });
     const modx = mkIn('in-modx', 'MODX-1'), lumi = mkIn('in-lumi', 'LUMI Keys BLOCK');
     const out = { id: 'out-lumi', name: 'LUMI Keys BLOCK', state: 'connected', send: () => {} };

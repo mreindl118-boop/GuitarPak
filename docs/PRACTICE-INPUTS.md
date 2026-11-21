@@ -43,6 +43,26 @@ last consumer release stops capture tracks. The analyser itself has no
 destination/speaker connection. Existing **Hear input** is a separate explicit
 monitor setting, not enabled by this detector.
 
+Since 2.0 **Hear input sounds in one window.** soundLAB and soundLAB Gear
+(`gear.html`) share the setting, and only one open window sends the input to
+the speakers: the one opened first. Pressing On in the other window moves it
+there (soundLAB: *Hear it* or *Both* under Settings › Sound input & output;
+Gear: *On* in the Hear input switch on the Hub page). The window that is not
+playing says that your other soundLAB window has Hear input, and takes over
+when that window closes. Off in either window switches it off in both. A
+practice or meter hold in the window that is not playing still opens the
+device for its own analyser; it is never sent to the speakers. If the browser
+declines the input for that window, only that window says so: Hear input stays
+on and the other window keeps playing. Where the browser has no Web Locks,
+every window behaves as before 2.0.
+
+The **Output** picked under Settings › Sound input & output is Gear's output
+too (its metronome, the Player and Hear input): Gear puts it on its audio at
+the first press after it opens, and again when the device is plugged back in.
+It asks for no permission to do so; an output the browser does not list is
+left alone. An Output changed in soundLAB while a Gear window is open reaches
+that window at its next start.
+
 Legacy ToneIn previously kept an independent capture open even while its
 Woodshed tick was paused. `App.tonein.suspend(owner,on)` now stops that capture
 before practice opens the shared stream. Releasing suspension preserves the

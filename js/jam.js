@@ -343,7 +343,7 @@
     return noiseBuf;
   }
 
-  // ---- drum KITS: the Studio engine's 808/909 synth kit, jam-side ----
+  // ---- drum KITS: the shared 808/909 synth drum kit, jam-side ----
   // DAW.createDrums (js/daw/engine.js) replaces the old fixed kick/snare/hat
   // trio. Each prebuilt is a per-lane {tune (semis), decay 0..1, level} set;
   // 'snare' picks the snare lane (1) or the clap lane (2, the 808 move).
@@ -828,6 +828,7 @@
       });
     }
     if (!section('a')) state.sections = defaultSections(state.genre);
+    SAVED.forEach(function (k) { loaded[k] = JSON.stringify(state[k]); });
 
     // one-time migration: an old jam.track progression becomes section A
     if (!g('jam2.migr', false)) {
@@ -846,14 +847,17 @@
     bpm = Math.max(30, Math.min(280, parseInt(g('met.bpm', 100), 10) || 100));
   }
 
+  // Every change saves all seven values. One that still waits for its copy
+  // (2.0 Phase A4, App.store.waiting: the earlier song did not fit yet) is
+  // stored only once ITS value differs from what was loaded: the default
+  // song this page shows meanwhile is not the user's, and once stored the
+  // next start would take it for the user's own and stop trying
+  var SAVED = ['genre', 'energy', 'swing', 'comp', 'kit', 'mix', 'sections'], loaded = {};
   function saveState() {
-    App.store.set('jam2.genre', state.genre);
-    App.store.set('jam2.energy', state.energy);
-    App.store.set('jam2.swing', state.swing);
-    App.store.set('jam2.comp', state.comp);
-    App.store.set('jam2.kit', state.kit);
-    App.store.set('jam2.mix', state.mix);
-    App.store.set('jam2.sections', state.sections);
+    SAVED.forEach(function (k) {
+      if (App.store.waiting('jam2.' + k) && JSON.stringify(state[k]) === loaded[k]) return;
+      App.store.set('jam2.' + k, state[k]);
+    });
   }
 
   // ---------------- UI ----------------

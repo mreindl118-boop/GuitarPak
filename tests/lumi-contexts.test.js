@@ -20,7 +20,7 @@ function targetFrame(frame) {
       const seed = { 'help.seen': true, 'help.done': true, 'qz.landed': true, 'fb.root': 0, 'fb.scale': 'major',
         'fb.mode': 1, 'pn.hand': 'right', 'pn.pr.guide': true, 'pn.pr.sound': false, 'fb.pr.sound': false,
         'qz.sound': false, 'kl.dbltap': false, 'met.bpm': 240, 'pn.pr.rate': 4, 'fb.pr.rate': 4, 'midi.rangeLo': 48 };
-      Object.keys(seed).forEach(k => localStorage.setItem('guitarlab.' + k, JSON.stringify(seed[k])));
+      Object.keys(seed).forEach(k => localStorage.setItem('soundlab2.' + k, JSON.stringify(seed[k])));
       window.__sent = []; window.__epoch = 0;
       class Port extends EventTarget {
         constructor(id, name) { super(); this.id = id; this.name = name; this.state = 'connected'; this.onmidimessage = null; }

@@ -28,7 +28,7 @@ fs.writeFileSync(wav, buf);
   const b = await chromium.launch({ executablePath: env.CHROMIUM, args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream',
     '--use-file-for-fake-audio-capture=' + wav, '--autoplay-policy=no-user-gesture-required'] });
   const c = await b.newContext();
-  await c.addInitScript(() => { ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true')); localStorage.setItem('guitarlab.met.bpm', '120'); });
+  await c.addInitScript(() => { ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true')); localStorage.setItem('soundlab2.met.bpm', '120'); });
   const p = await c.newPage();
   const errs = []; p.on('pageerror', e => errs.push(String(e)));
   await p.goto(env.URL);

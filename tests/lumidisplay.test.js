@@ -12,8 +12,8 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
 async function newPage(browser, seed) {
   const ctx = await browser.newContext({ viewport: { width: 1200, height: 900 } });
   await ctx.addInitScript((seed) => {
-    ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
-    for (const k in seed) localStorage.setItem('guitarlab.' + k, JSON.stringify(seed[k]));
+    ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true'));
+    for (const k in seed) localStorage.setItem('soundlab2.' + k, JSON.stringify(seed[k]));
     window.__sent = [];
     const inp = { id: 'in1', name: 'LUMI Keys BLOCK', state: 'connected', onmidimessage: null };
     const out = { id: 'out1', name: 'LUMI Keys BLOCK', state: 'connected', send: b => window.__sent.push(Array.from(b)) };

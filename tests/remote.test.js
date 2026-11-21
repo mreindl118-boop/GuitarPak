@@ -8,6 +8,10 @@
 // double-tap key on pages that allow it, routing (help tour first, a sheet
 // folds away, Settings = a test that says it works, a page's onRemote and its
 // label, 'nothing here' toast), the HUD, and the Android bridge path.
+// 2.0 Phase A3b (two apps, plan D44): soundLAB keeps its rule — it acts on a
+// bound press whenever its document is visible, focused or not — and while
+// visible it holds the Web Lock that tells soundLAB Gear the pedal is taken
+// (App.remote.holdsMain). The Gear side is tests/remote-gear.test.js.
 const { chromium } = require('playwright');
 const env = require('./env');
 let fails = 0;
@@ -17,9 +21,9 @@ const J = JSON.stringify;
 async function newPage(browser, seed, native) {
   const ctx = await browser.newContext({ viewport: { width: 1200, height: 900 } });
   await ctx.addInitScript(([seed, native]) => {
-    ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
-    localStorage.setItem('guitarlab.lights.on', 'false');
-    for (const k in seed) localStorage.setItem('guitarlab.' + k, JSON.stringify(seed[k]));
+    ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true'));
+    localStorage.setItem('soundlab2.lights.on', 'false');
+    for (const k in seed) localStorage.setItem('soundlab2.' + k, JSON.stringify(seed[k]));
     window.__wait = ms => new Promise(r => setTimeout(r, ms));
     window.__q = s => document.querySelector(s);
     window.__raw = []; window.__notes = []; window.__remote = []; window.__ev = [];
@@ -51,7 +55,7 @@ async function newPage(browser, seed, native) {
   page.on('pageerror', e => errs.push(e.message));
   await page.goto(env.URL);
   await page.waitForFunction(() => window.App && App.midi && App.midi.ready && App.active === 'quiz' && App.remote);
-  // a test page that records what reaches it (addPage = the plugin page API)
+  // a test page that records what reaches it (addPage = the internal page hook; its third argument is ignored)
   await page.evaluate(() => {
     window.__rm = []; window.__rmKey = true;
     App.addPage('rmtest', 'RM test', 'practice', { init: function () {}, remoteKey: function () { return window.__rmKey; },
@@ -327,6 +331,36 @@ const BOUND = { next: { midi: { t: 'cc', n: 86, ch: null, port: 'MODX-1' }, key:
     const n = __rm.length; delete document.hidden; return n;
   });
   ok(hid === 0, 'nothing fires while the app is hidden');
+  ok(!errs.length, 'no page errors: ' + J(errs)); await ctx.close();
+
+  console.log('# two apps: soundLAB answers the pedal while it is visible, focused or not');
+  ({ ctx, page, errs } = await newPage(browser, { 'remote.map': BOUND }));
+  const nf = await page.evaluate(async () => {
+    App.switchTo('rmtest'); await __wait(270); __rm.length = 0; __raw.length = 0;
+    const o = { app: App.app };
+    // another program has the focus (FL Studio next to soundLAB): the pedal must keep working
+    document.hasFocus = () => false;
+    __press(86); await __wait(60);
+    o.focus = document.hasFocus(); o.rm = __rm.slice(); o.raw = __raw.length; o.hud = __hud();
+    delete document.hasFocus;
+    return o;
+  });
+  ok(nf.app === 'main' && nf.focus === false && nf.rm.join() === 'next:cc' && nf.raw === 0 && /Next/.test(nf.hud),
+    'a bound CC still fires in soundLAB with document.hasFocus() false (and is still claimed): ' + J(nf));
+  // the lock is asked at load and answers a task later
+  const hm0 = await page.waitForFunction(() => App.remote.holdsMain === true, null, { timeout: 5000 }).then(() => true, () => false);
+  const hm = await page.evaluate(async () => {
+    const o = { locks: !!(navigator.locks && navigator.locks.request), visible: App.remote.holdsMain };
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => true }); document.dispatchEvent(new Event('visibilitychange'));
+    await __wait(50); o.hidden = App.remote.holdsMain;
+    delete document.hidden; document.dispatchEvent(new Event('visibilitychange'));
+    const t0 = Date.now(); while (!App.remote.holdsMain && Date.now() - t0 < 3000) await __wait(20);
+    o.back = App.remote.holdsMain;
+    return o;
+  });
+  ok(hm0 && hm.locks && hm.visible === true, 'App.remote.holdsMain is true while soundLAB is visible (it holds the Web Lock soundlab-remote-main:<store prefix>): ' + J([hm0, hm.locks, hm.visible]));
+  ok(hm.hidden === false, 'and false after a stubbed hide (document.hidden + visibilitychange): the lock is let go');
+  ok(hm.back === true, 'visible again: it holds the lock again');
   ok(!errs.length, 'no page errors: ' + J(errs)); await ctx.close();
 
   await browser.close();

@@ -19,7 +19,7 @@
   };
   var ENTRIES = {
     piano: [{ label: 'Keys scale lessons', page: 'piano', target: 'pn-lessons', kind: 'Keyboard lessons' }, { label: 'Wait / Tempo practice', page: 'shed', kind: 'Performance practice' }],
-    synth: [{ label: 'Keys scale lessons', page: 'piano', target: 'pn-lessons', kind: 'Keyboard lessons' }, { label: 'Synth keyboard', page: 'synth', kind: 'Instrument' }, { label: 'Wait / Tempo practice', page: 'shed', kind: 'Performance practice' }],
+    synth: [{ label: 'Keys scale lessons', page: 'piano', target: 'pn-lessons', kind: 'Keyboard lessons' }, { label: 'Synth keyboard', page: 'piano', voice: 'synth', kind: 'Instrument' }, { label: 'Wait / Tempo practice', page: 'shed', kind: 'Performance practice' }],
     guitar: [{ label: 'Guitar fretboard', page: 'fretboard', kind: 'Guitar' }, { label: 'Guitar tab & notation', page: 'tab', kind: 'Guitar' }, { label: 'Performance practice', page: 'shed', kind: 'Performance practice' }],
     bass: [{ label: 'Bass fretboard exercises', page: 'quiz', level: 'notes/nat/neck/1', kind: 'Four-string bass' }, { label: 'Bass performance practice', page: 'shed', kind: 'Performance practice' }, { label: 'Guitar tab reference', page: 'tab', kind: 'Shared reference · six-string guitar' }],
     drums: [{ label: 'Drum pads', page: 'pads', kind: 'Drums' }, { label: 'Drum & rhythm library', page: 'shed', kind: 'Rhythm practice' }],
@@ -62,6 +62,12 @@
       if (entry.page === 'shed') App.emit('learn:practice', { instrument: selected });
       if (entry.target === 'pn-lessons') App.emit('learn:lesson', { instrument: selected, kind: 'keys' });
       App.switchTo(entry.page);
+      // "Synth keyboard": the Piano page with the last synth sound picked
+      // (pn.synthPreset); Super saw when that sound is not there any more
+      if (entry.voice === 'synth' && App.keys && App.keys.setVoice) {
+        var last = App.store.get('pn.synthPreset', 'saw');
+        if (last === 'piano' || !App.keys.setVoice(last)) App.keys.setVoice('saw');
+      }
       if (entry.level && window.SLQuiz) SLQuiz.start(entry.level);
       if (entry.target) { var target = document.getElementById(entry.target); if (target) target.scrollIntoView({ block: 'start' }); }
     });

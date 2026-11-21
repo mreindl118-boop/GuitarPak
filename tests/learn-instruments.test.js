@@ -9,10 +9,10 @@ function ok(value, message) { if (!value) throw new Error(message); checks++; co
   try {
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     await context.addInitScript(() => {
-      ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
-      localStorage.setItem('guitarlab.qz.prog', JSON.stringify({ 'notes/nat/treble/1': { b: 9, s: 2 } }));
-      localStorage.setItem('guitarlab.xp.total', '77');
-      localStorage.setItem('guitarlab.xp.days', JSON.stringify({ '2026-01-01': { x: 77, s: 30, p: 0, q: 2, k: 1, l: 1, u: {} } }));
+      ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true'));
+      localStorage.setItem('soundlab2.qz.prog', JSON.stringify({ 'notes/nat/treble/1': { b: 9, s: 2 } }));
+      localStorage.setItem('soundlab2.xp.total', '77');
+      localStorage.setItem('soundlab2.xp.days', JSON.stringify({ '2026-01-01': { x: 77, s: 30, p: 0, q: 2, k: 1, l: 1, u: {} } }));
     });
     const page = await context.newPage(), errors = [];
     page.on('pageerror', error => errors.push(error.message));
@@ -88,6 +88,34 @@ function ok(value, message) { if (!value) throw new Error(message); checks++; co
     await page.selectOption('#learn-instrument', 'piano');
     await page.locator('[data-learn-entry="0"]').click();
     ok(await page.evaluate(() => App.active === 'piano') && await page.locator('#pn-lessons').isVisible(), 'Piano lesson entry opens the real keys lesson module');
+    // 2.0: there is no Synth page; the Synth category's "Synth keyboard" entry is the Piano page with a synth sound
+    await page.evaluate(() => App.switchTo('quiz'));
+    await page.selectOption('#learn-instrument', 'synth');
+    const synthKeyboard = page.locator('#learn-instrument-links button', { hasText: 'Synth keyboard' });
+    ok(await synthKeyboard.count() === 1, 'the Synth category keeps its "Synth keyboard" entry');
+    await synthKeyboard.click();
+    const sound = () => page.evaluate(() => {
+      const select = document.getElementById('pn-voice');
+      return { active: App.active, panel: !!document.getElementById('panel-synth'), picked: select ? select.value : null, stored: App.store.get('pn.voice', null),
+        last: App.store.get('pn.synthPreset', null), synths: (window.DAW && DAW.SYNTH_PRESETS || []).map(preset => preset.id),
+        label: select && select.closest('label') ? select.closest('label').textContent.trim().slice(0, 5) : null };
+    });
+    const firstSynth = await sound();
+    ok(firstSynth.active === 'piano' && !firstSynth.panel && await page.locator('#pn-voice').isVisible() && firstSynth.label === 'Sound',
+      'Synth keyboard lands on the Piano page (no Synth page) with its Sound picker in view');
+    ok(firstSynth.picked !== 'piano' && firstSynth.synths.includes(firstSynth.picked) && firstSynth.stored === firstSynth.picked && firstSynth.last === firstSynth.picked,
+      'with a synth sound selected, stored as the keyboard sound and as the last synth sound: ' + JSON.stringify([firstSynth.picked, firstSynth.stored, firstSynth.last]));
+    // the entry returns to the synth sound used last, after the grand piano was picked again
+    const otherSynth = firstSynth.synths.find(id => id !== firstSynth.picked);
+    await page.selectOption('#pn-voice', otherSynth);
+    await page.selectOption('#pn-voice', 'piano');
+    const grand = await sound();
+    await page.evaluate(() => App.switchTo('quiz'));
+    await page.locator('#learn-instrument-links button', { hasText: 'Synth keyboard' }).click();
+    const lastSynth = await sound();
+    ok(grand.picked === 'piano' && grand.stored === 'piano' && grand.last === otherSynth && lastSynth.active === 'piano' && lastSynth.picked === otherSynth && lastSynth.stored === otherSynth,
+      'Synth keyboard comes back to the last synth sound after the grand piano was chosen: ' + JSON.stringify([otherSynth, grand.picked, lastSynth.picked]));
+    await page.selectOption('#pn-voice', 'piano');
     await page.evaluate(() => App.switchTo('quiz'));
     await page.selectOption('#learn-instrument', 'bass');
     await page.locator('[data-learn-entry="0"]').click();

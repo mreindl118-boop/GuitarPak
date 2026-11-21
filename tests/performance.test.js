@@ -17,11 +17,11 @@ const TEMPO = { title: 'Original browser fixture: timed melody', bpm: 120, len: 
   try {
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     await context.addInitScript(() => {
-      ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
-      localStorage.setItem('guitarlab.midi.outputId', '"lumi-out"');
-      localStorage.setItem('guitarlab.lights.displayEnabled', 'true');
-      localStorage.setItem('guitarlab.lights.led', '"scale"');
-      localStorage.setItem('guitarlab.fb.root', '0'); localStorage.setItem('guitarlab.fb.scale', '"major"');
+      ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true'));
+      localStorage.setItem('soundlab2.midi.outputId', '"lumi-out"');
+      localStorage.setItem('soundlab2.lights.displayEnabled', 'true');
+      localStorage.setItem('soundlab2.lights.led', '"scale"');
+      localStorage.setItem('soundlab2.fb.root', '0'); localStorage.setItem('soundlab2.fb.scale', '"major"');
       window.__performanceSent = [];
       class Port extends EventTarget {
         constructor(id, name) { super(); this.id = id; this.name = name; this.state = 'connected'; this.onmidimessage = null; }

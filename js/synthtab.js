@@ -2,8 +2,7 @@
  *   deck     PERFORM face (this file) over the Synth Deck's data, plus EDIT =
  *            the MIDI Hub's Control view (knob card + the deck's Knobs /
  *            Buttons / Sounds / Scope / Map), borrowed while this page is open
- *            and handed back on leave — one DOM, like the Keys page's 'synth'
- *            pill borrows the piano
+ *            and handed back on leave (one DOM)
  *   liveset  Live sets: pages of 16 presets (step 5)
  *   midihub  the MIDI Hub as it is (pill "Hub")
  * Plan: docs/SYNTH-TAB-PLAN.md. Decisions (Matt, 2026-10-25): STRIPS not
@@ -578,6 +577,9 @@
       // a refused send (the deck's funnel, a remote press): repaint and nudge the connect panel
       App.on('synth:conn', function (d) { if (App.active !== 'deck') return; paint(); if (d && d.refused) nudgeConn(); });
       App.on('deck:assignnames', function () { if (App.active === 'deck') render(); }); // the strips take the Performance's knob names
+      // the factory sound names arrived (js/synthdeck.js loads them on first use): the Now bar and the slots
+      // take them. The Deck is the first page of soundLAB Gear, on screen before that file is in
+      App.on('deck:factorynames', function () { if (App.active === 'deck') schedulePaint(); });
       App.on('midihub:split', function () { if (App.active === 'deck') { paintChips(); if (els.sheet && !els.sheet.hidden) paintSplitBox(); } });
       App.on('synthlive:slot', function () { if (App.active === 'deck') schedulePaint(); });
       App.on('midi:note', function (d) { if (!splitLearning || !d || !d.on || !els.splitat) return; splitLearning = false; els.splitat.value = String(Math.max(36, Math.min(84, d.midi))); paintSplitBox(); });
