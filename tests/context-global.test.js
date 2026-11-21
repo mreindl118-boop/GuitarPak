@@ -4,7 +4,7 @@ const { chromium } = require('playwright');
 const fs = require('fs'), path = require('path'), env = require('./env');
 let checks = 0;
 function ok(value, message) { if (!value) throw new Error(message); checks++; console.log('  PASS', message); }
-const pages = ['quiz', 'practiceplan', 'fretboard', 'tab', 'notation', 'chords', 'piano', 'chart', 'pads', 'songs', 'jam', 'shed', 'tuner', 'theory', 'settings']; // 2.0: the Synth, LUMI and Trainer pages are folded into Piano and Plan; Deck, Live sets, the MIDI Hub and Helix are soundLAB Gear (their matrix is in tests/gear.test.js)
+const pages = ['quiz', 'practiceplan', 'fretboard', 'tab', 'notation', 'chords', 'piano', 'chart', 'pads', 'songs', 'jam', 'shed', 'vocal', 'tuner', 'theory', 'settings']; // 2.0: the Synth, LUMI and Trainer pages are folded into Piano and Plan; Deck, Live sets, the MIDI Hub and Helix are soundLAB Gear (their matrix is in tests/gear.test.js)
 async function switchTo(page, name) {
   await page.evaluate(name => App.switchTo(name), name);
   await page.waitForFunction(name => App.active === name, name);

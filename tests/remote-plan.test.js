@@ -271,7 +271,7 @@ async function newPage(browser, seed) {
     o.b2 = __ra('back');
     // a plan with no matching blocks: nothing to move on to or back to
     App.switchTo('practiceplan'); await __wait(60);
-    P.preview('Sing the melody'); P.accept();
+    P.preview('Sight-read the melody'); P.accept();
     o.empty = JSON.stringify([P.state().availableItems.length, __ra('next'), __ra('back'), __ra('stop')]);
     return o;
   });

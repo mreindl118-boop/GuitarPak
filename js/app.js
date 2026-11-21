@@ -59,13 +59,13 @@ window.App = (function () {
   if (APP_ID === 'gear') document.documentElement.setAttribute('data-app', 'gear'); // css keys on it; SL_APP alone has no tag
   var APPS = {
     main: { url: 'index.html', name: 'soundLAB', tabKey: 'app.tab',
-      pages: ['quiz', 'practiceplan', 'fretboard', 'tab', 'notation', 'chords', 'piano', 'chart', 'pads', 'songs', 'jam', 'shed', 'tuner', 'theory'],
+      pages: ['quiz', 'practiceplan', 'fretboard', 'tab', 'notation', 'chords', 'piano', 'chart', 'pads', 'songs', 'jam', 'shed', 'vocal', 'tuner', 'theory'],
       groups: [
         { id: 'gtheory', label: 'Learn', icon: 'learn', pages: ['quiz', 'chords', 'theory', 'practiceplan'] }, // Exercises = the home
         { id: 'ginst', label: 'Guitar', icon: 'guitar', pages: ['fretboard', 'tab', 'notation'] },
         { id: 'gkeys', label: 'Keys', icon: 'keys', pages: ['piano', 'chart', 'pads'] }, // synth sounds = the Sound picker on Piano; LUMI practice = a section under its lessons
         { id: 'gplay', label: 'Play', icon: 'note', pages: ['songs', 'jam'] },
-        { id: 'gprac', label: 'Train', icon: 'target', pages: ['shed', 'tuner'] } // 1.3 (primer A1): the tab is called 'Train' // the game first
+        { id: 'gprac', label: 'Train', icon: 'target', pages: ['shed', 'vocal', 'tuner'] } // 1.3 (primer A1): the tab is called 'Train' // the game first
       ] },
     gear: { url: 'gear.html', name: 'soundLAB Gear', tabKey: 'gear.tab',
       pages: ['deck', 'liveset', 'midihub', 'helix'],
@@ -88,7 +88,7 @@ window.App = (function () {
     chords: 'Chords', piano: 'Piano', songs: 'Songs', jam: 'Jam', tuner: 'Tuner',
     theory: 'Theory', settings: 'Settings', shed: 'Shed',
     pads: 'Pads',
-    quiz: 'Exercises', midihub: 'MIDI Hub', deck: 'Synth deck', liveset: 'Live sets', practiceplan: 'Practice plan', helix: 'Helix Stadium', chart: 'Chord charts'
+    quiz: 'Exercises', midihub: 'MIDI Hub', deck: 'Synth deck', liveset: 'Live sets', practiceplan: 'Practice plan', helix: 'Helix Stadium', chart: 'Chord charts', vocal: 'Voice trainer'
   };
   // overlays live outside the page list: the metronome opens as a SHEET over
   // whatever page you're on (corner icon), settings toggles in place (gear)
@@ -100,7 +100,7 @@ window.App = (function () {
     chords: 'Chords', theory: 'Circle', songs: 'Songs', jam: 'Jam',
     shed: 'Woodshed', metronome: 'Metronome', tuner: 'Tuner',
     pads: 'Pads',
-    quiz: 'Exercises', midihub: 'Hub', deck: 'Deck', liveset: 'Live', practiceplan: 'Plan', helix: 'Helix', chart: 'Charts'
+    quiz: 'Exercises', midihub: 'Hub', deck: 'Deck', liveset: 'Live', practiceplan: 'Plan', helix: 'Helix', chart: 'Charts', vocal: 'Voice'
   };
 
   function groupOf(name) {
@@ -119,7 +119,7 @@ window.App = (function () {
   //            when an APK is actually built. Older APKs read nothing else, so
   //            this must never run ahead of the real file: when it did, the
   //            Android app kept downloading the same old APK in a loop.
-  var APP_VERSION = '2.0.0';
+  var APP_VERSION = '2.1.0';
   var UPDATE_INFO_URL = 'https://raw.githubusercontent.com/mreindl118-boop/GuitarPak/main/version.json';
 
   function verNum(v) {

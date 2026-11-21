@@ -23,7 +23,7 @@
     guitar: [{ label: 'Guitar fretboard', page: 'fretboard', kind: 'Guitar' }, { label: 'Guitar tab & notation', page: 'tab', kind: 'Guitar' }, { label: 'Performance practice', page: 'shed', kind: 'Performance practice' }],
     bass: [{ label: 'Bass fretboard exercises', page: 'quiz', level: 'notes/nat/neck/1', kind: 'Four-string bass' }, { label: 'Bass performance practice', page: 'shed', kind: 'Performance practice' }, { label: 'Guitar tab reference', page: 'tab', kind: 'Shared reference · six-string guitar' }],
     drums: [{ label: 'Drum pads', page: 'pads', kind: 'Drums' }, { label: 'Drum & rhythm library', page: 'shed', kind: 'Rhythm practice' }],
-    voice: [{ label: 'Ear-training exercises', page: 'quiz', level: 'notes/pitch/ear/1', kind: 'Shared ear training' }, { label: 'Monophonic pitch practice', page: 'shed', kind: 'Audio or virtual input' }, { label: 'Pitch tuner', page: 'tuner', kind: 'Pitch reference' }],
+    voice: [{ label: 'Voice trainer', page: 'vocal', kind: 'Pitch line, takes and scores' }, { label: 'Ear-training exercises', page: 'quiz', level: 'notes/pitch/ear/1', kind: 'Shared ear training' }, { label: 'Monophonic pitch practice', page: 'shed', kind: 'Audio or virtual input' }, { label: 'Pitch tuner', page: 'tuner', kind: 'Pitch reference' }],
     other: [{ label: 'Performance practice', page: 'shed', kind: 'Explicit instrument selection' }, { label: 'Circle of fifths', page: 'theory', kind: 'Shared theory' }]
   };
   var saved = App.store.get('learn.instrument', 'piano'), selected = IDS.indexOf(saved) >= 0 ? saved : 'piano', bar = null;
