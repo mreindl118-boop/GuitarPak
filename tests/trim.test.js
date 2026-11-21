@@ -31,7 +31,7 @@
 // the Synth pill is the Sound picker on Piano, LUMI practice is a section
 // under the Keys lessons:
 //   - no pill reads Trainer, Synth or LUMI; Keys is Piano | Charts | Pads,
-//     Train is Woodshed | Tuner
+//     Train is Woodshed | Voice | Tuner
 //   - App.switchTo('trainer' / 'synth' / 'lumipractice') lands on Plan / Piano
 //     / Piano and says where the feature went; so does a stored last page
 //   - a stored pill (app.gtab.gkeys = synth, app.gtab.gprac = trainer) opens
@@ -40,7 +40,7 @@
 //     level, and says why it does not under a category without ear training
 // A3b = the Deck, Live sets, the MIDI Hub and Helix are soundLAB Gear
 // (gear.html, plan section 7; tests/gear.test.js holds Gear to its side):
-//   - soundLAB loads none of the gear modules and has 14 pages in five tabs;
+//   - soundLAB loads none of the gear modules and has 15 pages in five tabs;
 //     no tab or pill reads Synth, Helix, Deck, Live or Hub
 //   - the Hub's "Apply rules to what soundLAB hears" still works here: a
 //     stored rule shapes what the Piano page receives, and Settings › MIDI
@@ -62,7 +62,7 @@ const J = JSON.stringify;
 // ---- what this app is (A2 and A3b edited these lists) ----
 // soundLAB's page list (js/app.js APPS.main.pages), in its order; Settings is an overlay page
 const PAGES = ['quiz', 'practiceplan', 'fretboard', 'tab', 'notation', 'chords', 'piano', 'chart', 'pads',
-  'songs', 'jam', 'shed', 'tuner', 'theory'];
+  'songs', 'jam', 'shed', 'vocal', 'tuner', 'theory'];
 // soundLAB Gear's pages (APPS.gear.pages): gear.html has them, index.html does not
 const GEAR_PAGES = ['deck', 'liveset', 'midihub', 'helix'];
 const TABS = 'Learn|Guitar|Keys|Play|Train';
@@ -434,7 +434,7 @@ const lines = a => a.length ? '\n    ' + a.join('\n    ') : '';
     ok(mem.keys.active === 'piano' && mem.keys.shown === 'piano' && mem.keys.seen, 'app.gtab.gkeys = synth: the Keys tab opens Piano with a visible panel: ' + J([mem.keys.active, mem.keys.shown, mem.keys.seen]));
     ok(mem.keys.pills === 'Piano|Charts|Pads' && mem.keys.stored === 'piano', 'Keys is Piano | Charts | Pads, and it remembers a real page again: ' + J([mem.keys.pills, mem.keys.stored]));
     ok(mem.train.active === 'shed' && mem.train.shown === 'shed' && mem.train.seen, 'app.gtab.gprac = trainer: the Train tab opens the Woodshed with a visible panel: ' + J([mem.train.active, mem.train.shown, mem.train.seen]));
-    ok(mem.train.pills === 'Woodshed|Tuner' && mem.train.stored === 'shed', 'Train is Woodshed | Tuner, and it remembers a real page again: ' + J([mem.train.pills, mem.train.stored]));
+    ok(mem.train.pills === 'Woodshed|Voice|Tuner' && mem.train.stored === 'shed', 'Train is Woodshed | Voice | Tuner, and it remembers a real page again: ' + J([mem.train.pills, mem.train.stored]));
   }
   // the same for the last page of a 1.x session (app.tab is copied across): it comes back as the page that took the feature in
   await page.evaluate(() => localStorage.setItem('soundlab2.app.tab', JSON.stringify('lumipractice')));
