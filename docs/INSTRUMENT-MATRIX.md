@@ -1,7 +1,9 @@
 # soundLAB 2.0 — instrument matrix (Phase B0)
 
 Written 2026-11-14 and finished the same day after the review of the Phase B plan. Checked against branch `v2`
-with all five Phase A steps (commit `a914df2`).
+with all five Phase A steps (commit `a914df2`). Brought up to date on 2026-11-21 for soundLAB 2.1.0 (MIDI
+guitar, the voice trainer, the weak-spot map): the section "Changed by soundLAB 2.1.0" near the end lists what
+moved.
 
 The roadmap says: "Four instruments, one kit. Guitar, bass (incl. 5-string fretless), keys and drums each
 get lessons, exercises, Woodshed, Help levels, plan blocks and progress. Note input on every practice page:
@@ -38,7 +40,7 @@ Of the 56 cells, 15 work, 26 work partly, 11 are missing and 4 do not apply.
 | **Plan blocks** | **Partly.** A scale line opens the Neck, but that block can never be ticked off. → 4, 22 | **Partly.** A scale line finds nothing. → 22 | **Works.** A scale line opens the exact lesson. | **Partly.** "Rudiments" opens the Woodshed list, not the rudiment named. A beat finds nothing. → 22 |
 | **Progress / XP** | **Partly.** Exercises and Woodshed count. Neck, Chords, Jam and Songs do not. → 4 | **Partly.** The same. → 4 | **Works.** Lessons, Exercises and Woodshed count. | **Partly.** Rudiments count. Pads do not. → 4, 17 |
 | **Note input by audio** | **Partly.** Single notes over the whole guitar range. No chords. → 9 (strums are counted; chords: no task, see below) | **Partly.** The D and G strings only. The E string, the A string and a low B are not heard. → 2 | **Partly.** Single notes only. Keys use MIDI. No task, see below | **Partly.** A loud hit counts, in the Woodshed only. It cannot tell drums apart. → 16, 17 |
-| **Note input by MIDI** | **Partly.** A MIDI guitar is heard as if it were a keyboard. The string is not known. → 3 | **Partly.** The same. → 3 | **Works.** | **Partly.** A pad controller plays Pads. In the Woodshed any note is a hit. → 16 |
+| **Note input by MIDI** | **Partly.** Since 2.1 a MIDI guitar with one channel per string is found by one strum, and the Neck lights the string and fret you played. Exercises and the Woodshed still grade the pitch only. → 3 | **Partly.** A MIDI bass is heard as if it were a keyboard. The string is not known. → 3 | **Works.** | **Partly.** A pad controller plays Pads. In the Woodshed any note is a hit. → 16 |
 | **On-screen instrument** | **Works.** Neck, Tab, Notation; five tunings. | **Missing.** No bass neck: not 4-string, not 5-string, not fretless. → 10, 11 | **Works.** Piano. | **Partly.** Eight pads to play. Nothing to follow. → 17 |
 | **LUMI lights** | **Partly.** The lights follow the Neck runner and Songs. Chords lights this chord, not the next. → 25 | — (no bass page yet) | **Works.** | **Partly.** Pads light their eight keys. No "this pad next". → 17 |
 | **Tuner** | **Works.** | **Partly.** It reads the D and G strings. No bass string guide. → 13 | — | — |
@@ -70,10 +72,11 @@ inside the Exercises questions.
    finds them, but only after you open its range settings and type a lower number. The detector can do it
    when it is given a longer listening window, so this is a setting to fix, not a new invention. It has not
    been tried with a real bass.
-2. **A MIDI guitar is heard as a keyboard.** Its notes arrive on every page and are graded by pitch. But the
-   app does not use the six channels to know which string you played, so the neck lights every place that
-   pitch can be played, and "find it on the A string" accepts any string. Pitch bend is already ignored by
-   default, which suits a guitar. Not tried with a real MIDI guitar.
+2. **A MIDI guitar's string is known on the Neck, but not yet when you are graded.** Since 2.1 a guitar that
+   sends each string on its own channel is found by one strum, and the Neck lights the one string and fret you
+   played. Exercises and the Woodshed still hear only the pitch, so "find it on the A string" accepts any
+   string. A bass is not covered. Pitch bend is ignored by default, which suits a guitar. Not tried with a real
+   MIDI guitar (the 2.1 notes say the same of the channel order).
 3. **The Help level is for keys only.** Full, Colors, Target, Tonic and None change the Piano page, the Keys
    lessons and the key lights. The neck and the pads do not react to it.
 4. **Only four places keep score.** Exercises, Keys lessons, Woodshed runs and Guided performance write
@@ -91,7 +94,10 @@ The instrument picker on the Learn pages has seven entries. Besides the four ins
 - **Synth** has exactly the same exercises and lessons as Piano and keeps its own, separate progress. Its
   one extra is a button that opens the Piano page with a synth sound.
 - **Voice** is for singers: the shared reading, ear and theory exercises, with pointers to the Woodshed and
-  the Tuner. The app says itself that it is "not a vocal technique curriculum".
+  the Tuner. Since 2.1 it also has a page of its own, Train > Voice: you sing a five-note scale or hold a note,
+  see your pitch as a line over the targets, and get a score for each take. Takes count toward your streak and
+  daily goal, and a "sing" line in a plan opens the page. Range, warm-ups and harmony are planned there, not
+  built.
 - **Other** is for any instrument not on the list: the shared exercises, and a place for its progress.
 
 ## The gap list: task candidates for Phase C
@@ -105,7 +111,7 @@ Size: **S** = about a day. **M** = several days, one pull request. **L** = more 
 |---|---|---|---|---|---|
 | 1 | One instrument table | You choose "Bass, 5 strings, fretless" once. Every page then knows the strings, the tuning, the lowest note and the clef. | M | your answers to questions 1 and 2 | "Four instruments, one kit … bass (incl. 5-string fretless)" |
 | 2 | One listener, with a range per instrument | A bass is heard down to its low E, a five-string down to low B, on every page, with one switch. | M | 1; a real bass to test with | "audio interface direct input (pitch detection)" |
-| 3 | MIDI guitar as its own kind of input | The neck shows the string you played. "Find it on the A string" is really checked. | M | a MIDI guitar to test with | "any MIDI source (incl. a MIDI guitar)" |
+| 3 | MIDI guitar: use the string when grading | 2.1 did the first half (found by one strum, string and fret shown on the Neck). Left: "find it on the A string" is really checked in Exercises, the Woodshed can ask for a position, and a MIDI bass with four or five channels is understood. | S–M | a MIDI guitar to test with | "any MIDI source (incl. a MIDI guitar)" |
 | 4 | Progress from every practice page | Time on the Neck, on Pads and in Jam counts toward your streak and daily goal. | S per page | — | "each get … progress" |
 
 ### Guitar
@@ -227,7 +233,8 @@ given there is copied here.
 
 ## Where the facts come from
 
-Lines are those of commit `a914df2`. The longer version, with every check that was run, is the map
+Lines are those of commit `a914df2` (`git show a914df2:<file>`). soundLAB 2.1.0 has since moved lines in
+`js/quiz.js`, `js/midi.js`, `js/fretboard.js`, `js/settings.js` and `js/practiceplan.js`. The longer version, with every check that was run, is the map
 `map-matrix.md` that belongs to the Phase B plan.
 
 | Row | Evidence |
@@ -248,6 +255,21 @@ Lines are those of commit `a914df2`. The longer version, with every check that w
 | Songs | Six-line tab: `js/songs.js:76`, `:682`. Drum channel dropped: `:144`. Low notes moved up: `:168-171`. Open a score: `:546` |
 | Jam | Mixer with a Mute per player: `js/jam.js:1090-1105`. Neck follows: `js/fretboard.js:466-503` |
 | Charts | Keyboards only: `js/chordchart.js:1-6`, `:18-21` |
+
+## Changed by soundLAB 2.1.0 (19 November 2026)
+
+2.1.0 was built in another line of work while this page waited to be merged. It closes part of three gaps and
+changes no cell's status (the counts above stand):
+
+- **MIDI guitar** (`js/midiguitar.js`, `docs/MIDI-GUITAR.md`): a guitar with one MIDI channel per string is
+  found by one strum; the Neck lights the string and fret played (`js/fretboard.js`, the `guitar:note` event).
+  Task 3 is now only its second half: use the string when grading. Finding 2 and the guitar cell of "Note input
+  by MIDI" are rewritten above.
+- **Voice trainer** (`js/vocal.js`, page `vocal`, Train > Voice, `docs/VOCAL-TRAINER.md`): the Voice category
+  has a page of its own. soundLAB has 15 pages with it. It is not one of the four instruments of the table.
+- **Weak-spot map** (`js/quiz.js`): Exercises shows which frets and strings (guitar, bass) or which notes (keys)
+  you miss or answer slowly, and the note levels ask those more often. This helps the "Exercises" row for
+  guitar, bass and keys; the gaps named there (few neck levels, no five-string, no bass topics) are unchanged.
 
 ## Changed by Phase B
 

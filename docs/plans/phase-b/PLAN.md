@@ -2577,3 +2577,29 @@ above. Each step that departs from the plan adds its lines here in its own pull 
 - **T2 also reads `index.html` and `gear.html`**, not only `css/` and `js/`.
 - **Counts.** The suite's own counter is the contract: 220 raw colours in 27 files of `js/` after the allow list
   (this plan says 239 before it); `--teal` has 11 uses in soundLAB's files (this plan says 9).
+
+### soundLAB 2.1.0 merged underneath (21 November 2026)
+
+`v2` moved to 2.1.0 (pull requests #107-#111: the weak-spot map in Exercises, MIDI guitar input, the voice
+trainer) while Phase A and B0-B1a waited to be merged. `v2` was merged into the whole stack. What that changes
+for this plan:
+
+- **Every `file:line` of this plan is still a line of `a914df2`** (`git show a914df2:<file>`). In the merged
+  tree the lines of `js/quiz.js`, `js/midi.js`, `js/fretboard.js`, `js/settings.js`, `js/practiceplan.js`,
+  `js/app.js`, `css/style.css`, `index.html` and `sw.js` have moved; find by name.
+- **One more page.** `vocal` (Train > Voice, `js/vocal.js`, `js/vocal-analysis.js`) is soundLAB's 15th page;
+  the home will be the 16th. Train is Woodshed | Voice | Tuner. The page needs its own re-skin step, beside the
+  Tuner (B15b): it is a practice page (the pitch graph is its hero). Its CSS is already written with tokens.
+- **Tokens are read today.** The voice trainer and the weak-spot map use `--sl-*` tokens, so "nothing reads a
+  token" (B1a) no longer holds for those two: B1a's corrected light values show there at once.
+- **Cache numbers.** 2.1.0 took `v6`. Phase A is now `v7`-`v11`, B1a `v12`; every number of section 3 is 2
+  higher, and it rises again with each release that lands first. The rule is only that the number rises.
+- **The `tokens` ceilings** were raised to the merged counts (`css/style.css` 55, `js/quiz.js` 21 raw colours
+  and its old variables, `js/vocal.js` 10).
+- **MIDI guitar** (`js/midiguitar.js`) gives the Neck the string and fret played; the instrument matrix says
+  what is left of its task 3.
+- **Open on `v2`, not merged:** pull request #112 turns the clef into a chip that shows the key and tempo on
+  every page, makes Chords use the shared tempo (this plan's B11 item) and hides the Studio button behind a
+  setting (Phase A1 removes the Studio). If it lands, B5a (the key bar) builds on that chip instead of the
+  clef, B11 loses its tempo item, and A1's removal of `#space-btn` meets its new code.
+
