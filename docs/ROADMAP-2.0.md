@@ -103,13 +103,13 @@ Removed in 2.0: `js/studio.js`, `js/arrange.js`, `js/plugins.js`, `plugins/`, `P
 Plan: `docs/plans/phase-b/PLAN.md`. 24 draft pull requests into `v2`, at most three open at a time.
 Phase B is not a release. The instrument matrix of Phase B0 is `docs/INSTRUMENT-MATRIX.md`.
 The owner's questions and the four drawings that open B5a, B6, B9 and B16: `docs/design/phase-b/index.html`
-(added by step B1b).
+(added by step B1b). The specification every later step builds from: `docs/DESIGN-SYSTEM.md`.
 
 | Step | What | Pull request | State |
 |---|---|---|---|
-| B0 | The instrument matrix | #105 | in review (pull request #105, ready for review) |
-| B1a | Tokens that pass, the `tokens` suite, the plan | # | in review (draft pull request) |
-| B1b | The specification, the drawings, the wording list | # | |
+| B0 | The instrument matrix | #105 | in review (ready for review) |
+| B1a | Tokens that pass, the `tokens` suite, the plan | #106 | in review (ready for review) |
+| B1b | The specification, the drawings, the wording list | # | in review (draft pull request) |
 | B2 | Colour bridge, `look` suite, screenshot tool | # | |
 | B3 | Component sheet, gallery, instrument drawings | # | |
 | B4 | The shell built once from JavaScript | # | |
@@ -131,6 +131,10 @@ The owner's questions and the four drawings that open B5a, B6, B9 and B16: `docs
 | B16 | The lighting vocabulary on every instrument drawing (waits for G4) | # | |
 | B17 | Settings | # | |
 | B18 | Clean-up, documents | # | |
+
+soundLAB 2.1.0 was merged underneath Phase B and added a 15th page, Train › Voice. It is a practice page and gets
+the new look in a step of its own beside the Tuner's (B15b); the table above was written before it and has no row
+for it yet.
 
 When Phase B is done, and until Phase H: soundLAB Gear has the new shell with its key bar folded, and its four
 pages in the old look; `css/style.css` keeps the old variables and shared classes for them; the Player card on
