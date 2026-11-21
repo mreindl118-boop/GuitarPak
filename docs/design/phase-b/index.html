@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>The new look: your questions · soundLAB 2.0 drawings</title>
+<!--
+  soundLAB 2.0 Phase B, step B1b: the owner's page (docs/plans/phase-b/PLAN.md, table B1b.1,
+  first row; section 9 "For the owner"). It asks the four gates G1 to G4, each beside its
+  phone and desktop picture, then lists what is decided unless the owner says otherwise
+  (items 1 to 13), the questions from the instrument matrix (14 to 18) and the housekeeping
+  question (19). Every text is plain words for a musician; step and decision numbers of the
+  plan are left out on purpose.
+
+  The texts are written in the markup, so the page reads without script. The script only adds
+  the small pictures: a list in data-frames on a .mk-frames element becomes frames built by
+  Mock.figure and sized by Mock.fit (mock.js). ?theme=dark|light sets this page's theme and the
+  pictures' theme.
+
+  The styles are drawing-only: the page is laid out with mock.css's contact-view rules, plus
+  the few rules below, written from tokens.
+-->
+<link rel="icon" href="../../../icons/icon.svg">
+<link rel="stylesheet" href="../../../css/tokens.css">
+<link rel="stylesheet" href="mock.css">
+<style>
+/* drawing-only */
+html { background: var(--sl-bg); scroll-behavior: smooth; }
+.mk-owner { max-width: calc(var(--sl-space-8) * 15); margin: 0 auto; }
+.mk-owner .mk-contact-head { max-width: 68ch; }
+.mk-owner .mk-group { scroll-margin-top: var(--sl-space-4); padding-top: var(--sl-space-5); border-top: 1px solid var(--sl-line-strong); }
+.mk-owner .mk-group > h2 { margin-top: var(--sl-space-2); }
+.mk-owner .mk-group > h3, .mk-item > h3 {
+  margin: var(--sl-space-5) 0 var(--sl-space-1);
+  font-family: var(--sl-font-cond);
+  font-size: var(--sl-text-lg);
+  font-weight: var(--sl-weight-cond-bold);
+  line-height: 1.25;
+}
+.mk-owner .mk-group > p, .mk-item > p { max-width: 68ch; margin: var(--sl-space-2) 0 0; color: var(--sl-ink-soft); line-height: var(--sl-leading); }
+.mk-owner .mk-group > p.sl-eyebrow { margin: 0; color: var(--sl-accent-text); }
+.mk-owner .mk-group > p.mk-ask { margin-top: var(--sl-space-3); color: var(--sl-ink); font-size: var(--sl-text-lg); }
+.mk-owner b { color: var(--sl-ink); }
+/* a link: accent text with a line under it, and a touch target as high as a control */
+.mk-owner a:not(.chip) { color: var(--sl-accent-text); text-underline-offset: 0.2em; }
+.mk-links { display: flex; flex-wrap: wrap; gap: 0 var(--sl-space-5); max-width: 76ch; margin: var(--sl-space-3) 0 0; padding: 0; list-style: none; font-size: var(--sl-text-sm); }
+.mk-links a { display: inline-flex; align-items: center; min-height: var(--sl-control-h); }
+/* what is not settled, said beside the picture */
+.mk-open {
+  max-width: 68ch;
+  margin-top: var(--sl-space-4);
+  padding: var(--sl-space-3) var(--sl-space-4);
+  border: 1px solid var(--sl-line-control);
+  border-radius: var(--sl-radius-md);
+  background: var(--sl-surface-2);
+}
+.mk-owner .mk-group > .mk-open, .mk-item > .mk-open { color: var(--sl-ink-soft); }
+.mk-more { display: flex; flex-wrap: wrap; gap: 0 var(--sl-space-5); margin-top: var(--sl-space-1); font-size: var(--sl-text-sm); }
+.mk-more a { display: inline-flex; align-items: center; min-height: var(--sl-control-h); }
+.mk-open > b:first-child, .mk-waits > b:first-child, .mk-choice dt {
+  display: block;
+  margin-bottom: var(--sl-space-1);
+  color: var(--sl-ink-muted);
+  font-family: var(--sl-font-cond);
+  font-size: var(--sl-text-xs);
+  font-weight: var(--sl-weight-cond);
+  letter-spacing: var(--sl-caps-ls);
+  text-transform: uppercase;
+}
+/* the list "decided unless you say otherwise" */
+.mk-items { display: grid; gap: 0; margin: var(--sl-space-4) 0 0; padding: 0; list-style: none; }
+.mk-item { scroll-margin-top: var(--sl-space-4); padding: var(--sl-space-4) 0 var(--sl-space-5); border-top: 1px solid var(--sl-line); }
+.mk-item > h3 { display: flex; align-items: baseline; gap: var(--sl-space-3); margin-top: 0; }
+.mk-num { flex: 0 0 auto; min-width: var(--sl-space-5); color: var(--sl-accent-text); font-variant-numeric: tabular-nums; }
+.mk-choice { display: grid; gap: var(--sl-space-3) var(--sl-space-5); max-width: 76ch; margin: var(--sl-space-3) 0 0; }
+.mk-choice > div { min-width: 0; }
+.mk-choice dd { margin: 0; color: var(--sl-ink-soft); line-height: var(--sl-leading); }
+@media (min-width: 641px) { .mk-choice { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.mk-answer { max-width: 68ch; }
+.mk-answer > p.mk-example { padding: var(--sl-space-3) var(--sl-space-4); border-left: 2px solid var(--sl-accent-text); color: var(--sl-ink); }
+</style>
+<script src="mock.js"></script>
+</head>
+<body>
+<main class="mk-contact sl-skin mk-owner">
+
+<header class="mk-contact-head">
+  <p class="sl-eyebrow">soundLAB 2.0 · the new look, drawn</p>
+  <h1>Four questions before we build</h1>
+  <p>soundLAB 2.0 gets the look you chose: a dark stage, one amber accent, and your instrument as the largest thing on the page. Most of it had never been drawn. So nothing is built yet: everything here is a drawing that you can open and tap.</p>
+  <p><b>Four questions need your yes</b>, or a few words on what to change. Each is asked beside its picture, and the part of the app it is about is built only after your answer.</p>
+  <p>After them come <b>19 smaller points</b>. Those go ahead as written unless you say otherwise.</p>
+  <p class="sl-hint">Each small picture is the real drawing, made smaller. Tap the line above a picture to open it alone at this device’s own size.</p>
+  <div class="mk-tools" id="theme-tools"><span class="mk-tools-label">Show the pictures in</span>
+    <a class="chip" data-theme-chip="dark" href="index.html?theme=dark">Dark</a>
+    <a class="chip" data-theme-chip="light" href="index.html?theme=light">Light</a></div>
+  <div class="mk-tools"><span class="mk-tools-label">Go to</span>
+    <a class="chip" href="#g1">1 · Key bar</a><a class="chip" href="#g2">2 · Header</a><a class="chip" href="#g3">3 · Home</a><a class="chip" href="#g4">4 · Lit notes</a>
+    <a class="chip" href="#decided">The 19 points</a><a class="chip" href="#answer">How to answer</a></div>
+</header>
+
+<section class="mk-group" id="changed">
+  <h2>What changed since this was planned</h2>
+  <p>The plan was written before soundLAB 2.1. Since then 2.1 has added the <b>Voice page</b> (the Train tab is now Woodshed, Voice, Tuner), <b>MIDI guitar</b> (found by one strum, in Settings) and the <b>weak-spot map</b> in Exercises. The drawings follow that: the Train tab has its three pages and Settings shows the MIDI guitar line. The Voice page itself and the weak-spot map are not drawn; they get the new look in a step of their own.</p>
+  <p>One more change is open and not merged yet (pull request #112). It turns the clef button into a small button that shows the key and the tempo on every page. That is a first step toward the key bar drawn here, so question 1 still decides where it ends up.</p>
+  <ul class="mk-links"><li><a href="shell.html?only=train">Picture: the Train tab with Voice</a></li><li><a href="pages.html?only=settings-keys">Picture: MIDI guitar in Settings</a></li></ul>
+</section>
+
+<section class="mk-group" id="g1">
+  <p class="sl-eyebrow">Question 1 of 4 · waits for your answer</p>
+  <h2>The key bar</h2>
+  <p class="mk-ask"><b>Is this the bar?</b></p>
+  <h3>What is proposed</h3>
+  <p>Key, tempo, Scale lock, LUMI lights and Help sit in one bar under the header, on every page. The bar stays when the header slides away. On a phone it is five small buttons, and each opens a panel. From tablet width up the Scale lock says in words what it does: “ON · only A Dorian notes sound”. Each time you flip the lock, a short message says it too. The time signature moves into the metronome.</p>
+  <div class="mk-frames" data-frames='[{"file":"shell.html","q":"w=390&amp;touch=1","w":390,"h":844,"name":"Phone"},{"file":"shell.html","q":"w=1280","w":1280,"h":800,"name":"Desktop"}]'></div>
+  <ul class="mk-links">
+    <li><a href="shell.html?only=bar-phone">The bar on a phone, all sizes</a></li>
+    <li><a href="shell.html?only=bar-tablet">On a tablet</a></li>
+    <li><a href="shell.html?only=bar-desktop">On a desktop</a></li>
+    <li><a href="shell.html?only=lock-panel">The lock’s panel on a phone</a></li>
+    <li><a href="shell.html?only=flip-on">The message after a flip</a></li>
+    <li><a href="shell.html?only=panel-help">The Help panel</a></li>
+    <li><a href="shell.html">Every picture of the bar and the header</a></li>
+  </ul>
+  <p class="mk-open"><b>Not settled</b>Two words on the lights button are our own choice; the plan gave none. With no keyboard connected the phone’s button says “None”, and with a keyboard that is not a LUMI the bar says “No LUMI”. Say so if you want other words.<span class="mk-more"><a href="shell.html?only=panel-lights-none">No keyboard</a><a href="shell.html?only=status-kbd">Another keyboard</a></span></p>
+  <p class="mk-waits"><b>What waits for your answer</b>The step that builds the key bar, and after it every step that changes the frame of the app: the header, the sheets, your instrument in the header.</p>
+</section>
+
+<section class="mk-group" id="g2">
+  <p class="sl-eyebrow">Question 2 of 4 · waits for your answer</p>
+  <h2>The header</h2>
+  <p class="mk-ask"><b>Is this the header?</b></p>
+  <h3>What is proposed</h3>
+  <p>The logo (a tap goes home), the five tabs, your instrument, the keyboard’s state in words (“LUMI · On”, “No keyboard”), help, settings, the way to Gear, and the metronome in the corner. On a phone the logo, your instrument and the metronome stay, and one “More” button holds Keyboard lights, Help, Settings and Gear; the tabs run along the bottom. At the beta address the word “beta” stands beside the logo, and “alpha” goes.</p>
+  <div class="mk-frames" data-frames='[{"file":"shell.html","q":"w=390&amp;touch=1&amp;pop=more","w":390,"h":844,"name":"Phone, “More” open"},{"file":"shell.html","q":"w=1280&amp;beta=1","w":1280,"h":800,"name":"Desktop, at the beta address"}]'></div>
+  <ul class="mk-links">
+    <li><a href="shell.html?only=more">“More” on a phone, all sizes</a></li>
+    <li><a href="shell.html?only=inst">Your instrument in the header</a></li>
+    <li><a href="shell.html?only=status-none">No keyboard connected</a></li>
+    <li><a href="shell.html?only=goal">The dot on Learn while today’s goal is open</a></li>
+    <li><a href="shell.html?only=beta">The “beta” tag</a></li>
+    <li><a href="shell.html?only=scrolled">The header slid away</a></li>
+  </ul>
+  <p class="mk-waits"><b>What waits for your answer</b>The step that builds the header, and the step that puts your instrument into it.</p>
+</section>
+
+<section class="mk-group" id="g3">
+  <p class="sl-eyebrow">Question 3 of 4 · waits for your answer</p>
+  <h2>The home</h2>
+  <p class="mk-ask"><b>Where does the home sit: as a page of its own that the logo leads to (proposed), or as “Today” inside Learn?</b></p>
+  <h3>What is proposed</h3>
+  <p>A page of its own. It has one headline (the next thing to practise), one button, your instrument, and one line of numbers. The button says “Start” only when a tap starts playing; otherwise it says where it takes you, for example “Open the Tuner”. The picture of your instrument shows the scale of the key in the bar and nothing else.</p>
+  <div class="mk-frames" data-frames='[{"file":"home.html","q":"w=390&amp;touch=1","w":390,"h":844,"name":"Phone"},{"file":"home.html","q":"w=1280","w":1280,"h":800,"name":"Desktop"}]'></div>
+  <ul class="mk-links">
+    <li><a href="home.html?only=home">The proposed home, dark and light</a></li>
+    <li><a href="home.html#place-b">The three places side by side</a></li>
+    <li><a href="home.html?only=guitar">For guitar</a></li>
+    <li><a href="home.html?only=bass">For bass</a></li>
+    <li><a href="home.html?only=drums">For drums</a></li>
+    <li><a href="home.html?only=tuner">“Open the Tuner”</a></li>
+    <li><a href="home.html">Every picture of the home</a></li>
+  </ul>
+  <p class="mk-open"><b>Not settled</b>The plan wants the instrument to take at least a quarter of the screen. The proposed home keeps that in every window the plan names, but not everywhere. On the smallest phones (360 px wide) it is a little under a quarter with a two-line headline or with the goal reached, and under an invented title of 80 letters it drops to a fifth; on a desktop that long title also makes the words taller than the instrument. No title in the app is that long today, but a teacher’s own line could be.<span class="mk-more"><a href="home.html?only=long-title">The 80-letter title</a><a href="home.html?only=small">A very small phone</a></span></p>
+  <p class="mk-open"><b>Also yours to decide</b>The picture follows the key in the bar, not the headline. So “C major · RH” can stand over an A Dorian keyboard until you press Start.<span class="mk-more"><a href="home.html?only=lesson">A Keys lesson as the next step</a></span></p>
+  <p class="mk-waits"><b>What waits for your answer</b>The step that builds the home.</p>
+</section>
+
+<section class="mk-group" id="g4">
+  <p class="sl-eyebrow">Question 4 of 4 · waits for your answer</p>
+  <h2>The lit notes and their colours</h2>
+  <p class="mk-ask"><b>Is this how “play this now”, “next” and the root should look? And which colours: today’s, where the root is amber like the Start button, or the mockup’s, where the root is red?</b></p>
+  <h3>What is proposed</h3>
+  <p>Four signs, the same on keys, neck and pads. A dot means the note is in the scale. A filled key (on the neck, a dot with a bright ring) means play this now. An empty ring means next. A thicker ring is the root. Right and wrong are a green tick and a red cross, never a colour alone, so all of it can be told apart without colour. The colours stay today’s unless you pick the other set.</p>
+  <div class="mk-frames" data-frames='[{"file":"instruments.html","q":"w=390&amp;touch=1&amp;view=intro&amp;hero=keyboard","w":390,"h":1400,"name":"Phone"},{"file":"instruments.html","q":"w=1280&amp;view=intro&amp;hero=keyboard","w":1280,"h":860,"name":"Desktop"}]'></div>
+  <ul class="mk-links">
+    <li><a href="instruments.html?only=intro-keyboard">Keyboard, all sizes</a></li>
+    <li><a href="instruments.html?only=intro-neck">Guitar neck</a></li>
+    <li><a href="instruments.html?only=intro-pads">Pads</a></li>
+    <li><a href="instruments.html?only=rootnow-keyboard">The root as the note to play, beside Start</a></li>
+    <li><a href="instruments.html?only=grey-keyboard">The same in grey</a></li>
+    <li><a href="instruments.html?only=states-keyboard-app">Every state of a key</a></li>
+    <li><a href="instruments.html?only=help-keyboard">The five Help levels</a></li>
+    <li><a href="instruments.html">Every picture of the instruments</a></li>
+  </ul>
+  <p class="mk-open"><b>How the two sets read beside the Start button</b>In today’s colours the root and the Start button are almost the same amber, so a root that is the note to play looks like a second Start button. In the mockup’s colours the root is a pinkish red and stands apart, but its second and third notes are orange and sit close to the amber too.</p>
+  <p class="mk-open"><b>Not settled</b>Two letters on a dot are a little harder to read than we aim for, with dark or with light ink: “♭7” in the mockup’s colours and “A♯” when notes are coloured by name. The drawing puts a thin dark outline around those letters. Say if that is good enough.<span class="mk-more"><a href="instruments.html?only=states-keyboard-tokens">♭7 in the mockup’s colours</a><a href="instruments.html?only=states-keyboard-note">Coloured by note name</a></span></p>
+  <p class="mk-waits"><b>What waits for your answer</b>The step that puts these signs on every instrument picture in the app. Only if you pick the red-first colours, one more small step changes the colours.</p>
+</section>
+
+<section class="mk-group" id="decided">
+  <h2>Decided unless you say otherwise</h2>
+  <p>These go ahead as written. To change one, the number and a few words are enough.</p>
+  <ol class="mk-items">
+    <li class="mk-item" id="p1"><h3><span class="mk-num">1</span>The key bar on a phone never slides away</h3>
+      <p>Part of question 1. So that one stray touch cannot switch the Scale lock, a tap on the lock opens a small panel with the switch and the sentence.</p>
+      <dl class="mk-choice"><div><dt>Goes ahead</dt><dd>The bar stays, and the lock sits behind one extra tap on a phone.</dd></div><div><dt>The other choice</dt><dd>The lock flips at the first tap, as today.</dd></div></dl>
+      <ul class="mk-links"><li><a href="shell.html?only=lock-panel">Picture: the lock’s panel</a></li></ul></li>
+    <li class="mk-item" id="p2"><h3><span class="mk-num">2</span>The accent colour picker goes</h3>
+      <p>With question 1. The design says amber is the only accent. Teal, violet and coral would mean checking every screen four times, and the new parts would ignore the choice anyway.</p>
+      <dl class="mk-choice"><div><dt>Goes ahead</dt><dd>The picker leaves Settings together with the key bar’s step. A colour you chose stays stored and is no longer used.</dd></div><div><dt>The other choice</dt><dd>Keep the picker; then every screen is checked in four colours.</dd></div></dl>
+      <ul class="mk-links"><li><a href="pages.html?only=settings-look">Picture: Settings, “Look”, without the picker</a></li></ul></li>
+    <li class="mk-item" id="p3"><h3><span class="mk-num">3</span>Your instrument is in the header</h3>
+      <p>Part of question 2. It is on every page, with the word “Practising” on a wide screen, so that “Guitar” on the Keys tab is not a riddle. A tap opens a sheet where you change it. The bar above the four Learn pages goes.</p>
+      <dl class="mk-choice"><div><dt>Goes ahead</dt><dd>Yes.</dd></div><div><dt>The other choice</dt><dd>Keep the bar above the Learn pages.</dd></div></dl>
+      <ul class="mk-links"><li><a href="shell.html?only=inst">Picture: the instrument in the header</a></li><li><a href="overlays.html?only=inst">Picture: the Instrument sheet</a></li></ul></li>
+    <li class="mk-item" id="p4"><h3><span class="mk-num">4</span>What opens when you start the app</h3>
+      <p>As today, the page you were on last. New: everybody sees the home once, and the logo always leads to it. The home shows only real numbers: minutes against your goal, your streak, your plan’s blocks. No teacher’s name, no “pass 2 of 3”, no week count and no FL Studio light until the app stores those (Phases D and F). If you have not given the app a plan of your own, the home offers the next Exercises level, not the starter plan’s “Tune up”.</p>
+      <dl class="mk-choice"><div><dt>Goes ahead</dt><dd>The app opens where you left it.</dd></div><div><dt>The other choice</dt><dd>Open on the home at the first start of every day. That is planned for Phase D.</dd></div></dl>
+      <ul class="mk-links"><li><a href="home.html?only=home">Picture: the home</a></li><li><a href="home.html?only=piano">Picture: a brand-new profile</a></li></ul></li>
+    <li class="mk-item" id="p5"><h3><span class="mk-num">5</span>soundLAB Gear until its own phase</h3>
+      <p>Gear gets the new header, sheets and messages. Its key bar stays folded behind one button, as it is behind the clef today, so that a stray touch during a gig cannot switch the Scale lock. Its four pages look exactly as today until Phase H redesigns them, so for a while the frame and the pages will not match.</p>
+      <dl class="mk-choice"><div><dt>Goes ahead</dt><dd>New frame, today’s pages.</dd></div><div><dt>The other choice</dt><dd>Re-colour Gear’s pages now. It is cheap, but nobody has checked those screens for readability.</dd></div></dl>
+      <ul class="mk-links"><li><a href="gear.html?only=deck">Picture: the Deck in the new header</a></li><li><a href="gear.html?only=deck-open">Picture: its key bar open</a></li><li><a href="gear.html">Every picture of Gear</a></li></ul>
+      <p class="mk-open"><b>Not settled</b>On a small phone (360 px wide) five long key names, such as “Db Harm Minor”, are cut with “…” in Gear’s key button.<span class="mk-more"><a href="gear.html?only=key-first">The key button on a phone</a></span></p></li>
+    <li class="mk-item" id="p6"><h3><span class="mk-num">6</span>Nine pages keep today’s arrangement</h3>
+      <p>Exercises’ start, Chords, Circle, Plan, Charts, Songs, Jam, the Woodshed’s library and the Tuner get the new colours, type, one headline, one main button and bigger controls. But they stay as long and as full as they are (Exercises’ start is about ten screens on a desktop). “One thing on screen” is built for the home, Piano, the neck pages, Pads, a question and a run. Making the nine shorter means deciding what leaves each page; that is planned for Phases C and D.</p>
+      <dl class="mk-choice"><div><dt>Goes ahead</dt><dd>New look, same arrangement.</dd></div><div><dt>The other choice</dt><dd>Tell us which of them must be rebuilt now.</dd></div></dl>
+      <ul class="mk-links"><li><a href="pages.html?only=quiz">Picture: Exercises’ start</a></li><li><a href="pages.html?only=shed">Picture: the Woodshed</a></li><li><a href="pages.html?only=plan">Picture: the Plan</a></li><li><a href="pages.html?only=chords">Picture: Chords</a></li><li><a href="pages.html?only=piano">Picture: Piano, rebuilt</a></li></ul></li>
+    <li class="mk-item" id="p7"><h3><span class="mk-num">7</span>Smaller rows for the mouse</h3>
+      <p>The design says every control is 44 px high. In long lists (the Woodshed’s library, Settings, Piano’s folded rows) the plan would use 36 px when you work with a mouse, and 44 or 48 px as soon as the device has a touch screen.</p>
+      <dl class="mk-choice"><div><dt>Goes ahead</dt><dd>36 px with a mouse, in long lists only.</dd></div><div><dt>The other choice</dt><dd>Say no and every row is 44 px.</dd></div></dl>
+      <ul class="mk-links"><li><a href="pages.html?only=rows">Picture: one row at 44, 36 and 48 px</a></li></ul></li>
+    <li class="mk-item" id="p8"><h3><span class="mk-num">8</span>Note colours</h3>
+      <p>Part of question 4. Unless you pick the red-first set, the colours stay as they are. The seven colour values in the design’s own file were never what the app shows; they now hold the app’s seven colours.</p>
+      <dl class="mk-choice"><div><dt>Goes ahead</dt><dd>Today’s colours. No answer needed.</dd></div><div><dt>The other choice</dt><dd>The mockup’s red-first colours: say so in question 4.</dd></div></dl>
+      <ul class="mk-links"><li><a href="instruments.html?only=intro-keyboard">Picture: both sets on a keyboard</a></li></ul></li>
+    <li class="mk-item" id="p9"><h3><span class="mk-num">9</span>Help level and note colours are set in the key bar only</h3>
+      <p>They leave the Piano page and the lights sheet, which is then called “Keyboard lights”. “Color notes by” sits in the Help panel, with the words “Degree” and “Note name”.</p>
+      <dl class="mk-choice"><div><dt>Goes ahead</dt><dd>One place: the key bar.</dd></div><div><dt>The other choice</dt><dd>Keep a second place for them.</dd></div></dl>
+      <ul class="mk-links"><li><a href="shell.html?only=panel-help">Picture: the Help panel</a></li><li><a href="overlays.html?only=lights">Picture: the Keyboard lights sheet</a></li></ul></li>
+    <li class="mk-item" id="p10"><h3><span class="mk-num">10</span>Chords follows the one tempo</h3>
+      <p>Its own tempo box will show and set the tempo of the key bar. The open change named at the top (pull request #112) already does this; if it is merged first, nothing is left to do here.</p>
+      <dl class="mk-choice"><div><dt>Goes ahead</dt><dd>Yes.</dd></div><div><dt>The other choice</dt><dd>Chords keeps a tempo of its own.</dd></div></dl>
+      <ul class="mk-links"><li><a href="pages.html?only=chords-2">Picture: Chords, with its tempo box</a></li></ul></li>
+    <li class="mk-item" id="p11"><h3><span class="mk-num">11</span>The Help level also works on the guitar neck</h3>
+      <p>In this phase, because the Help control is in the key bar on every page.</p>
+      <dl class="mk-choice"><div><dt>Goes ahead</dt><dd>The neck obeys Help: Full, Colors, Target, Tonic, None.</dd></div><div><dt>The other choice</dt><dd>Leave it for Phase C; the neck then only gets the new look.</dd></div></dl>
+      <ul class="mk-links"><li><a href="instruments.html?only=help-neck">Picture: the neck at the five Help levels</a></li></ul></li>
+    <li class="mk-item" id="p12"><h3><span class="mk-num">12</span>The beta looks half-done for a while</h3>
+      <p>From the key bar’s step until the last page, the beta shows the new frame around pages in the old layout, one page changing with each merge.</p>
+      <dl class="mk-choice"><div><dt>Goes ahead</dt><dd>Page by page.</dd></div><div><dt>The other choice</dt><dd>We hold the page steps back and you merge them together. That makes one very large merge.</dd></div></dl>
+      <ul class="mk-links"><li><a href="gear.html?only=hub">Picture: what a new frame around an old page looks like</a></li></ul></li>
+    <li class="mk-item" id="p13"><h3><span class="mk-num">13</span>How you see a step, and how fast the pile grows</h3>
+      <p>When this page was written, the five pull requests of the trim (Phase A) and the first two of this phase were still waiting to be merged, and this phase adds 24. We open at most three at a time and stop at three points (after these drawings, after the groundwork, after the home) until you have merged. Each pull request has a link that shows that step alone. The beta address shows a step only after you merged it; that is the only way to try it on your iPad or phone. Pictures are never put among the app’s files on GitHub, because those are published as a whole.</p>
+      <dl class="mk-choice"><div><dt>Proposed</dt><dd>Each pull request comes with a private claude.ai page of before and after pictures at phone, tablet and desktop width, dark and light. Publishing such a page needs your yes once.</dd></div><div><dt>Also possible, each only with your yes</dt><dd>A second preview address for the newest step that is not merged yet, or pictures uploaded by the automatic test run. Both change how the app is published.</dd></div></dl></li>
+  </ol>
+
+  <h3>From the instrument list</h3>
+  <ol class="mk-items">
+    <li class="mk-item" id="p14"><h3><span class="mk-num">14</span>Does “Synth” stay in the instrument list?</h3>
+      <dl class="mk-choice"><div><dt>Goes ahead</dt><dd>This phase moves Synth, Voice and Other under “More” and keeps all seven.</dd></div><div><dt>The other choice</dt><dd>Take Synth out. That is a task for Phase C.</dd></div></dl>
+      <ul class="mk-links"><li><a href="overlays.html?only=inst-list">Picture: the list, opened</a></li></ul></li>
+    <li class="mk-item" id="p15"><h3><span class="mk-num">15</span>What should “fretless” do first?</h3>
+      <dl class="mk-choice"><div><dt>Proposed</dt><dd>A neck without fret wires. Intonation practice comes after it, in Phase C.</dd></div><div><dt>The other choice</dt><dd>Tell us what it should do first.</dd></div></dl>
+      <ul class="mk-links"><li><a href="instruments.html?only=necks-flat">Picture: necks with and without fret wires</a></li></ul></li>
+    <li class="mk-item" id="p16"><h3><span class="mk-num">16</span>Two smaller ones for Phase C</h3>
+      <dl class="mk-choice"><div><dt>Proposed</dt><dd>A bass note may be recognised a little later than a guitar note, for bass only. Rudiments are graded per hand, on pads and an e-kit.</dd></div><div><dt>The other choice</dt><dd>Say no to either one.</dd></div></dl></li>
+    <li class="mk-item" id="p17"><h3><span class="mk-num">17</span>Where does bass live?</h3>
+      <dl class="mk-choice"><div><dt>Proposed</dt><dd>On the Guitar tab: Neck, Tab and Notation draw the instrument you chose. The header is built with five tabs either way, so the answer can wait until Phase C starts.</dd></div><div><dt>The other choice</dt><dd>A tab of its own.</dd></div></dl>
+      <ul class="mk-links"><li><a href="home.html?only=bass">Picture: the home for bass</a></li></ul></li>
+    <li class="mk-item" id="p18"><h3><span class="mk-num">18</span>Where do drums live?</h3>
+      <dl class="mk-choice"><div><dt>Proposed</dt><dd>Pads stays under Keys through this phase and moves next to the neck when it is rebuilt in Phase C.</dd></div><div><dt>The other choice</dt><dd>Move it now.</dd></div></dl>
+      <ul class="mk-links"><li><a href="home.html?only=drums">Picture: the home for drums</a></li></ul></li>
+  </ol>
+
+  <h3>One housekeeping question</h3>
+  <ol class="mk-items">
+    <li class="mk-item" id="p19"><h3><span class="mk-num">19</span>May we correct the notes file at the top?</h3>
+      <p>CLAUDE.md, the notes every Claude session reads first, has a paragraph at the top that the trim was told not to touch, because another pull request was rewriting it. That pull request is merged, and two of the paragraph’s sentences are no longer true.</p>
+      <dl class="mk-choice"><div><dt>Goes ahead</dt><dd>It stays untouched, and a new section says what is out of date.</dd></div><div><dt>The other choice</dt><dd>Say yes and we correct the two sentences.</dd></div></dl></li>
+  </ol>
+</section>
+
+<section class="mk-group mk-answer" id="answer">
+  <h2>How to answer</h2>
+  <p>Write the number and a few words. Put them in a comment on this pull request, or say them in the chat with Claude. For example:</p>
+  <p class="mk-example">Question 1 yes. Question 2 yes, but keep Settings outside “More”. Question 3 a page of its own. Question 4 yes, today’s colours. Point 7 no.</p>
+  <p>The four questions each wait for you. Every point you do not mention goes ahead as written.</p>
+  <h3>All drawings</h3>
+  <ul class="mk-links">
+    <li><a href="shell.html">Header and key bar</a></li>
+    <li><a href="home.html">The home</a></li>
+    <li><a href="instruments.html">Instruments</a></li>
+    <li><a href="overlays.html">Sheets, messages and the tour</a></li>
+    <li><a href="pages.html">Pages</a></li>
+    <li><a href="gear.html">soundLAB Gear</a></li>
+  </ul>
+</section>
+
+</main>
+<noscript><p class="mk-note">The small pictures need JavaScript. Every link works without it.</p></noscript>
+<script>
+(function () {
+  'use strict';
+  var theme = Mock.q('theme', '') === 'light' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', theme);
+  // the theme chips: the one in use is marked, in words too
+  Array.prototype.forEach.call(document.querySelectorAll('[data-theme-chip]'), function (a) {
+    var on = a.getAttribute('data-theme-chip') === theme;
+    a.classList.toggle('active', on);
+    if (on) a.setAttribute('aria-current', 'true');
+  });
+  // the small pictures: Mock's frames, a phone and a desktop, in this page's theme
+  Array.prototype.forEach.call(document.querySelectorAll('.mk-frames[data-frames]'), function (box) {
+    var list = JSON.parse(box.getAttribute('data-frames'));
+    box.innerHTML = list.map(function (f) {
+      var url = f.file + '?' + f.q + '&theme=' + theme;
+      return Mock.figure({ url: url, w: f.w, h: f.h, title: f.name + ', ' + f.w + ' px wide, ' + theme,
+        caption: '<b>' + Mock.esc(f.name) + '</b> ' + f.w + ' px wide · tap to open', cap: f.w <= 640 ? 0.62 : 1 });
+    }).join('');
+  });
+  Mock.fit();
+  window.addEventListener('resize', Mock.fit);
+})();
+</script>
+</body>
+</html>

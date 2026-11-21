@@ -731,8 +731,11 @@
     var themes = P.theme === 'light' || P.theme === 'dark' ? [P.theme] : ['dark', 'light'], only = q('only', '');
     var h = '<main class="mk-contact sl-skin">';
     h += '<header class="mk-contact-head"><p class="sl-eyebrow">' + esc(def.eyebrow || 'soundLAB 2.0 · the new look, drawn') + '</p><h1>' + esc(def.title) + '</h1>' +
-      (def.lead || []).map(function (p) { return '<p>' + p + '</p>'; }).join('') +
-      '<p class="sl-hint">Every picture is the real page at its real width, made smaller to fit this window. Tap the line above a picture to open it alone at this device’s own size.</p>' +
+      // one picture only (?only=, the way the owner's page links to a picture): no introduction, so
+      // that the picture is on the first screen of a phone
+      (only ? '' : (def.lead || []).map(function (p) { return '<p>' + p + '</p>'; }).join('')) +
+      '<p class="sl-hint">' + (only ? 'Tap the line above a picture to open it alone at this device’s own size.'
+        : 'Every picture is the real page at its real width, made smaller to fit this window. Tap the line above a picture to open it alone at this device’s own size.') + '</p>' +
       '<p class="mk-back"><a href="index.html">All drawings and questions</a></p>' +
       '<div class="mk-tools"><span class="mk-tools-label">Show</span>' +
       [['', 'Dark and light'], ['dark', 'Dark'], ['light', 'Light']].map(function (t) {
@@ -756,7 +759,7 @@
     (def.groups || []).forEach(function (g) {
       var states = g.states.filter(function (s) { return !only || s.id === only; });
       if (!states.length) return;
-      h += '<section class="mk-group"><h2>' + esc(g.title) + '</h2>' + (g.lead ? '<p>' + g.lead + '</p>' : '');
+      h += '<section class="mk-group"><h2>' + esc(g.title) + '</h2>' + (g.lead && !only ? '<p>' + g.lead + '</p>' : '');
       states.forEach(function (s) {
         h += '<section class="mk-state" id="' + esc(s.id) + '"><h3><a href="' + esc(href({ theme: q('theme', ''), only: s.id })) + '">' + esc(s.title) + '</a></h3>' + (s.note ? '<p>' + s.note + '</p>' : '');
         themes.forEach(function (theme) {

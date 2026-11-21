@@ -1847,6 +1847,9 @@ body { margin: 0; min-height: 100vh; font-family: var(--sl-font-body); color: va
 .mk-back { color: var(--sl-ink-muted); font-size: var(--sl-text-sm); }
 .mk-back a { color: var(--sl-accent-text); }
 
+/* a question to the owner, set off by an amber line (instruments.html, index.html) */
+.mk-ask { max-width: 68ch; padding-left: var(--sl-space-4); border-left: 2px solid var(--sl-accent-text); color: var(--sl-ink); }
+
 /* the contact view: every state of a drawing as labelled, scaled frames */
 .mk-contact { max-width: none; padding: var(--sl-space-5) var(--sl-gutter) var(--sl-space-8); }
 .mk-contact-head { display: grid; gap: var(--sl-space-3); max-width: 72ch; margin-bottom: var(--sl-space-6); }
