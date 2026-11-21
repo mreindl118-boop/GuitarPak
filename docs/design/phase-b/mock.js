@@ -87,7 +87,7 @@
  *   Mock.keyName(root, scale, 'full'|'plain'|'short')    Mock.scaleName(scale, form)
  *   Mock.lockSentence(on, root, scale, 'full'|'mid'|'short')    Mock.lockMessage(on, root, scale)
  *   Mock.scaleNotes(root, scale)   the notes of a key: { pc, step, name, color, label }
- *   Mock.inkOn(hex)  'dark' or 'light': which ink reads on a note colour
+ *   Mock.inkOn(hex)  'dark' or 'light': which ink reads on a note colour (SLHero.inkOn of mock-hero.js)
  *   Mock.quietPage(opts)    a quiet page body, a headline and a keyboard, for drawings of the shell
  *                    (the keyboard is SLHero.keyboard: load mock-hero.js after this file)
  *   Mock.toast(t)    one message of the stack, as markup
@@ -327,15 +327,9 @@
     var sc = SCALES[scaleId] || SCALES.minorPent, flat = flatKey(rootPc);
     return sc.steps.map(function (s) { var pc = (rootPc + s) % 12; return { pc: pc, step: s, name: pcName(pc, flat), color: COLORS.INTERVALS[s], label: COLORS.INTERVAL_LABELS[s] }; });
   }
-  // which ink reads on a note colour: the dark one unless white has the better contrast
-  function inkOn(hex) {
-    var m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex || '');
-    if (!m) return 'dark';
-    var lin = function (v) { v = parseInt(v, 16) / 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
-    var L = 0.2126 * lin(m[1]) + 0.7152 * lin(m[2]) + 0.0722 * lin(m[3]);
-    var dark = (L + 0.05) / (0.0056 + 0.05), light = 1.05 / (L + 0.05);      // against #1a1206 and against white
-    return light > dark ? 'light' : 'dark';
-  }
+  // which ink reads on a note colour: mock-hero.js owns the rule (SLHero.inkOn, with the two
+  // inks of css/tokens.css); this is its name for a drawing that loads both files
+  function inkOn(hex) { return window.SLHero ? window.SLHero.inkOn(hex) : 'dark'; }
 
   // ---- the shell's state: defaults, then what the caller gives, then the URL --------
   function parseKey(text, o) {
@@ -550,7 +544,8 @@
     var folds = names.map(function (name) { return '<details class="sl-fold"><summary>' + name + '</summary></details>'; }).join('');
     return '<div class="mk-quiet' + (o.scrolled ? ' mk-quiet-tall' : '') + '">' +
       '<div class="mk-quiet-head"><h1>' + title + '</h1></div>' +      // one headline and no line over it, as pages.html draws a page (D28)
-      (g ? quietKeys(o) : '') +
+      // the Voice page (soundLAB 2.1.0) has a pitch graph, not a keyboard, and is not drawn yet
+      (o.page === 'vocal' ? '<p class="sl-hint">This page is not drawn yet. It gets the new look in a step of its own.</p>' : g ? quietKeys(o) : '') +
       '<div class="mk-quiet-folds">' + folds + '</div></div>';
   }
 

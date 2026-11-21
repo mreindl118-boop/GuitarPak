@@ -6,9 +6,23 @@ today and break that rule: 227 rows, 214 for soundLAB and 13 for soundLAB Gear. 
 screen shows it. It says where the text is in the code, where the user sees it, what it says today, a proposal
 in plain words, whether a suite reads the text, and which step rewords it.
 
-Nothing in the app changes with this file. Line numbers are those of this branch: `js/`, `index.html` and
-`gear.html` are the same here as in commit `0133287` (B1a), and the three lines the plan names
-(`js/woodshed.js:1140`, `js/practiceplan.js:292`, `js/quiz.js:2088`) are where they were in `a914df2`.
+Nothing in the app changes with this file. Line numbers are lines of commit `0133287` (B1a, the tree this
+list was written on: `git show 0133287:<file>`), and the three lines the plan names (`js/woodshed.js:1140`,
+`js/practiceplan.js:292`, `js/quiz.js:2088`) are where they were in `a914df2`.
+
+**After soundLAB 2.1.0** (merged underneath this branch on 21 November 2026; the rows were written before it):
+
+- In the merged tree 108 of the 542 line numbers of this list have moved: `js/quiz.js` 52, `js/practiceplan.js`
+  34, `js/help.js` 12, `js/midi.js` 8, `js/fretboard.js` 1, `js/settings.js` 1. Find a row by its text, not by
+  its number. The lines of `tests/` named under "Pinned by" may have moved in the same way.
+- Three listed lines changed with 2.1.0, and the texts of their rows are still shown:
+  `js/learn-instruments.js:26` (Voice has a new first button, "Voice trainer · Pitch line, takes and scores",
+  so "Monophonic pitch practice" is now its third button, not its second); `js/practiceplan.js:86` (the words
+  for singing left the pattern, the message is the same); `js/practiceplan.js:284` (the same sentence, on a
+  line that moved).
+- What 2.1.0 added was not read for this list: the Voice page (`js/vocal.js`), the MIDI guitar block in
+  Settings (`js/midiguitar.js`) and the weak-spot map on Exercises' Progress tab (`js/quiz.js`). The step that
+  re-skins each of them reads its texts against rule 16.
 
 ## How to read a row
 
