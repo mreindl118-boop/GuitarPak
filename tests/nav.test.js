@@ -47,7 +47,7 @@ const tabs = sel => [...document.querySelectorAll(sel + ' .tabbar-btn')].map(b =
   ok(await clickTab('Keys') === 'chart', 'Keys remembers the last page (Charts)');
   await page.click('#subnav .subtab:has-text("Piano")'); await page.waitForTimeout(150); // the scroll check below wants the tall Piano page
   ok(await clickTab('Train') === 'shed', 'Train opens the Woodshed');
-  ok((await page.evaluate(() => [...document.querySelectorAll('#subnav .subtab')].map(b => b.textContent).join('|'))) === 'Woodshed|Tuner', 'Train pills: Woodshed | Tuner (2.0: the Trainer cards are on the Plan page)');
+  ok((await page.evaluate(() => [...document.querySelectorAll('#subnav .subtab')].map(b => b.textContent).join('|'))) === 'Woodshed|Voice|Tuner', 'Train pills: Woodshed | Voice | Tuner (2.0: the Trainer cards are on the Plan page)');
   await page.click('#subnav .subtab:has-text("Tuner")'); await page.waitForTimeout(200);
   ok(await page.evaluate(() => App.active) === 'tuner', 'Tuner is a page under Train');
   await clickTab('Keys'); await page.evaluate(() => window.scrollTo(0, 600)); await page.waitForTimeout(150);

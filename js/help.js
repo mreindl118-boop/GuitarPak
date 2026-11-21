@@ -66,6 +66,12 @@
     tuner: [
       { t: 'Tuner', x: 'A chromatic tuner using your microphone. Press Start, allow mic access, and play one string at a time — the needle shows how far off you are; green means in tune.' }
     ],
+    vocal: [
+      { t: 'Voice trainer', x: 'Sing and see your pitch as a line over the target notes. Green = in tune, yellow = close, red = off.' },
+      { sel: '#vx-ch', t: 'Which input', x: 'The UR24C sends input 1 on the Left and input 2 (your Helix XLR mic) on the Right. Pick the side your voice is on; the L and R meters show which one moves.' },
+      { sel: '#vx-rec', t: 'Record a take', x: 'Press Record, wait for the 4 clicks, then sing. When it stops you get a score and one tip. Play it back alone or with the notes.' },
+      { sel: '#vx-st', t: 'Hear myself', x: 'Plays your voice into your headphones. For zero delay, use the MIX knob on the UR24C instead.' }
+    ],
     quiz: [
       { t: 'Exercises', x: 'A course in short levels of 10 questions: Notes, Intervals, Chords, Scales and Key signatures. Every right answer earns XP; quick answers and runs of 5 earn more.' },
       { sel: '#learn-instrument', t: 'Your instrument', x: 'Exercises count for the instrument picked here. Notation, ear training and theory are shared by every instrument; a run keeps the instrument it started with, and history from before instruments were tracked stays as Legacy / unassigned.' },
