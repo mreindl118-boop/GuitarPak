@@ -15,18 +15,18 @@
  * offset (tap-along wizard, stored per source in ws.cal). Misses fire when a
  * target ages out. Combos, accuracy, stars, per-song bests, XP/levels,
  * daily streaks, achievements, and a weak-phrase queue (lowest-accuracy
- * phrases resurface first). Every run is captured as an Idea (source
- * 'woodshed') for review on the DAW side.
+ * phrases resurface first).
  * Input: hardware MIDI (App.midi bus), QWERTY/touch piano (note:input) —
  * all three work on every instrument. KEY LIGHTS go through the keybed
  * engine (App.midi.guide, v0.80.0): the note to play + the next one, in
  * their colors with LUMI Display (Lights & help), folded into the LUMI's
  * window; Wait mode holds the lit note until it is played.
  * Scores: built-in generators (scales, Hanon, pentatonic workout, 8 PAS
- * rudiments with sticking + accents), MIDI file import (constant initial practice tempo),
- * ASCII tab paste (pitches only — timing marked approximate: Wait mode
- * immediately, scored modes after assuming even eighths), and any Studio
- * synth track. Library in ws.lib with auto difficulty.
+ * rudiments with sticking + accents), MIDI file import (constant initial practice tempo)
+ * and ASCII tab paste (pitches only — timing marked approximate: Wait mode
+ * immediately, scored modes after assuming even eighths). Library in ws.lib
+ * with auto difficulty. importTrack({name, notes}) turns a plain note list
+ * into a score (no button uses it any more; tests/remote-shed.test.js does).
  * Controller remote (js/remote.js): onRemote = remote() in the module
  * section (Guided performance delegates to PerformancePlayer.remote);
  * remoteKey only where NEXT acts and no note is being judged (never the
@@ -694,7 +694,7 @@
     weak.sort(function (a, b) { return a.acc - b.acc; });
     App.store.set('ws.weak', weak.slice(0, 12));
 
-    // bests + XP + streak + achievements + DAW capture
+    // bests + XP + streak + achievements
     var score = acc * 10 + S.maxCombo * 2;
     var bk = bestKey(S.sc, S.mode);
     var prev = parseInt(App.store.get(bk, 0), 10);
@@ -706,25 +706,7 @@
     if (acc >= 90) grantAch('ninety');
     if (S.counts.miss === 0 && S.targets.length > 4 && acc >= 80) grantAch('clean');
     if (days >= 3) grantAch('streak3');
-    captureRun();
     renderReport(acc, score, prev, xp, days);
-  }
-
-  function captureRun() {
-    if (!S.played.length) return;
-    var list = App.store.get('ideas.list', []);
-    if (Object.prototype.toString.call(list) !== '[object Array]') list = [];
-    list.push({
-      id: uid('i'), name: 'Shed: ' + S.sc.title.slice(0, 20), ts: Date.now(), source: 'woodshed',
-      bpm: Math.round(S.sc.bpm * S.tempoScale), root: App.store.get('fb.root', 0), scale: App.store.get('fb.scale', 'major'),
-      dur: Math.round((S.played[S.played.length - 1].at + 0.5) * 10) / 10,
-      misses: S.targets.filter(function (tg) { return tg.judged === 'miss'; })
-        .map(function (tg) { return Math.round(tg.at * 100) / 100; }).slice(0, 60),
-      notes: S.played.slice(0, 800).map(function (p) {
-        return { m: p.m, v: p.v || 90, t: Math.max(0, Math.round(p.at * 1000) / 1000), d: 0.3 };
-      })
-    });
-    App.store.set('ideas.list', list.slice(-100));
   }
 
   // ---------------- audio-in: mic/interface note reading ----------------
@@ -1166,7 +1148,7 @@
         '<div class="row spread"><h2 style="margin:0">Woodshed · ' + esc(selectedInstrument()) + '</h2>' +
           '<span class="muted small">' + statsLine() + '</span></div>' +
         '<div class="muted small" style="margin-top:6px">Pick something to practice — every run is scored (Perfect ±' + WIN.perfect +
-          'ms) and lands as a take in your Studio Ideas. Calibrate once per input for honest timing.</div>' +
+          'ms). Calibrate once per input for honest timing.</div>' +
         '<div class="card" style="margin-top:12px;background:var(--card2)"><h3 style="margin-top:0">Guided performance</h3>' +
           '<p class="small">See what to play on the piano roll and keyboard. <b>Wait for Me</b> follows your notes and chords; <b>Play at Tempo</b> keeps time and gives a full accuracy report. MIDI and touch/typing keys work without LUMI.</p>' +
           '<div class="row"><button type="button" class="btn primary" id="ws-guided-melody">Melody and rhythm</button><button type="button" class="btn" id="ws-guided-chords">Chord journey</button></div>' +
@@ -1177,7 +1159,6 @@
           '<button type="button" class="btn sm" id="ws-gen-pent">+ Pentatonic fours</button>' +
           '<label class="btn sm ws-filebtn">+ MIDI file<input type="file" id="ws-midi" accept=".mid,.midi" style="display:none"></label>' +
           '<button type="button" class="btn sm" id="ws-ascii-btn">+ Paste tab</button>' +
-          '<button type="button" class="btn sm" id="ws-track">+ From Studio track</button>' +
           '<button type="button" class="btn sm" id="ws-cal-btn">Calibrate timing</button>' +
         '</div>' +
         '<div id="ws-ascii-box" style="display:none;margin-top:10px">' +
@@ -1424,12 +1405,6 @@
         msg('Imported ' + sc.notes.length + ' notes from tab. Preserved: pitches, string/fret. Dropped: rhythm (marked approximate), technique glyphs (h/p/b noted but unscored).');
       } catch (e) { msg('Tab import failed: ' + e.message); }
     });
-    document.getElementById('ws-track').addEventListener('click', function () {
-      var t = (window.DAW ? DAW.engine.tracks : []).filter(function (x) { return x.kind !== 'drums' && x.notes && x.notes.length; })[0];
-      if (!t) { msg('No Studio track with notes yet — draw something in the Tracks piano roll first.'); return; }
-      addScore(importTrack(t));
-      msg('“' + t.name + '” imported from the Studio.');
-    });
     document.getElementById('ws-cal-btn').addEventListener('click', startCal);
     els.root.onclick = function (e) {
       var rud = e.target.closest('[data-wsrud]');
@@ -1598,7 +1573,7 @@
     });
   }
 
-  // read-only debug/test handle (also lets plugins peek at the session)
+  // read-only debug/test handle
   window.Woodshed = {
     get session() { return S; },
     get view() { return view; },

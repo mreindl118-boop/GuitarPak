@@ -216,19 +216,6 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
   filter: drop-shadow(0 0 10px var(--accent-glow));
 }
 
-/* workspace wipe — the curtain between Practice and Studio */
-#wipe {
-  position: fixed;
-  inset: 0;
-  z-index: 300;
-  background: #0d0b0e;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none;
-  will-change: transform;
-}
-
 .brand .tag {
   font-family: var(--font-body);
   font-size: 10px;
@@ -291,9 +278,11 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
   box-shadow: 0 0 0 2px var(--bg);
 }
 
-/* corner tools: workspace, help, settings, lights, metronome — the four
+/* corner tools: help, settings, the clef, lights, metronome — the five
    icons are quiet borderless squares (one size, one icon size), so the
-   corner reads as one toolset instead of five equal-weight boxes */
+   corner reads as one toolset instead of five equal-weight boxes. In front
+   of them sits the one worded button: the link to the other app
+   (soundLAB <-> soundLAB Gear, #app-switch) */
 .tb-tools { margin-left: auto; display: flex; align-items: center; gap: 6px; }
 .tb-tools .btn { height: var(--h-ctl); padding-top: 0; padding-bottom: 0; }
 .icon-btn { display: inline-flex; align-items: center; justify-content: center; }
@@ -301,7 +290,10 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
 .tb-tools .icon-btn { background: transparent; border-color: transparent; box-shadow: none; color: var(--label); }
 @media (hover: hover) { .tb-tools .icon-btn:hover { background: var(--card2); border-color: var(--ctl-border); color: var(--text); } }
 .tb-tools .icon-btn .ic { width: 20px; height: 20px; } /* one icon size, whatever App.icon was asked for */
-#space-btn { display: inline-flex; align-items: center; gap: 5px; padding: 0 12px; }
+/* the link across is an <a>: centre its word like a button does. Empty until
+   app.js fills it, hidden in the claude.ai preview */
+#app-switch { display: inline-flex; align-items: center; white-space: nowrap; }
+#app-switch:empty, #app-switch[hidden] { display: none; }
 #met-btn.on { color: var(--accent-ink); border-color: var(--accent-line); }
 #met-btn.tick { box-shadow: 0 0 14px var(--accent-glow), inset 0 0 6px var(--accent-glow); }
 #met-btn.active, #settings-btn.active, #lights-btn.active, #ctx-btn.active { color: var(--accent-ink); background: var(--accent-soft); border-color: var(--accent-line); }
@@ -413,9 +405,9 @@ input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-sele
 html:not(.ctx-open) .ctxbar, .ctxbar[hidden] { display: none; }
 .ctx-open .ctxbar { animation: ctx-in 140ms ease-out; }
 @keyframes ctx-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
-/* 1.3 (primer A2): the clef is an icon button like its five neighbours - same
+/* 1.3 (primer A2): the clef is an icon button like its four neighbours - same
    height, ghost until hovered / open - so the corner reads as ONE toolset;
-   the caret and the capture dot ride along in its corners */
+   the caret rides along in its corner */
 #ctx-btn { position: relative; }
 .ctx-caret { position: absolute; right: 2px; bottom: 4px; width: 7px; height: 5px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
 #ctx-btn[aria-expanded="true"] .ctx-caret { transform: rotate(180deg); }
@@ -429,18 +421,6 @@ html:not(.ctx-open) .ctxbar, .ctxbar[hidden] { display: none; }
 .cx-tnote[hidden] { display: none; }
 /* scale lock: out-of-key on-screen keys read as unplayable */
 .scale-locked .pn-key:not([data-dc]) { filter: brightness(0.45); cursor: not-allowed; }
-/* Studio capture running (the ● lives in the dropdown) */
-#ctx-btn.rec::after {
-  content: '';
-  position: absolute;
-  top: 3px;
-  right: 3px;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--red);
-  box-shadow: 0 0 0 2px var(--bg);
-}
 
 .cx-field {
   display: inline-flex;
@@ -462,8 +442,7 @@ html:not(.ctx-open) .ctxbar, .ctxbar[hidden] { display: none; }
 .ctxbar select { padding: 6px 30px 6px 10px; background-position: right 10px center; }
 .ctxbar input[type="number"] { width: 68px; }
 
-/* the transport: metronome glyph + play/stop in Practice, plain play/stop in
-   the Studio (app.js paintCx) */
+/* the transport: metronome glyph + play/stop (app.js paintCx) */
 #cx-met { display: inline-flex; align-items: center; gap: 3px; padding: 0 12px; }
 #cx-met.on { color: var(--accent-ink); border-color: var(--accent-line); }
 #cx-met.tick { box-shadow: 0 0 14px var(--accent-glow), inset 0 0 6px var(--accent-glow); }
@@ -646,8 +625,8 @@ details.tips > :not(summary) { margin-top: 4px; line-height: 1.55; }
    buttons, chips, segmented controls, selects and inputs line up in a row;
    .btn (40) and .btn.big stay the larger tiers for primary actions */
 .btn.sm, .chip { min-height: var(--h-ctl); }
-.chip.ar-mini { min-height: 0; } /* Timeline lane M/S/arm mini-chips */
 .btn[disabled] { opacity: 0.4; cursor: default; }
+a.btn { text-decoration: none; } /* a link dressed as a button (the header's way to the other app) */
 
 /* ---------- form controls ---------- */
 
@@ -886,7 +865,7 @@ button .ic, .chip .ic { display: inline-block; }
 ::-webkit-scrollbar-thumb:hover { background: var(--ctl-border); }
 
 /* update banner */
-#snd-hint, #back-hint, #xp-toast, #sd-toast, #app-toast {
+#snd-hint, #back-hint, #xp-toast, #app-toast {
   position: fixed;
   left: 50%;
   bottom: calc(18px + env(safe-area-inset-bottom, 0px));
@@ -903,7 +882,7 @@ button .ic, .chip .ic { display: inline-block; }
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
 }
 
-#back-hint, #xp-toast, #sd-toast, #app-toast { width: auto; max-width: calc(100vw - 32px); text-align: center; }
+#back-hint, #xp-toast, #app-toast { width: auto; max-width: calc(100vw - 32px); text-align: center; }
 #app-toast[hidden] { display: none; }
 
 #app-update {
@@ -970,7 +949,7 @@ button .ic, .chip .ic { display: inline-block; }
   .goal-due .tabbar-bottom .tabbar-btn[data-group="gtheory"]::after { top: 4px; right: calc(50% - 30px); }
   main { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
   .foot { padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
-  #snd-hint, #back-hint, #xp-toast, #sd-toast, #app-toast, #app-update { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+  #snd-hint, #back-hint, #xp-toast, #app-toast, #app-update { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
 }
 
 @media (max-width: 640px) {
@@ -978,14 +957,17 @@ button .ic, .chip .ic { display: inline-block; }
   .brand .tag { display: none; }
   .brand { font-size: 21px; }
   .wordmark { height: 21px; }
-  /* logo + workspace + four icons on ONE row down to 360 px */
+  /* logo + the link across + five icons on ONE row down to 360 px */
   .tb-tools { gap: 2px; }
-  #space-btn { padding: 0 10px; margin-right: 2px; }
 }
-/* 360-380 px phones: six corner controls still share the logo's row */
+/* 360-380 px phones: the corner controls still share the logo's row */
 @media (max-width: 380px) {
   .tb-tools .icon-btn { width: 34px; height: 34px; }
-  #space-btn { padding: 0 8px; margin-right: 0; }
+}
+/* soundLAB Gear on narrow phones: its link is the longer word ("soundLAB"),
+   so it is set tighter to stay on that row (soundLAB's "Gear" fits as it is) */
+@media (max-width: 420px) {
+  html[data-app="gear"] #app-switch { padding: 0 4px; font-size: 12px; letter-spacing: 0; }
 }
 @media (max-width: 640px) {
   /* the clef dropdown spans the screen: Key | Scale, then BPM | Time | ▶ */
@@ -994,7 +976,7 @@ button .ic, .chip .ic { display: inline-block; }
   .cx-field.cx-scale { flex: 1 1 calc(100% - 120px); min-width: 0; }
   .cx-field.cx-scale select { flex: 1 1 0; min-width: 0; }
   .ctxbar input[type="number"] { width: 58px; }
-  #cx-met { margin-left: auto; } /* transport (and the studio ●) on the right */
+  #cx-met { margin-left: auto; } /* transport on the right */
   /* the metronome becomes a bottom sheet */
   .sheet { align-items: flex-end; padding: 0; }
   .sheet-card {
@@ -1009,9 +991,6 @@ button .ic, .chip .ic { display: inline-block; }
   .card { padding: 16px; }
   .big-display { font-size: 60px; }
 }
-
-/* narrowest phones: the workspace button keeps only its word */
-@media (max-width: 400px) { #space-btn .ic { display: none; } }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }

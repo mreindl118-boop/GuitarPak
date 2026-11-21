@@ -15,11 +15,11 @@ const SCORE = { title: 'Original safety fixture', bpm: 120, len: 5,
   try {
     const context = await browser.newContext({ serviceWorkers: 'block', viewport: { width: 1000, height: 900 } });
     await context.addInitScript(() => {
-      ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
-      localStorage.setItem('guitarlab.fb.root', '0'); localStorage.setItem('guitarlab.fb.scale', '"major"');
-      localStorage.setItem('guitarlab.ws.performance.input', '"synth-in"');
-      localStorage.setItem('guitarlab.midi.appSound', 'false'); localStorage.setItem('guitarlab.midi.voiceAuto', 'true');
-      localStorage.setItem('guitarlab.lights.displayEnabled', 'true');
+      ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true'));
+      localStorage.setItem('soundlab2.fb.root', '0'); localStorage.setItem('soundlab2.fb.scale', '"major"');
+      localStorage.setItem('soundlab2.ws.performance.input', '"synth-in"');
+      localStorage.setItem('soundlab2.midi.appSound', 'false'); localStorage.setItem('soundlab2.midi.voiceAuto', 'true');
+      localStorage.setItem('soundlab2.lights.displayEnabled', 'true');
       window.__sent = [];
       class Port extends EventTarget {
         constructor(id, name) { super(); this.id = id; this.name = name; this.state = 'connected'; this.onmidimessage = null; }

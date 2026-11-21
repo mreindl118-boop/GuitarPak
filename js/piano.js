@@ -265,9 +265,11 @@
   // per-channel bend (ROLI key wiggle) and pressure shape the live note.
   var heldVoices = {};
 
-  // ---- synth voice (the Studio's MPE synth, playable right here) ----
-  // pn.voice: 'piano' (sampled grand) or a DAW.SYNTH_PRESETS id. The synth
-  // gets true MPE: per-channel bend and pressure route straight into it.
+  // ---- synth voice (the MPE synth from js/daw/synth.js, playable right here) ----
+  // pn.voice: 'piano' (sampled grand) or a DAW.SYNTH_PRESETS id, chosen in
+  // the Sound picker (#pn-voice). The synth gets true MPE: per-channel bend
+  // and pressure route straight into it. pn.synthPreset = the last synth
+  // sound (the Learn bar's "Synth keyboard" entry comes back to it).
 
   var pnVoice = 'piano';
   var pnSyn = null, pnSynFor = null;
@@ -284,7 +286,7 @@
     if (!preset) { pnSyn = null; return null; }
     pnSyn = DAW.createSynth(ctx, preset.params);
     var trim = ctx.createGain();
-    trim.gain.value = 0.55; // presets are mixed hot for the studio chain
+    trim.gain.value = 0.55; // the presets are mixed hot
     pnSyn.output.connect(trim);
     trim.connect(ctx.destination);
     pnSynFor = pnVoice;
@@ -301,6 +303,33 @@
     sel.innerHTML = h;
     sel.value = pnVoice;
     if (sel.value !== pnVoice) { sel.value = 'piano'; pnVoice = 'piano'; } // preset gone
+  }
+
+  // the one place the sound changes: the Sound picker's change handler and
+  // App.keys.setVoice. id = 'piano' or a DAW.SYNTH_PRESETS id.
+  function applyVoice(id) {
+    pnVoice = id;
+    App.store.set('pn.voice', pnVoice);
+    if (pnVoice !== 'piano') App.store.set('pn.synthPreset', pnVoice);
+    // heldSynth is forgotten below, so the later note-offs never reach the
+    // synth: silence it for every change (also the same synth picked again)
+    if (pnSyn) { try { pnSyn.allNotesOff(); } catch (e) { /* ok */ } }
+    heldSynth = {};
+  }
+
+  // App.keys.setVoice(id): pick a sound from outside the page. false = no
+  // such sound (nothing changes)
+  function setVoice(id) {
+    var known = id === 'piano';
+    if (!known && window.DAW && DAW.SYNTH_PRESETS) {
+      DAW.SYNTH_PRESETS.forEach(function (p) { if (p.id === id) known = true; });
+    }
+    if (!known) return false;
+    paintVoiceSel(); // the option list is current before the value is set
+    var sel = document.getElementById('pn-voice');
+    if (sel) sel.value = id;
+    applyVoice(id);
+    return true;
   }
 
   var pianoSources = [];
@@ -1004,6 +1033,9 @@
   }
 
   function ppStart() {
+    // open = owner: the runner starting (Play or Guide, from the button or
+    // the pedal) folds the LUMI section, which stops its session
+    if (App.lumiPractice) App.lumiPractice.close('The runner started. LUMI session stopped.');
     ppHeld = false;
     if (pp.guide) { guideStart(); return; }
     pp.path = practicePath();
@@ -1062,8 +1094,9 @@
   // on-screen pause, leaving the page or opening a lesson hands NEXT back to
   // the lesson card). NEXT = skip a note in Guide / resume (a timed run just
   // plays on); BACK = a note back in Guide, else restart from the first
-  // note; STOP = pause, keeping the place. The Synth page hides the lesson
-  // card, so there the remote drives this runner only.
+  // note; STOP = pause, keeping the place. While the LUMI section (#pn-lumi)
+  // is open it is asked INSTEAD of both (onRemote below): opening it stopped
+  // the lessons and this runner, and starting either one closes it.
   var ppHeld = false;
   function ppBusy() { return pp.running || pp.guiding || ppHeld; }
   function ppRemote(action) {
@@ -1090,6 +1123,9 @@
     return false;
   }
   function onRemote(action, info) {
+    // the LUMI section owns the pedal while it is open. No fall-through:
+    // a press it has no use for never starts a lesson or the runner
+    if (App.lumiPractice && App.lumiPractice.open) return App.lumiPractice.remote(action) || false;
     var kl = App.keysLessons, r = kl && kl.remote ? kl.remote(action, info) : false;
     return r || ppRemote(action) || false;
   }
@@ -1233,10 +1269,7 @@
 
   // ---------------- init ----------------
 
-  var pianoRoot = null, synthRoot = null;
-
   function init(rootEl) {
-    pianoRoot = rootEl;
     App.injectCSS('piano',
       // the scale name is the card's h2 (global .card h2: Bebas + amber dot)
       '.card h2.pn-title{margin:0}' +
@@ -1300,10 +1333,11 @@
       '.pn-key.pn-hit-ok{stroke:#4cc9b0 !important;stroke-width:5 !important}' +
       '.pn-key.pn-hit-meh{stroke:#ffd166 !important;stroke-width:5 !important}' +
       '.pn-key.pn-hit-bad{stroke:#ff5d5d !important;stroke-width:5 !important;fill:#ff8f8f !important}' +
-      '#panel-synth #pn-lessons{display:none}' +
+      // the LUMI section under the lessons: a folded card, its summary is the heading
+      '#pn-lumi>summary{cursor:pointer;font-weight:600}' +
       '.pn-range{fill:var(--accent);opacity:.85}.pn-rangel{font:600 10.5px var(--font-body);fill:var(--accent)}' +
       '#pn-assist button{min-width:0}' +
-      // Voice / Strum: the label sits beside its control, not above it
+      // Sound / Strum: the label sits beside its control, not above it
       'label.field.pn-inl{flex-direction:row;align-items:center;gap:8px}' +
       // segs in the Keys card a touch tighter, so the help seg fits at 360px
       '.pn-card .seg button{padding:4px 11px;font-size:13.5px}' +
@@ -1337,7 +1371,7 @@
               '<span class="chip" id="pn-octlabel"></span>' +
               '<button type="button" class="btn sm" id="pn-octup" aria-label="Keys octave up">' + App.icon('plus', 13) + '</button>' +
             '</span>' +
-            '<label class="field pn-inl" title="What this keyboard sounds like — the sampled grand, or the Studio&rsquo;s MPE synth presets (full pitch-bend / pressure expression from a ROLI)">Voice' +
+            '<label class="field pn-inl" title="What this keyboard sounds like: the sampled grand piano or a synth sound (full pitch-bend and pressure from a ROLI)">Sound' +
               '<select id="pn-voice"><option value="piano">Grand piano</option></select></label>' +
             '<button type="button" class="btn sm" id="pn-qwmap" title="Remap which computer key plays which note">Remap</button>' +
             '<button type="button" class="btn sm" id="pn-rotate" title="Rotate the keyboard (portrait / landscape)" aria-label="Rotate the keyboard">' + App.icon('rotate', 14) + '</button>' +
@@ -1424,7 +1458,11 @@
         '<div class="row tight pn-legend" id="pn-legend"></div>' +
         '<div class="muted small pn-foot" style="margin-top:10px">Tap<span class="pn-tyhint">, type (home row = white keys, Z / X = octave)</span> or play a MIDI keyboard.</div>' +
       '</div>' +
-      '<div id="pn-lessons"></div>';
+      '<div id="pn-lessons"></div>' +
+      // LUMI note and triad practice (js/lumi-practice.js), closed by default
+      '<details class="card" id="pn-lumi"><summary>Notes and triads on the LUMI</summary>' +
+        '<p class="muted small">While this section is open, your pedal works here and the lessons&#39; Double-tap on the lowest key is paused. The double-tap key from Settings › Hands-free control, if it is on, works here in Simulated mode. Close the section to use the pedal and Double-tap for the lessons above.</p>' +
+        '<div id="pn-lumi-body"></div></details>';
 
     els.title = document.getElementById('pn-title');
     els.stage = document.getElementById('pn-stage');
@@ -1479,15 +1517,7 @@
     els.qwSlots = document.getElementById('pn-qwslots');
     pnVoice = App.store.get('pn.voice', 'piano');
     var vsel = document.getElementById('pn-voice');
-    if (vsel) {
-      vsel.addEventListener('change', function () {
-        pnVoice = this.value;
-        App.store.set('pn.voice', pnVoice);
-        if (pnVoice !== 'piano') App.store.set('pn.synthPreset', pnVoice);
-        if (pnVoice === 'piano' && pnSyn) { try { pnSyn.allNotesOff(); } catch (e) { /* ok */ } }
-        heldSynth = {};
-      });
-    }
+    if (vsel) vsel.addEventListener('change', function () { applyVoice(this.value); });
     paintVoiceSel(); // presets may land later (daw/synth.js loads after us)
 
     var pf = App.store.get('pn.perf', null);
@@ -1752,7 +1782,7 @@
       setTimeout(function () { noteOff(midi, 98); }, 450);
       pressKey(midi);
       guideCheck(midi);
-      // tap = a short note for the capture service (no key-up to wait for)
+      // tap = one short note for the note:input listeners (no key-up to wait for)
       App.emit('note:input', { on: true, midi: midi, vel: 90, src: 'touch', dur: 0.5 });
     });
 
@@ -1761,12 +1791,9 @@
     // is held — same visual language as QWERTY input. ----
     App.on('midi:note', function (d) {
       if (!d) return;
-      // in the Studio with a track armed, the TRACK's instrument sounds the
-      // note (studio.js routes it) — the piano voice would double it
-      var studioArmed = App.space === 'studio' && App.store.get('st.armed', null);
       var padsOwn = App.active === 'pads'; // the pads page owns the keys there
       if (d.on) {
-        if (!studioArmed && !padsOwn && !d.silent && !d.mute) noteOn(d.midi, d.vel, d.chan);
+        if (!padsOwn && !d.silent && !d.mute) noteOn(d.midi, d.vel, d.chan);
         pressKeyHold(d.midi, true);
         guideCheck(d.midi);
       } else {
@@ -1810,6 +1837,22 @@
     if (App.keysLessons) {
       try { App.keysLessons.init(document.getElementById('pn-lessons')); } catch (e) { console.error('keys lessons', e); }
     }
+    // LUMI practice lives in the folded section under the lessons. OPEN =
+    // OWNER, one owner at a time: opening it stops a lesson run and the
+    // runner (a remote pause too); a lesson or the runner starting closes it
+    // (keylessons.js start / releaseRunner, ppStart above). So the pedal and
+    // the reserved lowest key never have two candidates.
+    var lumiBox = document.getElementById('pn-lumi');
+    if (App.lumiPractice) {
+      try { App.lumiPractice.init(document.getElementById('pn-lumi-body')); } catch (e) { console.error('lumi practice', e); }
+    } else lumiBox.hidden = true; // the module did not load: no empty section
+    lumiBox.addEventListener('toggle', function () {
+      var lp = App.lumiPractice;
+      if (!lumiBox.open) { if (lp) lp.hide(); return; } // closing stops and disarms a session
+      if (App.keysLessons && App.keysLessons.halt) App.keysLessons.halt();
+      ppStop();
+      if (lp && App.active === 'piano') lp.show(); // on another page onShow does it
+    });
   }
 
   function paintAssist() {
@@ -1859,14 +1902,17 @@
 
   function onShow() {
     render();       // palette may have been customized in the fretboard settings
-    paintVoiceSel(); // synth presets (incl. plugins) are loaded by now
+    paintVoiceSel(); // synth presets are loaded by now
     scrollToWindow();
+    // a LUMI section left open: it is live again (ports refreshed)
+    if (App.lumiPractice && App.lumiPractice.open) App.lumiPractice.show();
   }
 
   function onHide() {
     ppPause();      // exercise pauses (keeps its place) when leaving the tab
     ppHeld = false; // leaving is not a remote pause: NEXT is the lessons' again
     if (App.keysLessons) App.keysLessons.stop(); // a lesson run ends (unscored)
+    if (App.lumiPractice) App.lumiPractice.hide(); // a LUMI session stops and disarms
     // release any computer-keyboard notes whose keyup we'll never see
     Object.keys(qw.held).forEach(function (c) {
       noteOff(qw.held[c], 99);
@@ -1890,6 +1936,9 @@
     ring: function (midi, next) { ppRing(midi, next); ledGuide(midi == null ? -1 : midi, next == null ? -1 : next); },
     clearRing: function () { ppRing(null, null); ledClear(); },
     flash: flashKey,
+    // the Sound picker from outside: 'piano' or a synth sound's id
+    // (DAW.SYNTH_PRESETS); false for an unknown id
+    setVoice: setVoice,
     stopRunner: ppStop,
     runnerBusy: ppBusy, // playing, guiding, or paused by the remote
     releaseRemote: function () { ppHeld = false; }, // a lesson was opened: NEXT starts it
@@ -1903,48 +1952,13 @@
     init: init,
     onShow: onShow,
     onHide: onHide,
-    onRemote: onRemote // no remoteKey: the lessons keep their own lowest-key double-tap
+    onRemote: onRemote,
+    // the reserved lowest key (remote.dbl) only for the LUMI section, while
+    // it is open in simulated mode. A lesson or the runner starting closes
+    // the section, so their lowest key is played and graded as before; the
+    // lessons keep their own lowest-key double-tap (kl.dbltap)
+    remoteKey: function () { return !!(App.lumiPractice && App.lumiPractice.open && App.lumiPractice.remoteKey()); }
   });
-
-  // ---- the SYNTH page: the same playable keyboard, voice forced to the
-  // Studio synth presets. One DOM, borrowed while the page is open — every
-  // input path (touch, QWERTY, MIDI, tone-in) and the Perform layer come
-  // along for free.
-  App.register('synth', {
-    init: function (rootEl) {
-      synthRoot = rootEl;
-    },
-    onShow: function () {
-      if (pianoRoot && synthRoot) {
-        while (pianoRoot.firstChild) synthRoot.appendChild(pianoRoot.firstChild);
-      }
-      paintVoiceSel();
-      var sel = document.getElementById('pn-voice');
-      var last = App.store.get('pn.synthPreset', 'saw');
-      if (sel) {
-        sel.value = last;
-        if (sel.value !== last) sel.value = 'saw';
-        pnVoice = sel.value === 'piano' ? 'saw' : sel.value;
-        sel.value = pnVoice;
-        App.store.set('pn.voice', pnVoice);
-      }
-      render();
-      paintPerf();
-      scrollToWindow();
-    },
-    onHide: function () {
-      onHide();
-      if (pianoRoot && synthRoot) {
-        while (synthRoot.firstChild) pianoRoot.appendChild(synthRoot.firstChild);
-      }
-    },
-    onKey: modules_onKey_passthrough,
-    // the runner strip only: the lesson card is hidden on this page
-    // ('#panel-synth #pn-lessons'), so NEXT never starts a lesson nobody sees
-    onRemote: function (action) { return ppRemote(action) || false; }
-  });
-
-  function modules_onKey_passthrough(e) { /* QWERTY handled by document-level qw listeners */ }
 
   // the sampled piano voice, shared with other modules (chords' piano
   // voicings), plus the tone-library setting surface for the Settings tab

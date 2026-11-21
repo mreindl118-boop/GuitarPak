@@ -27,6 +27,7 @@ New-Item -ItemType Directory -Force "$out\obj", "$out\dex", "$out\assets" | Out-
 # loads the live site (MainActivity.LIVE_URL) whenever it can, so web releases
 # reach Android without a new APK. (sw.js omitted — no service workers on file://.)
 Copy-Item "$web\index.html" "$out\assets\"
+Copy-Item "$web\gear.html" "$out\assets\"
 Copy-Item "$web\manifest.webmanifest" "$out\assets\"
 Copy-Item -Recurse "$web\css", "$web\js", "$web\icons", "$web\fonts", "$web\samples", "$web\data" "$out\assets\"
 

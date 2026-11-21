@@ -1,3 +1,5 @@
+> 2.0: this page lives in soundLAB Gear (gear.html) since Phase A. Menu paths below are from before Phase A (1.x and the live 2.0.0).
+
 # Synth Deck — control your synth from soundLAB (1.2.0)
 
 > 1.3: the deck is the **Deck** pill of the Synth tab (docs/SYNTH-TAB.md): a strips-based play

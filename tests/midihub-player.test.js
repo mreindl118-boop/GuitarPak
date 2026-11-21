@@ -4,6 +4,10 @@
 // goes to the LUMI, velocity cap, tempo, channels as in file vs one Part,
 // pause/stop/Panic/leaving release everything, MusicXML chords/ties/rests/
 // voices/tempo, and .mxl (stored and deflated). Test material is synthetic.
+// 2.0 Phase A3b: the Hub (and this mount of the Player card, js/scoreplayer.js) is in soundLAB
+// Gear (gear.html, env.GEAR_URL), which boots on the Deck; "leaving" goes to the Deck.
+// Last: the Hub's mount of the card passes no per-mount option (its own no-output line, no ports
+// row, no button, a tip that names the Hub, no Open as tab in Gear), with MIDI connected after boot.
 const { chromium } = require('playwright');
 const env = require('./env');
 let fails = 0;
@@ -13,10 +17,10 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
   const browser = await chromium.launch({ executablePath: env.CHROMIUM });
   const ctx = await browser.newContext({ viewport: { width: 1200, height: 800 } });
   await ctx.addInitScript(() => {
-    ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
-    localStorage.setItem('guitarlab.lights.on', 'false');
-    localStorage.setItem('guitarlab.midi.outputId', JSON.stringify('lumi'));
-    localStorage.setItem('guitarlab.midihub.profile', JSON.stringify('yamaha'));
+    ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true'));
+    localStorage.setItem('soundlab2.lights.on', 'false');
+    localStorage.setItem('soundlab2.midi.outputId', JSON.stringify('lumi'));
+    localStorage.setItem('soundlab2.midihub.profile', JSON.stringify('yamaha'));
     window.__by = { lumi: [], modx1: [] };
     const mk = (id, name) => ({ id, name, state: 'connected', send: b => window.__by[id].push(Array.from(b)) });
     const outs = new Map([['lumi', mk('lumi', 'LUMI Keys BLOCK')], ['modx1', mk('modx1', 'MODX-1')]]);
@@ -25,8 +29,8 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
   });
   const page = await ctx.newPage(), errs = [];
   page.on('pageerror', e => errs.push(e.message));
-  await page.goto(env.URL);
-  await page.waitForFunction(() => window.App && App.midi && App.midi.ready && App.midi.hasOutput && App.active === 'quiz');
+  await page.goto(env.GEAR_URL);
+  await page.waitForFunction(() => window.App && App.midi && App.midi.ready && App.midi.hasOutput && App.active === 'deck');
 
   // ---- test material (built in the page) ----
   await page.evaluate(() => {
@@ -119,7 +123,7 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
     document.getElementById('mh-panic').click();
     const afterPanic = SLMidiHub.player.state;
     SLMidiHub.player.play(); await wait(120);
-    App.switchTo('piano');
+    App.switchTo('deck'); // another page of soundLAB Gear
     const afterLeave = SLMidiHub.player.state;
     App.switchTo('midihub');
     return { mid, afterPause, afterPanic, afterLeave };
@@ -128,7 +132,7 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
   ok(p.filter(b => (b[0] & 0xf0) === 0x90).every(b => b[0] === 0x92) && /All on Part 3/.test(m2.mid.label), 'All on one Part: every note on channel 3: ' + m2.mid.label);
   ok(m2.mid.held > 0 && m2.afterPause.held === 0 && !m2.afterPause.playing && pOff >= pOn && p.some(b => b[0] === 0xb2 && b[1] === 64 && b[2] === 0) && m2.afterPause.btn === 'Play', 'Pause releases every held note and lifts the pedal: ' + pOn + ' on / ' + pOff + ' off');
   ok(!m2.afterPanic.playing && m2.afterPanic.held === 0, 'Panic stops the player');
-  ok(!m2.afterLeave.playing && m2.afterLeave.held === 0, 'leaving the MIDI tab pauses it with nothing held');
+  ok(!m2.afterLeave.playing && m2.afterLeave.held === 0, 'leaving the Hub page (for the Deck) pauses it with nothing held');
 
   console.log('# MusicXML and .mxl');
   const x = await page.evaluate(async () => {
@@ -208,7 +212,62 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
   ok(k.hidden && k.plain.join() === '60,62,64,65,67,69,71,72,66', 'Change key off: notes as written again');
 
   ok(errs.length === 0, 'no page errors' + (errs.length ? ': ' + errs.join(' | ') : ''));
-  await ctx.close(); await browser.close();
+  await ctx.close();
+
+  // The Hub's mount of the card (SLScorePlayer.mount(el, { show })) passes none of the per-mount options the
+  // Songs page in soundLAB uses (ports, noOut, connect: tests/oneopen.test.js, from where this half moved in
+  // A3b): the Hub header above the card has Connect MIDI, Synth out and the Parts. A profile where MIDI was
+  // never connected, so the card starts with no synth output.
+  console.log('# the Hub\u2019s mount of the card, MIDI connected after boot');
+  const c2 = await browser.newContext({ viewport: { width: 1200, height: 800 } });
+  await c2.addInitScript(() => {
+    ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true')); // not midi.wanted: nothing connects at boot
+    localStorage.setItem('soundlab2.lights.on', 'false');
+    const out = { id: 'modx1', name: 'MODX-1', state: 'connected', send: () => { } };
+    const inp = { id: 'mi', name: 'MODX-1', state: 'connected', onmidimessage: null };
+    navigator.requestMIDIAccess = () => Promise.resolve({ inputs: new Map([['mi', inp]]), outputs: new Map([['modx1', out]]), sysexEnabled: true, onstatechange: null });
+    window.__card = () => {
+      const q = id => document.getElementById(id), tips = document.querySelector('.mh-pl details p'), host = q('mh-player');
+      return {
+        cards: document.querySelectorAll('.mh-pl').length, inHub: !!host.querySelector('.mh-pl'), seen: host.getBoundingClientRect().height > 0,
+        out: q('mh-plout').textContent, tips: tips.textContent.slice(tips.textContent.indexOf('sends everything')),
+        row: !!(q('mh-plports') || q('mh-plsynth') || q('mh-plch')), btn: !!q('mh-plconnect'),
+        tabBtn: !!q('mh-pltab'), tabLine: /Open as tab is on the Songs page in soundLAB\./.test(host.textContent)
+      };
+    };
+  });
+  const p2 = await c2.newPage(), errs2 = [];
+  p2.on('pageerror', e => errs2.push(e.message));
+  await p2.goto(env.GEAR_URL);
+  await p2.waitForFunction(() => window.App && App.midi && window.SLMidiHub && window.SLScorePlayer && App.active === 'deck');
+  const hub = await p2.evaluate(() => {
+    window.__sameDoc = true; // gone after a reload
+    App.switchTo('midihub');
+    document.querySelector('#mh-views [data-view="player"]').click();
+    const o = { ready: App.midi.ready, songs: typeof App.songs, connect: !!document.getElementById('mh-enable') && document.getElementById('mh-enable').getClientRects().length > 0, card: __card() };
+    // Open as tab through the module: there is no Songs page in Gear, so nothing opens and the page stays
+    SLMidiHub.player.loadScore({ title: 'Line', bpm: 120, len: 4, notes: [60, 62, 64, 65].map((m, i) => ({ t: i, d: 1, m, partId: 'p1', v: 100 })) });
+    o.asTab = SLMidiHub.player.openAsTab(); o.active = App.active; o.file = location.pathname.split('/').pop();
+    return o;
+  });
+  ok(hub.ready === false && hub.card.cards === 1 && hub.card.inHub && hub.card.seen && /connect MIDI above$/.test(hub.card.out) && !hub.card.row && !hub.card.btn,
+    'the Hub\u2019s mount passes no option: its own line while there is no output, no ports row, no button: ' + hub.card.out);
+  ok(hub.connect, 'and the "above" that line points at is there: the Hub header\u2019s Connect MIDI button');
+  ok(hub.card.tips === 'sends everything to the Part picked in Control.', 'its tip names the Hub: ' + hub.card.tips);
+  ok(hub.songs === 'undefined' && !hub.card.tabBtn && hub.card.tabLine && hub.asTab === false && hub.active === 'midihub' && hub.file === 'gear.html',
+    'Gear has no Songs page: the card has no Open as tab button, says where it is, and openAsTab() opens nothing: ' + JSON.stringify([hub.card.tabBtn, hub.card.tabLine, hub.asTab, hub.active, hub.file]));
+  await p2.evaluate(() => document.getElementById('mh-enable').click());
+  await p2.waitForFunction(() => App.midi.ready && App.midi.hasOutput && /MODX-1/.test(document.getElementById('mh-plout').textContent));
+  const live = await p2.evaluate(() => ({ sameDoc: window.__sameDoc === true, card: __card() }));
+  ok(live.sameDoc && /MODX-1/.test(live.card.out) && !live.card.row && !live.card.btn, 'Connect MIDI in the Hub header: the card names the synth without a reload, still with no ports row of its own: ' + live.card.out);
+  const own = await p2.evaluate(() => {
+    const host = document.createElement('div'); host.id = 'own-player'; document.body.appendChild(host);
+    SLScorePlayer.mount(host, { ports: true });
+    return { cards: document.querySelectorAll('.mh-pl').length, hubHost: document.getElementById('mh-player').children.length, own: host.querySelectorAll('.mh-pl').length, title: SLScorePlayer.state.title };
+  });
+  ok(own.cards === 1 && own.hubHost === 0 && own.own === 1 && own.title === 'Line', 'one card per document: mounting it somewhere else empties the Hub\u2019s host and keeps the open score: ' + JSON.stringify(own));
+  ok(errs2.length === 0, 'no page errors (the Hub\u2019s mount)' + (errs2.length ? ': ' + errs2.join(' | ') : ''));
+  await c2.close(); await browser.close();
   console.log(fails ? 'FAILED ' + fails : 'ALL PASS');
   process.exit(fails ? 1 : 0);
 })().catch(e => { console.log('FAIL (crash)', e); process.exit(1); });

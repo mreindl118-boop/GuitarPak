@@ -6,58 +6,98 @@
  *   - every NEW 2.0 component uses ONLY --sl-* tokens, never a raw color;
  *   - both themes are defined here and both must pass WCAG AA contrast;
  *   - no token is read before this file loads (it is the first stylesheet).
+ * Note colours are not tokens: App.colors hands them to an element as --c.
+ * tests/tokens.test.js computes the contrast of the pairs it lists from this
+ * file (text 4.5:1, control boundaries and the focus ring 3:1), in both themes.
+ * It reads the :root block and the light block, so this file holds no other
+ * rule that sets a colour: a rule new to the file is first added to the list
+ * PLACES in that test.
  */
 
 :root {
   color-scheme: dark;
 
   /* ---- surfaces ---------------------------------------------------- */
-  --sl-bg: #0f0d10;             /* the stage */
+  --sl-bg: #0f0d10;             /* the page's ground (an instrument stands on --sl-stage) */
   --sl-bg-raised: #161317;      /* header, footer, sheets */
   --sl-surface: #1c191d;        /* cards */
   --sl-surface-2: #262128;      /* rows inside cards, inputs */
+  --sl-surface-sunken: #0a090b; /* wells, inputs inside cards */
+  --sl-stage: #0a090b;          /* the ground under an instrument: dark in both
+                                   themes, so ivory keys stand off it */
   --sl-line: rgba(255, 255, 255, 0.08);
   --sl-line-strong: #302a32;
+  --sl-line-control: #80767e;   /* the boundary of a control: ≥ 3:1 on the five surfaces */
   --sl-overlay: rgba(0, 0, 0, 0.6);
 
   /* ---- ink ---------------------------------------------------------- */
   --sl-ink: #f6f1ea;
+  --sl-ink-soft: #cbc3c9;       /* secondary text, field labels */
   --sl-ink-muted: #9d939b;      /* ≥ 4.5:1 on --sl-bg */
   --sl-ink-faint: #6a6168;      /* decorative only, never for text that matters */
 
   /* ---- accent: tube amber ------------------------------------------ */
   --sl-accent: #ffab47;
-  --sl-accent-ink: #1a1206;     /* text ON the accent */
+  --sl-accent-ink: #1a1206;     /* text ON the accent; never use it for amber text */
+  --sl-accent-text: #ffab47;    /* amber as text and as the focus ring */
+  --sl-accent-deep: #c97f26;    /* the dark end of a gradient, a hover border; never text */
   --sl-accent-soft: rgba(255, 171, 71, 0.14);
   --sl-accent-line: rgba(255, 171, 71, 0.6);
   --sl-accent-glow: 0 14px 40px rgba(255, 171, 71, 0.28);
+  --sl-accent-glow-color: rgba(255, 171, 71, 0.28);   /* the colour inside --sl-accent-glow */
 
   /* ---- status ------------------------------------------------------- */
   --sl-ok: #6fd58f;
   --sl-warn: #ffb36b;
   --sl-bad: #ff6f6f;
   --sl-info: #6ea8fe;
+  /* judgements of a played note (Woodshed, lessons): always shown with their word */
+  --sl-judge-perfect: #4cc9b0;
+  --sl-judge-great: #8bd450;
+  --sl-judge-good: #ffd166;
+  --sl-judge-miss: var(--sl-bad);
 
-  /* ---- scale-degree colors (the default color mode: 1 is always the
-          1 color in every key; the LUMI gets the same seven) ---------- */
-  --sl-deg-1: #ff4d4d;
-  --sl-deg-2: #ff9a3c;
-  --sl-deg-3: #ffd23f;
-  --sl-deg-4: #4cd964;
-  --sl-deg-5: #34d0e0;
-  --sl-deg-6: #4d7dff;
-  --sl-deg-7: #b36bff;
+  /* ---- scale-degree colors: the palette's default colours as they are
+          stored, for documents and drawings. No rule reads these: a page
+          shows the colours of App.colors, which the user can change and
+          which are snapped to the LUMI's colour table first (plan D12).
+          They are the source array DEGREE_DEFAULTS of js/app.js;
+          tests/tokens.test.js keeps the two equal. On screen and on a LUMI
+          today's seven defaults are #ffaa2e #ffd429 #7dfc74 #41eab4 #439af5
+          #7e58f5 #ff6460 (mapped() of js/note-palette.js, pinned by
+          tests/colors.test.js): a drawing of today's palette takes those,
+          not these tokens. ------------------------------------------------ */
+  --sl-deg-1: #ffab47;
+  --sl-deg-2: #e8d44d;
+  --sl-deg-3: #7ad97a;
+  --sl-deg-4: #4cc9b0;
+  --sl-deg-5: #6ea8fe;
+  --sl-deg-6: #b48ef0;
+  --sl-deg-7: #ff85b3;
 
   /* ---- keys and strings -------------------------------------------- */
+  /* ivory and ebony in both themes: this is the instrument, not chrome */
   --sl-key-white: #ece5db;
   --sl-key-black: #1b171c;
-  --sl-string: #b9bccb;
-  --sl-fret: #3a3c4d;
+  --sl-key-line: #6b6168;       /* a key's outline */
+  --sl-key-press: #cfc5b6;      /* a pressed key without a note colour */
+  --sl-string: #b9bccb;         /* a string, on the stage */
+  --sl-fret: #3a3c4d;           /* a fret wire, on the stage: quieter than a string */
+  --sl-nut: #d8cdb8;            /* the neck's nut, on the stage */
+  --sl-ink-on-stage: #cbc3c9;   /* text drawn on the stage: octave names, string
+                                   names, fret numbers */
+  --sl-ink-on-color: #1a1206;        /* a label on a note colour */
+  --sl-ink-on-color-light: #ffffff;  /* the same on a dark note colour */
 
   /* ---- type ---------------------------------------------------------- */
   --sl-font-display: 'Bebas Neue', 'Barlow Condensed', 'Segoe UI', system-ui, sans-serif;
   --sl-font-body: 'Barlow', 'Segoe UI', system-ui, sans-serif;
   --sl-font-cond: 'Barlow Condensed', 'Segoe UI', system-ui, sans-serif;
+  /* only the weights that have a font file (Bebas Neue has one weight, 400) */
+  --sl-weight-regular: 400;                   /* Barlow */
+  --sl-weight-medium: 500;                    /* Barlow */
+  --sl-weight-cond: 600;                      /* Barlow Condensed */
+  --sl-weight-cond-bold: 700;                 /* Barlow Condensed */
   --sl-text-xs: 12px;
   --sl-text-sm: 14px;
   --sl-text-md: 16px;
@@ -67,7 +107,7 @@
   --sl-display-md: 56px;                      /* big numbers (streak) */
   --sl-display-lg: clamp(44px, 7.8vw, 100px); /* the one headline on a page */
   --sl-eyebrow-ls: 0.16em;                    /* small caps labels */
-  --sl-caps-ls: 0.08em;                       /* Bebas buttons and tabs */
+  --sl-caps-ls: 0.08em;                       /* Barlow Condensed caps: tabs and the hero button */
   --sl-leading-tight: 0.92;
   --sl-leading: 1.4;
 
@@ -90,8 +130,10 @@
 
   /* ---- controls ------------------------------------------------------- */
   --sl-control-h: 44px;                       /* every tappable control */
+  --sl-control-h-hero: 64px;                  /* the one Start button of the home */
+  --sl-control-h-dense: 36px;                 /* rows of a list inside a card or a fold, with a mouse only */
   --sl-tap-min: 44px;
-  --sl-focus: 0 0 0 3px rgba(255, 171, 71, 0.55);
+  --sl-focus: 0 0 0 2px var(--sl-bg), 0 0 0 4px var(--sl-accent-text);   /* opaque, follows the theme */
   --sl-shadow-1: 0 1px 3px rgba(0, 0, 0, 0.3);
   --sl-shadow-2: 0 10px 30px rgba(0, 0, 0, 0.35);
 
@@ -101,44 +143,60 @@
   --sl-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
 
   /* ---- layers --------------------------------------------------------- */
-  --sl-z-bar: 20;
-  --sl-z-sheet: 40;
-  --sl-z-toast: 60;
+  --sl-z-bar: 50;                             /* header, key bar */
+  --sl-z-pop: 60;                             /* bottom tab bar, a panel under a chip */
+  --sl-z-full: 200;                           /* a page's own full-screen mode */
+  --sl-z-sheet: 420;
+  --sl-z-tour: 500;                           /* the help tour */
+  --sl-z-toast: 600;                          /* messages: above an open sheet */
+  --sl-z-drag: 700;                           /* what a finger is dragging */
 }
 
-/* Light theme: same tokens re-inked so every pairing keeps ≥ 4.5:1. */
+/* Light theme: same tokens re-inked so every text pairing keeps ≥ 4.5:1 and
+   every control boundary ≥ 3:1. Not re-inked: the keys, their outline, the
+   strings, the nut, the ink on the stage and the inks on a note colour (the
+   instrument stands on --sl-stage, which is dark in both themes, and looks the
+   same in both). The one exception is the fret wire: the light theme's stage is
+   a little lighter, so the wire is lifted to keep its weight (1.85:1 there,
+   1.83:1 in dark). */
 :root[data-theme="light"] {
   color-scheme: light;
   --sl-bg: #f5f1ea;
   --sl-bg-raised: #efe9df;
   --sl-surface: #ffffff;
   --sl-surface-2: #f1ebe1;
+  --sl-surface-sunken: #e7e0d3;
+  --sl-stage: #2a2429;
   --sl-line: rgba(0, 0, 0, 0.08);
   --sl-line-strong: #d8cfc1;
+  --sl-line-control: #857b82;
   --sl-overlay: rgba(20, 16, 12, 0.45);
   --sl-ink: #1d1a1c;
-  --sl-ink-muted: #6d646b;
+  --sl-ink-soft: #4a4248;
+  --sl-ink-muted: #645b62;
   --sl-ink-faint: #a39aa0;
   --sl-accent: #c96f0a;         /* amber deepened for white cards */
-  --sl-accent-ink: #ffffff;
+  --sl-accent-ink: #1a1206;     /* dark text on the amber, as in dark */
+  --sl-accent-text: #8a4a00;
+  --sl-accent-deep: #9f5606;
   --sl-accent-soft: rgba(201, 111, 10, 0.12);
   --sl-accent-line: rgba(201, 111, 10, 0.55);
   --sl-accent-glow: 0 10px 30px rgba(201, 111, 10, 0.22);
-  --sl-ok: #1f8a46;
-  --sl-warn: #9a5a0c;
-  --sl-bad: #c23434;
-  --sl-info: #2f68c8;
-  --sl-key-white: #ffffff;
-  --sl-key-black: #2a2429;
-  --sl-string: #6f7384;
-  --sl-fret: #c9ccd8;
-  --sl-focus: 0 0 0 3px rgba(201, 111, 10, 0.5);
+  --sl-accent-glow-color: rgba(201, 111, 10, 0.22);
+  --sl-ok: #156b33;
+  --sl-warn: #8a500a;
+  --sl-bad: #b32e2e;
+  --sl-info: #2a5fb8;
+  --sl-judge-perfect: #12806b;
+  --sl-judge-great: #3f7a14;
+  --sl-judge-good: #8a6300;
+  --sl-fret: #4b4e61;           /* the same weight on the lighter stage as in dark */
   --sl-shadow-1: 0 1px 3px rgba(0, 0, 0, 0.1);
   --sl-shadow-2: 0 10px 30px rgba(23, 26, 31, 0.08);
 }
 
-@media (pointer: coarse) {
-  :root { --sl-control-h: 48px; }
+@media (any-pointer: coarse) {
+  :root { --sl-control-h: 48px; --sl-control-h-dense: 48px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

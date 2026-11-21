@@ -17,7 +17,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
   });
   const ctx = await browser.newContext({ viewport: { width: 1200, height: 900 } });
   await ctx.addInitScript(() => {
-    ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
+    ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true'));
     window.__gum = 0;
     const md = navigator.mediaDevices, gum = md.getUserMedia.bind(md);
     md.getUserMedia = c => { window.__gum++; return gum(c); };

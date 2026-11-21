@@ -3,7 +3,7 @@
 Open **Practice → Woodshed → Guided performance**. **Melody and rhythm** and
 **Chord journey** generate original exercises in the treble-clef menu's selected
 root and scale. Library rows offer **Wait for Me** and **Play at Tempo** for
-generated scales, imported MIDI, Studio tracks and pasted ASCII tab.
+generated scales, imported MIDI and pasted ASCII tab.
 
 The player works without a physical keyboard or LUMI. Its piano roll, current
 notes, **Coming up**, playable keyboard and optional LUMI targets share one
@@ -47,8 +47,7 @@ are saved locally, up to 30 runs. **Stop** shows **partial results**, including
 **pending** notes; it does not manufacture misses or mark the piece completed.
 Loop statistics accumulate across passes and include pending notes in the
 current pass. Stop, navigation and unfinished loops do not save a completed
-summary. This player does not claim the older Woodshed modes' XP/Ideas export
-behavior.
+summary. This player does not claim the older Woodshed modes' XP behavior.
 
 ## Sound, display and color
 
@@ -58,8 +57,10 @@ Grading observes the original input **before** Scale Lock and sound-routing
 filters, so a muted wrong note still counts as a mistake. The player warns when
 the score or transposition contains pitches outside the selected scale.
 
-Virtual key sound uses the guarded DAW synth. Hardware MIDI sound uses existing
-app/Hub routes; this player does not create another external MIDI writer. To
+Virtual key sound uses the guarded DAW synth. Hardware MIDI sound uses the
+existing routes (the practice router, or MIDI Hub Thru, which runs in soundLAB
+Gear since 2.0 Phase A); this player does not create another external MIDI
+writer. To
 lock out an external synth's own engine, its **Local Control must be OFF** and
 external echo/Thru routing must be disabled manually. Software cannot suppress
 the synth's direct physical keyboard-to-engine path. See
@@ -71,7 +72,8 @@ turning it on restores the current instruction. Structured targets override the
 base scale layout. Display notes never supply performance answers. Shared
 lighting folds pitches into the LUMI window, while grading still requires the
 score's exact synth octave. See [LUMI-PRACTICE.md](LUMI-PRACTICE.md) for display
-ownership and the separate Keys → LUMI practice workflow, and
+ownership and the separate LUMI practice workflow (the section *Notes and triads
+on the LUMI* on the Piano page), and
 [FEATURE-COVERAGE-2026-10-23.md](FEATURE-COVERAGE-2026-10-23.md) for context and
 routing coverage. The performance roll and keyboard use the shared pitch
 palette; its editor and color modes are documented in
@@ -93,8 +95,6 @@ you. Unavailable hardware cannot receive a cleanup message.
   1,500 notes with a warning. Controllers, programs, bends, lyrics and other
   metadata are not performance targets. Mixed-file channel-10 percussion is
   excluded from pitched material; percussion-only imports remain identified.
-- **Studio:** existing note pitches, positions, durations and velocities are
-  copied at the shared tempo. Recorded audio clips are not transcribed.
 - **ASCII tab:** standard tuning, frets 0–24 and aligned chord columns provide
   pitches. Onset groups become even eighths with approximate holds; rhythm,
   rests and techniques are not inferred. Timed results therefore describe the
@@ -139,5 +139,6 @@ latency calibration. Tests use synthetic
 MIDI files, simulated ports/clocks and browser rendering. Web MIDI hardware,
 native iOS/Android device behavior, real timing latency, physical color/octave
 response and audible external lockout remain unverified. The separate
-Keys → LUMI independent port leases are Web MIDI-only; native bridge support
-must not be inferred from the player sharing the app's raw event API.
+independent port leases of LUMI practice (the Piano page section) are Web
+MIDI-only; native bridge support must not be inferred from the player sharing
+the app's raw event API.

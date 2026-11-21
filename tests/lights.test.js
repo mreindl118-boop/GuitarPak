@@ -11,11 +11,11 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
 async function newPage(browser, name, seed) {
   const ctx = await browser.newContext({ viewport: { width: 1200, height: 900 } });
   await ctx.addInitScript(([name, seed]) => {
-    ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
+    ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true'));
     // these checks pin the CLASSIC look (scale lit + white note to play);
     // LUMI Display (the v0.79 default) has its own suite: lumidisplay
-    localStorage.setItem('guitarlab.lights.display', 'false');
-    for (const k in seed) localStorage.setItem('guitarlab.' + k, JSON.stringify(seed[k]));
+    localStorage.setItem('soundlab2.lights.display', 'false');
+    for (const k in seed) localStorage.setItem('soundlab2.' + k, JSON.stringify(seed[k]));
     window.__sent = [];
     const inp = { id: 'in1', name, onmidimessage: null };
     const out = { id: 'out1', name, state: 'connected', send: b => window.__sent.push(Array.from(b)) };
@@ -117,27 +117,8 @@ const keys = o => Object.keys(o).map(Number).sort((a, b) => a - b);
   ok(lock.touch === 1 && /brightness/.test(lock.dim), 'on-screen keys outside the scale are dimmed and do not play: ' + JSON.stringify([lock.touch, lock.dim]));
   ok(lock.off && lock.after.endsWith('+61,-61'), 'unlocked: every note plays again: ' + lock.after);
   ok(lock.shed === 'x61,-61' && lock.songs === true, 'Woodshed and Songs share the global pitched-note lock: ' + JSON.stringify([lock.shed, lock.songs]));
-  const studio = await page.evaluate(async () => {
-    const wait = ms => new Promise(r => setTimeout(r, ms));
-    App.scaleLock.set(true);
-    App.switchTo('tracks'); await wait(900); // the studio wipe
-    const o = { space: App.space, melodic: App.scaleLock.active };
-    let drums = DAW.engine.tracks.find(t => t.kind === 'drums'), temp = false;
-    if (!drums) { drums = { id: 'test-drums', kind: 'drums' }; DAW.engine.tracks.push(drums); temp = true; }
-    App.store.set('st.armed', drums.id); o.drums = App.scaleLock.active; App.store.set('st.armed', null);
-    if (temp) DAW.engine.tracks.splice(DAW.engine.tracks.indexOf(drums), 1);
-    App.scaleLock.set(false);
-    App.switchTo('ideas'); await wait(150);
-    const b = document.getElementById('sd-retro');
-    if (b) b.click();
-    await wait(50);
-    const t = document.getElementById('sd-toast');
-    o.toast = t ? t.textContent : null; o.toastShown = !!t && t.getBoundingClientRect().height > 0;
-    App.switchTo('quiz'); await wait(900);
-    return o;
-  });
-  ok(studio.space === 'studio' && studio.melodic && studio.drums === true, 'Studio: arming drums does not unlock other pitched tracks; drum voice factories are exempt explicitly: ' + JSON.stringify(studio));
-  ok(studio.toast && studio.toastShown, 'Ideas page messages show in a toast while the clef dropdown is tucked away: ' + studio.toast);
+  // the next checks run on the Exercises page with the lock off
+  await page.evaluate(async () => { App.scaleLock.set(false); App.switchTo('quiz'); await new Promise(r => setTimeout(r, 150)); });
   const col = await page.evaluate(() => {
     App.help.set(4); const from = __sent.length; App.store.set('lights.bright', 40); App.midi.repaint();
     const sx = __sent.slice(from).filter(b => b[0] === 0xf0 && b[6] === 0x10);
@@ -172,7 +153,7 @@ const keys = o => Object.keys(o).map(Number).sort((a, b) => a - b);
     __play(70);                      // back up
     o.back = App.midi.range();
     o.handUp = App.keys.hand();
-    o.stored = JSON.parse(localStorage.getItem('guitarlab.midi.rangeLo'));
+    o.stored = JSON.parse(localStorage.getItem('soundlab2.midi.rangeLo'));
     App.store.set('lights.octHand', false); // 'Octave only': the hand stays put
     __play(30); o.handOff = App.keys.hand(); o.offLo = App.midi.range().lo;
     __play(70); App.store.set('lights.octHand', true);
@@ -268,7 +249,7 @@ const keys = o => Object.keys(o).map(Number).sort((a, b) => a - b);
     o.offActive = document.querySelector('#set-midi-bend .active').textContent;
     document.querySelector('#set-midi-bend [data-bend="12"]').click();
     bend(); o.on = got.slice(-1)[0];
-    o.stored = JSON.parse(localStorage.getItem('guitarlab.midi.bendOn'));
+    o.stored = JSON.parse(localStorage.getItem('soundlab2.midi.bendOn'));
     got.length = 0;
     document.querySelector('#set-midi-bend [data-bend="0"]').click();
     o.reset = got.length === 16 && got.every(d => d.semis === 0);
@@ -415,7 +396,7 @@ const keys = o => Object.keys(o).map(Number).sort((a, b) => a - b);
   {
     const ctx2 = await browser.newContext({ viewport: { width: 1200, height: 900 } });
     await ctx2.addInitScript(() => {
-      ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
+      ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true'));
       window.__posts = [];
       window.GuitarLabHost = { shellVersion: () => '0.75.0', setKeepScreenOn: () => {} };
       window.SoundLabMidi = { post: j => {

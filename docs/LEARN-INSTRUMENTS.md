@@ -55,8 +55,8 @@ browser site data is outside app persistence guarantees.
 
 ## Global musical context
 
-The vector treble-clef control remains in the header on every built-in tab and
-workspace, including Exercises and Settings. It provides the single root/scale,
+The vector treble-clef control remains in the header on every built-in page,
+including Exercises and Settings. It provides the single root/scale,
 Scale Lock, LUMI Display and pitch-color mode. Keyboard opening, Escape/focus
 return, outside tap and navigation closure are supported. Modal utility sheets
 temporarily disable the disclosure to avoid competing overlays. It does not

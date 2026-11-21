@@ -38,7 +38,8 @@ own and next to FL Studio. The design system is `docs/DESIGN-SYSTEM.md`.
 - **Shipping:** 2.0 grows on branch `v2`, published to the beta address
   `https://mreindl118-boop.github.io/GuitarPak/next/` by
   `.github/workflows/pages-next.yml` after the full test suite passes. The live
-  app stays on `main`. The main address flips at the release.
+  app is `main` (2.0.0 since 2026-11-11: `v2` as it was then). What is built on
+  `v2` after that reaches the live address at the next release to `main`.
 
 - **Added 2026-11-10 (Matt):** scales on the Keys page show as ONE colored dot
   per key (the LUMI colors) instead of whole painted keys ("Whole keys" stays
@@ -52,7 +53,7 @@ own and next to FL Studio. The design system is `docs/DESIGN-SYSTEM.md`.
 | # | Phase | Scope | Needs |
 |---|---|---|---|
 | 0 | Set up | `v2` branch, beta workflow, design tokens, this roadmap | — |
-| A | Trim | remove the Studio space, sequencer, sampler, plug-in API; fold Trainer, Synth pill, LUMI pill; move Synth tab + Helix behind `gear.html`; storage prefix for 2.0 (`soundlab2.*`, one-time import of `guitarlab.*` at the flip) | 0 |
+| A | Trim | remove the Studio space, sequencer, sampler, plug-in API; fold Trainer, Synth pill, LUMI pill; move Synth tab + Helix behind `gear.html`; storage prefix for 2.0 (`soundlab2.*`, one-time copy of `guitarlab.*`: on the beta at its first start, at the live address at the next release to `main`) | 0 |
 | B | Design system + shell | components, key bar, new home, nav, sheets; every kept page re-skinned; light theme | A |
 | B0 | Instrument matrix | gap list per instrument × kit item; each gap becomes a Phase C task | A |
 | C | Education core | bass lessons, drum rudiments (Pads + Woodshed drums), Keys + Exercises upgrades, next-chord lights, slim Jam, degree colors default | B, B0 |
@@ -62,8 +63,79 @@ own and next to FL Studio. The design system is `docs/DESIGN-SYSTEM.md`.
 | G | Songs library | library schema, PDF viewer, MusicXML/MIDI → Woodshed, per-song progress | C |
 | G2 | Sheet-music recognition | research prototype; never blocks 2.0 | G |
 | H | Gear app | `gear.html`: MODX live control, Helix page, Hub tools; same design system | A, B |
-| I | 2.0 release | tests, docs, main address flips; Android app follows (no new APK) | all |
+| I | 2.0 release | tests, docs, the release to `main` (the live address takes the work of phases A-H); Android app follows (no new APK) | all |
 | J | After 2.0 | FL plugin shell (VST3 + CLAP, web view), G2 if proven | I |
+
+## Phase A status (Trim)
+
+"Done" means merged into `v2` with the full suite green. Plan: five draft pull requests.
+The step-by-step plan is `docs/plans/phase-a/PLAN.md`.
+State on 2026-11-14: all five pull requests (#99 to #103) are open and marked ready for review; none is merged.
+
+| Step | What | State | PR |
+|---|---|---|---|
+| A1 | Studio space, sequencer/arranger, sampler and plug-in API removed; synth and drum sounds kept as a library; Pads is play-only | ready to merge | #99 |
+| A2 | Trainer cards on the Plan page; Synth pill = the Sound picker on Piano; LUMI practice = a section under the Keys lessons | ready to merge | #100 |
+| A3a | Score player, synth-out and rule engine are shared files; the main app no longer calls the Hub | ready to merge | #101 |
+| A3b | soundLAB Gear (`gear.html`): Deck, Live sets, MIDI Hub, Helix leave the main app | ready to merge | #102 |
+| A4 | Storage prefix `soundlab2.*` (beta: `soundlab2-next.*`) with the one-time copy from `guitarlab.*` | ready to merge | #103 |
+
+Decided while trimming (each takes effect with its step):
+
+- Pads keeps the eight pads, both MIDI maps, Remap and key lights. Record and Play loop return when Phase C
+  rebuilds Pads.
+- The interval ear trainer is Exercises › Intervals › All intervals › Ear. The one-minute chord changes become
+  a real Exercises drill in Phase C.
+- MIDI Hub Thru and key splits run while soundLAB Gear is open.
+- With soundLAB and Gear both visible, a bound pedal acts in soundLAB; Gear answers it when soundLAB is hidden
+  or closed. Hear input sounds in one window.
+- LUMI practice on the Piano page: while its section is open it owns the pedal; starting a lesson closes it.
+- The copy from `guitarlab.*` runs once per browser and never changes or deletes the live app's data (2.0.0 still stores under `guitarlab.*`). Items that do
+  not fit are tried again at each start. Studio, sampler and plug-in data is not copied and not deleted.
+- The beta has its own data (`soundlab2-next.*`). Practice done in the beta does not flow into the live app at
+  the next release: the live address copies its own earlier data then. Settings › Backup offers to copy again, and a
+  backup file from the beta restores on the live address.
+
+Removed in 2.0: `js/studio.js`, `js/arrange.js`, `js/plugins.js`, `plugins/`, `PLUGINS.md`.
+
+## Phase B status (Design system + shell)
+
+Plan: `docs/plans/phase-b/PLAN.md`. 24 draft pull requests into `v2`, at most three open at a time.
+Phase B is not a release. The instrument matrix of Phase B0 is `docs/INSTRUMENT-MATRIX.md`.
+The owner's questions and the four drawings that open B5a, B6, B9 and B16: `docs/design/phase-b/index.html`
+(added by step B1b).
+
+| Step | What | Pull request | State |
+|---|---|---|---|
+| B0 | The instrument matrix | #105 | in review (pull request #105, ready for review) |
+| B1a | Tokens that pass, the `tokens` suite, the plan | # | in review (draft pull request) |
+| B1b | The specification, the drawings, the wording list | # | |
+| B2 | Colour bridge, `look` suite, screenshot tool | # | |
+| B3 | Component sheet, gallery, instrument drawings | # | |
+| B4 | The shell built once from JavaScript | # | |
+| B5a | Key bar (waits for G1) | # | |
+| B5b | Help level and colour switch in the bar only | # | |
+| B6 | Header and navigation (waits for G2) | # | |
+| B7a | Sheets | # | |
+| B7b | Messages, help tour, pedal confirmation | # | |
+| B8 | Instrument chip | # | |
+| B9 | Home (waits for G3) | # | |
+| B10 | Exercises | # | |
+| B11 | Chords, Circle, Plan | # | |
+| B12 | Piano, Keys lessons, LUMI section | # | |
+| B13 | Neck, Tab, Notation | # | |
+| B14a | Charts, Pads | # | |
+| B14b | Songs, Jam | # | |
+| B15a | Woodshed, guided performance, Practice progress | # | |
+| B15b | Tuner | # | |
+| B16 | The lighting vocabulary on every instrument drawing (waits for G4) | # | |
+| B17 | Settings | # | |
+| B18 | Clean-up, documents | # | |
+
+When Phase B is done, and until Phase H: soundLAB Gear has the new shell with its key bar folded, and its four
+pages in the old look; `css/style.css` keeps the old variables and shared classes for them; the Player card on
+Songs keeps its own rules. The home's footer shows the streak and the goal already (two of Phase D's words for
+the home); the review and the weekly plan come in Phase D through the home's providers.
 
 ## Rules for the build
 
@@ -71,7 +143,11 @@ own and next to FL Studio. The design system is `docs/DESIGN-SYSTEM.md`.
 - Nothing lands on `main` before Phase I except the deployment plumbing.
 - Tests green before every merge; add suites for new features.
 - Private songs, teacher material and signing keys never enter the repo.
-- Phase 0 beta caveats: the beta and the live app share the browser origin, so
-  they share `localStorage` until Phase A adds the `soundlab2.*` prefix, and
-  the live service worker clears the beta's cache whenever the live app
-  updates (the beta refills on the next visit).
+- Beta caveats: the beta and the live app share the browser origin. The
+  shared-`localStorage` caveat of Phase 0 ended with Phase A (step A4): the
+  beta keeps its data under `soundlab2-next.*`, the live address will use
+  `soundlab2.*` from the next release to `main` on, and neither writes, deletes
+  or changes the live app's `guitarlab.*` data (it is copied across once). What stays shared is
+  the browser's storage budget for the origin. The cache caveat ended with 2.0.0: service-worker
+  caches are named by scope (`sl2-live-*` / `sl2-next-*`), so the live app and
+  the beta no longer clear each other's.

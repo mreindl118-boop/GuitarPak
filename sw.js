@@ -5,10 +5,11 @@
 // live app, the 1.x 'guitarlab-*' caches it replaces.
 var BETA = /\/next\/$/.test(self.registration.scope);
 var PREFIX = BETA ? 'sl2-next-' : 'sl2-live-';
-var CACHE = PREFIX + 'v6';
+var CACHE = PREFIX + 'v12';
 var ASSETS = [
   '.',
   'index.html',
+  'gear.html',
   'css/tokens.css',
   'css/style.css',
   'css/lumi-practice.css',
@@ -25,6 +26,7 @@ var ASSETS = [
   'js/midi.js',
   'js/midiguitar.js',
   'js/remote.js',
+  'js/midirules.js',
   'js/practice-router.js',
   'js/tonein.js',
   'js/audioin.js',
@@ -45,8 +47,6 @@ var ASSETS = [
   'js/settings.js',
   'js/daw/synth.js',
   'js/daw/engine.js',
-  'js/studio.js',
-  'js/arrange.js',
   'js/woodshed.js',
   'js/performance-engine.js',
   'js/performance-player.js',
@@ -55,6 +55,7 @@ var ASSETS = [
   'js/pitch-detector.js',
   'js/practice-input.js',
   'js/pads.js',
+  'js/scoreplayer.js',
   'js/midihub.js',
   'js/synthdeck-maps.js',
   'js/synthdeck-scope.js',
@@ -68,7 +69,6 @@ var ASSETS = [
   'js/practiceplan.js',
   'js/helix.js',
   'js/help.js',
-  'js/plugins.js',
   'manifest.webmanifest',
   'icons/icon-192.png',
   'icons/logo.svg',
@@ -128,7 +128,7 @@ self.addEventListener('fetch', function (e) {
   // never intercept cross-origin requests (e.g. the version.json update check)
   if (e.request.url.indexOf(self.location.origin) !== 0) return;
   e.respondWith(
-    caches.match(e.request, { ignoreSearch: true }).then(function (hit) {
+    caches.open(CACHE).then(function (c) { return c.match(e.request, { ignoreSearch: true }); }).then(function (hit) {
       return hit || fetch(e.request).then(function (res) {
         var copy = res.clone();
         caches.open(CACHE).then(function (c) { c.put(e.request, copy); });

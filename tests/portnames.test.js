@@ -11,8 +11,8 @@ function ok(c, msg) { if (c) console.log('  PASS', msg); else { fails++; console
 async function newPage(browser, seed, outs) {
   const ctx = await browser.newContext({ viewport: { width: 1200, height: 900 } });
   await ctx.addInitScript(([seed, outs]) => {
-    ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
-    for (const k in seed) localStorage.setItem('guitarlab.' + k, JSON.stringify(seed[k]));
+    ['help.seen', 'help.done', 'qz.landed', 'midi.wanted'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true'));
+    for (const k in seed) localStorage.setItem('soundlab2.' + k, JSON.stringify(seed[k]));
     window.__sent = {};
     const mkOut = (id, name) => { window.__sent[id] = []; return { id, name, state: 'connected', send: b => window.__sent[id].push(Array.from(b)) }; };
     const lumiIn = { id: 'input-1', name: 'LUMI Keys Block', state: 'connected', onmidimessage: null };
@@ -38,7 +38,7 @@ async function newPage(browser, seed, outs) {
     App.switchTo('piano');
     await new Promise(r => setTimeout(r, 600));
     return { out: App.midi.outputName, lights: App.midi.displayState, lumi: __sysex('output-3'), ur: __sysex('output-1'), two: __sysex('output-2'),
-      savedId: JSON.parse(localStorage.getItem('guitarlab.lights.outputId')), savedName: JSON.parse(localStorage.getItem('guitarlab.lights.outputName')) };
+      savedId: JSON.parse(localStorage.getItem('soundlab2.lights.outputId')), savedName: JSON.parse(localStorage.getItem('soundlab2.lights.outputName')) };
   });
   ok(a.lights.connected && a.lights.name === 'LUMI Keys Block', 'the lights find the LUMI by name, not the UR24C now at output-1: ' + a.lights.reason);
   ok(a.out === 'LUMI Keys Block', 'the key-light output skips the LUMI second port: ' + a.out);
@@ -62,7 +62,7 @@ async function newPage(browser, seed, outs) {
   ({ ctx, page, errs } = await newPage(browser, {}, [['output-1', 'LUMI Keys Block'], ['output-2', 'MODX-1']]));
   const c = await page.evaluate(() => {
     App.midi.setOutput('output-2');
-    return { out: App.midi.outputName, name: JSON.parse(localStorage.getItem('guitarlab.midi.outputName')) };
+    return { out: App.midi.outputName, name: JSON.parse(localStorage.getItem('soundlab2.midi.outputName')) };
   });
   ok(c.out === 'MODX-1' && c.name === 'MODX-1', 'picking the MODX by hand sticks and saves its name');
   await ctx.close();

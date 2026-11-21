@@ -11,8 +11,8 @@ async function newPage(browser, seed) {
   await ctx.addInitScript((seed) => {
     if (sessionStorage.getItem('__seeded')) return;
     sessionStorage.setItem('__seeded', '1');
-    ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('guitarlab.' + k, 'true'));
-    for (const k in seed) localStorage.setItem('guitarlab.' + k, JSON.stringify(seed[k]));
+    ['help.seen', 'help.done', 'qz.landed'].forEach(k => localStorage.setItem('soundlab2.' + k, 'true'));
+    for (const k in seed) localStorage.setItem('soundlab2.' + k, JSON.stringify(seed[k]));
   }, seed || {});
   const page = await ctx.newPage(), errs = [];
   page.on('pageerror', e => errs.push(e.message));
@@ -154,7 +154,7 @@ const PLAY = async (right) => {
     await play(10);
     document.querySelector('[data-qzapply="smm"]').click();
     await new Promise(r => setTimeout(r, 100));
-    out.fb2 = { page: App.active, scale: JSON.parse(localStorage.getItem('guitarlab.fb.scale')) };
+    out.fb2 = { page: App.active, scale: JSON.parse(localStorage.getItem('soundlab2.fb.scale')) };
     return out;
   }, PLAY.toString());
   ok(lx.lesson && /Fretboard/.test(lx.apply || ''), 'a new step opens with its lesson + an apply-it button: ' + lx.apply);
