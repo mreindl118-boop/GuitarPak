@@ -17,7 +17,7 @@
 // the Synth pill is the Sound picker on Piano, LUMI practice is a section
 // under the Keys lessons:
 //   - no pill reads Trainer, Synth or LUMI; Keys is Piano | Charts | Pads,
-//     Train is Woodshed | Tuner
+//     Train is Woodshed | Voice | Tuner
 //   - App.switchTo('trainer' / 'synth' / 'lumipractice') lands on Plan / Piano
 //     / Piano and says where the feature went; so does a stored last page
 //   - a stored pill (app.gtab.gkeys = synth, app.gtab.gprac = trainer) opens
@@ -34,7 +34,7 @@ const J = JSON.stringify;
 // ---- what this app is (A2 edited these lists; A3b edits them again) ----
 // the page list of js/app.js (PAGES), in its order; Settings is an overlay page
 const PAGES = ['quiz', 'practiceplan', 'fretboard', 'tab', 'notation', 'helix', 'chords', 'piano', 'chart', 'pads',
-  'deck', 'liveset', 'midihub', 'songs', 'jam', 'shed', 'tuner', 'theory'];
+  'deck', 'liveset', 'midihub', 'songs', 'jam', 'shed', 'vocal', 'tuner', 'theory'];
 // pages that left the app (MOVED in js/app.js): App.switchTo(id) goes to the page that took the feature in,
 // or home, and says why. there = what the sentence names, on the page it lands on.
 const STUDIO = /Studio is no longer part of soundLAB\./;
@@ -319,7 +319,7 @@ const lines = a => a.length ? '\n    ' + a.join('\n    ') : '';
     ok(mem.keys.active === 'piano' && mem.keys.shown === 'piano' && mem.keys.seen, 'app.gtab.gkeys = synth: the Keys tab opens Piano with a visible panel: ' + J([mem.keys.active, mem.keys.shown, mem.keys.seen]));
     ok(mem.keys.pills === 'Piano|Charts|Pads' && mem.keys.stored === 'piano', 'Keys is Piano | Charts | Pads, and it remembers a real page again: ' + J([mem.keys.pills, mem.keys.stored]));
     ok(mem.train.active === 'shed' && mem.train.shown === 'shed' && mem.train.seen, 'app.gtab.gprac = trainer: the Train tab opens the Woodshed with a visible panel: ' + J([mem.train.active, mem.train.shown, mem.train.seen]));
-    ok(mem.train.pills === 'Woodshed|Tuner' && mem.train.stored === 'shed', 'Train is Woodshed | Tuner, and it remembers a real page again: ' + J([mem.train.pills, mem.train.stored]));
+    ok(mem.train.pills === 'Woodshed|Voice|Tuner' && mem.train.stored === 'shed', 'Train is Woodshed | Voice | Tuner, and it remembers a real page again: ' + J([mem.train.pills, mem.train.stored]));
   }
   // the same for the last page of a 1.x session: it comes back as the page that took the feature in
   await page.evaluate(() => localStorage.setItem('guitarlab.app.tab', JSON.stringify('lumipractice')));

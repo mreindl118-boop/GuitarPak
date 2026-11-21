@@ -983,3 +983,44 @@ button .ic, .chip .ic { display: inline-block; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* ---- Voice trainer (js/vocal.js, prefix vx-; 2.x tokens only) ---- */
+.vx-wrap { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(280px, 1fr); gap: var(--sl-space-5); }
+@media (max-width: 900px) { .vx-wrap { grid-template-columns: minmax(0, 1fr); } }
+.vx-inrow, .vx-modes, .vx-tr { margin-bottom: var(--sl-space-3); }
+.vx-meters { display: grid; gap: 4px; min-width: 110px; }
+.vx-m { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--sl-ink-muted); }
+.vx-m i { flex: 1; height: 7px; border-radius: var(--sl-radius-pill); background: var(--sl-surface-2); overflow: hidden; }
+.vx-m b { display: block; height: 100%; width: 0; background: var(--sl-ok); transition: width 60ms linear; }
+.vx-m b.clip { background: var(--sl-bad); }
+.vx-stage { position: relative; margin: var(--sl-space-2) 0 var(--sl-space-3); }
+.vx-graph { display: block; width: 100%; height: 280px; border-radius: var(--sl-radius-md); background: var(--sl-bg-raised); border: 1px solid var(--sl-line); }
+.vx-read { position: absolute; top: 8px; right: 12px; text-align: right; pointer-events: none; }
+.vx-note { font-family: var(--sl-font-display); font-size: var(--sl-display-md); line-height: 1; color: var(--sl-ink); }
+.vx-cents { font-size: 12px; }
+.vx-rec.live { background: var(--sl-bad); border-color: var(--sl-bad); color: #fff; animation: vx-pulse 1s ease-in-out infinite; }
+@keyframes vx-pulse { 50% { filter: brightness(1.25); } }
+.vx-side { border-top: 1px solid var(--sl-line); padding-top: var(--sl-space-3); }
+.vx-side input[type=range] { width: 120px; }
+.vx-steps { margin: 6px 0 8px 18px; padding: 0; }
+.vx-steps li { margin: 3px 0; }
+.vx-top { display: flex; gap: var(--sl-space-4); align-items: center; margin-bottom: var(--sl-space-3); }
+.vx-grade { font-family: var(--sl-font-display); font-size: 54px; line-height: 1; min-width: 76px; height: 76px; display: grid; place-items: center;
+  border-radius: 50%; border: 3px solid var(--sl-line-strong); color: var(--sl-ink); }
+.vx-grade[data-band=good] { border-color: var(--sl-ok); color: var(--sl-ok); }
+.vx-grade[data-band=ok] { border-color: var(--sl-accent); color: var(--sl-accent-ink); }
+.vx-grade[data-band=bad] { border-color: var(--sl-bad); color: var(--sl-bad); }
+.vx-tip { margin: 0; font-size: 15px; line-height: var(--sl-leading); color: var(--sl-ink); }
+.vx-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.vx-stat { display: grid; grid-template-rows: auto auto auto; padding: 8px 10px; border-radius: var(--sl-radius-sm); background: var(--sl-surface-2); border-left: 3px solid var(--sl-line); }
+.vx-stat.good { border-left-color: var(--sl-ok); }
+.vx-stat.ok { border-left-color: var(--sl-accent); }
+.vx-stat.bad { border-left-color: var(--sl-bad); }
+.vx-sl { font-size: 11px; text-transform: uppercase; letter-spacing: var(--sl-caps-ls); color: var(--sl-ink-muted); }
+.vx-stat b { font-size: 17px; color: var(--sl-ink); }
+.vx-takes { display: grid; gap: 6px; }
+.vx-take { display: flex; align-items: center; gap: 6px; padding: 4px; border-radius: var(--sl-radius-sm); border: 1px solid var(--sl-line); }
+.vx-take.sel { border-color: var(--sl-accent-line); background: var(--sl-accent-soft); }
+.vx-tsel { flex: 1; display: flex; gap: 10px; align-items: center; text-align: left; background: none; border: 0; color: var(--sl-ink); cursor: pointer; font: inherit; padding: 4px; }
+.vx-tsel > b { font-family: var(--sl-font-display); font-size: 24px; min-width: 34px; text-align: center; }
+.vx-take .btn.on { color: var(--sl-accent-ink); border-color: var(--sl-accent-line); }

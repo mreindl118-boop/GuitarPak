@@ -17,7 +17,11 @@ black keys on amber) rendered to icons/icon-192/512.png.
 ## soundLAB 2.0 (branch `v2`) — read first
 
 2.0.0 WENT LIVE (2026-11-11): `main` = v2 at that point (1.4.1 + scale dots,
-Keys > Charts, the controller remote), served at /GuitarPak/. Work continues on
+Keys > Charts, the controller remote), served at /GuitarPak/.
+2.1.0 WENT LIVE (2026-11-19, Matt's yes): PRs #107 weak-spot map (Exercises),
+#108 MIDI guitar (js/midiguitar.js, inside the MIDI keyboard card) and #109
+voice trainer part A (Train > Voice, js/vocal*.js) merged into v2, then v2 ->
+main; sw CACHE v6. Work continues on
 branch `v2`, published to the BETA address
 https://mreindl118-boop.github.io/GuitarPak/next/ by
 `.github/workflows/pages-next.yml` (full suite first; replaces only `next/` on
@@ -138,6 +142,19 @@ js/midi.js        MIDI service (App.midi: in/out ports, note/bend/pressure
                   output; name() = the name of the port that is used; has() =
                   MIDI ready and a synth port or a selected output exists;
                   set(v) stores v ('' / null = 'shared').
+js/midiguitar.js  MIDI GUITAR (2.0 beta / v2, docs/MIDI-GUITAR.md): a guitar
+                  with one MIDI channel per string (the Rock Band 3 Squier via
+                  the UR24C's MIDI IN). FOUND BY ITSELF from one strum (mg.port
+                  by NAME, mg.auto false = None picked by hand); string order
+                  auto from the outer strings (mg.set auto|pluck); UI is a
+                  sub-section #set-guitar INSIDE the MIDI keyboard card (Fix
+                  strings = one pluck -> mg.layout hi1|lo1 + mg.oct; ring
+                  mg.ring s). Owner rule: features blend in, no partitions. Emits 'guitar:note' {string 1-6 (1 = high
+                  E), fret, ...}; App.midiGuitar.held lights ONE fretboard ring
+                  (data-gs/data-f). midi.js guitarSrc: channels 1-6 of that
+                  port are mono (re-strum without Note Off retriggers) and
+                  auto-release after mg.ring. Suite tests/midiguitar.test.js.
+                  Loaded right after midi.js.
 js/tonein.js      1/4"/audio-in TONE-IN: pitch-detects the selected audio
                   input (audio.inId; toggle audio.tonein in Settings) and
                   emits midi:note {silent:true} — instrument pages show the
@@ -184,6 +201,17 @@ js/audioin.js     SOUND INPUT (App.audioIn): the ONE shared live-input service.
                   audio.outId is re-applied (setSinkId) when it is listed again.
                   Suite tests/audioin.test.js (Chromium fake media device).
                   Loaded right after tonein.js.
+js/vocal.js       VOICE TRAINER (page 'vocal', Train pill "Voice", prefix vx-,
+                  store vx.*; docs/VOCAL-TRAINER.md): part A Sing & see - shared
+                  input via App.audioIn.hold/tap('vocal'), side pick L/R/Both
+                  (UR24C in 2 = Right), ScriptProcessor -> SLPitchDetector frames,
+                  live pitch line over targets (5-note scale / hold / free),
+                  takes (PCM, WAV, play with notes), Hear myself sidetone (Off on
+                  every visit, delay readout). js/vocal-analysis.js = pure score
+                  (SLVocalAnalysis.score). FITS IN: takes = 'voice' sessions in
+                  App.practiceProgress; scale/hold targets light via App.midi.guide;
+                  Plan 'sing' lines -> page vocal (shared). Hook window.SLVocal. Suites vocal-
+                  analysis, vocal, vocal-sung (WAV as fake capture).
 js/remote.js      CONTROLLER REMOTE (App.remote, 2.0 beta / v2; docs/CONTROLLER-
                   REMOTE.md): practice moves on from the instrument. Actions
                   next / back / stop, each bound in Settings › Hands-free
@@ -463,6 +491,23 @@ js/quiz.js        EXERCISES ('quiz', the practice HOME since v0.69.0): Musicca-
                   window.SLQuiz = test hook (levels, gen, start, pick, q,
                   view, cur, nodes, node(i), current, sprint, endless,
                   clock, finishSprint, tab, theory).
+                  2.1 WEAK-SPOT MAP (v2, docs/ROADMAP-2.0.md sibling plan
+                  Music-Studio/soundlab/2.1-CONCEPT.md): qz.items entries are
+                  [right, asked, avgMs?, day?] (avgMs = running average of
+                  RIGHT answers, recordItem). wsSpots(kind) adds items up per
+                  spot - guitar/bass: fret 0-12 x string (gn + gf items), keys:
+                  12 pitch classes (kn + kf) - score = accuracy x (0.6 + 0.4 x
+                  speed; <= 2 s full, >= 6 s none), bands strong/good/shaky/
+                  weak/none. Progress tab card #qz-wscard + small map on note-
+                  level results; tap a spot (data-qzspot) = startLevel(base,
+                  {drill: items, spot: true}) -> GEN.spot asks exactly those
+                  items (forced params fs/ff/fpc on neckName/neckFind/keyName/
+                  keyFind). Keys: 'Light them on the LUMI' = App.midi.reveal.
+                  ONE FLOW, NOT A NEW SECTION (Matt: features must gel, no
+                  partitioning): normal note levels already lean on it -
+                  keyName/keyFind/neckName/neckFind pick by pickW (missed AND
+                  slow items, s[2] > 2 s, come up more).
+                  Hook SLQuiz.weakSpots; suite tests/weakspots.test.js.
 js/learn-instruments.js Shared explicit Learn category (piano/synth/guitar/bass/
                   drums/voice/other), instrument-appropriate course modes and
                   actual lesson/practice entry points. Selection is not credit.
@@ -876,9 +921,10 @@ A1 (Studio space, sequencer/arranger, sampler, plug-in API removed):
 - NO PLUG-IN API: js/plugins.js, plugins/, PLUGINS.md and the Settings card
   are gone, nothing runs stored code. `App.addPage(id, label, sp, mod)` stays
   as an INTERNAL test hook (tests/remote.test.js; `sp` is ignored).
-- sw.js: A1 set `CACHE` to `PREFIX + 'v5'` ('sl2-next-v5' on the beta,
-  'sl2-live-v5' at the live address; A2 v6, A3a v7 = the number now, A3b v8,
-  A4 v9; v4 = the live 2.0.0). The fetch handler looks ONLY in
+- sw.js: A1 set `CACHE` to `PREFIX + 'v7'` ('sl2-next-v7' on the beta,
+  'sl2-live-v7' at the live address; A2 v8, A3a v9 = the number now, A3b v10,
+  A4 v11; v6 = the live 2.1.0. The numbers only have to rise: a step takes the
+  next one after whatever `v2` holds when it is merged). The fetch handler looks ONLY in
   its own cache
   (`caches.open(CACHE)` then `match(req, {ignoreSearch: true})`), never the
   global `caches.match`: the live worker's cache on the same origin can hold
@@ -895,9 +941,9 @@ A1 (Studio space, sequencer/arranger, sampler, plug-in API removed):
 
 A2 (the three folds: the Trainer page, the Synth pill, the LUMI pill):
 
-- 18 PAGES: Learn (quiz, chords, theory, practiceplan) · Guitar (fretboard,
+- 19 PAGES: Learn (quiz, chords, theory, practiceplan) · Guitar (fretboard,
   tab, notation, helix) · Keys (piano, chart, pads) · Synth (deck, liveset,
-  midihub) · Play (songs, jam) · Train (shed, tuner). The ids 'trainer',
+  midihub) · Play (songs, jam) · Train (shed, vocal, tuner). The ids 'trainer',
   'synth' and 'lumipractice' are in js/app.js ONLY as MOVED rows: no PAGES
   entry, no label, no panel in index.html. No file was deleted or added:
   js/trainer.js, js/lumi-practice.js, css/lumi-practice.css and
@@ -1057,7 +1103,7 @@ controls and what it sends are as before):
   tab bar of GROUPS (icon + label), not a drop-down — Learn (quiz=Exercises
   HOME/chords/theory/practiceplan), Guitar (fretboard/tab/notation/helix),
   Keys (piano/chart/pads), SYNTH (1.3: deck/liveset/midihub), Play
-  (songs/jam), Train (shed/tuner; 1.3: the Practice tab became Train).
+  (songs/jam), Train (shed/vocal/tuner; 1.3: the Practice tab became Train).
   Rendered twice: #tabbar inside the top bar (> 900px) and #tabbar-m fixed
   along the bottom (<= 900px) — #tabbar-m sits OUTSIDE <header> because the
   header's backdrop-filter / auto-hide transform would trap a fixed child.
