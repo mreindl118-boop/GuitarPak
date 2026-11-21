@@ -129,7 +129,7 @@
     var sc = g('ch.scale', 'major');
     st.scaleId = SEVEN_NOTE_SCALES.indexOf(sc) !== -1 ? sc : 'major';
     st.sevenths = !!g('ch.sevenths', false);
-    st.bpm = clampBpm(g('ch.bpm', 90));
+    st.bpm = clampBpm(g('met.bpm', g('ch.bpm', 90))); // the app's ONE tempo (was a private ch.bpm)
     st.barsPerChord = Number(g('ch.barsPerChord', 1)) === 2 ? 2 : 1;
     var v = g('ch.view', 'guitar');
     st.view = /^(guitar|piano|tab|sheet)$/.test(v) ? v : 'guitar';
@@ -1077,7 +1077,7 @@
         '<h2>Chord explorer</h2>' +
         // 1. where most journeys start: the chords of the current key
         '<div class="ch-inkeyrow">' +
-          '<span class="chip" id="ch-key-label" title="Key and scale come from the bar at the top"></span>' +
+          '<button type="button" class="chip key-link" id="ch-key-label" data-keylink title="Tap to change the key, scale or tempo for the whole app"></button>' +
           '<span class="seg" id="ch-seg">' +
             '<button type="button" data-v="0">Triads</button>' +
             '<button type="button" data-v="1">7ths</button>' +
@@ -1323,7 +1323,13 @@
     els.bpm.addEventListener('change', function () {
       st.bpm = clampBpm(els.bpm.value);
       els.bpm.value = st.bpm;
-      App.store.set('ch.bpm', st.bpm);
+      App.store.set('met.bpm', st.bpm);
+      App.emit('tempo', { bpm: st.bpm, source: 'ch' }); // metronome, Jam, Neck, Keys follow
+    });
+    App.on('tempo', function (d) {
+      if (!d || d.source === 'ch' || !isFinite(d.bpm)) return;
+      st.bpm = clampBpm(d.bpm);
+      els.bpm.value = st.bpm;
     });
     els.bars.addEventListener('change', function () {
       st.barsPerChord = els.bars.value === '2' ? 2 : 1;
@@ -1347,7 +1353,7 @@
 
     // stay linked to the fretboard's scale: seed from its saved state now,
     // follow its changes live (7-note scales only - the palette is diatonic)
-    applyFbScale(App.store.get('fb.root', null), App.store.get('fb.scale', null), true);
+    applyFbScale(App.store.get('fb.root', 9), App.store.get('fb.scale', 'minorPent'), true); // same defaults as the bar
     App.on('fb:scale', function (d) {
       if (d) applyFbScale(d.root, d.scale, false);
     });
@@ -1374,7 +1380,10 @@
 
   function applyFbScale(root, scale, quiet) {
     if (typeof root !== 'number' || !isFinite(root)) return;
-    if (!scale || !Theory.SCALES[scale] || Theory.SCALES[scale].steps.length !== 7) return;
+    if (!scale || !Theory.SCALES[scale]) return;
+    // 5- and 6-note scales (pentatonic, blues) have no chords of their own:
+    // show the chords of the major / minor key they sit in, same root
+    scale = Theory.parentScale(scale);
     st.keyPc = validPc(root);
     st.scaleId = scale;
     App.store.set('ch.key', st.keyPc);

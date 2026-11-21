@@ -154,6 +154,8 @@ const tabs = sel => [...document.querySelectorAll(sel + ' .tabbar-btn')].map(b =
 
   console.log('# studio space');
   ({ ctx, page, errs } = await open(b, { width: 1280, height: 800 }));
+  ok(await page.evaluate(() => document.getElementById('space-btn').hidden && !App.studioShown()), 'the Studio button is off by default (Settings > Studio brings it back)');
+  await page.evaluate(() => App.setStudioShown(true));
   await page.click('#space-btn'); await page.waitForTimeout(900);
   const st = await page.evaluate(() => ({ space: App.space, tabs: [...document.querySelectorAll('#tabbar .tabbar-btn')].map(b => b.textContent).join('|'), active: App.active }));
   ok(st.space === 'studio' && st.tabs === 'Studio|Sketch', 'studio tabs: ' + JSON.stringify(st));

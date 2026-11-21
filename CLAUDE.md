@@ -724,6 +724,20 @@ version.json      auto-update feed (source of truth for latest version)
 
 ## Cross-module conventions
 
+- FLOW PASS (v2, tests/flow.test.js): the clef #ctx-btn is the KEY CHIP - it
+  shows the key + tempo (Theory.keyShort, #ctx-key / #ctx-tempo) on every page
+  and opens the context bar. A page's key title is a DOOR to the same picker:
+  give it `data-keylink` + class key-link (app.js delegates the click to
+  setCtx(true)); never add a per-page key select. The bar's #cx-go row ("Use
+  <key> on" Neck/Keys/Chords/Jam band/Circle/Voice) switches page, same key.
+  Theory.parentScale(id) is the ONE rule for pages that need chords from a 5/6
+  note scale (minor third -> aeolian, else major): Chords and Jam use it.
+  Chords plays at met.bpm ('tempo' source 'ch'; ch.bpm is retired); boot seeds
+  met.bpm 120 so every page starts on one tempo. The STUDIO BUTTON #space-btn
+  is hidden unless app.studio (Settings > Studio, App.setStudioShown) or you
+  are inside the Studio. Not changed: a Keys scale lesson still moves the app
+  key to the lesson's key and leaves it there.
+
 - BACK TO BASICS (v0.68.0): the app ALWAYS boots into the practice space
   (stored app.space is ignored at launch); the capture dot #cx-rec is CSS-
   hidden outside the studio. 'synth' is a page registered by piano.js: it
