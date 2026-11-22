@@ -519,8 +519,8 @@ window.Theory = (function () {
 
   // Index sequence for a pattern: the pattern builds the ascending run
   // (straight scale, sliding groups g3-g7, or interval pairs i2-i16), the
-  // direction plays it up, down (exact reverse), or up-then-down (skipping
-  // the repeated apex).
+  // direction plays it up, down (exact reverse), or up-then-down (the top
+  // plays once, then the mirrored pattern walks back down).
   // pattern tokens: 'scale' | 'gN' (groups 3-7) | 'iN' / 'iNmM' (intervals
   // 2nd-16th; M = enabled-strings bitmask, applied in exercisePath) |
   // 'ssK' (single-string, K handled by exercisePath - plain run here)
@@ -543,8 +543,17 @@ window.Theory = (function () {
     }
     if (dir === 'down') return up.slice().reverse();
     if (dir === 'updown') {
+      // the descent mirrors the ascent unit by unit (one note, a group of
+      // k, or an interval pair). Drop its first unit (it would repeat the
+      // top) and its last one (the loop's next ascent starts there) — a
+      // WHOLE unit, never one note, so the top note plays once and the way
+      // down starts on a complete group/pair (dropping single notes cut the
+      // first group short: "... C D E | D C | D C B ...")
+      var unit = 1;
+      if (g && n >= k) unit = k;
+      else if (iv && n > k) unit = 2;
       var down = up.slice().reverse();
-      return up.concat(down.slice(1, Math.max(1, down.length - 1)));
+      return up.concat(down.length > 2 * unit ? down.slice(unit, down.length - unit) : []);
     }
     return up;
   }
