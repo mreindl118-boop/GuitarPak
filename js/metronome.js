@@ -70,6 +70,8 @@
   var masterGain = null;
   var timer = null;
   var raf = 0;
+  var lastBeatT = -1; // AudioContext time of the last scheduled beat (sub 0)
+  var jamOn = false;  // the Jam band holds the beat: a practice runner never starts the click over it
   var nextTime = 0;   // AudioContext time of the next click to schedule
   var curBeat = 0;    // beat index about to be scheduled
   var curSub = 0;     // subdivision index within the current beat
@@ -405,6 +407,7 @@
       if (curBeat >= nb) { curBeat = 0; curSub = 0; } // signature shrank mid-bar
       var n = SUBN[subdiv];
       if (curSub === 0) {
+        lastBeatT = nextTime;
         var lvl = levels[curBeat];
         if (lvl === 2) voice(nextTime, snd.acc, FREQ_ACCENT, GAIN_ACCENT);
         else if (lvl === 1) voice(nextTime, snd.beat, FREQ_NORMAL, GAIN_NORMAL);
@@ -437,7 +440,7 @@
     raf = requestAnimationFrame(draw);
   }
 
-  function start() {
+  function start(at) {
     if (running) return;
     try {
       ctx = App.getAudio(); // only ever called from click / keydown handlers
@@ -461,6 +464,9 @@
     visQueue.length = 0;
     litIndex = -1;
     nextTime = ctx.currentTime + 0.08;
+    // a practice runner starts the click ON its first note (App.metronome.start)
+    if (typeof at === 'number' && isFinite(at) && at > ctx.currentTime + 0.01) nextTime = at;
+    lastBeatT = -1;
     App.emit('transport:claim', { owner: 'met' }); // one beat authority at a time
     running = true;
     App.wake.acquire('met');
@@ -498,7 +504,88 @@
   // the emit happens synchronously inside the user's click, so getAudio is
   // still within the gesture
   App.on('met:toggle', function () { toggle(); });
-  App.on('transport:claim', function (d) { if (d && d.owner !== 'met' && running) stop(); });
+  App.on('transport:claim', function (d) {
+    if (d && d.owner === 'jam') jamOn = true;
+    if (d && d.owner !== 'met' && running) stop();
+  });
+  App.on('jam:stopped', function () { jamOn = false; });
+
+  // ONE METRONOME (2.3): the Neck and Keys practice runners use THIS click
+  // instead of a tick of their own, and lock their notes to its beat, so the
+  // corner metronome, the clef bar's button, the full-screen button and a
+  // runner's Click box are the same thing: same tempo, same on / off.
+  App.metronome = {
+    running: function () { return running; },
+    // start the click with its first beat at AudioContext time `at` (a
+    // runner's first note); false when it cannot (no audio, Jam owns the beat)
+    start: function (at) {
+      if (running) return true;
+      if (jamOn || !els.startStop) return false;
+      start(at);
+      return running;
+    },
+    stop: function () { if (running) stop(); },
+    // the beat of the click's grid nearest to AudioContext time t (null while
+    // stopped or before its first beat is scheduled)
+    nearestBeat: function (t) {
+      if (!running || lastBeatT < 0) return null;
+      var len = 60 / bpm;
+      return lastBeatT + Math.round((t - lastBeatT) / len) * len;
+    },
+    jamOn: function () { return jamOn; },
+    link: link
+  };
+
+  // A practice runner's handle on the click. o = { running(): is the runner
+  // playing, wantClick(): its Click box, setClick(on): tick / untick the box }.
+  //  begin(t0)        Play pressed, first note at t0: the click is already on
+  //                   -> returns the click's next beat (the run joins it);
+  //                   Click ticked -> starts the click AT t0. Returns the
+  //                   time the first note should sound.
+  //  lock(t, bpm, onBeat) every note: a note on a beat snaps to the click's
+  //                   grid (tempo trainer, a click started later), so the
+  //                   two never drift apart.
+  //  own()            true while the runner should sound its own tick (the
+  //                   one click could not start, e.g. the Jam band owns it).
+  //  end()            the run paused: the click stops if Play started it.
+  //  toggle(on, at)   the Click box changed during a run.
+  // The click switched on / off anywhere during a run ticks / unticks the box.
+  function link(o) {
+    var owns = false;
+    App.on('met:state', function (d) {
+      if (!o.running()) return;
+      var on = !!(d && d.running);
+      if (!on) owns = false;
+      if (on !== !!o.wantClick()) o.setClick(on);
+    });
+    return {
+      begin: function (t0) {
+        owns = false;
+        if (running) {
+          var b = App.metronome.nearestBeat(t0), len = 60 / bpm;
+          if (b === null) return t0;
+          while (b < ctx.currentTime + 0.05) b += len;
+          return b;
+        }
+        if (o.wantClick()) owns = App.metronome.start(t0);
+        return t0;
+      },
+      lock: function (t, rbpm, onBeat) {
+        if (!onBeat || !running || !ctx) return t;
+        var b = App.metronome.nearestBeat(t), len = 60 / rbpm;
+        if (b === null || Math.abs(b - t) > len / 2) return t;
+        while (b < ctx.currentTime + 0.02) b += len;
+        return b;
+      },
+      own: function () { return !!o.wantClick() && !running; },
+      end: function () { if (owns) { owns = false; if (running) stop(); } },
+      toggle: function (on, at) {
+        if (!o.running()) return;
+        if (on && !running) owns = App.metronome.start(at);
+        else if (!on && running) { owns = false; stop(); }
+      }
+    };
+  }
 
   // ---- tempo trainer UI ----
 

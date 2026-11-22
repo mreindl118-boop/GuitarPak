@@ -855,8 +855,28 @@
 
   // a rest beat's soft tick — the pulse keeps going through the pause so the
   // loop stays locked to the beat
+  // ONE METRONOME: the runner's Click is the app's metronome (metronome.js
+  // App.metronome.link) - its own tick only sounds when that cannot run
+  var prMet = null;
+  function prLink() {
+    if (!prMet && App.metronome && App.metronome.link) {
+      prMet = App.metronome.link({
+        running: function () { return pr.running; },
+        wantClick: function () { return pr.click; },
+        setClick: function (on) {
+          pr.click = on;
+          App.store.set('fb.pr.click', on);
+          var c = document.getElementById('fb-pr-click');
+          if (c) c.checked = on;
+        }
+      });
+    }
+    return prMet;
+  }
+  function prOwnTick() { var l = prLink(); return l ? l.own() : pr.click; }
+
   function prRestClick(t) {
-    if (!pr.click) return;
+    if (!prOwnTick()) return;
     var o = pr.ctx.createOscillator(), gn = pr.ctx.createGain();
     o.type = 'sine';
     o.frequency.value = 1150;
@@ -899,6 +919,7 @@
           continue; // re-check the horizon before scheduling the note
         }
       }
+      if (prMet) pr.nextT = prMet.lock(pr.nextT, pr.bpm, pr.idx % pr.rate === 0); // stay on the click's beat
       var node = pr.path[pr.seq[pr.idx % pr.seq.length]];
       var nextNode = pr.path[pr.seq[(pr.idx + 1) % pr.seq.length]];
       var when = pr.nextT - pr.ctx.currentTime;
@@ -912,7 +933,7 @@
         var up = pr.dirs && pr.dirs[pr.idx % pr.dirs.length] === 'u';
         App.pluck(node.midi, when, dur, (accent ? 0.4 : 0.3) * (up ? 0.92 : 1));
       }
-      if (pr.click) {
+      if (prOwnTick()) {
         var o = pr.ctx.createOscillator(), gn = pr.ctx.createGain();
         o.type = 'sine';
         o.frequency.value = 1150;
@@ -1272,6 +1293,7 @@
     pr.vis.length = 0;
     pr.pausedAtIdx = -1;
     pr.nextT = pr.ctx.currentTime + 0.15;
+    if (prLink()) pr.nextT = prMet.begin(pr.nextT); // join / start the one metronome
     // count-in rest before the very first note when the pause sits at the start
     if (pr.pause > 0 && pr.idx % pr.seq.length === 0 &&
         (pr.pausePos === 'start' || pr.pausePos === 'both')) {
@@ -1294,6 +1316,7 @@
     if (pr.timer) { clearInterval(pr.timer); pr.timer = null; }
     if (pr.raf) { cancelAnimationFrame(pr.raf); pr.raf = 0; }
     pr.running = false;
+    if (prMet) prMet.end(); // the click stops with the run it started
     App.wake.release('fb-run');
     pr.vis.length = 0;
     prPlayBtn(false);
@@ -1589,6 +1612,7 @@
     click.addEventListener('change', function () {
       pr.click = !!this.checked;
       App.store.set('fb.pr.click', pr.click);
+      if (prLink()) prMet.toggle(pr.click, pr.running ? pr.nextT + ((pr.rate - pr.idx % pr.rate) % pr.rate) * 60 / pr.bpm / pr.rate : 0); // first click on the run's next beat
     });
 
     // pause (keep position) when the whole app goes to the background
@@ -2154,6 +2178,8 @@
     els.maxBtn.innerHTML = App.icon(on ? 'close' : 'expand', 14);
     els.maxBtn.title = on ? 'Exit fullscreen' : 'Fullscreen';
     document.body.style.overflow = on ? 'hidden' : '';
+    // the key chip + metronome come along into full screen (app.js fullDock)
+    if (App.fullDock) { if (on) App.fullDock.enter(els.board); else App.fullDock.exit(els.board); }
     if (on) {
       els.settings.classList.remove('open'); // its gear toggle is hidden in max mode
       if (els.board.requestFullscreen) {
