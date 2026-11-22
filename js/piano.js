@@ -800,9 +800,10 @@
   function ppSeq(path, pattern, dir) {
     var seq = Theory.exerciseSeq(path, pattern, dir);
     // up-down sequences are ascent + mirrored descent (top played once): the
-    // first descent note sits at len/2 + 1 — where a "top of the scale" rest
-    // belongs (same rule as the fretboard runner)
-    pp.turn = dir === 'updown' && seq.length >= 4 ? seq.length / 2 + 1 : -1;
+    // first descent note sits right after the ascent — where a "top of the
+    // scale" rest belongs (same rule as the fretboard runner)
+    var upLen = Theory.exerciseSeq(path, pattern, 'up').length;
+    pp.turn = dir === 'updown' && seq.length > upLen ? upLen : -1;
     return seq;
   }
 

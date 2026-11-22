@@ -756,9 +756,10 @@
     // pick strokes ride along with every seq rebuild so they can never drift
     pr.dirs = Theory.pickDirs(path, seq, pr.pick === 'off' ? 'alt' : pr.pick);
     // up-down sequences are ascent + mirrored descent (top played once), so
-    // the first descent note sits at len/2 + 1 — that's where a "top of the
-    // scale" rest belongs
-    pr.turn = dir === 'updown' && seq.length >= 4 ? seq.length / 2 + 1 : -1;
+    // the first descent note sits right after the ascent — that's where a
+    // "top of the scale" rest belongs
+    var upLen = Theory.exerciseSeq(path, pattern, 'up').length;
+    pr.turn = dir === 'updown' && seq.length > upLen ? upLen : -1;
     return seq;
   }
 
