@@ -757,6 +757,19 @@ version.json      auto-update feed (source of truth for latest version)
   are inside the Studio. Not changed: a Keys scale lesson still moves the app
   key to the lesson's key and leaves it there.
 
+- FULL SCREEN + ONE METRONOME (2.3, tests/fullscreen.test.js): the Neck's
+  (#fb-max) and the Keys' (#pn-max, new) full-screen views call
+  App.fullDock.enter(host)/exit(host) (app.js): a key chip (#fs-key: key +
+  tempo, opens THE clef dropdown, which is MOVED into the host while full
+  screen lasts) and THE metronome button (#fs-met, met:toggle). Never build a
+  second key or tempo picker for a full-screen view. A practice runner's
+  Click is the app metronome: metronome.js App.metronome {running, start(at),
+  stop, nearestBeat(t), link(o)}; link() gives begin/lock/own/end/toggle -
+  Play starts the click on the first note (or joins a running one), notes on
+  a beat snap to its grid, Pause stops a click Play started, and the click
+  switched on/off anywhere during a run ticks/unticks Click. The runner's own
+  tick only sounds when the click cannot start (Jam owns the beat).
+
 - BACK TO BASICS (v0.68.0): the app ALWAYS boots into the practice space
   (stored app.space is ignored at launch); the capture dot #cx-rec is CSS-
   hidden outside the studio. 'synth' is a page registered by piano.js: it

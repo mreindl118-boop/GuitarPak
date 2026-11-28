@@ -827,6 +827,7 @@ window.App = (function () {
     var b = document.getElementById('ctx-btn'), bar = document.getElementById('ctxbar');
     if (b) { b.setAttribute('aria-expanded', String(on)); b.classList.toggle('active', on); }
     if (bar) bar.hidden = !on;
+    if (fsDock) fsPaint();
     if (on) {
       showBar();
       if (ctxOnOpen) ctxOnOpen();
@@ -835,6 +836,71 @@ window.App = (function () {
     }
   }
   function closeCtx() { if (ctxIsOpen()) setCtx(false); }
+
+  // FULL-SCREEN DOCK (2.3, Matt: "change scales and metronome in full screen
+  // neck or keys view"): a page's full-screen view covers the top bar, so it
+  // BORROWS the same controls instead of copying them - a key chip (key +
+  // tempo, opens THE clef dropdown, moved into the full-screen view while it
+  // lasts) and THE metronome button (met:toggle, the one shared click).
+  // App.fullDock.enter(host) / exit(host); the neck and the keys call it.
+  var fsHost = null, fsDock = null, fsHome = null;
+  function fsPaint() {
+    if (!fsDock) return;
+    var k = fsDock.querySelector('#fs-key'), m = fsDock.querySelector('#fs-met');
+    var b = parseInt(store.get('met.bpm', 120), 10) || 120;
+    var r = store.get('fb.root', 9), sc = store.get('fb.scale', 'minorPent');
+    r = typeof r === 'number' ? Theory.mod12(r) : 9;
+    if (!Theory.SCALES[sc]) sc = 'minorPent';
+    k.innerHTML = icon('clef', 22) + '<span>' + Theory.keyShort(r, sc) + '</span><span class="fs-bpm">' + b + '</span>';
+    k.setAttribute('aria-label', 'Key, scale and tempo: ' + Theory.keyShort(r, sc) + ', ' + b + ' BPM');
+    k.setAttribute('aria-expanded', String(ctxIsOpen()));
+    var runs = !!(window.App && App.metronome && App.metronome.running());
+    m.innerHTML = icon('metronome', 18) + icon(runs ? 'stop' : 'play', 12);
+    m.classList.toggle('on', runs);
+    m.setAttribute('aria-pressed', String(runs));
+    if (!runs) m.classList.remove('tick');
+  }
+  function fsBuild() {
+    fsDock = document.createElement('div');
+    fsDock.className = 'fs-dock'; fsDock.id = 'fs-dock';
+    fsDock.innerHTML = '<button type="button" class="fs-btn fs-key" id="fs-key" aria-controls="ctxbar" title="Change the key, scale or tempo"></button>' +
+      '<button type="button" class="fs-btn fs-met" id="fs-met" title="Start / stop the metronome" aria-label="Start or stop the metronome"></button>';
+    fsDock.querySelector('#fs-key').addEventListener('click', function () { setCtx(!ctxIsOpen()); fsPaint(); });
+    fsDock.querySelector('#fs-met').addEventListener('click', function () { emit('met:toggle', {}); });
+    ['fb:set', 'fb:scale', 'tempo', 'met:state'].forEach(function (ev) { on(ev, fsPaint); });
+    var tt = null;
+    on('met:beat', function () {
+      var m = fsDock.querySelector('#fs-met');
+      m.classList.add('tick');
+      if (tt) clearTimeout(tt);
+      tt = setTimeout(function () { m.classList.remove('tick'); }, 110);
+    });
+  }
+  function fsEnter(host) {
+    if (!host) return;
+    if (fsHost && fsHost !== host) fsExit(fsHost);
+    if (!fsDock) fsBuild();
+    closeCtx();
+    var bar = document.getElementById('ctxbar');
+    if (bar && !fsHome) { fsHome = { parent: bar.parentNode, next: bar.nextSibling }; host.appendChild(bar); }
+    host.appendChild(fsDock);
+    host.classList.add('fs-host');
+    fsHost = host;
+    document.documentElement.classList.add('fs-on');
+    fsPaint();
+  }
+  function fsExit(host) {
+    if (!fsHost || (host && host !== fsHost)) return;
+    closeCtx();
+    var bar = document.getElementById('ctxbar');
+    if (bar && fsHome) { fsHome.parent.insertBefore(bar, fsHome.next && fsHome.next.parentNode === fsHome.parent ? fsHome.next : null); }
+    fsHome = null;
+    if (fsDock.parentNode) fsDock.parentNode.removeChild(fsDock);
+    fsHost.classList.remove('fs-host');
+    fsHost = null;
+    document.documentElement.classList.remove('fs-on');
+  }
+  function inFsDock(t) { return !!(fsDock && fsDock.parentNode && fsDock.contains(t)); }
 
   // SCALE LOCK: global admission of pitched note events, including playback
   // and auditions. Raw answers/visuals remain available; explicit drums,
@@ -1377,17 +1443,18 @@ window.App = (function () {
         if (e.key === 'ArrowDown') { e.preventDefault(); setCtx(true); }
       });
       document.addEventListener('pointerdown', function (e) {
-        if (ctxIsOpen() && !cbar.contains(e.target) && !cbtn.contains(e.target)) setCtx(false);
+        if (ctxIsOpen() && !cbar.contains(e.target) && !cbtn.contains(e.target) && !inFsDock(e.target)) setCtx(false);
       }, true);
       document.addEventListener('keydown', function (e) {
         if (e.key !== 'Escape' || !ctxIsOpen()) return;
         setCtx(false);
-        try { cbtn.focus({ preventScroll: true }); } catch (err) { /* old engines */ }
+        var back = fsHost && fsDock ? fsDock.querySelector('#fs-key') : cbtn;
+        try { back.focus({ preventScroll: true }); } catch (err) { /* old engines */ }
         e.stopPropagation();
         e.preventDefault();
       }, true);
       document.addEventListener('focusin', function (e) {
-        if (ctxIsOpen() && !cbar.contains(e.target) && e.target !== cbtn) setCtx(false);
+        if (ctxIsOpen() && !cbar.contains(e.target) && e.target !== cbtn && !inFsDock(e.target)) setCtx(false);
       });
       cbar.addEventListener('keydown', function (e) {
         if (e.key === 'Tab' && e.shiftKey && e.target === cbar.querySelector('select, input, button')) {
@@ -1789,6 +1856,7 @@ window.App = (function () {
     closeSheet: closeSheet,
     // the clef dropdown (key / scale / tempo): App.ctx(true|false); App.ctx() = is it open
     ctx: function (on) { if (on != null) setCtx(on); return ctxIsOpen(); },
+    fullDock: { enter: fsEnter, exit: fsExit, host: function () { return fsHost; } },
     scaleLock: {
       get on() { return lockOn(); },
       get active() { return lockActive(); }, // global pitched-note scope

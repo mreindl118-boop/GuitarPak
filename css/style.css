@@ -1078,3 +1078,17 @@ button .ic, .chip .ic { display: inline-block; }
 .vx-tsel { flex: 1; display: flex; gap: 10px; align-items: center; text-align: left; background: none; border: 0; color: var(--sl-ink); cursor: pointer; font: inherit; padding: 4px; }
 .vx-tsel > b { font-family: var(--sl-font-display); font-size: 24px; min-width: 34px; text-align: center; }
 .vx-take .btn.on { color: var(--sl-accent-ink); border-color: var(--sl-accent-line); }
+
+/* FULL-SCREEN DOCK (2.3, app.js App.fullDock): the key chip + the metronome
+   ride into the neck's / keys' full-screen view, top left (the exit x is top
+   right); the clef dropdown itself moves in beside them while it lasts */
+.fs-dock { position: absolute; top: calc(12px + env(safe-area-inset-top, 0px)); left: calc(12px + env(safe-area-inset-left, 0px)); z-index: 212; display: flex; gap: 8px; align-items: center; }
+.fs-btn { display: inline-flex; align-items: center; gap: 7px; height: 44px; min-width: 44px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: rgba(19, 17, 20, 0.78); color: #ede8e0; font: 600 14px var(--font-body); cursor: pointer; white-space: nowrap; } /* fixed dark chip, light glyph in BOTH themes (like the exit x) */
+.fs-btn:hover, .fs-btn[aria-expanded="true"] { border-color: var(--accent); }
+.fs-bpm { color: #b9b0a4; font-variant-numeric: tabular-nums; }
+.fs-bpm::before { content: '\00b7'; margin-right: 6px; }
+.fs-met.on { color: var(--accent); border-color: var(--accent); }
+.fs-met.tick { box-shadow: 0 0 0 3px var(--accent-line); }
+.fs-host > .ctxbar { position: absolute; top: calc(64px + env(safe-area-inset-top, 0px)); left: calc(12px + env(safe-area-inset-left, 0px)); right: auto; z-index: 214; max-width: min(720px, calc(100% - 24px)); max-height: calc(100% - 80px); }
+.fs-host > .ctxbar .cx-go { display: none; } /* "Use it on" would leave full screen */
+@media (max-width: 640px) { .fs-host > .ctxbar { right: calc(12px + env(safe-area-inset-right, 0px)); } .fs-btn { padding: 0 11px; } }

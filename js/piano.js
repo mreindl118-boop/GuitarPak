@@ -810,8 +810,28 @@
     if (els.status) els.status.textContent = msg || '';
   }
 
+  // ONE METRONOME: the runner's Click is the app's metronome (metronome.js
+  // App.metronome.link) - its own tick only sounds when that cannot run
+  var ppMet = null;
+  function ppLink() {
+    if (!ppMet && App.metronome && App.metronome.link) {
+      ppMet = App.metronome.link({
+        running: function () { return pp.running; },
+        wantClick: function () { return pp.click; },
+        setClick: function (on) {
+          pp.click = on;
+          App.store.set('pn.pr.click', on);
+          var c = document.getElementById('pn-click');
+          if (c) c.checked = on;
+        }
+      });
+    }
+    return ppMet;
+  }
+  function ppOwnTick() { var l = ppLink(); return l ? l.own() : pp.click; }
+
   function ppRestClick(t) {
-    if (!pp.click) return;
+    if (!ppOwnTick()) return;
     var o = pp.ctx.createOscillator(), gn = pp.ctx.createGain();
     o.type = 'sine';
     o.frequency.value = 1150;
@@ -849,6 +869,7 @@
           continue;
         }
       }
+      if (ppMet) pp.nextT = ppMet.lock(pp.nextT, pp.bpm, pp.idx % pp.rate === 0); // stay on the click's beat
       var node = pp.path[pp.seq[pp.idx % pp.seq.length]];
       var when = pp.nextT - pp.ctx.currentTime;
       var spn = 60 / pp.bpm / pp.rate;
@@ -856,7 +877,7 @@
         var dur = Math.max(0.5, Math.min(1.7, spn * 1.5));
         play(node.midi, when, dur, pp.idx % (pp.rate > 1 ? pp.rate : 4) === 0 ? 0.55 : 0.42);
       }
-      if (pp.click) {
+      if (ppOwnTick()) {
         var o = pp.ctx.createOscillator(), gn = pp.ctx.createGain();
         o.type = 'sine';
         o.frequency.value = 1150;
@@ -938,6 +959,35 @@
     if (els.playBtn) {
       els.playBtn.innerHTML = running ? App.icon('pause', 14) + ' Pause' : App.icon('play', 14) + ' Play';
     }
+    var m = document.getElementById('pn-playmax'); // full-screen twin
+    if (m) { m.innerHTML = App.icon(running ? 'pause' : 'play', 17); m.classList.toggle('on', !!running); }
+  }
+
+  // ---- FULL SCREEN (2.3, like the neck's): the keyboard alone, with the
+  // exit x, the exercise's Play and the app's key chip + metronome
+  // (App.fullDock). A CSS overlay always; native full screen on top where
+  // the browser allows it. ----
+  var maxMode = false, usedNativeFs = false;
+  function setMax(on) {
+    on = !!on;
+    if (on === maxMode) return;
+    maxMode = on;
+    var card = document.querySelector('.pn-card');
+    if (!card) return;
+    card.classList.toggle('pn-max', on);
+    var b = document.getElementById('pn-max');
+    if (b) { b.innerHTML = App.icon(on ? 'close' : 'expand', 14); b.title = on ? 'Exit full screen' : 'Full screen'; }
+    document.body.style.overflow = on ? 'hidden' : '';
+    if (App.fullDock) { if (on) App.fullDock.enter(card); else App.fullDock.exit(card); }
+    if (on) {
+      if (card.requestFullscreen) {
+        card.requestFullscreen().then(function () { usedNativeFs = true; }).catch(function () { usedNativeFs = false; });
+      }
+    } else {
+      usedNativeFs = false;
+      if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(function () {});
+    }
+    setTimeout(function () { scrollToWindow(); }, 60); // the keys changed size
   }
 
   // ---- Guide mode: the app shows the note (screen ring + bright LED, next
@@ -1013,6 +1063,7 @@
     pp.vis.length = 0;
     pp.pausedAtIdx = -1;
     pp.nextT = pp.ctx.currentTime + 0.15;
+    if (ppLink()) pp.nextT = ppMet.begin(pp.nextT); // join / start the one metronome
     if (pp.pause > 0 && pp.idx % pp.seq.length === 0 &&
         (pp.pausePos === 'start' || pp.pausePos === 'both')) {
       var b0 = 60 / pp.bpm;
@@ -1035,6 +1086,7 @@
     if (pp.timer) { clearInterval(pp.timer); pp.timer = null; }
     if (pp.raf) { cancelAnimationFrame(pp.raf); pp.raf = 0; }
     pp.running = false;
+    if (ppMet) ppMet.end(); // the click stops with the run it started
     pp.vis.length = 0;
     App.wake.release('pn-run');
     ledClear();
@@ -1301,6 +1353,23 @@
       '.pn-key.pn-hit-meh{stroke:#ffd166 !important;stroke-width:5 !important}' +
       '.pn-key.pn-hit-bad{stroke:#ff5d5d !important;stroke-width:5 !important;fill:#ff8f8f !important}' +
       '#panel-synth #pn-lessons{display:none}' +
+      // FULL SCREEN: the keyboard only, big; exit x + Play top right, the
+      // key chip + metronome top left (app.js .fs-dock)
+      '.pn-card.pn-max{position:fixed;inset:0;z-index:200;margin:0;border-radius:0;display:flex;flex-direction:column;justify-content:center;' +
+        'padding:calc(68px + env(safe-area-inset-top,0px)) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px);overflow:hidden}' +
+      '.pn-card.pn-max>:not(.pn-stage):not(.pn-maxbtn):not(.fs-dock):not(.ctxbar){display:none!important}' +
+      '.pn-card.pn-max .pn-stage{flex:0 1 auto;min-height:0}' +
+      // about two octaves across the screen (29 white keys drawn), never
+      // taller than 64% of it (the drawing is ~6:1)
+      '.pn-card.pn-max .pn-stage:not(.pn-v) svg{width:min(193vw,381vh);width:min(193vw,381dvh);height:auto}' +
+      '.pn-card.pn-max .pn-stage.pn-v{flex:1 1 auto;overflow-y:auto;align-items:flex-start}' +
+      '.pn-card.pn-max .pn-stage.pn-v svg{width:min(560px,94%)}' +
+      '.pn-maxbtn{display:none;position:absolute;top:calc(12px + env(safe-area-inset-top,0px));right:calc(12px + env(safe-area-inset-right,0px));z-index:210;width:44px;height:44px;' +
+        'align-items:center;justify-content:center;border-radius:50%;border:1px solid var(--line);background:rgba(19,17,20,0.72);color:#ede8e0;cursor:pointer}' +
+      '.pn-maxbtn:hover{border-color:var(--accent)}' +
+      '.pn-card.pn-max .pn-maxbtn{display:flex}' +
+      '.pn-playmax{right:calc(64px + env(safe-area-inset-right,0px));color:var(--accent)}' +
+      '.pn-playmax.on{border-color:var(--accent)}' +
       '.pn-range{fill:var(--accent);opacity:.85}.pn-rangel{font:600 10.5px var(--font-body);fill:var(--accent)}' +
       '#pn-assist button{min-width:0}' +
       // Voice / Strum: the label sits beside its control, not above it
@@ -1341,6 +1410,7 @@
               '<select id="pn-voice"><option value="piano">Grand piano</option></select></label>' +
             '<button type="button" class="btn sm" id="pn-qwmap" title="Remap which computer key plays which note">Remap</button>' +
             '<button type="button" class="btn sm" id="pn-rotate" title="Rotate the keyboard (portrait / landscape)" aria-label="Rotate the keyboard">' + App.icon('rotate', 14) + '</button>' +
+            '<button type="button" class="btn sm" id="pn-max" title="Full screen" aria-label="Full screen keyboard">' + App.icon('expand', 14) + '</button>' +
           '</span>' +
         '</div>' +
         '<div class="row tight" id="pn-perf" style="margin-top:10px">' +
@@ -1421,6 +1491,8 @@
           '<span class="muted small" id="pn-status"></span>' +
         '</div>' +
         '<div class="pn-stage" id="pn-stage"></div>' +
+        '<button type="button" class="pn-maxbtn" id="pn-exitmax" title="Exit full screen" aria-label="Exit full screen">' + App.icon('close', 17) + '</button>' +
+        '<button type="button" class="pn-maxbtn pn-playmax" id="pn-playmax" title="Play / pause the exercise" aria-label="Play or pause the practice exercise">' + App.icon('play', 17) + '</button>' +
         '<div class="row tight pn-legend" id="pn-legend"></div>' +
         '<div class="muted small pn-foot" style="margin-top:10px">Tap<span class="pn-tyhint">, type (home row = white keys, Z / X = octave)</span> or play a MIDI keyboard.</div>' +
       '</div>' +
@@ -1594,6 +1666,14 @@
       render();
     });
 
+    document.getElementById('pn-max').addEventListener('click', function () { setMax(!maxMode); });
+    document.getElementById('pn-exitmax').addEventListener('click', function () { setMax(false); });
+    document.getElementById('pn-playmax').addEventListener('click', function () { ppToggle(); });
+    document.addEventListener('fullscreenchange', function () {
+      // system back / Esc leaves native full screen: drop the overlay with it
+      if (!document.fullscreenElement && maxMode && usedNativeFs) setMax(false);
+    });
+
     document.getElementById('pn-rotate').addEventListener('click', function () {
       state.orient = state.orient === 'h' ? 'v' : 'h';
       App.store.set('pn.orient', state.orient);
@@ -1706,6 +1786,7 @@
     clickChk.addEventListener('change', function () {
       pp.click = !!this.checked;
       App.store.set('pn.pr.click', pp.click);
+      if (ppLink()) ppMet.toggle(pp.click, pp.running ? pp.nextT + ((pp.rate - pp.idx % pp.rate) % pp.rate) * 60 / pp.bpm / pp.rate : 0); // first click on the run's next beat
     });
 
     els.playBtn.addEventListener('click', ppToggle);
@@ -1864,6 +1945,7 @@
   }
 
   function onHide() {
+    if (maxMode) setMax(false);
     ppPause();      // exercise pauses (keeps its place) when leaving the tab
     ppHeld = false; // leaving is not a remote pause: NEXT is the lessons' again
     if (App.keysLessons) App.keysLessons.stop(); // a lesson run ends (unscored)
