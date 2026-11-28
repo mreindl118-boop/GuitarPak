@@ -5,7 +5,7 @@
 // live app, the 1.x 'guitarlab-*' caches it replaces.
 var BETA = /\/next\/$/.test(self.registration.scope);
 var PREFIX = BETA ? 'sl2-next-' : 'sl2-live-';
-var CACHE = PREFIX + 'v7';
+var CACHE = PREFIX + 'v8';
 var ASSETS = [
   '.',
   'index.html',
@@ -65,6 +65,7 @@ var ASSETS = [
   'js/lumi-practice.js',
   'js/xp.js',
   'js/quiz.js',
+  'js/practicesession.js',
   'js/practiceplan.js',
   'js/helix.js',
   'js/help.js',
