@@ -452,6 +452,23 @@ js/practiceplan.js PRACTICE PLAN ('practiceplan', Learn group pill "Plan",
                   pp.active / pp.sessions (90 days) / pp.history / pp.running
                   / pp.gaps. App.practicePlan test hook. Suite
                   tests/practiceplan.test.js.
+js/practicesession.js PRACTICE SESSION (v2 beta, prefix ps-, store ps.*; docs/
+                  PRACTICE-SESSION.md): NOT a page - the first card of Learn >
+                  Plan (#ps-card, mounted by practiceplan.js), a countdown chip
+                  #ps-chip in the top bar while a block runs, and the check-in
+                  dialog #ps-check. Pick Guitar/Keys/Bass/Voice (one or more) +
+                  minutes; the time splits evenly into parts, ONE instrument
+                  after the other; Voice is the only add-on ("Sing with
+                  <instrument>" = a sing-and-play part). Blocks open their tool
+                  already set up (Learn category, fb:set / tempo / fb:practice,
+                  switchTo) with a one-line App.toast hint. Keys blocks = the
+                  accepted teacher plan's piano items via App.practicePlan.
+                  launch (measured completion kept). Alarm repeats until the
+                  check-in is touched (ps.sound). Nothing starts at boot; a
+                  reload brings a running block back paused. ps.log[day] 90
+                  days. Hook App.practiceSession / SLSession; suite
+                  tests/practicesession.test.js. Loaded right before
+                  practiceplan.js.
 js/help.js        (?) button + guided page tours (TOURS per page id, spotlight
                   ring + card overlay, first-run welcome; help.seen/help.done)
 js/plugins.js     window.SoundLab plugin API v1: registerPage (App.addPage),
